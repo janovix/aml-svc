@@ -17,7 +17,8 @@
 		"publish": true
 	},
 	"dependencies": {
-		"chanfana": "2.8.3",
+		"@prisma/adapter-d1": "^6.17.1",
+		"@prisma/client": "^6.17.1",
 		"hono": "4.10.7",
 		"zod": "3.25.67"
 	},
@@ -44,7 +45,8 @@
 		"typescript-eslint": "8.49.0",
 		"typescript": "5.9.3",
 		"vitest": "3.2.4",
-		"wrangler": "4.51.0"
+		"wrangler": "4.51.0",
+		"prisma": "^6.17.1"
 	},
 	"private": true,
 	"scripts": {
@@ -62,7 +64,7 @@
 		"predeploy:preview": "wrangler d1 migrations apply DB --remote --config wrangler.preview.jsonc",
 		"versions:upload": "node ./scripts/versions-upload.mjs",
 		"prepare": "husky",
-		"schema": "npx chanfana",
+		"prisma:generate": "prisma generate",
 		"seedLocalDb": "wrangler d1 migrations apply DB --local",
 		"release": "semantic-release",
 		"typecheck": "tsc -p tsconfig.json && tsc -p tests/tsconfig.json",
