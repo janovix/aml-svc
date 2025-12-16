@@ -3,8 +3,9 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { prettyJSON } from "hono/pretty-json";
 import pkg from "../package.json";
-import { getOpenApiInfo, getScalarHtml, type AppMeta } from "./app-meta";
+import { getScalarHtml, type AppMeta } from "./app-meta";
 import { errorHandler } from "./middleware/error";
+import { openAPISpec } from "./openapi";
 import { createRouter } from "./routes";
 
 export type Bindings = {
@@ -61,12 +62,7 @@ app.get("/healthz", (c) => {
 });
 
 app.get("/openapi.json", (c) => {
-	const openApiInfo = getOpenApiInfo(appMeta);
-	return c.json({
-		openapi: "3.1.0",
-		info: openApiInfo,
-		paths: {},
-	});
+	return c.json(openAPISpec);
 });
 
 app.get("/docsz", (c) => {
