@@ -1,3 +1,11 @@
+# [1.1.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.0.0...v1.1.0-rc.1) (2025-12-16)
+
+
+### Features
+
+* Add OpenAPI specification and routes ([efd5b63](https://github.com/janovix/aml-svc/commit/efd5b63eb61df22166392a458bcf3fab0e1eb7cf))
+* Add prisma generate to CI and pre-commit hook ([78563fb](https://github.com/janovix/aml-svc/commit/78563fb1623a54d61de614004b1d00ac8942e058))
+
 # 1.0.0 (2025-12-16)
 
 
