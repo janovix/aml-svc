@@ -1,0 +1,202 @@
+// Prisma schema for AML Core KYC domain
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum PersonType {
+  PHYSICAL
+  MORAL
+  TRUST
+}
+
+enum DocumentType {
+  PASSPORT
+  NATIONAL_ID
+  DRIVERS_LICENSE
+  TAX_ID
+  PROOF_OF_ADDRESS
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum AddressType {
+  RESIDENTIAL
+  BUSINESS
+  MAILING
+  OTHER
+}
+
+enum TransactionOperationType {
+  PURCHASE
+  SALE
+}
+
+enum TransactionVehicleType {
+  LAND
+  MARINE
+  AIR
+}
+
+model Client {
+  id                String     @id @default(uuid())
+  personType        PersonType
+  firstName         String?
+  lastName          String?
+  secondLastName    String?
+  birthDate         DateTime?
+  curp              String?
+  businessName      String?
+  incorporationDate DateTime?
+  rfc               String
+  nationality       String?
+  email             String
+  phone             String
+  country           String
+  stateCode         String
+  city              String
+  municipality      String
+  neighborhood      String
+  street            String
+  externalNumber    String
+  internalNumber    String?
+  postalCode        String
+  reference         String?
+  notes             String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  deletedAt         DateTime?
+
+  documents ClientDocument[]
+  addresses ClientAddress[]
+  transactions Transaction[]
+
+  @@map("clients")
+  @@index([rfc])
+  @@index([personType])
+  @@index([deletedAt])
+}
+
+model ClientDocument {
+  id             String         @id @default(uuid())
+  clientId       String
+  documentType   DocumentType
+  documentNumber String
+  issuingCountry String?
+  issueDate      DateTime?
+  expiryDate     DateTime?
+  status         DocumentStatus @default(PENDING)
+  fileUrl        String?
+  metadata       String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("client_documents")
+  @@index([clientId])
+  @@index([documentType])
+  @@index([status])
+  @@index([expiryDate])
+}
+
+model ClientAddress {
+  id          String      @id @default(uuid())
+  clientId    String
+  addressType AddressType @default(RESIDENTIAL)
+  street1     String
+  street2     String?
+  city        String
+  state       String?
+  postalCode  String?
+  country     String
+  isPrimary   Boolean     @default(false)
+  verifiedAt  DateTime?
+  reference   String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("client_addresses")
+  @@index([clientId])
+  @@index([addressType])
+  @@index([country])
+}
+
+model Catalog {
+  id        String        @id @default(uuid())
+  key       String        @unique
+  name      String
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  items CatalogItem[]
+
+  @@map("catalogs")
+  @@index([active])
+}
+
+model CatalogItem {
+  id             String   @id @default(uuid())
+  catalogId      String
+  name           String
+  normalizedName String
+  active         Boolean  @default(true)
+  metadata       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  catalog Catalog @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+
+  @@map("catalog_items")
+  @@index([catalogId])
+  @@index([normalizedName])
+  @@index([active])
+}
+
+model Transaction {
+  id                String                     @id @default(uuid())
+  clientId          String
+  operationDate     DateTime
+  operationType     TransactionOperationType
+  branchPostalCode  String
+  vehicleType       TransactionVehicleType
+  brandId           String
+  model             String
+  year              Int
+  serialNumber      String
+  armorLevel        String?
+  engineNumber      String?
+  plates            String?
+  registrationNumber String?
+  flagCountryId     String?
+  amount            Decimal
+  currency          String
+  paymentMethod     String
+  paymentDate       DateTime
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  deletedAt         DateTime?
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+  @@index([clientId])
+  @@index([operationDate])
+  @@index([operationType])
+  @@index([vehicleType])
+}
