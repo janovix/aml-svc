@@ -29,8 +29,8 @@ export const errorHandler = (err: Error, c: Context) => {
 	// Default error response
 	return c.json(
 		{
-			error: "InternalServerError",
-			message: "An unexpected error occurred",
+			success: false,
+			errors: [{ code: 7000, message: "Internal Server Error" }],
 		},
 		500,
 	);
