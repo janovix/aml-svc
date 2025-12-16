@@ -1,3 +1,10 @@
+# 1.0.0 (2025-12-16)
+
+
+### Bug Fixes
+
+* formatting issues ([3395147](https://github.com/janovix/aml-svc/commit/3395147217747064bdca619d4e55fe1f1ce03e68))
+
 # [1.1.0](https://github.com/algtools/backend-template/compare/v1.0.0...v1.1.0) (2025-12-14)
 
 
