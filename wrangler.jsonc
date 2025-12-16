@@ -1,0 +1,23 @@
+{
+	"compatibility_date": "2025-10-08",
+	"main": "src/index.ts",
+	"name": "aml-svc",
+	"upload_source_maps": true,
+	"workers_dev": true,
+	"observability": {
+		"enabled": true,
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "aml-dev",
+			"database_id": "85733cc4-1779-4b2e-9b22-82b85c3e7825",
+		},
+	],
+	"kv_namespaces": [
+		{
+			"binding": "TASKS_KV",
+			"id": "0f38527170fc41f09a967265ca262e19",
+		},
+	],
+}
