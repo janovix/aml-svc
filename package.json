@@ -63,6 +63,7 @@
 		"predeploy:dev": "wrangler d1 migrations apply DB --remote --config wrangler.jsonc",
 		"predeploy:preview": "wrangler d1 migrations apply DB --remote --config wrangler.preview.jsonc",
 		"versions:upload": "node ./scripts/versions-upload.mjs",
+		"postinstall": "prisma generate",
 		"prepare": "husky",
 		"prisma:generate": "prisma generate",
 		"seedLocalDb": "wrangler d1 migrations apply DB --local",
