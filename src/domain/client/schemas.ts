@@ -45,14 +45,71 @@ const dateOnlyString = z
 	.refine((value) => !Number.isNaN(Date.parse(value)), "Invalid date value")
 	.transform((value) => new Date(value).toISOString().split("T")[0]);
 
-const isoString = z.string().datetime({ offset: true });
+// More flexible ISO datetime that accepts partial formats
+const isoString = z
+	.string()
+	.transform((value) => {
+		// Handle partial datetime formats like "2025-09-19T14:06"
+		if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+			return `${value}:00Z`;
+		}
+		// Handle date-only formats
+		if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+			return `${value}T00:00:00Z`;
+		}
+		// Handle datetime without seconds: "2025-09-19T14:06:00"
+		if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(value)) {
+			return `${value}Z`;
+		}
+		return value;
+	})
+	.refine(
+		(value) => {
+			try {
+				const date = new Date(value);
+				return !isNaN(date.getTime()) && value.includes("T");
+			} catch {
+				return false;
+			}
+		},
+		{ message: "Invalid ISO datetime" },
+	)
+	.transform((value) => {
+		// Ensure it's a valid ISO string
+		const date = new Date(value);
+		return date.toISOString();
+	});
+
+// Country name to code mapping (common cases)
+const COUNTRY_NAME_TO_CODE: Record<string, string> = {
+	méxico: "MX",
+	mexico: "MX",
+	mex: "MX",
+	"estados unidos": "US",
+	"united states": "US",
+	usa: "US",
+	canadá: "CA",
+	canada: "CA",
+};
 
 const AddressSchema = z.object({
 	country: z
 		.string()
 		.min(2)
-		.max(2)
-		.transform((value) => value.toUpperCase()),
+		.transform((value) => {
+			const trimmed = value.trim();
+			// If it's already a 2-character code, return it uppercase
+			if (trimmed.length === 2) {
+				return trimmed.toUpperCase();
+			}
+			// Try to map country name to code
+			const normalized = trimmed.toLowerCase();
+			return COUNTRY_NAME_TO_CODE[normalized] || trimmed.toUpperCase();
+		})
+		.refine(
+			(value) => value.length === 2,
+			"Country must be a 2-character ISO code (e.g., MX, US)",
+		),
 	stateCode: z
 		.string()
 		.min(2)
@@ -98,7 +155,24 @@ const validateRFC = (personType: "physical" | "moral" | "trust") => {
 		);
 };
 
-const CommonSchema = z
+// Common schema with optional nationality (for moral/trust)
+const CommonSchemaBase = z
+	.object({
+		rfc: z.string(), // Will be validated in the merged schemas based on personType
+		nationality: z
+			.string()
+			.min(2)
+			.max(3)
+			.transform((value) => value.toUpperCase())
+			.optional()
+			.nullable(),
+		notes: z.string().max(500).optional().nullable(),
+	})
+	.merge(AddressSchema)
+	.merge(ContactSchema);
+
+// Common schema with required nationality (for physical persons)
+const CommonSchemaPhysical = z
 	.object({
 		rfc: z.string(), // Will be validated in the merged schemas based on personType
 		nationality: z
@@ -148,37 +222,41 @@ const TrustDetailsSchema = z.object({
 });
 
 // Base schemas without RFC validation (for updates)
-const ClientPhysicalBaseSchema = CommonSchema.merge(PhysicalDetailsSchema);
-const ClientMoralBaseSchema = CommonSchema.merge(MoralDetailsSchema);
-const ClientTrustBaseSchema = CommonSchema.merge(TrustDetailsSchema);
+const ClientPhysicalBaseSchema = CommonSchemaPhysical.merge(
+	PhysicalDetailsSchema,
+);
+const ClientMoralBaseSchema = CommonSchemaBase.merge(MoralDetailsSchema);
+const ClientTrustBaseSchema = CommonSchemaBase.merge(TrustDetailsSchema);
 
 // Merge schemas and add RFC validation based on personType
 export const ClientPhysicalSchema = ClientPhysicalBaseSchema.merge(
 	z.object({
 		rfc: validateRFC("physical"),
 	}),
-).refine((data) => data.personType === "physical");
+);
 
 export const ClientMoralSchema = ClientMoralBaseSchema.merge(
 	z.object({
 		rfc: validateRFC("moral"),
 	}),
-).refine((data) => data.personType === "moral");
+);
 
 export const ClientTrustSchema = ClientTrustBaseSchema.merge(
 	z.object({
 		rfc: validateRFC("trust"),
 	}),
-).refine((data) => data.personType === "trust");
+);
 
-export const ClientCreateSchema = z.union([
+// Use discriminated union for better error messages and type discrimination
+export const ClientCreateSchema = z.discriminatedUnion("personType", [
 	ClientPhysicalSchema,
 	ClientMoralSchema,
 	ClientTrustSchema,
 ]);
 
 // Update schema: RFC cannot be changed, so we omit it from base schemas
-export const ClientUpdateSchema = z.union([
+// Use discriminated union for better error messages
+export const ClientUpdateSchema = z.discriminatedUnion("personType", [
 	ClientPhysicalBaseSchema.omit({ rfc: true }),
 	ClientMoralBaseSchema.omit({ rfc: true }),
 	ClientTrustBaseSchema.omit({ rfc: true }),
