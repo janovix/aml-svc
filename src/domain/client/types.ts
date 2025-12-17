@@ -1,5 +1,6 @@
 export interface ClientEntity {
-	id: string;
+	id: string; // RFC is now the ID
+	rfc: string; // Keep RFC field for backward compatibility/API clarity
 	personType: "physical" | "moral" | "trust";
 	firstName?: string;
 	lastName?: string;
@@ -8,7 +9,6 @@ export interface ClientEntity {
 	curp?: string | null;
 	businessName?: string | null;
 	incorporationDate?: string | null;
-	rfc: string;
 	nationality?: string | null;
 	email: string;
 	phone: string;

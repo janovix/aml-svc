@@ -166,7 +166,8 @@ export const openAPISpec = {
 						in: "path",
 						required: true,
 						schema: { type: "string" },
-						description: "Client identifier",
+						description:
+							"Client RFC (Registro Federal de Contribuyentes) - Primary key",
 					},
 				],
 				responses: {
@@ -987,7 +988,11 @@ export const openAPISpec = {
 						format: "date-time",
 						nullable: true,
 					},
-					rfc: { type: "string" },
+					rfc: {
+						type: "string",
+						description:
+							"RFC (Registro Federal de Contribuyentes). 13 characters for physical persons, 12 characters for legal entities (moral/trust). Cannot be changed after creation.",
+					},
 					nationality: { type: "string", nullable: true },
 					email: { type: "string", format: "email" },
 					phone: { type: "string" },
@@ -1041,7 +1046,14 @@ export const openAPISpec = {
 					secondLastName: { type: "string", nullable: true },
 					birthDate: { type: "string", format: "date" },
 					curp: { type: "string" },
-					rfc: { type: "string" },
+					rfc: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{4}\\d{6}[A-Z0-9]{3}$",
+						minLength: 13,
+						maxLength: 13,
+						description:
+							"RFC for physical persons - must be exactly 13 characters",
+					},
 					nationality: { type: "string" },
 					email: { type: "string", format: "email" },
 					phone: { type: "string" },
@@ -1080,7 +1092,14 @@ export const openAPISpec = {
 					personType: { const: "moral" },
 					businessName: { type: "string" },
 					incorporationDate: { type: "string", format: "date-time" },
-					rfc: { type: "string" },
+					rfc: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$",
+						minLength: 12,
+						maxLength: 12,
+						description:
+							"RFC for legal entities (moral) - must be exactly 12 characters",
+					},
 					nationality: { type: "string" },
 					email: { type: "string", format: "email" },
 					phone: { type: "string" },
@@ -1119,7 +1138,13 @@ export const openAPISpec = {
 					personType: { const: "trust" },
 					businessName: { type: "string" },
 					incorporationDate: { type: "string", format: "date-time" },
-					rfc: { type: "string" },
+					rfc: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$",
+						minLength: 12,
+						maxLength: 12,
+						description: "RFC for trusts - must be exactly 12 characters",
+					},
 					nationality: { type: "string" },
 					email: { type: "string", format: "email" },
 					phone: { type: "string" },
@@ -1152,7 +1177,7 @@ export const openAPISpec = {
 						format: "date-time",
 						nullable: true,
 					},
-					rfc: { type: "string" },
+					// RFC is intentionally omitted - it cannot be changed after creation
 					nationality: { type: "string" },
 					email: { type: "string", format: "email" },
 					phone: { type: "string" },
@@ -1188,8 +1213,7 @@ export const openAPISpec = {
 					},
 					clientId: {
 						type: "string",
-						pattern: "^[A-Za-z0-9-]{1,64}$",
-						description: "FK to the owning client (UUID or deterministic ID)",
+						description: "FK to the owning client (RFC - Primary key)",
 					},
 					documentType: {
 						type: "string",
@@ -1294,8 +1318,7 @@ export const openAPISpec = {
 					},
 					clientId: {
 						type: "string",
-						pattern: "^[A-Za-z0-9-]{1,64}$",
-						description: "FK to the owning client (UUID or deterministic ID)",
+						description: "FK to the owning client (RFC - Primary key)",
 					},
 					addressType: {
 						type: "string",

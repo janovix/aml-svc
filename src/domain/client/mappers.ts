@@ -116,7 +116,7 @@ function basePrismaPayload(input: ClientCreateInput | ClientUpdateInput) {
 		curp: normalizeOptional(input.curp),
 		businessName: normalizeOptional(input.businessName),
 		incorporationDate: toPrismaDate(input.incorporationDate),
-		rfc: input.rfc,
+		rfc: "rfc" in input ? input.rfc.toUpperCase() : undefined,
 		nationality: normalizeOptional(input.nationality),
 		email: input.email,
 		phone: input.phone,
@@ -135,11 +135,20 @@ function basePrismaPayload(input: ClientCreateInput | ClientUpdateInput) {
 }
 
 export function mapCreateInputToPrisma(input: ClientCreateInput) {
-	return basePrismaPayload(input);
+	const payload = basePrismaPayload(input);
+	// RFC is now the primary key, so we use it as the id
+	return {
+		...payload,
+		rfc: input.rfc.toUpperCase(),
+	};
 }
 
 export function mapUpdateInputToPrisma(input: ClientUpdateInput) {
-	return basePrismaPayload(input);
+	// RFC is not in update input (cannot be changed), so we use base payload without RFC
+	const payload = basePrismaPayload(input as ClientCreateInput);
+	// Remove RFC from update payload since it's the primary key and cannot be changed
+	const { rfc: _rfc, ...rest } = payload;
+	return rest;
 }
 
 export function mapPatchInputToPrisma(input: ClientPatchInput) {
@@ -149,13 +158,13 @@ export function mapPatchInputToPrisma(input: ClientPatchInput) {
 		payload.personType = toPrismaPersonType(input.personType);
 	}
 
+	// RFC is intentionally omitted - it cannot be changed after creation
 	const passthroughKeys: (keyof ClientPatchInput)[] = [
 		"firstName",
 		"lastName",
 		"secondLastName",
 		"curp",
 		"businessName",
-		"rfc",
 		"nationality",
 		"email",
 		"phone",
@@ -196,8 +205,10 @@ export function mapPrismaClient(
 		addresses?: PrismaClientAddressModel[];
 	},
 ): ClientEntity {
+	// RFC is now the primary key, so id = rfc
 	return {
-		id: record.id,
+		id: record.rfc,
+		rfc: record.rfc,
 		personType: fromPrismaPersonType(record.personType),
 		firstName: record.firstName ?? undefined,
 		lastName: record.lastName ?? undefined,
@@ -206,7 +217,6 @@ export function mapPrismaClient(
 		curp: record.curp ?? null,
 		businessName: record.businessName ?? null,
 		incorporationDate: mapDateTime(record.incorporationDate),
-		rfc: record.rfc,
 		nationality: record.nationality ?? null,
 		email: record.email,
 		phone: record.phone,

@@ -51,7 +51,7 @@ enum TransactionVehicleType {
 }
 
 model Client {
-  id                String     @id @default(uuid())
+  rfc               String     @id
   personType        PersonType
   firstName         String?
   lastName          String?
@@ -60,7 +60,6 @@ model Client {
   curp              String?
   businessName      String?
   incorporationDate DateTime?
-  rfc               String
   nationality       String?
   email             String
   phone             String
@@ -84,7 +83,6 @@ model Client {
   transactions Transaction[]
 
   @@map("clients")
-  @@index([rfc])
   @@index([personType])
   @@index([deletedAt])
 }
@@ -103,7 +101,7 @@ model ClientDocument {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [rfc], onDelete: Cascade)
 
   @@map("client_documents")
   @@index([clientId])
@@ -128,7 +126,7 @@ model ClientAddress {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [rfc], onDelete: Cascade)
 
   @@map("client_addresses")
   @@index([clientId])
@@ -192,7 +190,7 @@ model Transaction {
   updatedAt         DateTime                   @updatedAt
   deletedAt         DateTime?
 
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [rfc], onDelete: Cascade)
 
   @@map("transactions")
   @@index([clientId])
