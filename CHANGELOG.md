@@ -1,3 +1,10 @@
+# [1.1.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.2...v1.1.0-rc.3) (2025-12-17)
+
+
+### Features
+
+* Set pnpm as package manager ([0f88525](https://github.com/janovix/aml-svc/commit/0f885258234c8c06a70761662f697bd97b527b14))
+
 # [1.1.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.1...v1.1.0-rc.2) (2025-12-17)
 
 
