@@ -12,6 +12,7 @@ import {
 	mapPrismaAddress,
 	mapPrismaClient,
 	mapPrismaDocument,
+	mapUpdateInputToPrisma,
 	toPrismaPersonType,
 } from "./mappers";
 import {
@@ -85,37 +86,45 @@ export class ClientRepository {
 	}
 
 	async getById(id: string): Promise<ClientEntity | null> {
+		// id is now RFC (primary key)
 		const record = await this.prisma.client.findFirst({
-			where: { id, deletedAt: null },
+			where: { rfc: id.toUpperCase(), deletedAt: null },
 		});
 		return record ? mapPrismaClient(record) : null;
 	}
 
 	async create(input: ClientCreateInput): Promise<ClientEntity> {
+		const prismaData = mapCreateInputToPrisma(input);
+		// RFC is the primary key, so we use it directly
 		const created = await this.prisma.client.create({
-			data: mapCreateInputToPrisma(input),
+			data: {
+				...prismaData,
+				rfc: prismaData.rfc, // RFC is the PK
+			},
 		});
 		return mapPrismaClient(created);
 	}
 
 	async update(id: string, input: ClientUpdateInput): Promise<ClientEntity> {
+		// id is now RFC (primary key)
 		await this.ensureExists(id);
 
 		const updated = await this.prisma.client.update({
-			where: { id },
-			data: mapCreateInputToPrisma(input),
+			where: { rfc: id.toUpperCase() },
+			data: mapUpdateInputToPrisma(input),
 		});
 
 		return mapPrismaClient(updated);
 	}
 
 	async patch(id: string, input: ClientPatchInput): Promise<ClientEntity> {
+		// id is now RFC (primary key)
 		await this.ensureExists(id);
 
 		const payload = mapPatchInputToPrisma(input) as Prisma.ClientUpdateInput;
 
 		const updated = await this.prisma.client.update({
-			where: { id },
+			where: { rfc: id.toUpperCase() },
 			data: payload,
 		});
 
@@ -123,10 +132,11 @@ export class ClientRepository {
 	}
 
 	async delete(id: string): Promise<void> {
+		// id is now RFC (primary key)
 		await this.ensureExists(id);
 
 		await this.prisma.client.update({
-			where: { id },
+			where: { rfc: id.toUpperCase() },
 			data: {
 				deletedAt: new Date(),
 			},
@@ -234,9 +244,10 @@ export class ClientRepository {
 	}
 
 	private async ensureExists(id: string): Promise<void> {
+		// id is now RFC (primary key)
 		const exists = await this.prisma.client.findFirst({
-			where: { id, deletedAt: null },
-			select: { id: true },
+			where: { rfc: id.toUpperCase(), deletedAt: null },
+			select: { rfc: true },
 		});
 
 		if (!exists) {

@@ -26,7 +26,9 @@ export const ADDRESS_TYPE_VALUES = [
 ] as const;
 export const AddressTypeSchema = z.enum(ADDRESS_TYPE_VALUES);
 
-const RFC_REGEX = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i;
+// RFC validation: Personas físicas (PHYSICAL) = 13 chars, Personas morales (MORAL/TRUST) = 12 chars
+const RFC_PHYSICAL_REGEX = /^[A-ZÑ&]{4}\d{6}[A-Z0-9]{3}$/i; // 13 characters
+const RFC_MORAL_REGEX = /^[A-ZÑ&]{3}\d{6}[A-Z0-9]{3}$/i; // 12 characters
 const CURP_REGEX = /^[A-Z][AEIOUX][A-Z]{2}\d{6}[HM][A-Z]{5}[A-Z0-9]{2}$/i;
 const PHONE_REGEX = /^[+\d][\d\s\-()]{5,}$/;
 const POSTAL_CODE_REGEX = /^\d{4,10}$/;
@@ -74,12 +76,31 @@ const ContactSchema = z.object({
 	phone: z.string().regex(PHONE_REGEX, "Invalid phone format"),
 });
 
+// RFC validation function based on person type
+const validateRFC = (personType: "physical" | "moral" | "trust") => {
+	return z
+		.string()
+		.transform((value) => value.toUpperCase())
+		.refine(
+			(value) => {
+				if (personType === "physical") {
+					return RFC_PHYSICAL_REGEX.test(value) && value.length === 13;
+				}
+				// MORAL or TRUST
+				return RFC_MORAL_REGEX.test(value) && value.length === 12;
+			},
+			{
+				message:
+					personType === "physical"
+						? "RFC for physical persons must be 13 characters"
+						: "RFC for legal entities must be 12 characters",
+			},
+		);
+};
+
 const CommonSchema = z
 	.object({
-		rfc: z
-			.string()
-			.regex(RFC_REGEX, "Invalid RFC")
-			.transform((value) => value.toUpperCase()),
+		rfc: z.string(), // Will be validated in the merged schemas based on personType
 		nationality: z
 			.string()
 			.min(2)
@@ -126,9 +147,29 @@ const TrustDetailsSchema = z.object({
 	curp: z.string().optional().nullable(),
 });
 
-export const ClientPhysicalSchema = CommonSchema.merge(PhysicalDetailsSchema);
-export const ClientMoralSchema = CommonSchema.merge(MoralDetailsSchema);
-export const ClientTrustSchema = CommonSchema.merge(TrustDetailsSchema);
+// Base schemas without RFC validation (for updates)
+const ClientPhysicalBaseSchema = CommonSchema.merge(PhysicalDetailsSchema);
+const ClientMoralBaseSchema = CommonSchema.merge(MoralDetailsSchema);
+const ClientTrustBaseSchema = CommonSchema.merge(TrustDetailsSchema);
+
+// Merge schemas and add RFC validation based on personType
+export const ClientPhysicalSchema = ClientPhysicalBaseSchema.merge(
+	z.object({
+		rfc: validateRFC("physical"),
+	}),
+).refine((data) => data.personType === "physical");
+
+export const ClientMoralSchema = ClientMoralBaseSchema.merge(
+	z.object({
+		rfc: validateRFC("moral"),
+	}),
+).refine((data) => data.personType === "moral");
+
+export const ClientTrustSchema = ClientTrustBaseSchema.merge(
+	z.object({
+		rfc: validateRFC("trust"),
+	}),
+).refine((data) => data.personType === "trust");
 
 export const ClientCreateSchema = z.union([
 	ClientPhysicalSchema,
@@ -136,10 +177,15 @@ export const ClientCreateSchema = z.union([
 	ClientTrustSchema,
 ]);
 
-export const ClientUpdateSchema = ClientCreateSchema;
+// Update schema: RFC cannot be changed, so we omit it from base schemas
+export const ClientUpdateSchema = z.union([
+	ClientPhysicalBaseSchema.omit({ rfc: true }),
+	ClientMoralBaseSchema.omit({ rfc: true }),
+	ClientTrustBaseSchema.omit({ rfc: true }),
+]);
 
+// Patch schema: RFC cannot be changed, so we omit it
 export const ClientPatchSchema = z.object({
-	id: ResourceIdSchema.optional(),
 	personType: PersonTypeSchema.optional(),
 	firstName: z.string().min(1).optional().nullable(),
 	lastName: z.string().min(1).optional().nullable(),
@@ -152,11 +198,7 @@ export const ClientPatchSchema = z.object({
 		.optional(),
 	businessName: z.string().min(3).optional().nullable(),
 	incorporationDate: isoString.optional().nullable(),
-	rfc: z
-		.string()
-		.regex(RFC_REGEX, "Invalid RFC")
-		.transform((value) => value.toUpperCase())
-		.optional(),
+	// RFC is intentionally omitted - it cannot be changed after creation
 	nationality: z
 		.string()
 		.min(2)
@@ -194,26 +236,59 @@ export const ClientPatchSchema = z.object({
 
 export const ClientFilterSchema = z.object({
 	search: z.string().min(2).max(100).optional(),
-	rfc: z.string().regex(RFC_REGEX, "Invalid RFC").optional(),
+	rfc: z
+		.string()
+		.refine(
+			(value) => RFC_PHYSICAL_REGEX.test(value) || RFC_MORAL_REGEX.test(value),
+			"Invalid RFC",
+		)
+		.optional(),
 	personType: PersonTypeSchema.optional(),
 	page: z.coerce.number().int().min(1).default(1),
 	limit: z.coerce.number().int().min(1).max(100).default(10),
 });
 
-export const ClientIdParamSchema = z.object({ id: ResourceIdSchema });
+// RFC is now the primary key, so we use it as the ID parameter
+export const ClientIdParamSchema = z.object({
+	id: z
+		.string()
+		.refine(
+			(value) => RFC_PHYSICAL_REGEX.test(value) || RFC_MORAL_REGEX.test(value),
+			"Invalid RFC format",
+		)
+		.transform((value) => value.toUpperCase()),
+});
 
 export const DocumentIdParamSchema = z.object({
-	clientId: ResourceIdSchema,
+	clientId: z
+		.string()
+		.refine(
+			(value) => RFC_PHYSICAL_REGEX.test(value) || RFC_MORAL_REGEX.test(value),
+			"Invalid RFC format",
+		)
+		.transform((value) => value.toUpperCase()),
 	documentId: ResourceIdSchema,
 });
 
 export const AddressIdParamSchema = z.object({
-	clientId: ResourceIdSchema,
+	clientId: z
+		.string()
+		.refine(
+			(value) => RFC_PHYSICAL_REGEX.test(value) || RFC_MORAL_REGEX.test(value),
+			"Invalid RFC format",
+		)
+		.transform((value) => value.toUpperCase()),
 	addressId: ResourceIdSchema,
 });
 
 export const ClientDocumentCreateSchema = z.object({
-	clientId: ResourceIdSchema,
+	clientId: z
+		.string()
+		.refine(
+			(value) => RFC_PHYSICAL_REGEX.test(value) || RFC_MORAL_REGEX.test(value),
+			"Invalid RFC format",
+		)
+		.transform((value) => value.toUpperCase()),
 	documentType: DocumentTypeSchema,
 	documentNumber: z.string().min(3),
 	issuingCountry: z
@@ -256,7 +331,13 @@ export const ClientDocumentPatchSchema = z
 	});
 
 export const ClientAddressCreateSchema = z.object({
-	clientId: z.string().uuid(),
+	clientId: z
+		.string()
+		.refine(
+			(value) => RFC_PHYSICAL_REGEX.test(value) || RFC_MORAL_REGEX.test(value),
+			"Invalid RFC format",
+		)
+		.transform((value) => value.toUpperCase()),
 	addressType: AddressTypeSchema.default("RESIDENTIAL"),
 	street1: z.string().min(1),
 	street2: z.string().optional().nullable(),
