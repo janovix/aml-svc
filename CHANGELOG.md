@@ -1,3 +1,10 @@
+# [1.1.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.1...v1.1.0-rc.2) (2025-12-17)
+
+
+### Features
+
+* Use RFC as primary key for clients ([118a3b1](https://github.com/janovix/aml-svc/commit/118a3b1fec2af345eadc4267a27bf6c9762ee8fd))
+
 # [1.1.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.0.0...v1.1.0-rc.1) (2025-12-16)
 
 
