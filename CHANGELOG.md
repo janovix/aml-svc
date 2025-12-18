@@ -1,3 +1,11 @@
+# [1.1.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.3...v1.1.0-rc.4) (2025-12-18)
+
+
+### Features
+
+* Add support for multiple payment methods per transaction ([a8fc89d](https://github.com/janovix/aml-svc/commit/a8fc89dc928a569b4f7ad17e922a4828bf3ac955))
+* Remove serialNumber from Transaction entity ([13043b1](https://github.com/janovix/aml-svc/commit/13043b10ada81feae4ee769f81d60bf30ec27a01))
+
 # [1.1.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.2...v1.1.0-rc.3) (2025-12-17)
 
 
