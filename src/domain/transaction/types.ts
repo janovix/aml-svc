@@ -26,7 +26,6 @@ export interface TransactionEntity {
 	flagCountryId: string | null;
 	amount: string;
 	currency: string;
-	paymentDate: string;
 	paymentMethods: PaymentMethod[];
 	createdAt: string;
 	updatedAt: string;

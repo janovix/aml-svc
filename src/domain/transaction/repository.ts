@@ -52,10 +52,12 @@ export class TransactionRepository {
 		if (startDate || endDate) {
 			const dateRange: Prisma.DateTimeFilter = {};
 			if (startDate) {
-				dateRange.gte = new Date(startDate);
+				// For date-only strings, set to start of day (00:00:00)
+				dateRange.gte = new Date(startDate + "T00:00:00.000Z");
 			}
 			if (endDate) {
-				dateRange.lte = new Date(endDate);
+				// For date-only strings, set to end of day (23:59:59.999)
+				dateRange.lte = new Date(endDate + "T23:59:59.999Z");
 			}
 			where.operationDate = dateRange;
 		}

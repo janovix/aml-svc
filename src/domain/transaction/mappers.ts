@@ -63,11 +63,23 @@ function normalizeNullable(value?: string | null): string | null {
 	return value ?? null;
 }
 
-function toPrismaDate(value: string | Date): Date {
+function toPrismaDateOnly(value: string | Date): Date {
 	if (value instanceof Date) {
 		return value;
 	}
-	return new Date(value);
+	// For date-only strings (YYYY-MM-DD), create a date at midnight UTC
+	return new Date(value + "T00:00:00.000Z");
+}
+
+function mapDateOnly(value: Date | string | null | undefined): string {
+	if (!value) {
+		return new Date().toISOString().split("T")[0];
+	}
+	if (value instanceof Date) {
+		return value.toISOString().split("T")[0];
+	}
+	// If it's already a date string, extract just the date part
+	return value.split("T")[0];
 }
 
 function mapDate(value: Date | string | null | undefined): string {
@@ -99,7 +111,7 @@ function toPrismaDecimal(value: string | number): Prisma.Decimal {
 export function mapCreateInputToPrisma(input: TransactionCreateInput) {
 	return {
 		clientId: input.clientId,
-		operationDate: toPrismaDate(input.operationDate),
+		operationDate: toPrismaDateOnly(input.operationDate),
 		operationType: toPrismaOperationType(input.operationType),
 		branchPostalCode: input.branchPostalCode,
 		vehicleType: toPrismaVehicleType(input.vehicleType),
@@ -113,7 +125,6 @@ export function mapCreateInputToPrisma(input: TransactionCreateInput) {
 		flagCountryId: normalizeNullable(input.flagCountryId),
 		amount: toPrismaDecimal(input.amount),
 		currency: input.currency,
-		paymentDate: toPrismaDate(input.paymentDate),
 		paymentMethods: {
 			create: input.paymentMethods.map((pm) => ({
 				method: pm.method,
@@ -125,7 +136,7 @@ export function mapCreateInputToPrisma(input: TransactionCreateInput) {
 
 export function mapUpdateInputToPrisma(input: TransactionUpdateInput) {
 	return {
-		operationDate: toPrismaDate(input.operationDate),
+		operationDate: toPrismaDateOnly(input.operationDate),
 		operationType: toPrismaOperationType(input.operationType),
 		branchPostalCode: input.branchPostalCode,
 		vehicleType: toPrismaVehicleType(input.vehicleType),
@@ -139,7 +150,6 @@ export function mapUpdateInputToPrisma(input: TransactionUpdateInput) {
 		flagCountryId: normalizeNullable(input.flagCountryId),
 		amount: toPrismaDecimal(input.amount),
 		currency: input.currency,
-		paymentDate: toPrismaDate(input.paymentDate),
 		paymentMethods: {
 			deleteMany: {},
 			create: input.paymentMethods.map((pm) => ({
@@ -168,7 +178,7 @@ export function mapPrismaTransaction(
 	return {
 		id: record.id,
 		clientId: record.clientId,
-		operationDate: mapDate(record.operationDate),
+		operationDate: mapDateOnly(record.operationDate),
 		operationType: fromPrismaOperationType(record.operationType),
 		branchPostalCode: record.branchPostalCode,
 		vehicleType: fromPrismaVehicleType(record.vehicleType),
@@ -182,7 +192,6 @@ export function mapPrismaTransaction(
 		flagCountryId: record.flagCountryId ?? null,
 		amount: record.amount.toFixed(2),
 		currency: record.currency,
-		paymentDate: mapDate(record.paymentDate),
 		paymentMethods: record.paymentMethods?.map(mapPrismaPaymentMethod) ?? [],
 		createdAt: mapDate(record.createdAt),
 		updatedAt: mapDate(record.updatedAt),

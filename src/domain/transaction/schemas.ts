@@ -17,6 +17,9 @@ const ResourceIdSchema = z
 	.regex(RESOURCE_ID_REGEX, "Invalid ID format");
 
 const IsoDateTimeSchema = z.string().datetime({ offset: true });
+const IsoDateSchema = z
+	.string()
+	.regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (expected YYYY-MM-DD)");
 
 const CurrencySchema = z
 	.string()
@@ -46,7 +49,7 @@ const PaymentMethodSchema = z.object({
 
 const BaseTransactionSchema = z.object({
 	clientId: ResourceIdSchema,
-	operationDate: IsoDateTimeSchema,
+	operationDate: IsoDateSchema,
 	operationType: OperationTypeSchema,
 	branchPostalCode: z.string().regex(POSTAL_CODE_REGEX, "Invalid postal code"),
 	brandId: z.string().min(1),
@@ -62,7 +65,6 @@ const BaseTransactionSchema = z.object({
 	paymentMethods: z
 		.array(PaymentMethodSchema)
 		.min(1, "At least one payment method is required"),
-	paymentDate: IsoDateTimeSchema,
 });
 
 const LandVehicleSchema = z.object({
@@ -163,15 +165,15 @@ export const TransactionFilterSchema = z
 		operationType: OperationTypeSchema.optional(),
 		vehicleType: VehicleTypeSchema.optional(),
 		branchPostalCode: z.string().regex(POSTAL_CODE_REGEX).optional(),
-		startDate: IsoDateTimeSchema.optional(),
-		endDate: IsoDateTimeSchema.optional(),
+		startDate: IsoDateSchema.optional(),
+		endDate: IsoDateSchema.optional(),
 		page: z.coerce.number().int().min(1).default(1),
 		limit: z.coerce.number().int().min(1).max(100).default(10),
 	})
 	.refine(
 		(data) => {
 			if (!data.startDate || !data.endDate) return true;
-			return new Date(data.startDate) <= new Date(data.endDate);
+			return data.startDate <= data.endDate;
 		},
 		{
 			message: "startDate must be before or equal to endDate",
@@ -190,7 +192,7 @@ export const PaymentMethodEntitySchema = z.object({
 export const TransactionEntitySchema = z.object({
 	id: ResourceIdSchema,
 	clientId: ResourceIdSchema,
-	operationDate: IsoDateTimeSchema,
+	operationDate: IsoDateSchema,
 	operationType: OperationTypeSchema,
 	branchPostalCode: z.string().regex(POSTAL_CODE_REGEX),
 	vehicleType: VehicleTypeSchema,
@@ -204,7 +206,6 @@ export const TransactionEntitySchema = z.object({
 	flagCountryId: z.string().nullable().optional(),
 	amount: z.string(),
 	currency: CurrencySchema,
-	paymentDate: IsoDateTimeSchema,
 	paymentMethods: z.array(PaymentMethodEntitySchema),
 	createdAt: IsoDateTimeSchema,
 	updatedAt: IsoDateTimeSchema,
