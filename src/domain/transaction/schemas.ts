@@ -56,7 +56,6 @@ const BaseTransactionSchema = z.object({
 		.max(120)
 		.transform((value) => value.trim()),
 	year: z.coerce.number().int().min(1900).max(2100),
-	serialNumber: z.string().min(5),
 	armorLevel: z.string().min(1).max(50).optional().nullable(),
 	amount: AmountSchema,
 	currency: CurrencySchema,
@@ -198,7 +197,6 @@ export const TransactionEntitySchema = z.object({
 	brandId: z.string().min(1),
 	model: z.string().min(1),
 	year: z.number().int(),
-	serialNumber: z.string().min(5),
 	armorLevel: z.string().nullable().optional(),
 	engineNumber: z.string().nullable().optional(),
 	plates: z.string().nullable().optional(),

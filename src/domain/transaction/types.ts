@@ -19,7 +19,6 @@ export interface TransactionEntity {
 	brandId: string;
 	model: string;
 	year: number;
-	serialNumber: string;
 	armorLevel: string | null;
 	engineNumber: string | null;
 	plates: string | null;

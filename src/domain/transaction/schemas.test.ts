@@ -11,7 +11,6 @@ function buildBasePayload(overrides: Record<string, unknown> = {}) {
 		brandId: "brand-001",
 		model: "Armored SUV",
 		year: 2023,
-		serialNumber: "SERIAL-XYZ",
 		armorLevel: null,
 		amount: "3500000.75",
 		currency: "MXN",

@@ -176,7 +176,6 @@ model Transaction {
   brandId           String
   model             String
   year              Int
-  serialNumber      String
   armorLevel        String?
   engineNumber      String?
   plates            String?
