@@ -160,12 +160,21 @@ const CommonSchemaBase = z
 	.object({
 		rfc: z.string(), // Will be validated in the merged schemas based on personType
 		nationality: z
-			.string()
-			.min(2)
-			.max(3)
-			.transform((value) => value.toUpperCase())
-			.optional()
-			.nullable(),
+			.union([
+				z
+					.string()
+					.transform((value) => value.toUpperCase())
+					.refine(
+						(value) => value.length === 2 || value.length === 3,
+						"Nationality must be a 2-character (ISO alpha-2) or 3-character (ISO alpha-3) code",
+					)
+					.refine(
+						(value) => /^[A-Z]{2,3}$/.test(value),
+						"Nationality must contain only uppercase letters",
+					),
+				z.null(),
+			])
+			.optional(),
 		notes: z.string().max(500).optional().nullable(),
 	})
 	.merge(AddressSchema)
@@ -177,9 +186,15 @@ const CommonSchemaPhysical = z
 		rfc: z.string(), // Will be validated in the merged schemas based on personType
 		nationality: z
 			.string()
-			.min(2)
-			.max(3)
-			.transform((value) => value.toUpperCase()),
+			.transform((value) => value.toUpperCase())
+			.refine(
+				(value) => value.length === 2 || value.length === 3,
+				"Nationality must be a 2-character (ISO alpha-2) or 3-character (ISO alpha-3) code",
+			)
+			.refine(
+				(value) => /^[A-Z]{2,3}$/.test(value),
+				"Nationality must contain only uppercase letters",
+			),
 		notes: z.string().max(500).optional().nullable(),
 	})
 	.merge(AddressSchema)
@@ -278,10 +293,20 @@ export const ClientPatchSchema = z.object({
 	incorporationDate: isoString.optional().nullable(),
 	// RFC is intentionally omitted - it cannot be changed after creation
 	nationality: z
-		.string()
-		.min(2)
-		.max(3)
-		.transform((value) => value.toUpperCase())
+		.union([
+			z
+				.string()
+				.transform((value) => value.toUpperCase())
+				.refine(
+					(value) => value.length === 2 || value.length === 3,
+					"Nationality must be a 2-character (ISO alpha-2) or 3-character (ISO alpha-3) code",
+				)
+				.refine(
+					(value) => /^[A-Z]{2,3}$/.test(value),
+					"Nationality must contain only uppercase letters",
+				),
+			z.null(),
+		])
 		.optional(),
 	email: z
 		.string()
