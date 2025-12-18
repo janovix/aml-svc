@@ -740,16 +740,16 @@ export const openAPISpec = {
 					{
 						name: "startDate",
 						in: "query",
-						schema: { type: "string", format: "date-time" },
+						schema: { type: "string", format: "date" },
 						description:
-							"ISO date-time for the inclusive range start (`operationDate >= startDate`).",
+							"ISO date for the inclusive range start (`operationDate >= startDate`).",
 					},
 					{
 						name: "endDate",
 						in: "query",
-						schema: { type: "string", format: "date-time" },
+						schema: { type: "string", format: "date" },
 						description:
-							"ISO date-time for the inclusive range end (`operationDate <= endDate`).",
+							"ISO date for the inclusive range end (`operationDate <= endDate`).",
 					},
 					{
 						name: "page",
@@ -1499,7 +1499,6 @@ export const openAPISpec = {
 					"year",
 					"amount",
 					"currency",
-					"paymentDate",
 					"paymentMethods",
 					"createdAt",
 					"updatedAt",
@@ -1515,7 +1514,7 @@ export const openAPISpec = {
 						pattern: "^[A-Za-z0-9-]{1,64}$",
 						description: "Client identifier.",
 					},
-					operationDate: { type: "string", format: "date-time" },
+					operationDate: { type: "string", format: "date" },
 					operationType: {
 						$ref: "#/components/schemas/TransactionOperationType",
 					},
@@ -1534,7 +1533,6 @@ export const openAPISpec = {
 					flagCountryId: { type: "string", nullable: true },
 					amount: { type: "string" },
 					currency: { type: "string" },
-					paymentDate: { type: "string", format: "date-time" },
 					paymentMethods: {
 						type: "array",
 						items: { $ref: "#/components/schemas/PaymentMethod" },
@@ -1578,14 +1576,13 @@ export const openAPISpec = {
 					"amount",
 					"currency",
 					"paymentMethods",
-					"paymentDate",
 				],
 				properties: {
 					clientId: {
 						type: "string",
 						pattern: "^[A-Za-z0-9-]{1,64}$",
 					},
-					operationDate: { type: "string", format: "date-time" },
+					operationDate: { type: "string", format: "date" },
 					operationType: {
 						$ref: "#/components/schemas/TransactionOperationType",
 					},
@@ -1620,7 +1617,6 @@ export const openAPISpec = {
 						description:
 							"Array of payment methods. The sum of payment method amounts must equal the transaction amount.",
 					},
-					paymentDate: { type: "string", format: "date-time" },
 				},
 			},
 			TransactionUpdateRequest: {
@@ -1636,10 +1632,9 @@ export const openAPISpec = {
 					"amount",
 					"currency",
 					"paymentMethods",
-					"paymentDate",
 				],
 				properties: {
-					operationDate: { type: "string", format: "date-time" },
+					operationDate: { type: "string", format: "date" },
 					operationType: {
 						$ref: "#/components/schemas/TransactionOperationType",
 					},
@@ -1674,7 +1669,6 @@ export const openAPISpec = {
 						description:
 							"Array of payment methods. The sum of payment method amounts must equal the transaction amount.",
 					},
-					paymentDate: { type: "string", format: "date-time" },
 				},
 			},
 			TransactionPagination: {

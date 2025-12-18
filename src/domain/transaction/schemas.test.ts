@@ -5,7 +5,7 @@ import { TransactionCreateSchema } from "./schemas";
 function buildBasePayload(overrides: Record<string, unknown> = {}) {
 	return {
 		clientId: "client-123",
-		operationDate: "2024-11-20T15:30:00.000Z",
+		operationDate: "2024-11-20",
 		operationType: "purchase",
 		branchPostalCode: "06140",
 		brandId: "brand-001",
@@ -15,7 +15,6 @@ function buildBasePayload(overrides: Record<string, unknown> = {}) {
 		amount: "3500000.75",
 		currency: "MXN",
 		paymentMethods: [{ method: "wire", amount: "3500000.75" }],
-		paymentDate: "2024-11-22T18:00:00.000Z",
 		vehicleType: "land",
 		engineNumber: "ENG-ABC",
 		plates: "ABC1234",

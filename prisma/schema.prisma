@@ -183,7 +183,6 @@ model Transaction {
   flagCountryId     String?
   amount            Decimal
   currency          String
-  paymentDate       DateTime
   createdAt         DateTime                   @default(now())
   updatedAt         DateTime                   @updatedAt
   deletedAt         DateTime?
