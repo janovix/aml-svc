@@ -3,10 +3,16 @@ import type {
 	Transaction as PrismaTransaction,
 	TransactionOperationType as PrismaOperationType,
 	TransactionVehicleType as PrismaVehicleType,
+	TransactionPaymentMethod as PrismaPaymentMethod,
 } from "@prisma/client";
 
 import type { TransactionCreateInput, TransactionUpdateInput } from "./schemas";
-import type { OperationType, TransactionEntity, VehicleType } from "./types";
+import type {
+	OperationType,
+	PaymentMethod,
+	TransactionEntity,
+	VehicleType,
+} from "./types";
 
 const OPERATION_TYPE_TO_PRISMA: Record<OperationType, PrismaOperationType> = {
 	purchase: "PURCHASE",
@@ -108,8 +114,13 @@ export function mapCreateInputToPrisma(input: TransactionCreateInput) {
 		flagCountryId: normalizeNullable(input.flagCountryId),
 		amount: toPrismaDecimal(input.amount),
 		currency: input.currency,
-		paymentMethod: input.paymentMethod,
 		paymentDate: toPrismaDate(input.paymentDate),
+		paymentMethods: {
+			create: input.paymentMethods.map((pm) => ({
+				method: pm.method,
+				amount: toPrismaDecimal(pm.amount),
+			})),
+		},
 	};
 }
 
@@ -130,13 +141,31 @@ export function mapUpdateInputToPrisma(input: TransactionUpdateInput) {
 		flagCountryId: normalizeNullable(input.flagCountryId),
 		amount: toPrismaDecimal(input.amount),
 		currency: input.currency,
-		paymentMethod: input.paymentMethod,
 		paymentDate: toPrismaDate(input.paymentDate),
+		paymentMethods: {
+			deleteMany: {},
+			create: input.paymentMethods.map((pm) => ({
+				method: pm.method,
+				amount: toPrismaDecimal(pm.amount),
+			})),
+		},
+	};
+}
+
+function mapPrismaPaymentMethod(record: PrismaPaymentMethod): PaymentMethod {
+	return {
+		id: record.id,
+		method: record.method,
+		amount: record.amount.toFixed(2),
+		createdAt: mapDate(record.createdAt),
+		updatedAt: mapDate(record.updatedAt),
 	};
 }
 
 export function mapPrismaTransaction(
-	record: PrismaTransaction,
+	record: PrismaTransaction & {
+		paymentMethods?: PrismaPaymentMethod[];
+	},
 ): TransactionEntity {
 	return {
 		id: record.id,
@@ -156,8 +185,8 @@ export function mapPrismaTransaction(
 		flagCountryId: record.flagCountryId ?? null,
 		amount: record.amount.toFixed(2),
 		currency: record.currency,
-		paymentMethod: record.paymentMethod,
 		paymentDate: mapDate(record.paymentDate),
+		paymentMethods: record.paymentMethods?.map(mapPrismaPaymentMethod) ?? [],
 		createdAt: mapDate(record.createdAt),
 		updatedAt: mapDate(record.updatedAt),
 		deletedAt: mapNullableDate(record.deletedAt),

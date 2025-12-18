@@ -184,17 +184,31 @@ model Transaction {
   flagCountryId     String?
   amount            Decimal
   currency          String
-  paymentMethod     String
   paymentDate       DateTime
   createdAt         DateTime                   @default(now())
   updatedAt         DateTime                   @updatedAt
   deletedAt         DateTime?
 
   client Client @relation(fields: [clientId], references: [rfc], onDelete: Cascade)
+  paymentMethods    TransactionPaymentMethod[]
 
   @@map("transactions")
   @@index([clientId])
   @@index([operationDate])
   @@index([operationType])
   @@index([vehicleType])
+}
+
+model TransactionPaymentMethod {
+  id            String      @id @default(uuid())
+  transactionId String
+  method        String
+  amount        Decimal
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@map("transaction_payment_methods")
+  @@index([transactionId])
 }
