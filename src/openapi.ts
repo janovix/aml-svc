@@ -1460,6 +1460,31 @@ export const openAPISpec = {
 					pagination: { $ref: "#/components/schemas/CatalogPagination" },
 				},
 			},
+			PaymentMethod: {
+				type: "object",
+				required: ["id", "method", "amount", "createdAt", "updatedAt"],
+				properties: {
+					id: {
+						type: "string",
+						pattern: "^[A-Za-z0-9-]{1,64}$",
+						description: "Payment method identifier.",
+					},
+					method: {
+						type: "string",
+						minLength: 2,
+						maxLength: 80,
+						description:
+							"Payment method name (e.g., 'cash', 'transfer', 'wire').",
+					},
+					amount: {
+						type: "string",
+						description:
+							'Payment amount for this method, stored as string to preserve precision (e.g., "1500000.50").',
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
 			Transaction: {
 				type: "object",
 				required: [
@@ -1472,11 +1497,10 @@ export const openAPISpec = {
 					"brandId",
 					"model",
 					"year",
-					"serialNumber",
 					"amount",
 					"currency",
-					"paymentMethod",
 					"paymentDate",
+					"paymentMethods",
 					"createdAt",
 					"updatedAt",
 				],
@@ -1503,7 +1527,6 @@ export const openAPISpec = {
 					brandId: { type: "string" },
 					model: { type: "string" },
 					year: { type: "integer" },
-					serialNumber: { type: "string" },
 					armorLevel: { type: "string", nullable: true },
 					engineNumber: { type: "string", nullable: true },
 					plates: { type: "string", nullable: true },
@@ -1511,11 +1534,34 @@ export const openAPISpec = {
 					flagCountryId: { type: "string", nullable: true },
 					amount: { type: "string" },
 					currency: { type: "string" },
-					paymentMethod: { type: "string" },
 					paymentDate: { type: "string", format: "date-time" },
+					paymentMethods: {
+						type: "array",
+						items: { $ref: "#/components/schemas/PaymentMethod" },
+						description:
+							"Array of payment methods used for this transaction. The sum of amounts must equal the transaction amount.",
+					},
 					createdAt: { type: "string", format: "date-time" },
 					updatedAt: { type: "string", format: "date-time" },
 					deletedAt: { type: "string", format: "date-time", nullable: true },
+				},
+			},
+			PaymentMethodInput: {
+				type: "object",
+				required: ["method", "amount"],
+				properties: {
+					method: {
+						type: "string",
+						minLength: 2,
+						maxLength: 80,
+						description:
+							"Payment method name (e.g., 'cash', 'transfer', 'wire').",
+					},
+					amount: {
+						type: "string",
+						description:
+							'Payment amount for this method, stored as string to preserve precision (e.g., "1500000.50").',
+					},
 				},
 			},
 			TransactionCreateRequest: {
@@ -1529,10 +1575,9 @@ export const openAPISpec = {
 					"brandId",
 					"model",
 					"year",
-					"serialNumber",
 					"amount",
 					"currency",
-					"paymentMethod",
+					"paymentMethods",
 					"paymentDate",
 				],
 				properties: {
@@ -1552,7 +1597,6 @@ export const openAPISpec = {
 					brandId: { type: "string" },
 					model: { type: "string" },
 					year: { type: "integer", minimum: 1900, maximum: 2100 },
-					serialNumber: { type: "string" },
 					armorLevel: { type: "string", nullable: true },
 					engineNumber: { type: "string", nullable: true },
 					plates: { type: "string", nullable: true },
@@ -1561,7 +1605,7 @@ export const openAPISpec = {
 					amount: {
 						type: "string",
 						description:
-							'Stored as a string to preserve precision (e.g., "3500000.75").',
+							'Total transaction amount, stored as a string to preserve precision (e.g., "3500000.75").',
 					},
 					currency: {
 						type: "string",
@@ -1569,7 +1613,13 @@ export const openAPISpec = {
 						maxLength: 3,
 						description: "ISO 4217 currency code.",
 					},
-					paymentMethod: { type: "string" },
+					paymentMethods: {
+						type: "array",
+						items: { $ref: "#/components/schemas/PaymentMethodInput" },
+						minItems: 1,
+						description:
+							"Array of payment methods. The sum of payment method amounts must equal the transaction amount.",
+					},
 					paymentDate: { type: "string", format: "date-time" },
 				},
 			},
@@ -1583,10 +1633,9 @@ export const openAPISpec = {
 					"brandId",
 					"model",
 					"year",
-					"serialNumber",
 					"amount",
 					"currency",
-					"paymentMethod",
+					"paymentMethods",
 					"paymentDate",
 				],
 				properties: {
@@ -1602,7 +1651,6 @@ export const openAPISpec = {
 					brandId: { type: "string" },
 					model: { type: "string" },
 					year: { type: "integer", minimum: 1900, maximum: 2100 },
-					serialNumber: { type: "string" },
 					armorLevel: { type: "string", nullable: true },
 					engineNumber: { type: "string", nullable: true },
 					plates: { type: "string", nullable: true },
@@ -1611,7 +1659,7 @@ export const openAPISpec = {
 					amount: {
 						type: "string",
 						description:
-							'Stored as a string to preserve precision (e.g., "3500000.75").',
+							'Total transaction amount, stored as a string to preserve precision (e.g., "3500000.75").',
 					},
 					currency: {
 						type: "string",
@@ -1619,7 +1667,13 @@ export const openAPISpec = {
 						maxLength: 3,
 						description: "ISO 4217 currency code.",
 					},
-					paymentMethod: { type: "string" },
+					paymentMethods: {
+						type: "array",
+						items: { $ref: "#/components/schemas/PaymentMethodInput" },
+						minItems: 1,
+						description:
+							"Array of payment methods. The sum of payment method amounts must equal the transaction amount.",
+					},
 					paymentDate: { type: "string", format: "date-time" },
 				},
 			},

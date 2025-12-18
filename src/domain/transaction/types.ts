@@ -1,6 +1,14 @@
 export type OperationType = "purchase" | "sale";
 export type VehicleType = "land" | "marine" | "air";
 
+export interface PaymentMethod {
+	id: string;
+	method: string;
+	amount: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
 export interface TransactionEntity {
 	id: string;
 	clientId: string;
@@ -11,7 +19,6 @@ export interface TransactionEntity {
 	brandId: string;
 	model: string;
 	year: number;
-	serialNumber: string;
 	armorLevel: string | null;
 	engineNumber: string | null;
 	plates: string | null;
@@ -19,8 +26,8 @@ export interface TransactionEntity {
 	flagCountryId: string | null;
 	amount: string;
 	currency: string;
-	paymentMethod: string;
 	paymentDate: string;
+	paymentMethods: PaymentMethod[];
 	createdAt: string;
 	updatedAt: string;
 	deletedAt: string | null;

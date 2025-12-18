@@ -11,11 +11,10 @@ function buildBasePayload(overrides: Record<string, unknown> = {}) {
 		brandId: "brand-001",
 		model: "Armored SUV",
 		year: 2023,
-		serialNumber: "SERIAL-XYZ",
 		armorLevel: null,
 		amount: "3500000.75",
 		currency: "MXN",
-		paymentMethod: "wire",
+		paymentMethods: [{ method: "wire", amount: "3500000.75" }],
 		paymentDate: "2024-11-22T18:00:00.000Z",
 		vehicleType: "land",
 		engineNumber: "ENG-ABC",
@@ -68,5 +67,44 @@ describe("TransactionCreateSchema", () => {
 		expect(() => TransactionCreateSchema.parse(payload)).toThrow(
 			/flagCountryId/i,
 		);
+	});
+
+	it("requires at least one payment method", () => {
+		const payload = buildBasePayload({ paymentMethods: [] });
+		expect(() => TransactionCreateSchema.parse(payload)).toThrow(
+			/paymentMethods/i,
+		);
+	});
+
+	it("requires payment method amounts to sum to transaction amount", () => {
+		const payload = buildBasePayload({
+			amount: "3500000.75",
+			paymentMethods: [
+				{ method: "cash", amount: "2000000.00" },
+				{ method: "transfer", amount: "1500000.00" },
+			],
+		});
+		expect(() => TransactionCreateSchema.parse(payload)).toThrow(
+			/sum of payment method amounts/i,
+		);
+	});
+
+	it("accepts multiple payment methods that sum to transaction amount", () => {
+		const payload = buildBasePayload({
+			amount: "3500000.75",
+			paymentMethods: [
+				{ method: "cash", amount: "2000000.50" },
+				{ method: "transfer", amount: "1500000.25" },
+			],
+		});
+		expect(() => TransactionCreateSchema.parse(payload)).not.toThrow();
+	});
+
+	it("accepts a single payment method", () => {
+		const payload = buildBasePayload({
+			amount: "3500000.75",
+			paymentMethods: [{ method: "cash", amount: "3500000.75" }],
+		});
+		expect(() => TransactionCreateSchema.parse(payload)).not.toThrow();
 	});
 });

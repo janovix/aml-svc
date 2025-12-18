@@ -67,6 +67,7 @@ export class TransactionRepository {
 				skip: (page - 1) * limit,
 				take: limit,
 				orderBy: { operationDate: "desc" },
+				include: { paymentMethods: true },
 			}),
 		]);
 
@@ -86,6 +87,7 @@ export class TransactionRepository {
 	async getById(id: string): Promise<TransactionEntity | null> {
 		const record = await this.prisma.transaction.findFirst({
 			where: { id, deletedAt: null },
+			include: { paymentMethods: true },
 		});
 
 		return record ? mapPrismaTransaction(record) : null;
@@ -94,6 +96,7 @@ export class TransactionRepository {
 	async create(input: TransactionCreateInput): Promise<TransactionEntity> {
 		const created = await this.prisma.transaction.create({
 			data: mapCreateInputToPrisma(input),
+			include: { paymentMethods: true },
 		});
 		return mapPrismaTransaction(created);
 	}
@@ -106,6 +109,7 @@ export class TransactionRepository {
 		const updated = await this.prisma.transaction.update({
 			where: { id },
 			data: mapUpdateInputToPrisma(input),
+			include: { paymentMethods: true },
 		});
 		return mapPrismaTransaction(updated);
 	}

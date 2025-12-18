@@ -35,6 +35,15 @@ const AmountSchema = z
 	])
 	.transform((value) => value.toString());
 
+const PaymentMethodSchema = z.object({
+	method: z
+		.string()
+		.min(2)
+		.max(80)
+		.transform((value) => value.trim()),
+	amount: AmountSchema,
+});
+
 const BaseTransactionSchema = z.object({
 	clientId: ResourceIdSchema,
 	operationDate: IsoDateTimeSchema,
@@ -47,15 +56,12 @@ const BaseTransactionSchema = z.object({
 		.max(120)
 		.transform((value) => value.trim()),
 	year: z.coerce.number().int().min(1900).max(2100),
-	serialNumber: z.string().min(5),
 	armorLevel: z.string().min(1).max(50).optional().nullable(),
 	amount: AmountSchema,
 	currency: CurrencySchema,
-	paymentMethod: z
-		.string()
-		.min(2)
-		.max(80)
-		.transform((value) => value.trim()),
+	paymentMethods: z
+		.array(PaymentMethodSchema)
+		.min(1, "At least one payment method is required"),
 	paymentDate: IsoDateTimeSchema,
 });
 
@@ -109,6 +115,20 @@ const VehicleSpecificSchema = z.discriminatedUnion("vehicleType", [
 
 export const TransactionCreateSchema = BaseTransactionSchema.and(
 	VehicleSpecificSchema,
+).refine(
+	(data) => {
+		const totalPaymentAmount = data.paymentMethods.reduce(
+			(sum, pm) => sum + parseFloat(pm.amount),
+			0,
+		);
+		const transactionAmount = parseFloat(data.amount);
+		return Math.abs(totalPaymentAmount - transactionAmount) < 0.01;
+	},
+	{
+		message:
+			"The sum of payment method amounts must equal the transaction amount",
+		path: ["paymentMethods"],
+	},
 );
 
 const TransactionUpdateBaseSchema = BaseTransactionSchema.omit({
@@ -117,6 +137,20 @@ const TransactionUpdateBaseSchema = BaseTransactionSchema.omit({
 
 export const TransactionUpdateSchema = TransactionUpdateBaseSchema.and(
 	VehicleSpecificSchema,
+).refine(
+	(data) => {
+		const totalPaymentAmount = data.paymentMethods.reduce(
+			(sum, pm) => sum + parseFloat(pm.amount),
+			0,
+		);
+		const transactionAmount = parseFloat(data.amount);
+		return Math.abs(totalPaymentAmount - transactionAmount) < 0.01;
+	},
+	{
+		message:
+			"The sum of payment method amounts must equal the transaction amount",
+		path: ["paymentMethods"],
+	},
 );
 
 export const TransactionIdParamSchema = z.object({
@@ -145,6 +179,14 @@ export const TransactionFilterSchema = z
 		},
 	);
 
+export const PaymentMethodEntitySchema = z.object({
+	id: ResourceIdSchema,
+	method: z.string().min(2),
+	amount: z.string(),
+	createdAt: IsoDateTimeSchema,
+	updatedAt: IsoDateTimeSchema,
+});
+
 export const TransactionEntitySchema = z.object({
 	id: ResourceIdSchema,
 	clientId: ResourceIdSchema,
@@ -155,7 +197,6 @@ export const TransactionEntitySchema = z.object({
 	brandId: z.string().min(1),
 	model: z.string().min(1),
 	year: z.number().int(),
-	serialNumber: z.string().min(5),
 	armorLevel: z.string().nullable().optional(),
 	engineNumber: z.string().nullable().optional(),
 	plates: z.string().nullable().optional(),
@@ -163,8 +204,8 @@ export const TransactionEntitySchema = z.object({
 	flagCountryId: z.string().nullable().optional(),
 	amount: z.string(),
 	currency: CurrencySchema,
-	paymentMethod: z.string().min(2),
 	paymentDate: IsoDateTimeSchema,
+	paymentMethods: z.array(PaymentMethodEntitySchema),
 	createdAt: IsoDateTimeSchema,
 	updatedAt: IsoDateTimeSchema,
 	deletedAt: IsoDateTimeSchema.nullable().optional(),
