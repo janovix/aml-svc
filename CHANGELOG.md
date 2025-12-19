@@ -1,3 +1,16 @@
+# [1.1.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.4...v1.1.0-rc.5) (2025-12-19)
+
+
+### Bug Fixes
+
+* replace UNION ALL with VALUES clause to avoid SQLite compound SELECT limit ([32aca8a](https://github.com/janovix/aml-svc/commit/32aca8a9e727fa4447c435c5ff04692385fc19c6))
+* use individual INSERT statements instead of VALUES clause for SQLite compatibility ([c6884f0](https://github.com/janovix/aml-svc/commit/c6884f0f8d6ae48b04c8782c8d0ea1ef1afcb694))
+
+
+### Features
+
+* Add script to seed vehicle brands catalog ([af4c94a](https://github.com/janovix/aml-svc/commit/af4c94a9ee8320796f465c6d2ab19062d917fbb0))
+
 # [1.1.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.3...v1.1.0-rc.4) (2025-12-18)
 
 
