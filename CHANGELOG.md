@@ -1,3 +1,10 @@
+# [1.1.0-rc.9](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.8...v1.1.0-rc.9) (2025-12-19)
+
+
+### Features
+
+* **auth:** apply auth middleware to /transactions routes ([90752cd](https://github.com/janovix/aml-svc/commit/90752cde9a5c8ecc7d92b962876bf5e5498be412))
+
 # [1.1.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.7...v1.1.0-rc.8) (2025-12-19)
 
 
