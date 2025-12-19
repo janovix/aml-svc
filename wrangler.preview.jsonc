@@ -1,7 +1,7 @@
 {
 	"compatibility_date": "2025-10-08",
 	"main": "src/index.ts",
-	"name": "backend-template",
+	"name": "aml-svc-preview",
 	"upload_source_maps": true,
 	"workers_dev": true,
 	"observability": {
@@ -16,8 +16,13 @@
 	],
 	"kv_namespaces": [
 		{
-			"binding": "TASKS_KV",
+			"binding": "CACHE",
 			"id": "8873f68bc4f747399908d6e9ebc24a8c",
 		},
 	],
+	"vars": {
+		"ENVIRONMENT": "preview",
+		"AUTH_SERVICE_URL": "https://auth-svc-preview.janovix.workers.dev",
+		"AUTH_JWKS_CACHE_TTL": "3600",
+	},
 }

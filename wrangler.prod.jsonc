@@ -1,7 +1,7 @@
 {
 	"compatibility_date": "2025-10-08",
 	"main": "src/index.ts",
-	"name": "backend-template-prod",
+	"name": "aml-svc-prod",
 	"upload_source_maps": true,
 	"observability": {
 		"enabled": true,
@@ -15,8 +15,13 @@
 	],
 	"kv_namespaces": [
 		{
-			"binding": "TASKS_KV",
+			"binding": "CACHE",
 			"id": "da40a898aa9a4db3b8d819d3f384b811",
 		},
 	],
+	"vars": {
+		"ENVIRONMENT": "production",
+		"AUTH_SERVICE_URL": "https://auth-svc.janovix.ai",
+		"AUTH_JWKS_CACHE_TTL": "3600",
+	},
 }

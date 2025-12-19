@@ -16,8 +16,13 @@
 	],
 	"kv_namespaces": [
 		{
-			"binding": "TASKS_KV",
+			"binding": "CACHE",
 			"id": "0f38527170fc41f09a967265ca262e19",
 		},
 	],
+	"vars": {
+		"ENVIRONMENT": "dev",
+		"AUTH_SERVICE_URL": "https://auth-svc.janovix.workers.dev",
+		"AUTH_JWKS_CACHE_TTL": "3600",
+	},
 }

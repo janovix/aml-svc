@@ -13,6 +13,8 @@ export type Bindings = {
 	CACHE?: KVNamespace;
 	ENVIRONMENT?: string;
 	API_VERSION?: string;
+	AUTH_SERVICE_URL?: string;
+	AUTH_JWKS_CACHE_TTL?: string;
 };
 
 // Start a Hono app
