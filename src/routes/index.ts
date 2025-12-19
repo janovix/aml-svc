@@ -9,9 +9,8 @@ import { transactionsRouter } from "./transactions";
 export function createRouter() {
 	const router = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
-	// Apply auth middleware to all API routes
-	// All routes under /api/v1 require a valid JWT from auth-svc
-	router.use("*", authMiddleware());
+	// Apply auth middleware only to /clients routes
+	router.use("/clients/*", authMiddleware());
 
 	// Mount resource routers
 	router.route("/catalogs", catalogsRouter);
