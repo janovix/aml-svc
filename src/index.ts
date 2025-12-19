@@ -15,6 +15,8 @@ export type Bindings = {
 	API_VERSION?: string;
 	AUTH_SERVICE_URL?: string;
 	AUTH_JWKS_CACHE_TTL?: string;
+	/** Service binding to auth-svc for worker-to-worker communication */
+	AUTH_SERVICE?: Fetcher;
 };
 
 // Start a Hono app

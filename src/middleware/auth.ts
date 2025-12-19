@@ -40,6 +40,8 @@ export interface AuthUser {
 export type AuthBindings = Bindings & {
 	AUTH_SERVICE_URL: string;
 	AUTH_JWKS_CACHE_TTL?: string;
+	/** Service binding to auth-svc for direct worker-to-worker communication */
+	AUTH_SERVICE?: Fetcher;
 };
 
 /**
@@ -62,10 +64,12 @@ let cachedJWKSExpiry: number = 0;
 
 /**
  * Fetches JWKS from auth-svc with in-memory caching
+ * Uses service binding if available for direct worker-to-worker communication
  */
 async function getJWKS(
 	authServiceUrl: string,
 	cacheTtl: number,
+	authServiceBinding?: Fetcher,
 ): Promise<jose.JSONWebKeySet> {
 	const now = Date.now();
 
@@ -75,15 +79,27 @@ async function getJWKS(
 	}
 
 	// Fetch from auth service
-	// Use cf options to bypass Cloudflare cache and avoid worker-to-worker routing issues
 	const jwksUrl = `${authServiceUrl}/api/auth/jwks`;
-	const response = await fetch(jwksUrl, {
-		headers: { Accept: "application/json" },
-		cf: {
-			cacheTtl: 0,
-			cacheEverything: false,
-		},
-	} as RequestInit);
+	let response: Response;
+
+	if (authServiceBinding) {
+		// Use service binding for direct worker-to-worker communication
+		// This bypasses the public URL and avoids routing issues
+		response = await authServiceBinding.fetch(
+			new Request(jwksUrl, {
+				headers: { Accept: "application/json" },
+			}),
+		);
+	} else {
+		// Fallback to regular fetch with cf options
+		response = await fetch(jwksUrl, {
+			headers: { Accept: "application/json" },
+			cf: {
+				cacheTtl: 0,
+				cacheEverything: false,
+			},
+		} as RequestInit);
+	}
 
 	if (!response.ok) {
 		throw new Error(
@@ -112,8 +128,9 @@ async function verifyToken(
 	token: string,
 	authServiceUrl: string,
 	cacheTtl: number,
+	authServiceBinding?: Fetcher,
 ): Promise<AuthTokenPayload> {
-	const jwks = await getJWKS(authServiceUrl, cacheTtl);
+	const jwks = await getJWKS(authServiceUrl, cacheTtl, authServiceBinding);
 
 	// Create a local JWKS for verification
 	const jwksInstance = jose.createLocalJWKSet(jwks);
@@ -204,8 +221,16 @@ export function authMiddleware(options?: {
 			? parseInt(c.env.AUTH_JWKS_CACHE_TTL, 10)
 			: DEFAULT_JWKS_CACHE_TTL;
 
+		// Get the service binding for direct worker-to-worker communication
+		const authServiceBinding = c.env.AUTH_SERVICE;
+
 		try {
-			const payload = await verifyToken(token, authServiceUrl, cacheTtl);
+			const payload = await verifyToken(
+				token,
+				authServiceUrl,
+				cacheTtl,
+				authServiceBinding,
+			);
 
 			// Attach user info to context
 			const user: AuthUser = {

@@ -19,6 +19,12 @@
 			"id": "da40a898aa9a4db3b8d819d3f384b811",
 		},
 	],
+	"services": [
+		{
+			"binding": "AUTH_SERVICE",
+			"service": "auth-svc-prod",
+		},
+	],
 	"vars": {
 		"ENVIRONMENT": "production",
 		"AUTH_SERVICE_URL": "https://auth-svc.janovix.ai",

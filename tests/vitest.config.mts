@@ -36,7 +36,8 @@ export default defineWorkersConfig({
 			workers: {
 				singleWorker: true,
 				wrangler: {
-					configPath: "../wrangler.jsonc",
+					// Use test-specific config without service bindings
+					configPath: "../wrangler.test.jsonc",
 				},
 				miniflare: {
 					compatibilityFlags: ["experimental", "nodejs_compat"],

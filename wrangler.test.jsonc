@@ -1,0 +1,29 @@
+{
+	"compatibility_date": "2025-10-08",
+	"main": "src/index.ts",
+	"name": "aml-svc-test",
+	"upload_source_maps": true,
+	"workers_dev": true,
+	"observability": {
+		"enabled": true,
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "aml-test",
+			"database_id": "test-database-id",
+		},
+	],
+	"kv_namespaces": [
+		{
+			"binding": "CACHE",
+			"id": "test-cache-id",
+		},
+	],
+	// No service binding for tests - falls back to regular fetch via AUTH_SERVICE_URL
+	"vars": {
+		"ENVIRONMENT": "test",
+		"AUTH_SERVICE_URL": "https://auth-svc.test",
+		"AUTH_JWKS_CACHE_TTL": "3600",
+	},
+}

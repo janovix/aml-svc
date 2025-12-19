@@ -20,6 +20,12 @@
 			"id": "8873f68bc4f747399908d6e9ebc24a8c",
 		},
 	],
+	"services": [
+		{
+			"binding": "AUTH_SERVICE",
+			"service": "auth-svc",
+		},
+	],
 	"vars": {
 		"ENVIRONMENT": "preview",
 		"AUTH_SERVICE_URL": "https://auth-svc.janovix.workers.dev",
