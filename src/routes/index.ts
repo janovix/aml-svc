@@ -11,6 +11,7 @@ export function createRouter() {
 
 	// Apply auth middleware only to /clients routes
 	router.use("/clients/*", authMiddleware());
+	router.use("/transactions/*", authMiddleware());
 
 	// Mount resource routers
 	router.route("/catalogs", catalogsRouter);
