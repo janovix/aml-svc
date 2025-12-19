@@ -75,10 +75,15 @@ async function getJWKS(
 	}
 
 	// Fetch from auth service
+	// Use cf options to bypass Cloudflare cache and avoid worker-to-worker routing issues
 	const jwksUrl = `${authServiceUrl}/api/auth/jwks`;
 	const response = await fetch(jwksUrl, {
 		headers: { Accept: "application/json" },
-	});
+		cf: {
+			cacheTtl: 0,
+			cacheEverything: false,
+		},
+	} as RequestInit);
 
 	if (!response.ok) {
 		throw new Error(
