@@ -1,3 +1,15 @@
+# [1.1.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.6...v1.1.0-rc.7) (2025-12-19)
+
+
+### Bug Fixes
+
+* **auth:** add cf options to bypass cache in JWKS fetch ([227525c](https://github.com/janovix/aml-svc/commit/227525c194e829f52bfefed78fd242547b260e19))
+
+
+### Reverts
+
+* remove cookie-based auth, use JWT Bearer tokens only ([bd40f6c](https://github.com/janovix/aml-svc/commit/bd40f6c71fa62121dc5ec11db3183e3d42931bbe))
+
 # [1.1.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.5...v1.1.0-rc.6) (2025-12-19)
 
 
