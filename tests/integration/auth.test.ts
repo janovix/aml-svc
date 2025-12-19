@@ -1,12 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
-import {
-	generateKeyPair,
-	exportJWK,
-	SignJWT,
-	type JSONWebKeySet,
-	type CryptoKey,
-} from "jose";
+import { generateKeyPair, exportJWK, SignJWT, type JSONWebKeySet } from "jose";
 
 import {
 	authMiddleware,
@@ -26,9 +20,7 @@ async function generateTestKeyPair(): Promise<KeyPairResult> {
 }
 
 // Convert public key to JWK for JWKS response
-async function publicKeyToJWK(
-	publicKey: CryptoKey | KeyPairResult["publicKey"],
-) {
+async function publicKeyToJWK(publicKey: KeyPairResult["publicKey"]) {
 	const jwk = await exportJWK(publicKey);
 	return {
 		...jwk,
@@ -40,7 +32,7 @@ async function publicKeyToJWK(
 
 // Create a signed JWT for testing
 async function createTestJWT(
-	privateKey: CryptoKey | KeyPairResult["privateKey"],
+	privateKey: KeyPairResult["privateKey"],
 	payload: Record<string, unknown>,
 	options?: { expiresIn?: string },
 ) {

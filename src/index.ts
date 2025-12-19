@@ -33,7 +33,7 @@ app.use(
 	"*",
 	cors({
 		origin: "*",
-		allowHeaders: ["Content-Type", "Authorization"],
+		allowHeaders: ["Content-Type", "Authorization", "Cookie"],
 		allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
 		credentials: true,
 	}),
