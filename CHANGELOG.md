@@ -1,3 +1,10 @@
+# [1.1.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.5...v1.1.0-rc.6) (2025-12-19)
+
+
+### Features
+
+* **auth:** add JWT verification middleware using JWKS from auth-svc ([6fbad42](https://github.com/janovix/aml-svc/commit/6fbad42b855aa5eac3e15d323766e0f02f475ebd))
+
 # [1.1.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.4...v1.1.0-rc.5) (2025-12-19)
 
 
