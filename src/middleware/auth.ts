@@ -51,8 +51,6 @@ export interface AuthVariables {
 	tokenPayload: AuthTokenPayload;
 }
 
-// JWKS cache key prefix
-const JWKS_CACHE_KEY = "auth:jwks";
 const DEFAULT_JWKS_CACHE_TTL = 3600; // 1 hour in seconds
 
 /**
@@ -63,40 +61,20 @@ let cachedJWKS: jose.JSONWebKeySet | null = null;
 let cachedJWKSExpiry: number = 0;
 
 /**
- * Fetches JWKS from auth-svc with multi-layer caching:
- * 1. In-memory cache (fastest, per-worker instance)
- * 2. KV cache (shared across workers)
- * 3. Network fetch (fallback)
+ * Fetches JWKS from auth-svc with in-memory caching
  */
 async function getJWKS(
 	authServiceUrl: string,
-	kvCache: KVNamespace | undefined,
 	cacheTtl: number,
 ): Promise<jose.JSONWebKeySet> {
 	const now = Date.now();
 
-	// Layer 1: Check in-memory cache
+	// Check in-memory cache
 	if (cachedJWKS && cachedJWKSExpiry > now) {
 		return cachedJWKS;
 	}
 
-	// Layer 2: Check KV cache
-	if (kvCache) {
-		try {
-			const cached = await kvCache.get(JWKS_CACHE_KEY, "json");
-			if (cached) {
-				const jwks = cached as jose.JSONWebKeySet;
-				// Update in-memory cache
-				cachedJWKS = jwks;
-				cachedJWKSExpiry = now + cacheTtl * 1000;
-				return jwks;
-			}
-		} catch {
-			// KV cache miss or error, continue to fetch
-		}
-	}
-
-	// Layer 3: Fetch from auth service
+	// Fetch from auth service
 	const jwksUrl = `${authServiceUrl}/api/auth/jwks`;
 	const response = await fetch(jwksUrl, {
 		headers: { Accept: "application/json" },
@@ -119,17 +97,6 @@ async function getJWKS(
 	cachedJWKS = jwks;
 	cachedJWKSExpiry = now + cacheTtl * 1000;
 
-	// Update KV cache (fire and forget)
-	if (kvCache) {
-		kvCache
-			.put(JWKS_CACHE_KEY, JSON.stringify(jwks), {
-				expirationTtl: cacheTtl,
-			})
-			.catch(() => {
-				// Ignore KV write errors
-			});
-	}
-
 	return jwks;
 }
 
@@ -139,19 +106,15 @@ async function getJWKS(
 async function verifyToken(
 	token: string,
 	authServiceUrl: string,
-	kvCache: KVNamespace | undefined,
 	cacheTtl: number,
 ): Promise<AuthTokenPayload> {
-	const jwks = await getJWKS(authServiceUrl, kvCache, cacheTtl);
+	const jwks = await getJWKS(authServiceUrl, cacheTtl);
 
 	// Create a local JWKS for verification
 	const jwksInstance = jose.createLocalJWKSet(jwks);
 
 	// Verify the token
-	const { payload } = await jose.jwtVerify(token, jwksInstance, {
-		// Optionally validate issuer if needed
-		// issuer: authServiceUrl,
-	});
+	const { payload } = await jose.jwtVerify(token, jwksInstance);
 
 	// Validate required claims
 	if (!payload.sub) {
@@ -237,12 +200,7 @@ export function authMiddleware(options?: {
 			: DEFAULT_JWKS_CACHE_TTL;
 
 		try {
-			const payload = await verifyToken(
-				token,
-				authServiceUrl,
-				c.env.CACHE,
-				cacheTtl,
-			);
+			const payload = await verifyToken(token, authServiceUrl, cacheTtl);
 
 			// Attach user info to context
 			const user: AuthUser = {
