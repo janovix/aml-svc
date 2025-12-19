@@ -1,3 +1,10 @@
+# [1.1.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.7...v1.1.0-rc.8) (2025-12-19)
+
+
+### Features
+
+* **auth:** add service binding for worker-to-worker JWKS fetch ([976ec56](https://github.com/janovix/aml-svc/commit/976ec560ffb95b6e76c5a2fcd71738210c8e8eeb))
+
 # [1.1.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.6...v1.1.0-rc.7) (2025-12-19)
 
 
