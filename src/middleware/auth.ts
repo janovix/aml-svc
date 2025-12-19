@@ -141,85 +141,6 @@ function extractBearerToken(authHeader: string | undefined): string | null {
 }
 
 /**
- * Extracts better-auth session cookies from request
- */
-function extractSessionCookies(
-	cookieHeader: string | undefined,
-): string | null {
-	if (!cookieHeader) {
-		return null;
-	}
-
-	// Check for better-auth session cookies
-	const hasSessionToken =
-		cookieHeader.includes("better-auth.session_token") ||
-		cookieHeader.includes("__Secure-better-auth.session_token");
-	const hasSessionData =
-		cookieHeader.includes("better-auth.session_data") ||
-		cookieHeader.includes("__Secure-better-auth.session_data");
-
-	if (hasSessionToken || hasSessionData) {
-		return cookieHeader;
-	}
-
-	return null;
-}
-
-/**
- * Validates session cookies by calling the auth service
- * Returns user info if session is valid
- */
-async function validateSessionCookies(
-	cookieHeader: string,
-	authServiceUrl: string,
-	origin?: string,
-): Promise<{ user: AuthUser; token: string }> {
-	const sessionUrl = `${authServiceUrl}/api/auth/get-session`;
-
-	const headers: Record<string, string> = {
-		Cookie: cookieHeader,
-		Accept: "application/json",
-	};
-
-	// Include Origin header if provided (some auth services require it)
-	if (origin) {
-		headers.Origin = origin;
-	}
-
-	const response = await fetch(sessionUrl, {
-		headers,
-	});
-
-	if (!response.ok) {
-		throw new Error(
-			`Failed to validate session: ${response.status} ${response.statusText}`,
-		);
-	}
-
-	const data = (await response.json()) as {
-		session?: { userId: string };
-		user?: { id: string; email?: string; name?: string };
-	};
-
-	if (!data.session || !data.user) {
-		throw new Error("Invalid session: missing session or user data");
-	}
-
-	// Use session token as the token for context (or we could extract a JWT if available)
-	// For now, we'll use a synthetic token identifier
-	const token = `session:${data.session.userId}`;
-
-	return {
-		user: {
-			id: data.user.id,
-			email: data.user.email,
-			name: data.user.name,
-		},
-		token,
-	};
-}
-
-/**
  * Creates an authentication middleware that verifies JWTs signed by auth-svc
  *
  * @param options - Configuration options
@@ -243,12 +164,10 @@ export function authMiddleware(options?: {
 
 	return async (c, next) => {
 		const authHeader = c.req.header("Authorization");
-		const cookieHeader = c.req.header("Cookie");
 		const token = extractBearerToken(authHeader);
-		const sessionCookies = extractSessionCookies(cookieHeader);
 
-		// No token or cookies provided
-		if (!token && !sessionCookies) {
+		// No token provided
+		if (!token) {
 			if (optional) {
 				return next();
 			}
@@ -256,7 +175,7 @@ export function authMiddleware(options?: {
 				{
 					success: false,
 					error: "Unauthorized",
-					message: "Missing or invalid Authorization header or session cookies",
+					message: "Missing or invalid Authorization header",
 				},
 				401,
 			);
@@ -281,46 +200,20 @@ export function authMiddleware(options?: {
 			: DEFAULT_JWKS_CACHE_TTL;
 
 		try {
-			// If Bearer token is provided, use JWT verification
-			if (token) {
-				const payload = await verifyToken(token, authServiceUrl, cacheTtl);
+			const payload = await verifyToken(token, authServiceUrl, cacheTtl);
 
-				// Attach user info to context
-				const user: AuthUser = {
-					id: payload.sub,
-					email: payload.email,
-					name: payload.name,
-				};
+			// Attach user info to context
+			const user: AuthUser = {
+				id: payload.sub,
+				email: payload.email,
+				name: payload.name,
+			};
 
-				c.set("user", user);
-				c.set("token", token);
-				c.set("tokenPayload", payload);
+			c.set("user", user);
+			c.set("token", token);
+			c.set("tokenPayload", payload);
 
-				return next();
-			}
-
-			// Otherwise, validate session cookies
-			if (sessionCookies) {
-				const origin = c.req.header("Origin");
-				const { user, token: sessionToken } = await validateSessionCookies(
-					sessionCookies,
-					authServiceUrl,
-					origin,
-				);
-
-				// Create a minimal token payload for consistency
-				const tokenPayload: AuthTokenPayload = {
-					sub: user.id,
-					email: user.email,
-					name: user.name,
-				};
-
-				c.set("user", user);
-				c.set("token", sessionToken);
-				c.set("tokenPayload", tokenPayload);
-
-				return next();
-			}
+			return next();
 		} catch (error) {
 			// Handle specific JWT errors
 			if (error instanceof jose.errors.JWTExpired) {
@@ -359,32 +252,6 @@ export function authMiddleware(options?: {
 				);
 			}
 
-			// Handle session validation errors
-			if (
-				error instanceof Error &&
-				error.message.includes("Failed to validate session")
-			) {
-				return c.json(
-					{
-						success: false,
-						error: "Invalid Session",
-						message: "Session validation failed",
-					},
-					401,
-				);
-			}
-
-			if (error instanceof Error && error.message.includes("Invalid session")) {
-				return c.json(
-					{
-						success: false,
-						error: "Invalid Session",
-						message: error.message,
-					},
-					401,
-				);
-			}
-
 			// Log unexpected errors
 			console.error("Auth middleware error:", error);
 
@@ -408,7 +275,7 @@ export function authMiddleware(options?: {
 				{
 					success: false,
 					error: "Unauthorized",
-					message: "Invalid authentication token or session",
+					message: "Invalid authentication token",
 				},
 				401,
 			);
