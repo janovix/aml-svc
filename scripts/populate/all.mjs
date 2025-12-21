@@ -14,18 +14,22 @@ const __dirname = dirname(__filename);
 
 // Determine config file based on environment
 function getConfigFile() {
-	// Check if we're in preview environment (from versions-upload.mjs or CI)
-	if (
-		process.env.CF_PAGES_BRANCH ||
-		(process.env.WORKERS_CI_BRANCH &&
-			process.env.WORKERS_CI_BRANCH !== "main") ||
-		process.env.PREVIEW === "true"
-	) {
-		return "wrangler.preview.jsonc";
-	}
 	// Check if config is explicitly set
 	if (process.env.WRANGLER_CONFIG) {
 		return process.env.WRANGLER_CONFIG;
+	}
+	// Check if we're in preview environment (from versions-upload.mjs or CI)
+	// Note: 'dev' is the production branch, so don't treat it as preview
+	if (
+		(process.env.CF_PAGES_BRANCH &&
+			process.env.CF_PAGES_BRANCH !== "main" &&
+			process.env.CF_PAGES_BRANCH !== "dev") ||
+		(process.env.WORKERS_CI_BRANCH &&
+			process.env.WORKERS_CI_BRANCH !== "main" &&
+			process.env.WORKERS_CI_BRANCH !== "dev") ||
+		process.env.PREVIEW === "true"
+	) {
+		return "wrangler.preview.jsonc";
 	}
 	return "";
 }
