@@ -15,7 +15,11 @@ const __dirname = dirname(__filename);
 
 const catalogScripts = [
 	"catalog-vehicle-brands.mjs",
-	// Add more regular catalog population scripts here
+	"catalog-country.mjs",
+	"catalog-currency.mjs",
+	"catalog-operation-type.mjs",
+	"catalog-payment-forms.mjs",
+	"catalog-vulnerable-activities.mjs",
 ];
 
 async function populateAllCatalogs() {

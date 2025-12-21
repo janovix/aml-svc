@@ -85,9 +85,8 @@ export async function generateAndUploadSatFile(
 		(await config.getCatalogValue("pais", client.nationality || "MX")) ||
 		client.nationality ||
 		"MX";
-	// Get payment method codes from catalog
-	const formaPago =
-		(await config.getCatalogValue("payment-methods", "1")) || "1"; // Default from example
+	// Get payment form codes from catalog
+	const formaPago = (await config.getCatalogValue("payment-forms", "1")) || "1"; // Default from example
 	const instrumentoMonetario = "1"; // Default from example
 
 	// Map to SAT format

@@ -1,70 +1,84 @@
-# Missing SAT Catalogs for Population
+# SAT Catalogs for Population
 
-The following SAT catalogs need to be populated with initial data from CSV files. These catalogs are required for SAT XML file generation.
+The following SAT catalogs are populated with initial data from CSV files. These catalogs are required for SAT XML file generation.
 
 **Note:** These catalogs use the existing `Catalog` and `CatalogItem` system (not a separate SAT catalog system).
 
-## Required SAT Catalogs
+## Populated Catalogs
 
-Please provide CSV files for the following catalogs. Catalog keys should match the `key` field in the `catalogs` table:
+The following catalogs are automatically populated from CSV files:
 
-1. **tipo-operacion** - Type of operation
-
-   - Used in: `<tipo_operacion>` field (e.g., "802")
-   - Required: Yes
-   - CSV format: `name,normalizedName,active,metadata`
-   - Note: The `name` field should contain the code used in XML (e.g., "802")
-
-2. **moneda** - Currency codes
-
-   - Used in: `<moneda>` field (e.g., "3" for MXN)
-   - Required: Yes
-   - CSV format: `name,normalizedName,active,metadata`
-   - Note: The `name` field should contain the code used in XML (e.g., "3")
-
-3. **pais** - Country codes
+1. **country** - Country codes ✅
 
    - Used in: `<pais_nacionalidad>` field (e.g., "RW", "AI", "MX")
-   - Required: Yes
-   - CSV format: `name,normalizedName,active,metadata`
-   - Note: The `name` field should contain the ISO country code (e.g., "MX", "RW")
+   - Source: `COUNTRY.csv`
+   - Population script: `scripts/populate/catalog-country.mjs`
 
-4. **payment-methods** - Payment method codes
+2. **currency** - Currency codes ✅
+
+   - Used in: `<moneda>` field (e.g., "3" for MXN)
+   - Source: `CURRENCY.csv`
+   - Population script: `scripts/populate/catalog-currency.mjs`
+   - Note: The `name` field contains the code used in XML (e.g., "1", "2", "3")
+
+3. **operation-type** - Type of operation ✅
+
+   - Used in: `<tipo_operacion>` field (e.g., "802")
+   - Source: `OPERATION_TYPE.csv`
+   - Population script: `scripts/populate/catalog-operation-type.mjs`
+   - Note: The `name` field contains the code used in XML (e.g., "1", "802")
+
+4. **payment-forms** - Payment form codes ✅
 
    - Used in: `<forma_pago>` field (e.g., "1")
-   - Required: Yes
-   - CSV format: `name,normalizedName,active,metadata`
-   - Note: The `name` field should contain the code used in XML
+   - Source: `PAYMENT_FORM.csv`
+   - Population script: `scripts/populate/catalog-payment-forms.mjs`
+   - Note: The `name` field contains the code used in XML (e.g., "1", "2")
 
-5. **vehicle-brands** - Vehicle brand names
+5. **vulnerable-activities** - Vulnerable activities ✅
+
+   - Used in: `<clave_actividad>` field (e.g., "VEH" for vehicles)
+   - Source: `VULNERABLE_ACTIVITIES.csv`
+   - Population script: `scripts/populate/catalog-vulnerable-activities.mjs`
+   - Note: The `name` field contains the activity code (e.g., "VEH", "JYS", "TSC")
+
+6. **vehicle-brands** - Vehicle brand names ✅
 
    - Used in: `<marca_fabricante>` field (e.g., "FORD", "LINCOLN")
-   - Required: Yes
-   - CSV format: `name,normalizedName,active,metadata`
-   - Note: Already exists, may need to be populated with SAT-compliant brand names
-
-## CSV Format Expected
-
-Each CSV should have at least these columns:
-
-- `name` - The catalog item name/code (value used in XML) - **Required**
-- `normalizedName` - Normalized version of the name for searching - **Required**
-- `active` (optional) - Whether the item is active (default: true)
-- `metadata` (optional) - Additional JSON metadata
-
-**Note:** The `name` field should contain the exact value that will be used in the XML file (e.g., "802" for operation type, "3" for currency, "RW" for country code).
+   - Source: Existing SQL file
+   - Population script: `scripts/populate/catalog-vehicle-brands.mjs`
 
 ## Population Scripts
 
-Once CSV files are provided, population scripts will be created in:
+All catalog population scripts are located in `scripts/populate/`:
 
-- `scripts/populate/catalog-{catalog-key}.mjs` - Individual catalog population scripts
-- `scripts/populate/all-catalogs.mjs` - Master script to populate all catalogs
+- `catalog-country.mjs` - Populates country codes
+- `catalog-currency.mjs` - Populates currency codes
+- `catalog-operation-type.mjs` - Populates operation types
+- `catalog-payment-forms.mjs` - Populates payment forms
+- `catalog-vulnerable-activities.mjs` - Populates vulnerable activities
+- `catalog-vehicle-brands.mjs` - Populates vehicle brands
+- `all-catalogs.mjs` - Master script to populate all catalogs
+
+## Running Population Scripts
+
+To populate all catalogs:
+
+```bash
+pnpm populate
+```
+
+To populate a specific catalog:
+
+```bash
+node scripts/populate/catalog-country.mjs
+```
 
 ## Current Status
 
 - ✅ Using existing `Catalog` and `CatalogItem` system
 - ✅ XML generator updated to match actual SAT schema structure
 - ✅ Removed `tipo_sujeto_obligado` (replaced with `clave_actividad`)
-- ✅ Population script framework ready
-- ⏳ Waiting for CSV files to create population scripts
+- ✅ All catalog population scripts created and ready
+- ✅ CSV files downloaded from `https://eng-assets.algenium.tools/janovix_catalogs/`
+- ✅ Catalogs automatically populated during deployment
