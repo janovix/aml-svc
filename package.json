@@ -73,6 +73,7 @@
 		"seed:vehicle-brands:local": "REMOTE=false node ./scripts/seed-vehicle-brands.mjs",
 		"seed:vehicle-brands:remote": "REMOTE=true node ./scripts/seed-vehicle-brands.mjs",
 		"create:alert-rules": "node ./scripts/create-alert-rules.mjs",
+		"update:uma-values": "node ./scripts/update-uma-values.mjs",
 		"release": "semantic-release",
 		"typecheck": "tsc -p tsconfig.json && tsc -p tests/tsconfig.json",
 		"vitest": "vitest --config tests/vitest.config.mts",
