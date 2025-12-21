@@ -13,20 +13,33 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Determine config file based on environment
+// Setup:
+// - aml-svc (dev worker): dev branch = production → wrangler.jsonc
+// - aml-svc-prod (prod worker): main branch = production → wrangler.prod.jsonc
+// - aml-svc (preview): other branches = preview → wrangler.preview.jsonc
 function getConfigFile() {
-	// Check if we're in preview environment (from versions-upload.mjs or CI)
-	if (
-		process.env.CF_PAGES_BRANCH ||
-		(process.env.WORKERS_CI_BRANCH &&
-			process.env.WORKERS_CI_BRANCH !== "main") ||
-		process.env.PREVIEW === "true"
-	) {
-		return "wrangler.preview.jsonc";
-	}
 	// Check if config is explicitly set
 	if (process.env.WRANGLER_CONFIG) {
 		return process.env.WRANGLER_CONFIG;
 	}
+	const branch = process.env.CF_PAGES_BRANCH || process.env.WORKERS_CI_BRANCH;
+
+	// Main branch → use prod config (aml-svc-prod worker)
+	if (branch === "main") {
+		return "wrangler.prod.jsonc";
+	}
+
+	// Dev branch → use dev config (aml-svc worker production)
+	if (branch === "dev") {
+		return "wrangler.jsonc";
+	}
+
+	// Preview branches or explicit preview flag → use preview config
+	if (branch || process.env.PREVIEW === "true") {
+		return "wrangler.preview.jsonc";
+	}
+
+	// Default: no config (will use wrangler.jsonc as default)
 	return "";
 }
 
