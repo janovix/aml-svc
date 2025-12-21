@@ -83,12 +83,19 @@ async function seedAll() {
 
 	// Dynamically import unstable_dev to avoid build issues
 	// Use it for both local and remote Cloudflare environments (preview/dev)
+	// Seed scripts run AFTER the build, so they shouldn't affect the build process
 	let db;
 	let cleanup;
 	try {
-		// Use dynamic import - only executed at runtime, not during build analysis
-		const wranglerModule = await import("wrangler");
+		// Use string-based dynamic import to prevent build-time static analysis
+		// The import path is stored in a variable to prevent bundlers from analyzing it
+		const wranglerPath = "wr" + "angler"; // Split string to prevent static analysis
+		const wranglerModule = await import(wranglerPath);
 		const { unstable_dev } = wranglerModule;
+
+		if (!unstable_dev) {
+			throw new Error("unstable_dev not available in wrangler module");
+		}
 
 		// Determine if we should use local or remote database
 		// Use remote for Cloudflare Workers environments (preview/dev in CI)
