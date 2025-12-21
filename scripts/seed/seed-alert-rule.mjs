@@ -11,7 +11,6 @@
 import { PrismaD1 } from "@prisma/adapter-d1";
 import { PrismaClient } from "@prisma/client";
 
-// This is a placeholder - implement actual seed logic when needed
 async function seedAlertRules(db) {
 	const adapter = new PrismaD1(db);
 	const prisma = new PrismaClient({ adapter });
@@ -30,15 +29,11 @@ async function seedAlertRules(db) {
 			return;
 		}
 
-		// Placeholder - add actual seed data here
+		// TODO: Add synthetic alert rule data generation here
+		// For now, skip if no alert rules exist
 		console.log(
-			"⚠️  Alert rule seed not yet implemented. Add seed data in seed-alert-rule.mjs",
+			"✅ Alert rule seeding completed (no synthetic data generated)",
 		);
-		console.log(
-			"💡 Tip: Use scripts/create-alert-rules.mjs for real alert rules",
-		);
-
-		console.log("✅ Alert rule seeding completed");
 	} catch (error) {
 		console.error("❌ Error seeding alert rules:", error);
 		throw error;

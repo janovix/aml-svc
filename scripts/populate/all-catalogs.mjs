@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 /**
- * Populate All Regular Catalogs
+ * Populate All Catalogs
  *
- * Runs all regular catalog population scripts.
- * These catalogs are used by the application (not SAT-specific).
+ * Runs all catalog population scripts.
  */
 
 import { execSync } from "node:child_process";
@@ -23,13 +22,22 @@ const catalogScripts = [
 ];
 
 async function populateAllCatalogs() {
-	console.log("📦 Populating all regular catalogs...\n");
+	console.log("📦 Populating all catalogs...\n");
+
+	const env = { ...process.env };
+	// Inherit WRANGLER_CONFIG if set
+	if (process.env.WRANGLER_CONFIG) {
+		env.WRANGLER_CONFIG = process.env.WRANGLER_CONFIG;
+	}
 
 	for (const script of catalogScripts) {
 		const scriptPath = join(__dirname, script);
 		console.log(`Running ${script}...`);
 		try {
-			execSync(`node "${scriptPath}"`, { stdio: "inherit" });
+			execSync(`node "${scriptPath}"`, {
+				stdio: "inherit",
+				env,
+			});
 			console.log(`✅ ${script} completed\n`);
 		} catch (error) {
 			console.error(`❌ Failed to run ${script}:`, error);
@@ -37,7 +45,7 @@ async function populateAllCatalogs() {
 		}
 	}
 
-	console.log("✅ All regular catalogs populated successfully!");
+	console.log("✅ All catalogs populated successfully!");
 }
 
 populateAllCatalogs().catch((error) => {

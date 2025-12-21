@@ -72,7 +72,6 @@
 		"seed": "node ./scripts/seed/all.mjs",
 		"seed:validate": "node ./scripts/seed/validate.mjs",
 		"populate": "node ./scripts/populate/all.mjs",
-		"populate:sat": "node ./scripts/populate/all-sat-catalogs.mjs",
 		"populate:catalogs": "node ./scripts/populate/all-catalogs.mjs",
 		"populate:catalog:vehicle-brands": "node ./scripts/populate/catalog-vehicle-brands.mjs",
 		"create:alert-rules": "node ./scripts/create-alert-rules.mjs",

@@ -9,7 +9,6 @@
 import { PrismaD1 } from "@prisma/adapter-d1";
 import { PrismaClient } from "@prisma/client";
 
-// This is a placeholder - implement actual seed logic when needed
 async function seedClients(db) {
 	const adapter = new PrismaD1(db);
 	const prisma = new PrismaClient({ adapter });
@@ -28,12 +27,9 @@ async function seedClients(db) {
 			return;
 		}
 
-		// Placeholder - add actual seed data here
-		console.log(
-			"⚠️  Client seed not yet implemented. Add seed data in seed-client.mjs",
-		);
-
-		console.log("✅ Client seeding completed");
+		// TODO: Add synthetic client data generation here
+		// For now, skip if no clients exist
+		console.log("✅ Client seeding completed (no synthetic data generated)");
 	} catch (error) {
 		console.error("❌ Error seeding clients:", error);
 		throw error;

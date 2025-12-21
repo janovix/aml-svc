@@ -3,7 +3,6 @@
  * Populate All Catalogs
  *
  * Master script that runs all catalog population scripts.
- * This includes both regular catalogs and SAT catalogs.
  */
 
 import { execSync } from "node:child_process";
@@ -13,32 +12,40 @@ import { dirname, join } from "node:path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Determine config file based on environment
+function getConfigFile() {
+	// Check if we're in preview environment (from versions-upload.mjs or CI)
+	if (
+		process.env.CF_PAGES_BRANCH ||
+		(process.env.WORKERS_CI_BRANCH &&
+			process.env.WORKERS_CI_BRANCH !== "main") ||
+		process.env.PREVIEW === "true"
+	) {
+		return "wrangler.preview.jsonc";
+	}
+	// Check if config is explicitly set
+	if (process.env.WRANGLER_CONFIG) {
+		return process.env.WRANGLER_CONFIG;
+	}
+	return "";
+}
+
 async function populateAll() {
 	console.log("🚀 Starting catalog population...\n");
 
-	// Populate regular catalogs
-	console.log("=".repeat(60));
-	console.log("Regular Catalogs");
-	console.log("=".repeat(60));
+	const configFile = getConfigFile();
+	const env = { ...process.env };
+	if (configFile) {
+		env.WRANGLER_CONFIG = configFile;
+	}
+
 	try {
 		execSync(`node "${join(__dirname, "all-catalogs.mjs")}"`, {
 			stdio: "inherit",
+			env,
 		});
 	} catch (error) {
-		console.error("Failed to populate regular catalogs:", error);
-		process.exit(1);
-	}
-
-	// Populate SAT catalogs
-	console.log("\n" + "=".repeat(60));
-	console.log("SAT Catalogs");
-	console.log("=".repeat(60));
-	try {
-		execSync(`node "${join(__dirname, "all-sat-catalogs.mjs")}"`, {
-			stdio: "inherit",
-		});
-	} catch (error) {
-		console.error("Failed to populate SAT catalogs:", error);
+		console.error("Failed to populate catalogs:", error);
 		process.exit(1);
 	}
 

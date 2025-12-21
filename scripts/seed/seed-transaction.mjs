@@ -9,7 +9,6 @@
 import { PrismaD1 } from "@prisma/adapter-d1";
 import { PrismaClient } from "@prisma/client";
 
-// This is a placeholder - implement actual seed logic when needed
 async function seedTransactions(db) {
 	const adapter = new PrismaD1(db);
 	const prisma = new PrismaClient({ adapter });
@@ -29,12 +28,11 @@ async function seedTransactions(db) {
 			return;
 		}
 
-		// Placeholder - add actual seed data here
+		// TODO: Add synthetic transaction data generation here
+		// For now, skip if no transactions exist
 		console.log(
-			"⚠️  Transaction seed not yet implemented. Add seed data in seed-transaction.mjs",
+			"✅ Transaction seeding completed (no synthetic data generated)",
 		);
-
-		console.log("✅ Transaction seeding completed");
 	} catch (error) {
 		console.error("❌ Error seeding transactions:", error);
 		throw error;

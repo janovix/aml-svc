@@ -1,8 +1,6 @@
-# SAT Catalogs for Population
+# Catalogs for Population
 
-The following SAT catalogs are populated with initial data from CSV files. These catalogs are required for SAT XML file generation.
-
-**Note:** These catalogs use the existing `Catalog` and `CatalogItem` system (not a separate SAT catalog system).
+The following catalogs are populated with initial data from CSV files. These catalogs are required for SAT XML file generation.
 
 ## Populated Catalogs
 

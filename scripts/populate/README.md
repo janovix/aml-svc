@@ -8,23 +8,18 @@ Population scripts load **real catalog data** from CSV files into the database. 
 - **preview**: After migrations in `versions:upload` script
 - **prod**: After migrations in `deploy:prod` script
 
-## SAT Catalog Population
+## Catalog Population
 
-SAT catalogs are populated from CSV files provided by the user. Each catalog has its own population script:
+Catalogs are populated from CSV files. Each catalog has its own population script:
 
-- `populate-sat-catalog-tipo-sujeto-obligado.mjs`
-- `populate-sat-catalog-tipo-operacion.mjs`
-- `populate-sat-catalog-moneda.mjs`
-- etc.
-
-## Regular Catalog Population
-
-Regular catalogs (like vehicle-brands) are also populated:
-
-- `populate-catalog-vehicle-brands.mjs` (refactored from seed-vehicle-brands)
+- `catalog-vehicle-brands.mjs` - Vehicle brands
+- `catalog-country.mjs` - Country codes
+- `catalog-currency.mjs` - Currency codes
+- `catalog-operation-type.mjs` - Operation types
+- `catalog-payment-forms.mjs` - Payment forms
+- `catalog-vulnerable-activities.mjs` - Vulnerable activities
 
 ## Population Scripts
 
-- `populate-all-sat-catalogs.mjs` - Populates all SAT catalogs
-- `populate-all-catalogs.mjs` - Populates all regular catalogs
+- `populate-all-catalogs.mjs` - Populates all catalogs
 - `populate-all.mjs` - Master script that runs all population scripts
