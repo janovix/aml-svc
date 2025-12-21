@@ -1,8 +1,6 @@
--- Migration: Add SAT Catalogs and Alert File URL
--- Description: Add SAT catalog tables for XML generation and satFileUrl field to alerts
-
--- Add satFileUrl column to alerts table
-ALTER TABLE alerts ADD COLUMN satFileUrl TEXT;
+-- Migration: Add SAT Catalogs
+-- Description: Add SAT catalog tables for XML generation
+-- Note: satFileUrl column was already added in migration 0006
 
 -- Create sat_catalogs table
 CREATE TABLE IF NOT EXISTS sat_catalogs (
