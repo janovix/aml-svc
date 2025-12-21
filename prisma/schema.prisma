@@ -81,6 +81,7 @@ model Client {
   documents ClientDocument[]
   addresses ClientAddress[]
   transactions Transaction[]
+  alerts Alert[]
 
   @@map("clients")
   @@index([personType])
@@ -209,4 +210,74 @@ model TransactionPaymentMethod {
 
   @@map("transaction_payment_methods")
   @@index([transactionId])
+}
+
+enum AlertStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model AlertRule {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  severity    AlertSeverity @default(MEDIUM)
+  // Dynamic rule configuration stored as JSON
+  // Example: { "conditions": [...], "aggregations": {...}, "thresholds": {...} }
+  ruleConfig  String   // JSON string containing the dynamic rule configuration
+  metadata    String?  // Additional metadata as JSON
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  alerts Alert[]
+
+  @@map("alert_rules")
+  @@index([active])
+  @@index([severity])
+}
+
+model Alert {
+  id                String      @id @default(uuid())
+  alertRuleId       String
+  clientId          String
+  status            AlertStatus @default(PENDING)
+  severity          AlertSeverity
+  // Idempotency key: hash of (clientId + alertRuleId + contextHash)
+  // This ensures we never create duplicate alerts for the same condition
+  idempotencyKey    String      @unique
+  // Context hash: hash of the specific data that triggered this alert
+  // Example: hash of transaction IDs, amounts, dates, etc.
+  contextHash       String
+  // Alert details stored as JSON (transaction IDs, amounts, dates, etc.)
+  alertData         String      // JSON string with alert-specific data
+  // Optional reference to the transaction that triggered the alert
+  triggerTransactionId String?
+  notes             String?
+  reviewedAt        DateTime?
+  reviewedBy        String?
+  resolvedAt        DateTime?
+  resolvedBy        String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Restrict)
+  client    Client    @relation(fields: [clientId], references: [rfc], onDelete: Cascade)
+
+  @@map("alerts")
+  @@index([alertRuleId])
+  @@index([clientId])
+  @@index([status])
+  @@index([severity])
+  @@index([createdAt])
+  @@index([idempotencyKey])
 }
