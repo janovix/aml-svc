@@ -6,6 +6,7 @@ import { alertRulesRouter } from "./alert-rules";
 import { alertsRouter } from "./alerts";
 import { catalogsRouter } from "./catalogs";
 import { clientsRouter } from "./clients";
+import complianceOrganizationRouter from "./compliance-organization";
 import { transactionsRouter } from "./transactions";
 import { umaValuesRouter } from "./uma-values";
 
@@ -18,6 +19,7 @@ export function createRouter() {
 	router.use("/alert-rules/*", authMiddleware());
 	router.use("/alerts/*", authMiddleware());
 	router.use("/uma-values/*", authMiddleware());
+	router.use("/compliance-organization/*", authMiddleware());
 
 	// Mount resource routers
 	router.route("/catalogs", catalogsRouter);
@@ -26,6 +28,7 @@ export function createRouter() {
 	router.route("/alert-rules", alertRulesRouter);
 	router.route("/alerts", alertsRouter);
 	router.route("/uma-values", umaValuesRouter);
+	router.route("/compliance-organization", complianceOrganizationRouter);
 
 	return router;
 }

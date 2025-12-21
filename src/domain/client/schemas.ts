@@ -166,6 +166,8 @@ const CommonSchemaBase = z
 			])
 			.optional(),
 		notes: z.string().max(500).optional().nullable(),
+		countryCode: z.string().optional().nullable(), // Reference to countries catalog (metadata.code)
+		economicActivityCode: z.string().optional().nullable(), // Reference to economic activity catalog (7-digit code)
 	})
 	.merge(AddressSchema)
 	.merge(ContactSchema);
@@ -176,6 +178,8 @@ const CommonSchemaPhysical = z
 		rfc: z.string(), // Will be validated in the merged schemas based on personType
 		nationality: z.string().min(2, "Nationality must be at least 2 characters"),
 		notes: z.string().max(500).optional().nullable(),
+		countryCode: z.string().optional().nullable(), // Reference to countries catalog (metadata.code)
+		economicActivityCode: z.string().optional().nullable(), // Reference to economic activity catalog (7-digit code)
 	})
 	.merge(AddressSchema)
 	.merge(ContactSchema);
@@ -305,6 +309,8 @@ export const ClientPatchSchema = z.object({
 	postalCode: z.string().regex(POSTAL_CODE_REGEX).optional(),
 	reference: z.string().max(200).optional().nullable(),
 	notes: z.string().max(500).optional().nullable(),
+	countryCode: z.string().optional().nullable(), // Reference to countries catalog (metadata.code)
+	economicActivityCode: z.string().optional().nullable(), // Reference to economic activity catalog (7-digit code)
 });
 
 export const ClientFilterSchema = z.object({

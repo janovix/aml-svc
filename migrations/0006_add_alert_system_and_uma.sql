@@ -201,3 +201,34 @@ INSERT INTO uma_values (
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 );
+
+-- Add catalog reference fields to clients table for XML generation
+ALTER TABLE clients ADD COLUMN countryCode TEXT; -- Reference to countries catalog (metadata.code)
+ALTER TABLE clients ADD COLUMN economicActivityCode TEXT; -- Reference to economic activity catalog (7-digit code)
+
+CREATE INDEX IF NOT EXISTS idx_clients_countryCode ON clients(countryCode);
+CREATE INDEX IF NOT EXISTS idx_clients_economicActivityCode ON clients(economicActivityCode);
+
+-- Add catalog reference fields and UMA value to transactions table
+ALTER TABLE transactions ADD COLUMN operationTypeCode TEXT; -- Reference to operation-types catalog (metadata.code, e.g., "802")
+ALTER TABLE transactions ADD COLUMN currencyCode TEXT; -- Reference to currencies catalog (metadata.code, e.g., "3" for MXN)
+ALTER TABLE transactions ADD COLUMN umaValue NUMERIC; -- Calculated: amount / umaDailyValue for the transaction date
+
+CREATE INDEX IF NOT EXISTS idx_transactions_operationTypeCode ON transactions(operationTypeCode);
+CREATE INDEX IF NOT EXISTS idx_transactions_currencyCode ON transactions(currencyCode);
+
+-- Create compliance_organizations table
+-- Stores RFC (clave_sujeto_obligado) and vulnerable activity (clave_actividad) for compliance officer's organization
+-- Linked 1:1 to user (from JWT)
+CREATE TABLE IF NOT EXISTS compliance_organizations (
+    id TEXT PRIMARY KEY NOT NULL,
+    userId TEXT NOT NULL UNIQUE, -- User ID from JWT (compliance officer)
+    claveSujetoObligado TEXT NOT NULL, -- RFC (clave_sujeto_obligado) - 12 characters
+    claveActividad TEXT NOT NULL, -- Vulnerable activity code (e.g., "VEH") - reference to vulnerable-activities catalog
+    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_compliance_organizations_userId ON compliance_organizations(userId);
+CREATE INDEX IF NOT EXISTS idx_compliance_organizations_claveSujetoObligado ON compliance_organizations(claveSujetoObligado);
+CREATE INDEX IF NOT EXISTS idx_compliance_organizations_claveActividad ON compliance_organizations(claveActividad);

@@ -47,6 +47,11 @@ export const openAPISpec = {
 			description:
 				"UMA (Unidad de Medida y Actualización) value management endpoints",
 		},
+		{
+			name: "Compliance Organization",
+			description:
+				"Compliance organization management endpoints (RFC and vulnerable activity for compliance officer)",
+		},
 	],
 	paths: {
 		"/healthz": {
@@ -1744,6 +1749,106 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/compliance-organization": {
+			get: {
+				tags: ["Compliance Organization"],
+				summary: "Get compliance organization",
+				description:
+					"Retrieve the compliance organization (RFC and vulnerable activity) for the authenticated user.",
+				responses: {
+					"200": {
+						description: "Compliance organization",
+						content: {
+							"application/json": {
+								schema: {
+									$ref: "#/components/schemas/ComplianceOrganization",
+								},
+							},
+						},
+					},
+					"404": {
+						description: "Compliance organization not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			put: {
+				tags: ["Compliance Organization"],
+				summary: "Create or update compliance organization",
+				description:
+					"Create or update the compliance organization (RFC and vulnerable activity) for the authenticated user.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								$ref: "#/components/schemas/ComplianceOrganizationCreateRequest",
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Compliance organization created or updated",
+						content: {
+							"application/json": {
+								schema: {
+									$ref: "#/components/schemas/ComplianceOrganization",
+								},
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["Compliance Organization"],
+				summary: "Update compliance organization",
+				description:
+					"Partially update the compliance organization for the authenticated user.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								$ref: "#/components/schemas/ComplianceOrganizationUpdateRequest",
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Compliance organization updated",
+						content: {
+							"application/json": {
+								schema: {
+									$ref: "#/components/schemas/ComplianceOrganization",
+								},
+							},
+						},
+					},
+					"404": {
+						description: "Compliance organization not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
 	},
 	components: {
 		schemas: {
@@ -1818,6 +1923,18 @@ export const openAPISpec = {
 					postalCode: { type: "string" },
 					reference: { type: "string", nullable: true },
 					notes: { type: "string", nullable: true },
+					countryCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to countries catalog (metadata.code) for XML generation",
+					},
+					economicActivityCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to economic activity catalog (7-digit code) for XML generation",
+					},
 					createdAt: { type: "string", format: "date-time" },
 					updatedAt: { type: "string", format: "date-time" },
 					deletedAt: { type: "string", format: "date-time", nullable: true },
@@ -1970,6 +2087,18 @@ export const openAPISpec = {
 					postalCode: { type: "string" },
 					reference: { type: "string", nullable: true },
 					notes: { type: "string", nullable: true },
+					countryCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to countries catalog (metadata.code) for XML generation",
+					},
+					economicActivityCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to economic activity catalog (7-digit code) for XML generation",
+					},
 				},
 			},
 			ClientPatchRequest: {
@@ -2003,6 +2132,18 @@ export const openAPISpec = {
 					postalCode: { type: "string" },
 					reference: { type: "string", nullable: true },
 					notes: { type: "string", nullable: true },
+					countryCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to countries catalog (metadata.code) for XML generation",
+					},
+					economicActivityCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to economic activity catalog (7-digit code) for XML generation",
+					},
 				},
 			},
 			ClientDocument: {
@@ -2344,6 +2485,24 @@ export const openAPISpec = {
 					flagCountryId: { type: "string", nullable: true },
 					amount: { type: "string" },
 					currency: { type: "string" },
+					operationTypeCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to operation-types catalog (metadata.code, e.g., '802') for XML generation",
+					},
+					currencyCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to currencies catalog (metadata.code, e.g., '3' for MXN) for XML generation",
+					},
+					umaValue: {
+						type: "string",
+						nullable: true,
+						description:
+							"Calculated UMA value: amount / umaDailyValue for the transaction date (automatically calculated)",
+					},
 					paymentMethods: {
 						type: "array",
 						items: { $ref: "#/components/schemas/PaymentMethod" },
@@ -2421,6 +2580,18 @@ export const openAPISpec = {
 						maxLength: 3,
 						description: "ISO 4217 currency code.",
 					},
+					operationTypeCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to operation-types catalog (metadata.code, e.g., '802') for XML generation",
+					},
+					currencyCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to currencies catalog (metadata.code, e.g., '3' for MXN) for XML generation",
+					},
 					paymentMethods: {
 						type: "array",
 						items: { $ref: "#/components/schemas/PaymentMethodInput" },
@@ -2472,6 +2643,18 @@ export const openAPISpec = {
 						minLength: 3,
 						maxLength: 3,
 						description: "ISO 4217 currency code.",
+					},
+					operationTypeCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to operation-types catalog (metadata.code, e.g., '802') for XML generation",
+					},
+					currencyCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to currencies catalog (metadata.code, e.g., '3' for MXN) for XML generation",
 					},
 					paymentMethods: {
 						type: "array",
@@ -3017,6 +3200,87 @@ export const openAPISpec = {
 						type: "boolean",
 						description:
 							"If set to true, will deactivate all other UMA values and activate this one",
+					},
+				},
+			},
+			ComplianceOrganization: {
+				type: "object",
+				required: [
+					"id",
+					"userId",
+					"claveSujetoObligado",
+					"claveActividad",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: {
+						type: "string",
+						pattern: "^[A-Za-z0-9-]{1,64}$",
+						description: "Compliance organization identifier",
+					},
+					userId: {
+						type: "string",
+						description:
+							"User ID from JWT (compliance officer) - unique, 1:1 relationship",
+					},
+					claveSujetoObligado: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$",
+						minLength: 12,
+						maxLength: 12,
+						description:
+							"RFC (clave_sujeto_obligado) - 12 characters for legal entities",
+					},
+					claveActividad: {
+						type: "string",
+						minLength: 1,
+						maxLength: 10,
+						description:
+							"Vulnerable activity code (e.g., 'VEH') - reference to vulnerable-activities catalog",
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			ComplianceOrganizationCreateRequest: {
+				type: "object",
+				required: ["claveSujetoObligado", "claveActividad"],
+				properties: {
+					claveSujetoObligado: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$",
+						minLength: 12,
+						maxLength: 12,
+						description:
+							"RFC (clave_sujeto_obligado) - 12 characters for legal entities",
+					},
+					claveActividad: {
+						type: "string",
+						minLength: 1,
+						maxLength: 10,
+						description:
+							"Vulnerable activity code (e.g., 'VEH') - reference to vulnerable-activities catalog",
+					},
+				},
+			},
+			ComplianceOrganizationUpdateRequest: {
+				type: "object",
+				properties: {
+					claveSujetoObligado: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$",
+						minLength: 12,
+						maxLength: 12,
+						description:
+							"RFC (clave_sujeto_obligado) - 12 characters for legal entities",
+					},
+					claveActividad: {
+						type: "string",
+						minLength: 1,
+						maxLength: 10,
+						description:
+							"Vulnerable activity code (e.g., 'VEH') - reference to vulnerable-activities catalog",
 					},
 				},
 			},

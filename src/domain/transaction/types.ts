@@ -26,6 +26,9 @@ export interface TransactionEntity {
 	flagCountryId: string | null;
 	amount: string;
 	currency: string;
+	operationTypeCode: string | null; // Reference to operation-types catalog (metadata.code)
+	currencyCode: string | null; // Reference to currencies catalog (metadata.code)
+	umaValue: string | null; // Calculated: amount / umaDailyValue for the transaction date
 	paymentMethods: PaymentMethod[];
 	createdAt: string;
 	updatedAt: string;

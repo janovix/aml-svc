@@ -137,10 +137,15 @@ export class AlertServiceBinding {
 		const client = await clientService.get(alert.clientId);
 
 		// Get transaction
-		const transactionRepository = new TransactionRepository(prisma);
+		const umaRepository = new UmaValueRepository(prisma);
+		const transactionRepository = new TransactionRepository(
+			prisma,
+			umaRepository,
+		);
 		const transactionService = new TransactionService(
 			transactionRepository,
 			clientRepository, // Reuse clientRepository
+			umaRepository,
 		);
 		const transaction = await transactionService.get(
 			alert.triggerTransactionId,
