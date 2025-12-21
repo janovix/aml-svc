@@ -8,8 +8,13 @@
  * Note: Real alert rules should be created via the API or create-alert-rules script.
  */
 
-import { PrismaD1 } from "@prisma/adapter-d1";
-import { PrismaClient } from "@prisma/client";
+import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { writeFileSync, unlinkSync } from "node:fs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Alert rules based on Janovix AV Vehículos requirements
 const alertRules = [
@@ -216,45 +221,129 @@ const alertRules = [
 	},
 ];
 
-async function seedAlertRules(db) {
-	const adapter = new PrismaD1(db);
-	const prisma = new PrismaClient({ adapter });
+function escapeSqlString(str) {
+	if (!str) return "NULL";
+	return `'${String(str).replace(/'/g, "''")}'`;
+}
+
+function generateSql() {
+	const sql = [];
+
+	// Check if alert rules already exist
+	sql.push(`
+		-- Check if alert rules already exist
+		SELECT COUNT(*) as count FROM alert_rules;
+	`);
+
+	// Insert alert rules (using INSERT OR IGNORE to prevent duplicates)
+	for (const rule of alertRules) {
+		const name = escapeSqlString(rule.name);
+		const description = rule.description
+			? escapeSqlString(rule.description)
+			: "NULL";
+		const active = rule.active ? 1 : 0;
+		const severity = escapeSqlString(rule.severity);
+		const ruleConfig = escapeSqlString(JSON.stringify(rule.ruleConfig));
+		const metadata = rule.metadata
+			? escapeSqlString(JSON.stringify(rule.metadata))
+			: "NULL";
+
+		sql.push(`
+			INSERT OR IGNORE INTO alert_rules (id, name, description, active, severity, ruleConfig, metadata, createdAt, updatedAt)
+			VALUES (
+				lower(hex(randomblob(16))),
+				${name},
+				${description},
+				${active},
+				${severity},
+				${ruleConfig},
+				${metadata},
+				CURRENT_TIMESTAMP,
+				CURRENT_TIMESTAMP
+			);
+		`);
+	}
+
+	return sql.join("\n");
+}
+
+async function seedAlertRules() {
+	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
+	// Use WRANGLER_CONFIG if set, otherwise detect preview environment
+	let configFile = process.env.WRANGLER_CONFIG;
+	if (!configFile) {
+		if (
+			process.env.CF_PAGES_BRANCH ||
+			(process.env.WORKERS_CI_BRANCH &&
+				process.env.WORKERS_CI_BRANCH !== "main") ||
+			process.env.PREVIEW === "true"
+		) {
+			configFile = "wrangler.preview.jsonc";
+		}
+	}
+	const configFlag = configFile ? `--config ${configFile}` : "";
 
 	try {
-		console.log("🌱 Seeding alert rules...");
+		console.log(`🌱 Seeding alert rules (${isRemote ? "remote" : "local"})...`);
 
-		const existingCount = await prisma.alertRule.count();
-		if (existingCount > 0) {
-			console.log(
-				`⏭️  ${existingCount} alert rule(s) already exist. Skipping seed.`,
+		// Check if alert rules already exist
+		const checkSql = "SELECT COUNT(*) as count FROM alert_rules;";
+		const checkFile = join(__dirname, `temp-check-${Date.now()}.sql`);
+		try {
+			writeFileSync(checkFile, checkSql);
+			const checkCommand = isRemote
+				? `wrangler d1 execute DB ${configFlag} --remote --file "${checkFile}"`
+				: `wrangler d1 execute DB ${configFlag} --local --file "${checkFile}"`;
+			const checkOutput = execSync(checkCommand, { encoding: "utf-8" });
+			// Parse the count from output (format may vary)
+			const countMatch = checkOutput.match(/count\s*\|\s*(\d+)/i);
+			if (countMatch && parseInt(countMatch[1], 10) > 0) {
+				console.log(`⏭️  Alert rules already exist. Skipping seed.`);
+				return;
+			}
+		} catch {
+			// If check fails, continue with seeding
+			console.warn(
+				"⚠️  Could not check existing rules, proceeding with seed...",
 			);
-			return;
+		} finally {
+			try {
+				unlinkSync(checkFile);
+			} catch {
+				// Ignore cleanup errors
+			}
 		}
 
 		console.log(`Creating ${alertRules.length} alert rule(s)...`);
 
-		for (const rule of alertRules) {
-			await prisma.alertRule.create({
-				data: {
-					name: rule.name,
-					description: rule.description,
-					active: rule.active,
-					severity: rule.severity,
-					ruleConfig: JSON.stringify(rule.ruleConfig),
-					metadata: rule.metadata ? JSON.stringify(rule.metadata) : null,
-				},
-			});
-			console.log(`  ✓ Created: ${rule.name}`);
-		}
+		// Generate SQL
+		const sql = generateSql();
+		const sqlFile = join(__dirname, `temp-alert-rules-${Date.now()}.sql`);
 
-		console.log(
-			`✅ Alert rule seeding completed: ${alertRules.length} rule(s) created`,
-		);
+		try {
+			writeFileSync(sqlFile, sql);
+
+			// Execute SQL
+			const command = isRemote
+				? `wrangler d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
+				: `wrangler d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
+
+			execSync(command, { stdio: "inherit" });
+
+			console.log(
+				`✅ Alert rule seeding completed: ${alertRules.length} rule(s) created`,
+			);
+		} finally {
+			// Clean up temp file
+			try {
+				unlinkSync(sqlFile);
+			} catch {
+				// Ignore cleanup errors
+			}
+		}
 	} catch (error) {
 		console.error("❌ Error seeding alert rules:", error);
 		throw error;
-	} finally {
-		await prisma.$disconnect();
 	}
 }
 
@@ -263,7 +352,8 @@ export { seedAlertRules };
 
 // If run directly, execute seed
 if (import.meta.url === `file://${process.argv[1]}`) {
-	// This would need D1 database access - handled by all.mjs instead
-	console.log("Run via: pnpm seed");
-	process.exit(0);
+	seedAlertRules().catch((error) => {
+		console.error("Fatal error:", error);
+		process.exit(1);
+	});
 }

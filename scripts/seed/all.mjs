@@ -9,6 +9,7 @@
  */
 
 import { readdir } from "node:fs/promises";
+import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -59,6 +60,10 @@ async function seedAll() {
 	console.log(`Found ${seedScripts.length} seed script(s):\n`);
 
 	const configFile = getConfigFile();
+	const env = { ...process.env };
+	if (configFile) {
+		env.WRANGLER_CONFIG = configFile;
+	}
 
 	// Determine if we're in a Cloudflare Workers environment (preview or dev)
 	// We want to seed in preview and dev, but skip in production
@@ -81,104 +86,23 @@ async function seedAll() {
 		process.exit(0);
 	}
 
-	// Dynamically import unstable_dev to avoid build issues
-	// Use it for both local and remote Cloudflare environments (preview/dev)
-	// Seed scripts run AFTER the build, so they shouldn't affect the build process
-	let db;
-	let cleanup;
-	try {
-		// Use string-based dynamic import to prevent build-time static analysis
-		// The import path is stored in a variable to prevent bundlers from analyzing it
-		const wranglerPath = "wr" + "angler"; // Split string to prevent static analysis
-		const wranglerModule = await import(wranglerPath);
-		const { unstable_dev } = wranglerModule;
-
-		if (!unstable_dev) {
-			throw new Error("unstable_dev not available in wrangler module");
-		}
-
-		// Determine if we should use local or remote database
-		// Use remote for Cloudflare Workers environments (preview/dev in CI)
-		// Use local for local development
-		const useLocal = !isRemote && !process.env.CI;
-
-		const worker = await unstable_dev("src/index.ts", {
-			config: configFile || undefined,
-			local: useLocal,
-			ip: "127.0.0.1",
-			port: 8787,
-		});
-
-		db = worker.env?.DB;
-		if (!db) {
-			await worker.stop();
-			throw new Error("Database binding not found");
-		}
-		cleanup = () => worker.stop();
-	} catch (error) {
-		// Check if error is about KV namespace preview_id
-		if (
-			error.message &&
-			error.message.includes("preview_id") &&
-			error.message.includes("kv namespace")
-		) {
-			console.error("❌ KV namespace configuration issue:", error.message);
-			console.error(
-				"💡 To fix this, create a preview KV namespace and add its ID to the config:",
-			);
-			console.error("   1. Run: wrangler kv namespace create CACHE --preview");
-			console.error(
-				"   2. Add the returned ID as 'preview_id' to the CACHE kv_namespace in your wrangler config",
-			);
-			console.error(
-				"   3. For now, using the same ID as production (may cause issues)",
-			);
-			// Try to continue with a workaround - use the same ID
-			// This might work if the namespace supports both production and preview
-		} else {
-			console.error(
-				"❌ Failed to initialize database connection:",
-				error.message,
-			);
-			console.error(
-				"💡 Tip: Make sure wrangler is properly configured and the database exists.",
-			);
-		}
-		process.exit(1);
-	}
-
-	try {
-		// Import and run each seed script
-		for (const script of seedScripts) {
-			const scriptPath = join(__dirname, script);
-			console.log(`Running ${script}...`);
-			try {
-				// Import the seed function
-				const module = await import(`file://${scriptPath}`);
-				const seedFunctionName = Object.keys(module).find((key) =>
-					key.startsWith("seed"),
-				);
-				const seedFunction = module[seedFunctionName];
-
-				if (typeof seedFunction === "function") {
-					await seedFunction(db);
-					console.log(`✅ ${script} completed\n`);
-				} else {
-					console.error(`❌ ${script} does not export a seed function`);
-					process.exit(1);
-				}
-			} catch (error) {
-				console.error(`❌ Failed to run ${script}:`, error);
-				process.exit(1);
-			}
-		}
-
-		console.log("✅ All seed scripts completed successfully!");
-	} finally {
-		if (cleanup) {
-			await cleanup();
+	// Run each seed script directly (they handle their own database access via wrangler d1 execute)
+	for (const script of seedScripts) {
+		const scriptPath = join(__dirname, script);
+		console.log(`Running ${script}...`);
+		try {
+			execSync(`node "${scriptPath}"`, {
+				stdio: "inherit",
+				env,
+			});
+			console.log(`✅ ${script} completed\n`);
+		} catch (error) {
+			console.error(`❌ Failed to run ${script}:`, error);
+			process.exit(1);
 		}
 	}
+
+	console.log("✅ All seed scripts completed successfully!");
 }
 
 seedAll().catch((error) => {
