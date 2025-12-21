@@ -8,10 +8,10 @@
  * Note: Seeds are NOT run in production.
  */
 
-import { execSync } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { unstable_dev } from "wrangler";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -60,28 +60,51 @@ async function seedAll() {
 	console.log(`Found ${seedScripts.length} seed script(s):\n`);
 
 	const configFile = getConfigFile();
-	const env = { ...process.env };
-	if (configFile) {
-		env.WRANGLER_CONFIG = configFile;
-	}
 
-	// Run each seed script
-	for (const script of seedScripts) {
-		const scriptPath = join(__dirname, script);
-		console.log(`Running ${script}...`);
-		try {
-			execSync(`node "${scriptPath}"`, {
-				stdio: "inherit",
-				env,
-			});
-			console.log(`✅ ${script} completed\n`);
-		} catch (error) {
-			console.error(`❌ Failed to run ${script}:`, error);
-			process.exit(1);
+	// Start wrangler dev to get database access
+	const worker = await unstable_dev("src/index.ts", {
+		config: configFile || undefined,
+		local: !isRemote,
+		ip: "127.0.0.1",
+		port: 8787,
+	});
+
+	try {
+		// Get database from worker bindings
+		const db = worker.env?.DB;
+		if (!db) {
+			throw new Error("Database binding not found");
 		}
-	}
 
-	console.log("✅ All seed scripts completed successfully!");
+		// Import and run each seed script
+		for (const script of seedScripts) {
+			const scriptPath = join(__dirname, script);
+			console.log(`Running ${script}...`);
+			try {
+				// Import the seed function
+				const module = await import(`file://${scriptPath}`);
+				const seedFunctionName = Object.keys(module).find((key) =>
+					key.startsWith("seed"),
+				);
+				const seedFunction = module[seedFunctionName];
+
+				if (typeof seedFunction === "function") {
+					await seedFunction(db);
+					console.log(`✅ ${script} completed\n`);
+				} else {
+					console.error(`❌ ${script} does not export a seed function`);
+					process.exit(1);
+				}
+			} catch (error) {
+				console.error(`❌ Failed to run ${script}:`, error);
+				process.exit(1);
+			}
+		}
+
+		console.log("✅ All seed scripts completed successfully!");
+	} finally {
+		await worker.stop();
+	}
 }
 
 seedAll().catch((error) => {
