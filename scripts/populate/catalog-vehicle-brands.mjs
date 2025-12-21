@@ -20,9 +20,19 @@ const sqlFile = join(__dirname, "../seed-vehicle-brands.sql");
 
 // Determine if we're running locally or remotely based on environment
 const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
-const configFlag = process.env.WRANGLER_CONFIG
-	? `--config ${process.env.WRANGLER_CONFIG}`
-	: "";
+// Use WRANGLER_CONFIG if set, otherwise detect preview environment
+let configFile = process.env.WRANGLER_CONFIG;
+if (!configFile) {
+	if (
+		process.env.CF_PAGES_BRANCH ||
+		(process.env.WORKERS_CI_BRANCH &&
+			process.env.WORKERS_CI_BRANCH !== "main") ||
+		process.env.PREVIEW === "true"
+	) {
+		configFile = "wrangler.preview.jsonc";
+	}
+}
+const configFlag = configFile ? `--config ${configFile}` : "";
 
 try {
 	console.log(
