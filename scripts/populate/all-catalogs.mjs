@@ -19,6 +19,7 @@ const catalogScripts = [
 	"catalog-operation-types.mjs",
 	"catalog-payment-forms.mjs",
 	"catalog-vulnerable-activities.mjs",
+	"catalog-economic-activities.mjs",
 ];
 
 async function populateAllCatalogs() {
