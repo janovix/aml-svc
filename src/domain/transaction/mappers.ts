@@ -108,7 +108,10 @@ function toPrismaDecimal(value: string | number): Prisma.Decimal {
 	return new Prisma.Decimal(value);
 }
 
-export function mapCreateInputToPrisma(input: TransactionCreateInput) {
+export function mapCreateInputToPrisma(
+	input: TransactionCreateInput,
+	umaValue?: Prisma.Decimal | null,
+) {
 	return {
 		clientId: input.clientId,
 		operationDate: toPrismaDateOnly(input.operationDate),
@@ -125,6 +128,9 @@ export function mapCreateInputToPrisma(input: TransactionCreateInput) {
 		flagCountryId: normalizeNullable(input.flagCountryId),
 		amount: toPrismaDecimal(input.amount),
 		currency: input.currency,
+		operationTypeCode: normalizeNullable(input.operationTypeCode),
+		currencyCode: normalizeNullable(input.currencyCode),
+		umaValue: umaValue ?? null,
 		paymentMethods: {
 			create: input.paymentMethods.map((pm) => ({
 				method: pm.method,
@@ -134,7 +140,10 @@ export function mapCreateInputToPrisma(input: TransactionCreateInput) {
 	};
 }
 
-export function mapUpdateInputToPrisma(input: TransactionUpdateInput) {
+export function mapUpdateInputToPrisma(
+	input: TransactionUpdateInput,
+	umaValue?: Prisma.Decimal | null,
+) {
 	return {
 		operationDate: toPrismaDateOnly(input.operationDate),
 		operationType: toPrismaOperationType(input.operationType),
@@ -150,6 +159,9 @@ export function mapUpdateInputToPrisma(input: TransactionUpdateInput) {
 		flagCountryId: normalizeNullable(input.flagCountryId),
 		amount: toPrismaDecimal(input.amount),
 		currency: input.currency,
+		operationTypeCode: normalizeNullable(input.operationTypeCode),
+		currencyCode: normalizeNullable(input.currencyCode),
+		umaValue: umaValue ?? undefined,
 		paymentMethods: {
 			deleteMany: {},
 			create: input.paymentMethods.map((pm) => ({
@@ -192,6 +204,9 @@ export function mapPrismaTransaction(
 		flagCountryId: record.flagCountryId ?? null,
 		amount: record.amount.toFixed(2),
 		currency: record.currency,
+		operationTypeCode: record.operationTypeCode ?? null,
+		currencyCode: record.currencyCode ?? null,
+		umaValue: record.umaValue ? record.umaValue.toFixed(2) : null,
 		paymentMethods: record.paymentMethods?.map(mapPrismaPaymentMethod) ?? [],
 		createdAt: mapDate(record.createdAt),
 		updatedAt: mapDate(record.updatedAt),

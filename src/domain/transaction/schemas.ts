@@ -62,6 +62,8 @@ const BaseTransactionSchema = z.object({
 	armorLevel: z.string().min(1).max(50).optional().nullable(),
 	amount: AmountSchema,
 	currency: CurrencySchema,
+	operationTypeCode: z.string().optional().nullable(), // Reference to operation-types catalog (metadata.code)
+	currencyCode: z.string().optional().nullable(), // Reference to currencies catalog (metadata.code)
 	paymentMethods: z
 		.array(PaymentMethodSchema)
 		.min(1, "At least one payment method is required"),
@@ -206,6 +208,9 @@ export const TransactionEntitySchema = z.object({
 	flagCountryId: z.string().nullable().optional(),
 	amount: z.string(),
 	currency: CurrencySchema,
+	operationTypeCode: z.string().nullable().optional(),
+	currencyCode: z.string().nullable().optional(),
+	umaValue: z.string().nullable().optional(),
 	paymentMethods: z.array(PaymentMethodEntitySchema),
 	createdAt: IsoDateTimeSchema,
 	updatedAt: IsoDateTimeSchema,

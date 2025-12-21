@@ -1,4 +1,5 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 
 import {
 	mapCreateInputToPrisma,
@@ -13,9 +14,13 @@ import type {
 	TransactionUpdateInput,
 } from "./schemas";
 import type { TransactionEntity, TransactionListResult } from "./types";
+import type { UmaValueRepository } from "../uma/repository";
 
 export class TransactionRepository {
-	constructor(private readonly prisma: PrismaClient) {}
+	constructor(
+		private readonly prisma: PrismaClient,
+		private readonly umaRepository: UmaValueRepository,
+	) {}
 
 	async list(filters: TransactionFilters): Promise<TransactionListResult> {
 		const {
@@ -96,8 +101,14 @@ export class TransactionRepository {
 	}
 
 	async create(input: TransactionCreateInput): Promise<TransactionEntity> {
+		// Calculate UMA value for the transaction date
+		const umaValue = await this.calculateUmaValue(
+			input.operationDate,
+			input.amount,
+		);
+
 		const created = await this.prisma.transaction.create({
-			data: mapCreateInputToPrisma(input),
+			data: mapCreateInputToPrisma(input, umaValue),
 			include: { paymentMethods: true },
 		});
 		return mapPrismaTransaction(created);
@@ -108,12 +119,57 @@ export class TransactionRepository {
 		input: TransactionUpdateInput,
 	): Promise<TransactionEntity> {
 		await this.ensureExists(id);
+
+		// Calculate UMA value for the transaction date
+		const umaValue = await this.calculateUmaValue(
+			input.operationDate,
+			input.amount,
+		);
+
 		const updated = await this.prisma.transaction.update({
 			where: { id },
-			data: mapUpdateInputToPrisma(input),
+			data: mapUpdateInputToPrisma(input, umaValue),
 			include: { paymentMethods: true },
 		});
 		return mapPrismaTransaction(updated);
+	}
+
+	/**
+	 * Calculates UMA value for a transaction: amount / umaDailyValue
+	 * Uses the active UMA value for the transaction date's year
+	 */
+	private async calculateUmaValue(
+		operationDate: string,
+		amount: string,
+	): Promise<Prisma.Decimal | null> {
+		try {
+			// Get the year from the operation date
+			const date = new Date(operationDate + "T00:00:00.000Z");
+			const year = date.getFullYear();
+
+			// Get UMA value for the transaction year (prefer active, fallback to year-specific)
+			let umaValue = await this.umaRepository.getActive();
+			if (!umaValue || umaValue.year !== year) {
+				umaValue = await this.umaRepository.getByYear(year);
+			}
+
+			if (!umaValue) {
+				console.warn(
+					`No UMA value found for year ${year}, skipping UMA calculation`,
+				);
+				return null;
+			}
+
+			// Calculate: amount / umaDailyValue
+			const amountDecimal = new Prisma.Decimal(amount);
+			const umaDailyValue = new Prisma.Decimal(umaValue.dailyValue);
+			const calculatedUma = amountDecimal.dividedBy(umaDailyValue);
+
+			return calculatedUma;
+		} catch (error) {
+			console.error("Error calculating UMA value:", error);
+			return null;
+		}
 	}
 
 	async delete(id: string): Promise<void> {

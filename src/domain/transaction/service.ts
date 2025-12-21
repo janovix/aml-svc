@@ -6,11 +6,13 @@ import type {
 } from "./schemas";
 import type { TransactionEntity, TransactionListResult } from "./types";
 import type { ClientRepository } from "../client/repository";
+import type { UmaValueRepository } from "../uma/repository";
 
 export class TransactionService {
 	constructor(
 		private readonly repository: TransactionRepository,
 		private readonly clientRepository: ClientRepository,
+		private readonly umaRepository: UmaValueRepository,
 	) {}
 
 	list(filters: TransactionFilters): Promise<TransactionListResult> {

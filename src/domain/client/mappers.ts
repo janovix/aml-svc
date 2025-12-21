@@ -131,6 +131,12 @@ function basePrismaPayload(input: ClientCreateInput | ClientUpdateInput) {
 		postalCode: input.postalCode,
 		reference: normalizeOptional(input.reference),
 		notes: normalizeOptional(input.notes),
+		countryCode:
+			"countryCode" in input ? normalizeOptional(input.countryCode) : undefined,
+		economicActivityCode:
+			"economicActivityCode" in input
+				? normalizeOptional(input.economicActivityCode)
+				: undefined,
 	};
 }
 
@@ -179,6 +185,8 @@ export function mapPatchInputToPrisma(input: ClientPatchInput) {
 		"postalCode",
 		"reference",
 		"notes",
+		"countryCode",
+		"economicActivityCode",
 	];
 
 	for (const key of passthroughKeys) {
@@ -231,6 +239,8 @@ export function mapPrismaClient(
 		postalCode: record.postalCode,
 		reference: record.reference ?? null,
 		notes: record.notes ?? null,
+		countryCode: record.countryCode ?? null,
+		economicActivityCode: record.economicActivityCode ?? null,
 		createdAt: mapDateTime(record.createdAt) ?? new Date().toISOString(),
 		updatedAt: mapDateTime(record.updatedAt) ?? new Date().toISOString(),
 		deletedAt: mapDateTime(record.deletedAt) ?? null,

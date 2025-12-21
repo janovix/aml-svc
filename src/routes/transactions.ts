@@ -11,6 +11,7 @@ import {
 	TransactionService,
 	TransactionUpdateSchema,
 } from "../domain/transaction";
+import { UmaValueRepository } from "../domain/uma";
 import type { Bindings } from "../index";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
@@ -33,9 +34,17 @@ function parseWithZod<T>(
 
 function getService(c: Context<{ Bindings: Bindings }>) {
 	const prisma = getPrismaClient(c.env.DB);
-	const transactionRepository = new TransactionRepository(prisma);
+	const umaRepository = new UmaValueRepository(prisma);
+	const transactionRepository = new TransactionRepository(
+		prisma,
+		umaRepository,
+	);
 	const clientRepository = new ClientRepository(prisma);
-	return new TransactionService(transactionRepository, clientRepository);
+	return new TransactionService(
+		transactionRepository,
+		clientRepository,
+		umaRepository,
+	);
 }
 
 function handleServiceError(error: unknown): never {

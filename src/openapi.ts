@@ -34,6 +34,24 @@ export const openAPISpec = {
 			name: "Transactions",
 			description: "Vehicle transaction endpoints",
 		},
+		{
+			name: "Alert Rules",
+			description: "Dynamic alert rule management endpoints",
+		},
+		{
+			name: "Alerts",
+			description: "Alert detection and management endpoints",
+		},
+		{
+			name: "UMA Values",
+			description:
+				"UMA (Unidad de Medida y Actualización) value management endpoints",
+		},
+		{
+			name: "Compliance Organization",
+			description:
+				"Compliance organization management endpoints (RFC and vulnerable activity for compliance officer)",
+		},
 	],
 	paths: {
 		"/healthz": {
@@ -933,6 +951,904 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/alert-rules": {
+			get: {
+				tags: ["Alert Rules"],
+				summary: "List alert rules",
+				description:
+					"Retrieve a paginated list of alert rules with optional filters for active status and severity.",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+						description: "Page number to retrieve",
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 10 },
+						description: "Number of records per page",
+					},
+					{
+						name: "search",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by name or description",
+					},
+					{
+						name: "active",
+						in: "query",
+						schema: { type: "boolean" },
+						description: "Filter by active status",
+					},
+					{
+						name: "severity",
+						in: "query",
+						schema: {
+							type: "string",
+							enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+						},
+						description: "Filter by severity level",
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of alert rules",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/AlertRule" },
+										},
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Alert Rules"],
+				summary: "Create alert rule",
+				description: "Create a new dynamic alert rule.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertRuleCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Alert rule created successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRule" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/alert-rules/{id}": {
+			get: {
+				tags: ["Alert Rules"],
+				summary: "Get alert rule by ID",
+				description: "Retrieve a single alert rule.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert rule identifier",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Alert rule detail response",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRule" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			put: {
+				tags: ["Alert Rules"],
+				summary: "Update alert rule",
+				description: "Replace the full alert rule payload.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertRuleCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alert rule updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRule" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["Alert Rules"],
+				summary: "Patch alert rule",
+				description: "Apply a partial update to an alert rule.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertRulePatchRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alert rule updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRule" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["Alert Rules"],
+				summary: "Delete alert rule",
+				description: "Delete an alert rule.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": {
+						description: "Alert rule deleted",
+					},
+					"404": {
+						description: "Alert rule not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/alerts": {
+			get: {
+				tags: ["Alerts"],
+				summary: "List alerts",
+				description:
+					"Retrieve a paginated list of alerts with optional filters for alert rule, client, status, and severity.",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+						description: "Page number to retrieve",
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 10 },
+						description: "Number of records per page",
+					},
+					{
+						name: "alertRuleId",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by alert rule ID",
+					},
+					{
+						name: "clientId",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by client ID (RFC)",
+					},
+					{
+						name: "status",
+						in: "query",
+						schema: {
+							type: "string",
+							enum: [
+								"DETECTED",
+								"FILE_GENERATED",
+								"SUBMITTED",
+								"OVERDUE",
+								"CANCELLED",
+							],
+						},
+						description: "Filter by alert status",
+					},
+					{
+						name: "severity",
+						in: "query",
+						schema: {
+							type: "string",
+							enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+						},
+						description: "Filter by severity level",
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of alerts",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/Alert" },
+										},
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Alerts"],
+				summary: "Create alert",
+				description:
+					"Create a new alert. The alert creation is idempotent based on the idempotencyKey.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description:
+							"Alert created successfully (or existing alert returned if idempotencyKey matches)",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Alert" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/alerts/{id}": {
+			get: {
+				tags: ["Alerts"],
+				summary: "Get alert by ID",
+				description: "Retrieve a single alert.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert identifier",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Alert detail response",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Alert" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			put: {
+				tags: ["Alerts"],
+				summary: "Update alert",
+				description: "Update alert status and metadata.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertUpdateRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alert updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Alert" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["Alerts"],
+				summary: "Patch alert",
+				description: "Apply a partial update to an alert.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertPatchRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alert updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Alert" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["Alerts"],
+				summary: "Delete alert",
+				description: "Delete an alert.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": {
+						description: "Alert deleted",
+					},
+					"404": {
+						description: "Alert not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/uma-values": {
+			get: {
+				tags: ["UMA Values"],
+				summary: "List UMA values",
+				description:
+					"Retrieve a paginated list of UMA values with optional filters for year and active status.",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+						description: "Page number to retrieve",
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 10 },
+						description: "Number of records per page",
+					},
+					{
+						name: "year",
+						in: "query",
+						schema: { type: "integer", minimum: 2000, maximum: 2100 },
+						description: "Filter by year",
+					},
+					{
+						name: "active",
+						in: "query",
+						schema: { type: "boolean" },
+						description: "Filter by active status",
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of UMA values",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/UmaValue" },
+										},
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["UMA Values"],
+				summary: "Create UMA value",
+				description:
+					"Create a new UMA value for a specific year. Only one UMA value can be active at a time.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/UmaValueCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "UMA value created successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/uma-values/active": {
+			get: {
+				tags: ["UMA Values"],
+				summary: "Get active UMA value",
+				description:
+					"Retrieve the currently active UMA value. This is the value used for threshold calculations.",
+				responses: {
+					"200": {
+						description: "Active UMA value",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"404": {
+						description: "No active UMA value found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/uma-values/year/{year}": {
+			get: {
+				tags: ["UMA Values"],
+				summary: "Get UMA value by year",
+				description: "Retrieve the UMA value for a specific year.",
+				parameters: [
+					{
+						name: "year",
+						in: "path",
+						required: true,
+						schema: { type: "integer", minimum: 2000, maximum: 2100 },
+						description: "Year to retrieve UMA value for",
+					},
+				],
+				responses: {
+					"200": {
+						description: "UMA value for the specified year",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"404": {
+						description: "UMA value for year not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/uma-values/{id}": {
+			get: {
+				tags: ["UMA Values"],
+				summary: "Get UMA value by ID",
+				description: "Retrieve a single UMA value.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "UMA value identifier",
+					},
+				],
+				responses: {
+					"200": {
+						description: "UMA value detail response",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"404": {
+						description: "UMA value not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			put: {
+				tags: ["UMA Values"],
+				summary: "Update UMA value",
+				description:
+					"Replace the full UMA value payload. If setting as active, all other UMA values will be deactivated.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/UmaValueCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "UMA value updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"404": {
+						description: "UMA value not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["UMA Values"],
+				summary: "Patch UMA value",
+				description:
+					"Apply a partial update to a UMA value. If setting as active, all other UMA values will be deactivated.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/UmaValuePatchRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "UMA value updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"404": {
+						description: "UMA value not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["UMA Values"],
+				summary: "Delete UMA value",
+				description: "Delete a UMA value.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": {
+						description: "UMA value deleted",
+					},
+					"404": {
+						description: "UMA value not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/uma-values/{id}/activate": {
+			post: {
+				tags: ["UMA Values"],
+				summary: "Activate UMA value",
+				description:
+					"Activate a UMA value. This will deactivate all other UMA values and set this one as active.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "UMA value activated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"404": {
+						description: "UMA value not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/compliance-organization": {
+			get: {
+				tags: ["Compliance Organization"],
+				summary: "Get compliance organization",
+				description:
+					"Retrieve the compliance organization (RFC and vulnerable activity) for the authenticated user.",
+				responses: {
+					"200": {
+						description: "Compliance organization",
+						content: {
+							"application/json": {
+								schema: {
+									$ref: "#/components/schemas/ComplianceOrganization",
+								},
+							},
+						},
+					},
+					"404": {
+						description: "Compliance organization not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			put: {
+				tags: ["Compliance Organization"],
+				summary: "Create or update compliance organization",
+				description:
+					"Create or update the compliance organization (RFC and vulnerable activity) for the authenticated user.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								$ref: "#/components/schemas/ComplianceOrganizationCreateRequest",
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Compliance organization created or updated",
+						content: {
+							"application/json": {
+								schema: {
+									$ref: "#/components/schemas/ComplianceOrganization",
+								},
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["Compliance Organization"],
+				summary: "Update compliance organization",
+				description:
+					"Partially update the compliance organization for the authenticated user.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								$ref: "#/components/schemas/ComplianceOrganizationUpdateRequest",
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Compliance organization updated",
+						content: {
+							"application/json": {
+								schema: {
+									$ref: "#/components/schemas/ComplianceOrganization",
+								},
+							},
+						},
+					},
+					"404": {
+						description: "Compliance organization not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
 	},
 	components: {
 		schemas: {
@@ -1007,6 +1923,18 @@ export const openAPISpec = {
 					postalCode: { type: "string" },
 					reference: { type: "string", nullable: true },
 					notes: { type: "string", nullable: true },
+					countryCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to countries catalog (metadata.code) for XML generation",
+					},
+					economicActivityCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to economic activity catalog (7-digit code) for XML generation",
+					},
 					createdAt: { type: "string", format: "date-time" },
 					updatedAt: { type: "string", format: "date-time" },
 					deletedAt: { type: "string", format: "date-time", nullable: true },
@@ -1159,6 +2087,18 @@ export const openAPISpec = {
 					postalCode: { type: "string" },
 					reference: { type: "string", nullable: true },
 					notes: { type: "string", nullable: true },
+					countryCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to countries catalog (metadata.code) for XML generation",
+					},
+					economicActivityCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to economic activity catalog (7-digit code) for XML generation",
+					},
 				},
 			},
 			ClientPatchRequest: {
@@ -1192,6 +2132,18 @@ export const openAPISpec = {
 					postalCode: { type: "string" },
 					reference: { type: "string", nullable: true },
 					notes: { type: "string", nullable: true },
+					countryCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to countries catalog (metadata.code) for XML generation",
+					},
+					economicActivityCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to economic activity catalog (7-digit code) for XML generation",
+					},
 				},
 			},
 			ClientDocument: {
@@ -1533,6 +2485,24 @@ export const openAPISpec = {
 					flagCountryId: { type: "string", nullable: true },
 					amount: { type: "string" },
 					currency: { type: "string" },
+					operationTypeCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to operation-types catalog (metadata.code, e.g., '802') for XML generation",
+					},
+					currencyCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to currencies catalog (metadata.code, e.g., '3' for MXN) for XML generation",
+					},
+					umaValue: {
+						type: "string",
+						nullable: true,
+						description:
+							"Calculated UMA value: amount / umaDailyValue for the transaction date (automatically calculated)",
+					},
 					paymentMethods: {
 						type: "array",
 						items: { $ref: "#/components/schemas/PaymentMethod" },
@@ -1610,6 +2580,18 @@ export const openAPISpec = {
 						maxLength: 3,
 						description: "ISO 4217 currency code.",
 					},
+					operationTypeCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to operation-types catalog (metadata.code, e.g., '802') for XML generation",
+					},
+					currencyCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to currencies catalog (metadata.code, e.g., '3' for MXN) for XML generation",
+					},
 					paymentMethods: {
 						type: "array",
 						items: { $ref: "#/components/schemas/PaymentMethodInput" },
@@ -1662,6 +2644,18 @@ export const openAPISpec = {
 						maxLength: 3,
 						description: "ISO 4217 currency code.",
 					},
+					operationTypeCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to operation-types catalog (metadata.code, e.g., '802') for XML generation",
+					},
+					currencyCode: {
+						type: "string",
+						nullable: true,
+						description:
+							"Reference to currencies catalog (metadata.code, e.g., '3' for MXN) for XML generation",
+					},
 					paymentMethods: {
 						type: "array",
 						items: { $ref: "#/components/schemas/PaymentMethodInput" },
@@ -1708,6 +2702,586 @@ export const openAPISpec = {
 					error: { type: "string" },
 					message: { type: "string" },
 					details: { type: "object" },
+				},
+			},
+			AlertSeverity: {
+				type: "string",
+				enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+				description: "Alert severity levels",
+			},
+			AlertStatus: {
+				type: "string",
+				enum: [
+					"DETECTED",
+					"FILE_GENERATED",
+					"SUBMITTED",
+					"OVERDUE",
+					"CANCELLED",
+				],
+				description:
+					"Alert status: DETECTED (alert detected, awaiting file generation), FILE_GENERATED (file generated for SAT submission), SUBMITTED (successfully submitted to SAT with acknowledgment), OVERDUE (submission deadline has passed - worst case, penalties may apply), CANCELLED (alert was cancelled/dismissed)",
+			},
+			AlertRule: {
+				type: "object",
+				required: [
+					"id",
+					"name",
+					"active",
+					"severity",
+					"ruleConfig",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: {
+						type: "string",
+						pattern: "^[A-Za-z0-9-]{1,64}$",
+						description: "Alert rule identifier",
+					},
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					description: { type: "string", maxLength: 1000, nullable: true },
+					active: { type: "boolean" },
+					severity: { $ref: "#/components/schemas/AlertSeverity" },
+					ruleConfig: {
+						type: "object",
+						description:
+							"Dynamic rule configuration stored as JSON. Structure depends on rule type.",
+						additionalProperties: true,
+					},
+					metadata: {
+						type: "object",
+						nullable: true,
+						description: "Additional metadata as JSON",
+						additionalProperties: true,
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			AlertRuleCreateRequest: {
+				type: "object",
+				required: ["name", "severity", "ruleConfig"],
+				properties: {
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					description: { type: "string", maxLength: 1000, nullable: true },
+					active: { type: "boolean", default: true },
+					severity: {
+						$ref: "#/components/schemas/AlertSeverity",
+						default: "MEDIUM",
+					},
+					ruleConfig: {
+						type: "object",
+						description:
+							"Dynamic rule configuration. Examples: transaction_amount, transaction_count, aggregate_amount, custom",
+						additionalProperties: true,
+					},
+					metadata: {
+						type: "object",
+						nullable: true,
+						additionalProperties: true,
+					},
+				},
+			},
+			AlertRulePatchRequest: {
+				type: "object",
+				properties: {
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					description: { type: "string", maxLength: 1000, nullable: true },
+					active: { type: "boolean" },
+					severity: { $ref: "#/components/schemas/AlertSeverity" },
+					ruleConfig: {
+						type: "object",
+						additionalProperties: true,
+					},
+					metadata: {
+						type: "object",
+						nullable: true,
+						additionalProperties: true,
+					},
+				},
+			},
+			Alert: {
+				type: "object",
+				required: [
+					"id",
+					"alertRuleId",
+					"clientId",
+					"status",
+					"severity",
+					"idempotencyKey",
+					"contextHash",
+					"alertData",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: {
+						type: "string",
+						pattern: "^[A-Za-z0-9-]{1,64}$",
+						description: "Alert identifier",
+					},
+					alertRuleId: {
+						type: "string",
+						description:
+							"Reference to the alert rule that triggered this alert",
+					},
+					clientId: {
+						type: "string",
+						description: "Client ID (RFC) for which this alert was generated",
+					},
+					status: { $ref: "#/components/schemas/AlertStatus" },
+					severity: { $ref: "#/components/schemas/AlertSeverity" },
+					idempotencyKey: {
+						type: "string",
+						maxLength: 255,
+						description:
+							"Unique key ensuring idempotent alert creation. Hash of (clientId + alertRuleId + contextHash)",
+					},
+					contextHash: {
+						type: "string",
+						maxLength: 255,
+						description:
+							"Hash of the specific data that triggered this alert (transaction IDs, amounts, dates, etc.)",
+					},
+					alertData: {
+						type: "object",
+						description:
+							"Alert-specific data stored as JSON (transaction IDs, amounts, dates, etc.)",
+						additionalProperties: true,
+					},
+					triggerTransactionId: {
+						type: "string",
+						nullable: true,
+						description:
+							"Optional reference to the transaction that triggered the alert",
+					},
+					submissionDeadline: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description:
+							"Deadline for SAT submission (day 17 of following month for avisos, 24h for suspicion avisos)",
+					},
+					fileGeneratedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When the SAT file was generated",
+					},
+					submittedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When submitted to SAT",
+					},
+					satAcknowledgmentReceipt: {
+						type: "string",
+						maxLength: 500,
+						nullable: true,
+						description:
+							"File URL or reference to SAT acknowledgment (PDF/XML)",
+					},
+					satFolioNumber: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description: "Folio number from SAT acknowledgment",
+					},
+					isOverdue: {
+						type: "boolean",
+						description:
+							"Computed: true if submissionDeadline has passed and status != SUBMITTED",
+					},
+					notes: { type: "string", maxLength: 1000, nullable: true },
+					reviewedAt: { type: "string", format: "date-time", nullable: true },
+					reviewedBy: { type: "string", maxLength: 100, nullable: true },
+					cancelledAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When the alert was cancelled",
+					},
+					cancelledBy: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description: "User who cancelled the alert",
+					},
+					cancellationReason: {
+						type: "string",
+						maxLength: 1000,
+						nullable: true,
+						description: "Reason for cancellation",
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+					alertRule: {
+						$ref: "#/components/schemas/AlertRule",
+						nullable: true,
+						description:
+							"Alert rule details (included when fetching alert with relations)",
+					},
+				},
+			},
+			AlertCreateRequest: {
+				type: "object",
+				required: [
+					"alertRuleId",
+					"clientId",
+					"severity",
+					"idempotencyKey",
+					"contextHash",
+					"alertData",
+				],
+				properties: {
+					alertRuleId: { type: "string" },
+					clientId: { type: "string" },
+					severity: { $ref: "#/components/schemas/AlertSeverity" },
+					idempotencyKey: {
+						type: "string",
+						minLength: 1,
+						maxLength: 255,
+						description:
+							"Unique key ensuring idempotent alert creation. Must be hash of (clientId + alertRuleId + contextHash)",
+					},
+					contextHash: {
+						type: "string",
+						minLength: 1,
+						maxLength: 255,
+						description:
+							"Hash of the specific data that triggered this alert (transaction IDs, amounts, dates, etc.)",
+					},
+					alertData: {
+						type: "object",
+						description:
+							"Alert-specific data stored as JSON (transaction IDs, amounts, dates, etc.)",
+						additionalProperties: true,
+					},
+					triggerTransactionId: { type: "string", nullable: true },
+					submissionDeadline: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description:
+							"Deadline for SAT submission (will be calculated based on alert type if not provided)",
+					},
+					notes: { type: "string", maxLength: 1000, nullable: true },
+				},
+			},
+			AlertUpdateRequest: {
+				type: "object",
+				required: ["status"],
+				properties: {
+					status: { $ref: "#/components/schemas/AlertStatus" },
+					notes: { type: "string", maxLength: 1000, nullable: true },
+					reviewedBy: { type: "string", maxLength: 100, nullable: true },
+					fileGeneratedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When the SAT file was generated",
+					},
+					submittedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When submitted to SAT",
+					},
+					satAcknowledgmentReceipt: {
+						type: "string",
+						maxLength: 500,
+						nullable: true,
+						description: "File URL or reference to SAT acknowledgment",
+					},
+					satFolioNumber: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description: "Folio number from SAT acknowledgment",
+					},
+					cancelledBy: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description: "User who cancelled the alert",
+					},
+					cancellationReason: {
+						type: "string",
+						maxLength: 1000,
+						nullable: true,
+						description: "Reason for cancellation",
+					},
+				},
+			},
+			AlertPatchRequest: {
+				type: "object",
+				properties: {
+					status: { $ref: "#/components/schemas/AlertStatus" },
+					notes: { type: "string", maxLength: 1000, nullable: true },
+					reviewedBy: { type: "string", maxLength: 100, nullable: true },
+					fileGeneratedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When the SAT file was generated",
+					},
+					submittedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When submitted to SAT",
+					},
+					satAcknowledgmentReceipt: {
+						type: "string",
+						maxLength: 500,
+						nullable: true,
+						description: "File URL or reference to SAT acknowledgment",
+					},
+					satFolioNumber: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description: "Folio number from SAT acknowledgment",
+					},
+					cancelledBy: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description: "User who cancelled the alert",
+					},
+					cancellationReason: {
+						type: "string",
+						maxLength: 1000,
+						nullable: true,
+						description: "Reason for cancellation",
+					},
+				},
+			},
+			UmaValue: {
+				type: "object",
+				required: [
+					"id",
+					"year",
+					"dailyValue",
+					"effectiveDate",
+					"active",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: {
+						type: "string",
+						pattern: "^[A-Za-z0-9-]{1,64}$",
+						description: "UMA value identifier",
+					},
+					year: {
+						type: "integer",
+						minimum: 2000,
+						maximum: 2100,
+						description: "Year this UMA value applies to",
+					},
+					dailyValue: {
+						type: "string",
+						description:
+							"UMA daily value for the year, stored as string to preserve precision",
+					},
+					effectiveDate: {
+						type: "string",
+						format: "date-time",
+						description: "Date when this UMA value becomes effective",
+					},
+					endDate: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description:
+							"Optional date when this UMA value expires (usually end of year)",
+					},
+					approvedBy: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description:
+							"User who approved/configured this value (Compliance Officer)",
+					},
+					notes: {
+						type: "string",
+						maxLength: 1000,
+						nullable: true,
+						description: "Optional notes about the UMA value",
+					},
+					active: {
+						type: "boolean",
+						description:
+							"Whether this is the current active UMA value (only one can be active at a time)",
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			UmaValueCreateRequest: {
+				type: "object",
+				required: ["year", "dailyValue", "effectiveDate"],
+				properties: {
+					year: {
+						type: "integer",
+						minimum: 2000,
+						maximum: 2100,
+						description: "Year this UMA value applies to",
+					},
+					dailyValue: {
+						type: "number",
+						description: "UMA daily value for the year",
+					},
+					effectiveDate: {
+						type: "string",
+						format: "date-time",
+						description: "Date when this UMA value becomes effective",
+					},
+					endDate: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description:
+							"Optional date when this UMA value expires (usually end of year)",
+					},
+					approvedBy: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description:
+							"User who approved/configured this value (Compliance Officer)",
+					},
+					notes: {
+						type: "string",
+						maxLength: 1000,
+						nullable: true,
+						description: "Optional notes about the UMA value",
+					},
+					active: {
+						type: "boolean",
+						default: false,
+						description:
+							"Whether to set this as active (will deactivate all others). Usually set to false initially and activated manually.",
+					},
+				},
+			},
+			UmaValuePatchRequest: {
+				type: "object",
+				properties: {
+					year: {
+						type: "integer",
+						minimum: 2000,
+						maximum: 2100,
+					},
+					dailyValue: {
+						type: "number",
+					},
+					effectiveDate: {
+						type: "string",
+						format: "date-time",
+					},
+					endDate: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+					},
+					approvedBy: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+					},
+					notes: {
+						type: "string",
+						maxLength: 1000,
+						nullable: true,
+					},
+					active: {
+						type: "boolean",
+						description:
+							"If set to true, will deactivate all other UMA values and activate this one",
+					},
+				},
+			},
+			ComplianceOrganization: {
+				type: "object",
+				required: [
+					"id",
+					"userId",
+					"claveSujetoObligado",
+					"claveActividad",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: {
+						type: "string",
+						pattern: "^[A-Za-z0-9-]{1,64}$",
+						description: "Compliance organization identifier",
+					},
+					userId: {
+						type: "string",
+						description:
+							"User ID from JWT (compliance officer) - unique, 1:1 relationship",
+					},
+					claveSujetoObligado: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$",
+						minLength: 12,
+						maxLength: 12,
+						description:
+							"RFC (clave_sujeto_obligado) - 12 characters for legal entities",
+					},
+					claveActividad: {
+						type: "string",
+						minLength: 1,
+						maxLength: 10,
+						description:
+							"Vulnerable activity code (e.g., 'VEH') - reference to vulnerable-activities catalog",
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			ComplianceOrganizationCreateRequest: {
+				type: "object",
+				required: ["claveSujetoObligado", "claveActividad"],
+				properties: {
+					claveSujetoObligado: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$",
+						minLength: 12,
+						maxLength: 12,
+						description:
+							"RFC (clave_sujeto_obligado) - 12 characters for legal entities",
+					},
+					claveActividad: {
+						type: "string",
+						minLength: 1,
+						maxLength: 10,
+						description:
+							"Vulnerable activity code (e.g., 'VEH') - reference to vulnerable-activities catalog",
+					},
+				},
+			},
+			ComplianceOrganizationUpdateRequest: {
+				type: "object",
+				properties: {
+					claveSujetoObligado: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$",
+						minLength: 12,
+						maxLength: 12,
+						description:
+							"RFC (clave_sujeto_obligado) - 12 characters for legal entities",
+					},
+					claveActividad: {
+						type: "string",
+						minLength: 1,
+						maxLength: 10,
+						description:
+							"Vulnerable activity code (e.g., 'VEH') - reference to vulnerable-activities catalog",
+					},
 				},
 			},
 		},

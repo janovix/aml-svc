@@ -74,6 +74,9 @@ model Client {
   postalCode        String
   reference         String?
   notes             String?
+  // Catalog references for XML generation
+  countryCode       String?    // Reference to countries catalog (metadata.code)
+  economicActivityCode String? // Reference to economic activity catalog (7-digit code)
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
   deletedAt         DateTime?
@@ -81,10 +84,13 @@ model Client {
   documents ClientDocument[]
   addresses ClientAddress[]
   transactions Transaction[]
+  alerts Alert[]
 
   @@map("clients")
   @@index([personType])
   @@index([deletedAt])
+  @@index([countryCode])
+  @@index([economicActivityCode])
 }
 
 model ClientDocument {
@@ -183,6 +189,11 @@ model Transaction {
   flagCountryId     String?
   amount            Decimal
   currency          String
+  // Catalog references for XML generation
+  operationTypeCode String?    // Reference to operation-types catalog (metadata.code, e.g., "802")
+  currencyCode      String?    // Reference to currencies catalog (metadata.code, e.g., "3" for MXN)
+  // UMA value calculation (automatically calculated and saved)
+  umaValue          Decimal?   // Calculated: amount / umaDailyValue for the transaction date
   createdAt         DateTime                   @default(now())
   updatedAt         DateTime                   @updatedAt
   deletedAt         DateTime?
@@ -195,6 +206,8 @@ model Transaction {
   @@index([operationDate])
   @@index([operationType])
   @@index([vehicleType])
+  @@index([operationTypeCode])
+  @@index([currencyCode])
 }
 
 model TransactionPaymentMethod {
@@ -209,4 +222,125 @@ model TransactionPaymentMethod {
 
   @@map("transaction_payment_methods")
   @@index([transactionId])
+}
+
+enum AlertStatus {
+  DETECTED        // Alert detected, awaiting file generation
+  FILE_GENERATED  // File generated for SAT submission, ready to submit
+  SUBMITTED       // Successfully submitted to SAT with acknowledgment
+  OVERDUE         // Submission deadline has passed (worst case - penalties)
+  CANCELLED       // Alert was cancelled/dismissed (e.g., false positive)
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model AlertRule {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  severity    AlertSeverity @default(MEDIUM)
+  // Dynamic rule configuration stored as JSON
+  // Example: { "conditions": [...], "aggregations": {...}, "thresholds": {...} }
+  ruleConfig  String   // JSON string containing the dynamic rule configuration
+  metadata    String?  // Additional metadata as JSON
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  alerts Alert[]
+
+  @@map("alert_rules")
+  @@index([active])
+  @@index([severity])
+}
+
+model Alert {
+  id                String      @id @default(uuid())
+  alertRuleId       String
+  clientId          String
+  status            AlertStatus @default(DETECTED)
+  severity          AlertSeverity
+  // Idempotency key: hash of (clientId + alertRuleId + contextHash)
+  // This ensures we never create duplicate alerts for the same condition
+  idempotencyKey    String      @unique
+  // Context hash: hash of the specific data that triggered this alert
+  // Example: hash of transaction IDs, amounts, dates, etc.
+  contextHash       String
+  // Alert details stored as JSON (transaction IDs, amounts, dates, etc.)
+  alertData         String      // JSON string with alert-specific data
+  // Optional reference to the transaction that triggered the alert
+  triggerTransactionId String?
+  
+  // SAT Submission tracking
+  submissionDeadline DateTime?  // Deadline for SAT submission (day 17 of following month for avisos, 24h for suspicion)
+  fileGeneratedAt    DateTime?  // When the SAT file was generated
+  satFileUrl         String?   // URL of the generated XML file in R2
+  submittedAt        DateTime?  // When submitted to SAT
+  satAcknowledgmentReceipt String? // File URL or reference to SAT acknowledgment (PDF/XML)
+  satFolioNumber     String?   // Folio number from SAT acknowledgment
+  isOverdue          Boolean    @default(false) // Computed: true if submissionDeadline has passed and status != SUBMITTED
+  
+  // Review and cancellation
+  notes             String?
+  reviewedAt        DateTime?
+  reviewedBy        String?
+  cancelledAt       DateTime?
+  cancelledBy       String?
+  cancellationReason String?  // Reason for cancellation
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Restrict)
+  client    Client    @relation(fields: [clientId], references: [rfc], onDelete: Cascade)
+
+  @@map("alerts")
+  @@index([alertRuleId])
+  @@index([clientId])
+  @@index([status])
+  @@index([severity])
+  @@index([createdAt])
+  @@index([idempotencyKey])
+  @@index([submissionDeadline])
+  @@index([isOverdue])
+  @@index([submittedAt])
+}
+
+model UmaValue {
+  id          String   @id @default(uuid())
+  year        Int      @unique // Year this UMA value applies to (e.g., 2025)
+  dailyValue  Decimal  // UMA daily value for the year
+  effectiveDate DateTime // Date when this UMA value becomes effective
+  endDate     DateTime? // Optional: date when this UMA value expires (usually end of year)
+  approvedBy  String?  // User who approved/configured this value (Compliance Officer)
+  notes       String?  // Optional notes about the UMA value
+  active      Boolean  @default(true) // Whether this is the current active UMA value
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("uma_values")
+  @@index([year])
+  @@index([active])
+  @@index([effectiveDate])
+}
+
+// Compliance Organization - stores RFC and vulnerable activity for the compliance officer's organization
+// Linked 1:1 to user (from JWT)
+model ComplianceOrganization {
+  id              String   @id @default(uuid())
+  userId          String   @unique // User ID from JWT (compliance officer)
+  claveSujetoObligado String // RFC (clave_sujeto_obligado) - 12 characters
+  claveActividad  String   // Vulnerable activity code (e.g., "VEH") - reference to vulnerable-activities catalog
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("compliance_organizations")
+  @@index([userId])
+  @@index([claveSujetoObligado])
+  @@index([claveActividad])
 }
