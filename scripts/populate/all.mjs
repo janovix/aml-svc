@@ -23,25 +23,22 @@ function getConfigFile() {
 		return process.env.WRANGLER_CONFIG;
 	}
 	const branch = process.env.CF_PAGES_BRANCH || process.env.WORKERS_CI_BRANCH;
-	
+
 	// Main branch → use prod config (aml-svc-prod worker)
 	if (branch === "main") {
 		return "wrangler.prod.jsonc";
 	}
-	
+
 	// Dev branch → use dev config (aml-svc worker production)
 	if (branch === "dev") {
 		return "wrangler.jsonc";
 	}
-	
+
 	// Preview branches or explicit preview flag → use preview config
-	if (
-		branch ||
-		process.env.PREVIEW === "true"
-	) {
+	if (branch || process.env.PREVIEW === "true") {
 		return "wrangler.preview.jsonc";
 	}
-	
+
 	// Default: no config (will use wrangler.jsonc as default)
 	return "";
 }
