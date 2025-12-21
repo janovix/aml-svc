@@ -11,7 +11,6 @@
 import { readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { unstable_dev } from "wrangler";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -61,21 +60,48 @@ async function seedAll() {
 
 	const configFile = getConfigFile();
 
-	// Start wrangler dev to get database access
-	const worker = await unstable_dev("src/index.ts", {
-		config: configFile || undefined,
-		local: !isRemote,
-		ip: "127.0.0.1",
-		port: 8787,
-	});
+	// Dynamically import unstable_dev to avoid build issues
+	// Only use it for local development (not in CI/build environments)
+	let db;
+	let cleanup;
+	if (!isRemote && process.env.NODE_ENV !== "production") {
+		try {
+			// Use dynamic import with a string to prevent static analysis
+			const wranglerModule = await import(/* @vite-ignore */ "wrangler");
+			const { unstable_dev } = wranglerModule;
+			const worker = await unstable_dev("src/index.ts", {
+				config: configFile || undefined,
+				local: true,
+				ip: "127.0.0.1",
+				port: 8787,
+			});
+
+			db = worker.env?.DB;
+			if (!db) {
+				await worker.stop();
+				throw new Error("Database binding not found");
+			}
+			cleanup = () => worker.stop();
+		} catch (error) {
+			console.error(
+				"❌ Failed to initialize database connection:",
+				error.message,
+			);
+			console.error(
+				"💡 Tip: Make sure wrangler is properly configured and the database exists.",
+			);
+			process.exit(1);
+		}
+	} else {
+		// For remote/CI, we can't use unstable_dev
+		// Seed scripts will need to handle their own database access
+		console.warn(
+			"⚠️  Remote seeding requires scripts to handle database access themselves",
+		);
+		process.exit(1);
+	}
 
 	try {
-		// Get database from worker bindings
-		const db = worker.env?.DB;
-		if (!db) {
-			throw new Error("Database binding not found");
-		}
-
 		// Import and run each seed script
 		for (const script of seedScripts) {
 			const scriptPath = join(__dirname, script);
@@ -103,7 +129,9 @@ async function seedAll() {
 
 		console.log("✅ All seed scripts completed successfully!");
 	} finally {
-		await worker.stop();
+		if (cleanup) {
+			await cleanup();
+		}
 	}
 }
 
