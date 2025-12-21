@@ -141,7 +141,8 @@ export class AlertRepository {
 	constructor(private readonly prisma: PrismaClient) {}
 
 	async list(filters: AlertFilters): Promise<ListResult<AlertEntity>> {
-		const { page, limit, alertRuleId, clientId, status, severity } = filters;
+		const { page, limit, alertRuleId, clientId, status, severity, isOverdue } =
+			filters;
 
 		const where: Prisma.AlertWhereInput = {};
 
@@ -160,6 +161,14 @@ export class AlertRepository {
 		if (severity) {
 			where.severity = severity;
 		}
+
+		if (isOverdue !== undefined) {
+			where.isOverdue = isOverdue;
+		}
+
+		// Update overdue status for alerts that have passed their deadline
+		// This ensures we always have current overdue status
+		await this.updateOverdueStatus();
 
 		const [total, records] = await Promise.all([
 			this.prisma.alert.count({ where }),
@@ -188,6 +197,25 @@ export class AlertRepository {
 				totalPages,
 			},
 		};
+	}
+
+	/**
+	 * Update overdue status for alerts that have passed their submission deadline
+	 * This should be called periodically or before listing alerts
+	 */
+	private async updateOverdueStatus(): Promise<void> {
+		const now = new Date();
+		await this.prisma.alert.updateMany({
+			where: {
+				submissionDeadline: { lte: now },
+				status: { notIn: ["SUBMITTED", "CANCELLED", "OVERDUE"] },
+				isOverdue: false,
+			},
+			data: {
+				status: "OVERDUE",
+				isOverdue: true,
+			},
+		});
 	}
 
 	async getById(id: string): Promise<AlertEntity | null> {
@@ -221,8 +249,17 @@ export class AlertRepository {
 			};
 		}
 
+		const prismaData = mapAlertCreateInputToPrisma(input);
+
+		// Calculate isOverdue if submissionDeadline is provided
+		if (prismaData.submissionDeadline) {
+			prismaData.isOverdue =
+				new Date() > prismaData.submissionDeadline &&
+				prismaData.status !== "SUBMITTED";
+		}
+
 		const created = await this.prisma.alert.create({
-			data: mapAlertCreateInputToPrisma(input),
+			data: prismaData,
 			include: {
 				alertRule: true,
 			},
@@ -237,7 +274,37 @@ export class AlertRepository {
 	async update(id: string, input: AlertUpdateInput): Promise<AlertEntity> {
 		await this.ensureExists(id);
 
+		// Get current alert to check submissionDeadline
+		const current = await this.prisma.alert.findUnique({
+			where: { id },
+			select: { submissionDeadline: true, status: true },
+		});
+
 		const updateData = mapAlertUpdateInputToPrisma(input);
+
+		// Recalculate isOverdue based on status and deadline
+		if (current?.submissionDeadline) {
+			const now = new Date();
+			const deadline = current.submissionDeadline;
+			const newStatus = updateData.status;
+
+			// Overdue if deadline passed and not submitted/cancelled
+			updateData.isOverdue =
+				now > deadline &&
+				newStatus !== "SUBMITTED" &&
+				newStatus !== "CANCELLED";
+
+			// Auto-set status to OVERDUE if deadline passed
+			if (
+				now > deadline &&
+				newStatus !== "SUBMITTED" &&
+				newStatus !== "CANCELLED" &&
+				newStatus !== "OVERDUE"
+			) {
+				updateData.status = "OVERDUE";
+			}
+		}
+
 		const updated = await this.prisma.alert.update({
 			where: { id },
 			data: updateData,
@@ -255,9 +322,40 @@ export class AlertRepository {
 	async patch(id: string, input: AlertPatchInput): Promise<AlertEntity> {
 		await this.ensureExists(id);
 
+		// Get current alert to check submissionDeadline
+		const current = await this.prisma.alert.findUnique({
+			where: { id },
+			select: { submissionDeadline: true, status: true },
+		});
+
 		const payload = mapAlertPatchInputToPrisma(
 			input,
 		) as Prisma.AlertUpdateInput;
+
+		// Recalculate isOverdue based on status and deadline
+		if (current?.submissionDeadline) {
+			const now = new Date();
+			const deadline = current.submissionDeadline;
+			const newStatus = (payload.status as string) || current.status;
+
+			// Overdue if deadline passed and not submitted/cancelled
+			payload.isOverdue =
+				now > deadline &&
+				newStatus !== "SUBMITTED" &&
+				newStatus !== "CANCELLED";
+
+			// Auto-set status to OVERDUE if deadline passed and status is being changed
+			if (
+				input.status !== undefined &&
+				now > deadline &&
+				newStatus !== "SUBMITTED" &&
+				newStatus !== "CANCELLED" &&
+				newStatus !== "OVERDUE"
+			) {
+				payload.status = "OVERDUE";
+				payload.isOverdue = true;
+			}
+		}
 
 		const updated = await this.prisma.alert.update({
 			where: { id },

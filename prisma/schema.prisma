@@ -213,10 +213,11 @@ model TransactionPaymentMethod {
 }
 
 enum AlertStatus {
-  PENDING
-  REVIEWED
-  RESOLVED
-  DISMISSED
+  DETECTED        // Alert detected, awaiting file generation
+  FILE_GENERATED  // File generated for SAT submission, ready to submit
+  SUBMITTED       // Successfully submitted to SAT with acknowledgment
+  OVERDUE         // Submission deadline has passed (worst case - penalties)
+  CANCELLED       // Alert was cancelled/dismissed (e.g., false positive)
 }
 
 enum AlertSeverity {
@@ -250,7 +251,7 @@ model Alert {
   id                String      @id @default(uuid())
   alertRuleId       String
   clientId          String
-  status            AlertStatus @default(PENDING)
+  status            AlertStatus @default(DETECTED)
   severity          AlertSeverity
   // Idempotency key: hash of (clientId + alertRuleId + contextHash)
   // This ensures we never create duplicate alerts for the same condition
@@ -262,11 +263,23 @@ model Alert {
   alertData         String      // JSON string with alert-specific data
   // Optional reference to the transaction that triggered the alert
   triggerTransactionId String?
+  
+  // SAT Submission tracking
+  submissionDeadline DateTime?  // Deadline for SAT submission (day 17 of following month for avisos, 24h for suspicion)
+  fileGeneratedAt    DateTime?  // When the SAT file was generated
+  submittedAt        DateTime?  // When submitted to SAT
+  satAcknowledgmentReceipt String? // File URL or reference to SAT acknowledgment (PDF/XML)
+  satFolioNumber     String?   // Folio number from SAT acknowledgment
+  isOverdue          Boolean    @default(false) // Computed: true if submissionDeadline has passed and status != SUBMITTED
+  
+  // Review and cancellation
   notes             String?
   reviewedAt        DateTime?
   reviewedBy        String?
-  resolvedAt        DateTime?
-  resolvedBy        String?
+  cancelledAt       DateTime?
+  cancelledBy       String?
+  cancellationReason String?  // Reason for cancellation
+  
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
@@ -280,6 +293,9 @@ model Alert {
   @@index([severity])
   @@index([createdAt])
   @@index([idempotencyKey])
+  @@index([submissionDeadline])
+  @@index([isOverdue])
+  @@index([submittedAt])
 }
 
 model UmaValue {

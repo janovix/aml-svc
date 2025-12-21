@@ -21,17 +21,19 @@ import type {
 } from "./types";
 
 const ALERT_STATUS_TO_PRISMA: Record<AlertStatus, PrismaAlertStatus> = {
-	PENDING: "PENDING",
-	REVIEWED: "REVIEWED",
-	RESOLVED: "RESOLVED",
-	DISMISSED: "DISMISSED",
+	DETECTED: "DETECTED",
+	FILE_GENERATED: "FILE_GENERATED",
+	SUBMITTED: "SUBMITTED",
+	OVERDUE: "OVERDUE",
+	CANCELLED: "CANCELLED",
 };
 
 const ALERT_STATUS_FROM_PRISMA: Record<PrismaAlertStatus, AlertStatus> = {
-	PENDING: "PENDING",
-	REVIEWED: "REVIEWED",
-	RESOLVED: "RESOLVED",
-	DISMISSED: "DISMISSED",
+	DETECTED: "DETECTED",
+	FILE_GENERATED: "FILE_GENERATED",
+	SUBMITTED: "SUBMITTED",
+	OVERDUE: "OVERDUE",
+	CANCELLED: "CANCELLED",
 };
 
 const ALERT_SEVERITY_TO_PRISMA: Record<AlertSeverity, PrismaAlertSeverity> = {
@@ -101,11 +103,18 @@ export function mapPrismaAlert(prisma: PrismaAlertModel): AlertEntity {
 		contextHash: prisma.contextHash,
 		alertData: parseJson(prisma.alertData) ?? {},
 		triggerTransactionId: prisma.triggerTransactionId,
+		submissionDeadline: mapDateTime(prisma.submissionDeadline),
+		fileGeneratedAt: mapDateTime(prisma.fileGeneratedAt),
+		submittedAt: mapDateTime(prisma.submittedAt),
+		satAcknowledgmentReceipt: prisma.satAcknowledgmentReceipt,
+		satFolioNumber: prisma.satFolioNumber,
+		isOverdue: Boolean(prisma.isOverdue),
 		notes: prisma.notes,
 		reviewedAt: mapDateTime(prisma.reviewedAt),
 		reviewedBy: prisma.reviewedBy,
-		resolvedAt: mapDateTime(prisma.resolvedAt),
-		resolvedBy: prisma.resolvedBy,
+		cancelledAt: mapDateTime(prisma.cancelledAt),
+		cancelledBy: prisma.cancelledBy,
+		cancellationReason: prisma.cancellationReason,
 		createdAt: mapDateTime(prisma.createdAt) ?? "",
 		updatedAt: mapDateTime(prisma.updatedAt) ?? "",
 	};
@@ -168,22 +177,30 @@ export function mapAlertRulePatchInputToPrisma(
 
 export function mapAlertCreateInputToPrisma(
 	input: AlertCreateInput,
-): Omit<
-	PrismaAlertModel,
-	"id" | "createdAt" | "updatedAt" | "reviewedAt" | "resolvedAt"
-> {
+): Omit<PrismaAlertModel, "id" | "createdAt" | "updatedAt"> {
 	return {
 		alertRuleId: input.alertRuleId,
 		clientId: input.clientId,
-		status: "PENDING",
+		status: "DETECTED",
 		severity: ALERT_SEVERITY_TO_PRISMA[input.severity],
 		idempotencyKey: input.idempotencyKey,
 		contextHash: input.contextHash,
 		alertData: serializeJson(input.alertData) ?? "{}",
 		triggerTransactionId: input.triggerTransactionId ?? null,
+		submissionDeadline: input.submissionDeadline
+			? new Date(input.submissionDeadline)
+			: null,
+		fileGeneratedAt: null,
+		submittedAt: null,
+		satAcknowledgmentReceipt: null,
+		satFolioNumber: null,
+		isOverdue: false,
 		notes: input.notes ?? null,
+		reviewedAt: null,
 		reviewedBy: null,
-		resolvedBy: null,
+		cancelledAt: null,
+		cancelledBy: null,
+		cancellationReason: null,
 	};
 }
 
@@ -221,20 +238,64 @@ export function mapAlertUpdateInputToPrisma(
 	> = {};
 
 	result.status = ALERT_STATUS_TO_PRISMA[input.status];
+
+	// Handle status transitions
+	if (input.status === "FILE_GENERATED" && input.fileGeneratedAt) {
+		result.fileGeneratedAt = new Date(input.fileGeneratedAt);
+	} else if (input.status === "FILE_GENERATED" && !input.fileGeneratedAt) {
+		result.fileGeneratedAt = new Date();
+	}
+
+	if (input.status === "SUBMITTED" && input.submittedAt) {
+		result.submittedAt = new Date(input.submittedAt);
+	} else if (input.status === "SUBMITTED" && !input.submittedAt) {
+		result.submittedAt = new Date();
+	}
+
+	if (input.status === "CANCELLED" && input.cancelledBy) {
+		result.cancelledAt = new Date();
+		result.cancelledBy = input.cancelledBy;
+	}
+
+	// Check if overdue (deadline passed and not submitted)
+	if (input.status !== "SUBMITTED" && input.status !== "CANCELLED") {
+		// This will be calculated in the repository/service layer
+		result.isOverdue = false; // Will be recalculated based on submissionDeadline
+	} else if (input.status === "SUBMITTED") {
+		result.isOverdue = false;
+	}
+
 	if (input.notes !== undefined) {
 		result.notes = input.notes ?? null;
 	}
 	if (input.reviewedBy !== undefined) {
 		result.reviewedBy = input.reviewedBy ?? null;
-		if (input.status === "REVIEWED" && input.reviewedBy) {
+		if (input.reviewedBy) {
 			result.reviewedAt = new Date();
 		}
 	}
-	if (input.resolvedBy !== undefined) {
-		result.resolvedBy = input.resolvedBy ?? null;
-		if (input.status === "RESOLVED" && input.resolvedBy) {
-			result.resolvedAt = new Date();
+	if (input.fileGeneratedAt !== undefined) {
+		result.fileGeneratedAt = input.fileGeneratedAt
+			? new Date(input.fileGeneratedAt)
+			: null;
+	}
+	if (input.submittedAt !== undefined) {
+		result.submittedAt = input.submittedAt ? new Date(input.submittedAt) : null;
+	}
+	if (input.satAcknowledgmentReceipt !== undefined) {
+		result.satAcknowledgmentReceipt = input.satAcknowledgmentReceipt ?? null;
+	}
+	if (input.satFolioNumber !== undefined) {
+		result.satFolioNumber = input.satFolioNumber ?? null;
+	}
+	if (input.cancelledBy !== undefined) {
+		result.cancelledBy = input.cancelledBy ?? null;
+		if (input.cancelledBy) {
+			result.cancelledAt = new Date();
 		}
+	}
+	if (input.cancellationReason !== undefined) {
+		result.cancellationReason = input.cancellationReason ?? null;
 	}
 
 	return result;
@@ -275,27 +336,64 @@ export function mapAlertPatchInputToPrisma(
 
 	if (input.status !== undefined) {
 		result.status = ALERT_STATUS_TO_PRISMA[input.status];
-		if (input.status === "REVIEWED" && input.reviewedBy) {
-			result.reviewedAt = new Date();
+
+		// Handle status transitions
+		if (input.status === "FILE_GENERATED") {
+			result.fileGeneratedAt = input.fileGeneratedAt
+				? new Date(input.fileGeneratedAt)
+				: new Date();
 		}
-		if (input.status === "RESOLVED" && input.resolvedBy) {
-			result.resolvedAt = new Date();
+
+		if (input.status === "SUBMITTED") {
+			result.submittedAt = input.submittedAt
+				? new Date(input.submittedAt)
+				: new Date();
+			result.isOverdue = false; // No longer overdue once submitted
+		}
+
+		if (input.status === "CANCELLED") {
+			result.cancelledAt = input.cancelledBy ? new Date() : null;
+		}
+
+		if (input.status === "OVERDUE") {
+			result.isOverdue = true;
 		}
 	}
+
 	if (input.notes !== undefined) {
 		result.notes = input.notes ?? null;
 	}
 	if (input.reviewedBy !== undefined) {
 		result.reviewedBy = input.reviewedBy ?? null;
-		if (input.status === "REVIEWED" && input.reviewedBy) {
+		if (input.reviewedBy) {
 			result.reviewedAt = new Date();
 		}
 	}
-	if (input.resolvedBy !== undefined) {
-		result.resolvedBy = input.resolvedBy ?? null;
-		if (input.status === "RESOLVED" && input.resolvedBy) {
-			result.resolvedAt = new Date();
+	if (input.fileGeneratedAt !== undefined) {
+		result.fileGeneratedAt = input.fileGeneratedAt
+			? new Date(input.fileGeneratedAt)
+			: null;
+	}
+	if (input.submittedAt !== undefined) {
+		result.submittedAt = input.submittedAt ? new Date(input.submittedAt) : null;
+		if (input.submittedAt) {
+			result.isOverdue = false;
 		}
+	}
+	if (input.satAcknowledgmentReceipt !== undefined) {
+		result.satAcknowledgmentReceipt = input.satAcknowledgmentReceipt ?? null;
+	}
+	if (input.satFolioNumber !== undefined) {
+		result.satFolioNumber = input.satFolioNumber ?? null;
+	}
+	if (input.cancelledBy !== undefined) {
+		result.cancelledBy = input.cancelledBy ?? null;
+		if (input.cancelledBy) {
+			result.cancelledAt = new Date();
+		}
+	}
+	if (input.cancellationReason !== undefined) {
+		result.cancellationReason = input.cancellationReason ?? null;
 	}
 
 	return result;

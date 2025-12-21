@@ -25,17 +25,29 @@ CREATE TABLE IF NOT EXISTS alerts (
     id TEXT PRIMARY KEY NOT NULL,
     alertRuleId TEXT NOT NULL,
     clientId TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','REVIEWED','RESOLVED','DISMISSED')),
+    status TEXT NOT NULL DEFAULT 'DETECTED' CHECK(status IN ('DETECTED','FILE_GENERATED','SUBMITTED','OVERDUE','CANCELLED')),
     severity TEXT NOT NULL CHECK(severity IN ('LOW','MEDIUM','HIGH','CRITICAL')),
     idempotencyKey TEXT NOT NULL UNIQUE, -- Ensures no duplicate alerts
     contextHash TEXT NOT NULL, -- Hash of the specific data that triggered this alert
     alertData TEXT NOT NULL, -- JSON string with alert-specific data
     triggerTransactionId TEXT, -- Optional reference to the transaction that triggered the alert
+    
+    -- SAT Submission tracking
+    submissionDeadline DATETIME, -- Deadline for SAT submission (day 17 of following month for avisos, 24h for suspicion)
+    fileGeneratedAt DATETIME, -- When the SAT file was generated
+    submittedAt DATETIME, -- When submitted to SAT
+    satAcknowledgmentReceipt TEXT, -- File URL or reference to SAT acknowledgment (PDF/XML)
+    satFolioNumber TEXT, -- Folio number from SAT acknowledgment
+    isOverdue INTEGER NOT NULL DEFAULT 0 CHECK(isOverdue IN (0, 1)), -- Computed: true if submissionDeadline has passed and status != SUBMITTED
+    
+    -- Review and cancellation
     notes TEXT,
     reviewedAt DATETIME,
     reviewedBy TEXT,
-    resolvedAt DATETIME,
-    resolvedBy TEXT,
+    cancelledAt DATETIME,
+    cancelledBy TEXT,
+    cancellationReason TEXT, -- Reason for cancellation
+    
     createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (alertRuleId) REFERENCES alert_rules(id) ON DELETE RESTRICT,
@@ -49,6 +61,9 @@ CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
 CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alerts(severity);
 CREATE INDEX IF NOT EXISTS idx_alerts_createdAt ON alerts(createdAt);
 CREATE INDEX IF NOT EXISTS idx_alerts_idempotencyKey ON alerts(idempotencyKey);
+CREATE INDEX IF NOT EXISTS idx_alerts_submissionDeadline ON alerts(submissionDeadline);
+CREATE INDEX IF NOT EXISTS idx_alerts_isOverdue ON alerts(isOverdue);
+CREATE INDEX IF NOT EXISTS idx_alerts_submittedAt ON alerts(submittedAt);
 
 -- Create uma_values table
 CREATE TABLE IF NOT EXISTS uma_values (

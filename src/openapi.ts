@@ -1213,7 +1213,13 @@ export const openAPISpec = {
 						in: "query",
 						schema: {
 							type: "string",
-							enum: ["PENDING", "REVIEWED", "RESOLVED", "DISMISSED"],
+							enum: [
+								"DETECTED",
+								"FILE_GENERATED",
+								"SUBMITTED",
+								"OVERDUE",
+								"CANCELLED",
+							],
 						},
 						description: "Filter by alert status",
 					},
@@ -2522,8 +2528,15 @@ export const openAPISpec = {
 			},
 			AlertStatus: {
 				type: "string",
-				enum: ["PENDING", "REVIEWED", "RESOLVED", "DISMISSED"],
-				description: "Alert status values",
+				enum: [
+					"DETECTED",
+					"FILE_GENERATED",
+					"SUBMITTED",
+					"OVERDUE",
+					"CANCELLED",
+				],
+				description:
+					"Alert status: DETECTED (alert detected, awaiting file generation), FILE_GENERATED (file generated for SAT submission), SUBMITTED (successfully submitted to SAT with acknowledgment), OVERDUE (submission deadline has passed - worst case, penalties may apply), CANCELLED (alert was cancelled/dismissed)",
 			},
 			AlertRule: {
 				type: "object",
@@ -2659,11 +2672,64 @@ export const openAPISpec = {
 						description:
 							"Optional reference to the transaction that triggered the alert",
 					},
+					submissionDeadline: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description:
+							"Deadline for SAT submission (day 17 of following month for avisos, 24h for suspicion avisos)",
+					},
+					fileGeneratedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When the SAT file was generated",
+					},
+					submittedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When submitted to SAT",
+					},
+					satAcknowledgmentReceipt: {
+						type: "string",
+						maxLength: 500,
+						nullable: true,
+						description:
+							"File URL or reference to SAT acknowledgment (PDF/XML)",
+					},
+					satFolioNumber: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description: "Folio number from SAT acknowledgment",
+					},
+					isOverdue: {
+						type: "boolean",
+						description:
+							"Computed: true if submissionDeadline has passed and status != SUBMITTED",
+					},
 					notes: { type: "string", maxLength: 1000, nullable: true },
 					reviewedAt: { type: "string", format: "date-time", nullable: true },
 					reviewedBy: { type: "string", maxLength: 100, nullable: true },
-					resolvedAt: { type: "string", format: "date-time", nullable: true },
-					resolvedBy: { type: "string", maxLength: 100, nullable: true },
+					cancelledAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When the alert was cancelled",
+					},
+					cancelledBy: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description: "User who cancelled the alert",
+					},
+					cancellationReason: {
+						type: "string",
+						maxLength: 1000,
+						nullable: true,
+						description: "Reason for cancellation",
+					},
 					createdAt: { type: "string", format: "date-time" },
 					updatedAt: { type: "string", format: "date-time" },
 					alertRule: {
@@ -2709,6 +2775,13 @@ export const openAPISpec = {
 						additionalProperties: true,
 					},
 					triggerTransactionId: { type: "string", nullable: true },
+					submissionDeadline: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description:
+							"Deadline for SAT submission (will be calculated based on alert type if not provided)",
+					},
 					notes: { type: "string", maxLength: 1000, nullable: true },
 				},
 			},
@@ -2719,7 +2792,42 @@ export const openAPISpec = {
 					status: { $ref: "#/components/schemas/AlertStatus" },
 					notes: { type: "string", maxLength: 1000, nullable: true },
 					reviewedBy: { type: "string", maxLength: 100, nullable: true },
-					resolvedBy: { type: "string", maxLength: 100, nullable: true },
+					fileGeneratedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When the SAT file was generated",
+					},
+					submittedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When submitted to SAT",
+					},
+					satAcknowledgmentReceipt: {
+						type: "string",
+						maxLength: 500,
+						nullable: true,
+						description: "File URL or reference to SAT acknowledgment",
+					},
+					satFolioNumber: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description: "Folio number from SAT acknowledgment",
+					},
+					cancelledBy: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description: "User who cancelled the alert",
+					},
+					cancellationReason: {
+						type: "string",
+						maxLength: 1000,
+						nullable: true,
+						description: "Reason for cancellation",
+					},
 				},
 			},
 			AlertPatchRequest: {
@@ -2728,7 +2836,42 @@ export const openAPISpec = {
 					status: { $ref: "#/components/schemas/AlertStatus" },
 					notes: { type: "string", maxLength: 1000, nullable: true },
 					reviewedBy: { type: "string", maxLength: 100, nullable: true },
-					resolvedBy: { type: "string", maxLength: 100, nullable: true },
+					fileGeneratedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When the SAT file was generated",
+					},
+					submittedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When submitted to SAT",
+					},
+					satAcknowledgmentReceipt: {
+						type: "string",
+						maxLength: 500,
+						nullable: true,
+						description: "File URL or reference to SAT acknowledgment",
+					},
+					satFolioNumber: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description: "Folio number from SAT acknowledgment",
+					},
+					cancelledBy: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description: "User who cancelled the alert",
+					},
+					cancellationReason: {
+						type: "string",
+						maxLength: 1000,
+						nullable: true,
+						description: "Reason for cancellation",
+					},
 				},
 			},
 			UmaValue: {
