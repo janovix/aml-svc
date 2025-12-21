@@ -160,22 +160,31 @@ export class AlertServiceBinding {
 			claveSujetoObligado: this.env.SAT_CLAVE_SUJETO_OBLIGADO || "000000000000",
 			claveActividad: this.env.SAT_CLAVE_ACTIVIDAD || "VEH",
 			claveEntidadColegiada: this.env.SAT_CLAVE_ENTIDAD_COLEGIADA,
-			getCatalogValue: async (catalogKey: string, itemName: string) => {
+			getCatalogValue: async (catalogKey: string, code: string) => {
 				try {
 					// Look up catalog by key
 					const catalog = await catalogRepository.findByKey(catalogKey);
 					if (!catalog) {
 						return null;
 					}
-					// Search for catalog item by name (normalized search)
+					// Search for catalog item by code (stored in metadata.code)
+					// We need to search all items and find the one with matching code in metadata
 					const result = await catalogRepository.listItems(catalog.id, {
 						page: 1,
-						pageSize: 1,
-						search: itemName,
+						pageSize: 1000, // Get all items to search metadata
 						active: true,
 					});
-					// Return the normalizedName or name of the first matching item
-					return result.data[0]?.normalizedName || result.data[0]?.name || null;
+					// Find item where metadata.code matches the requested code
+					const item = result.data.find((item) => {
+						if (!item.metadata || typeof item.metadata !== "object") {
+							return false;
+						}
+						return (item.metadata as { code?: string }).code === code;
+					});
+					// Return the code from metadata if found
+					return item
+						? (item.metadata as { code?: string }).code || code
+						: null;
 				} catch (error) {
 					console.error(`Error looking up catalog ${catalogKey}:`, error);
 					return null;

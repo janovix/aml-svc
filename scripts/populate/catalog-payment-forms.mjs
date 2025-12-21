@@ -78,11 +78,18 @@ function generateSql(catalogId, items) {
 
 	// Insert catalog items
 	for (const item of items) {
-		// Use the key as the name (it's the code used in XML, e.g., "1", "2")
-		const name = item.key;
-		const normalizedName = name.toLowerCase().trim();
+		// name = human-readable name (e.g., "Contado", "Diferido o en parcialidades")
+		const name = item.value.replace(/'/g, "''");
+		// normalizedName = normalized human-readable name for searching
+		const normalizedName = item.value
+			.normalize("NFD")
+			.replace(/[\u0300-\u036f]/g, "")
+			.toLowerCase()
+			.trim()
+			.replace(/'/g, "''");
+		// Store the code in metadata for XML generation
 		const metadata = JSON.stringify({
-			description: item.value,
+			code: item.key, // e.g., "1", "2" - used in XML
 		}).replace(/'/g, "''"); // Escape single quotes
 
 		sql.push(`

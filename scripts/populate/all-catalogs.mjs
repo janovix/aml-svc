@@ -14,9 +14,9 @@ const __dirname = dirname(__filename);
 
 const catalogScripts = [
 	"catalog-vehicle-brands.mjs",
-	"catalog-country.mjs",
-	"catalog-currency.mjs",
-	"catalog-operation-type.mjs",
+	"catalog-countries.mjs",
+	"catalog-currencies.mjs",
+	"catalog-operation-types.mjs",
 	"catalog-payment-forms.mjs",
 	"catalog-vulnerable-activities.mjs",
 ];

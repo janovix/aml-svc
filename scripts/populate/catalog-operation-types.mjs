@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Populate Operation Type Catalog
+ * Populate Operation Types Catalog
  *
- * This script populates the operation-type catalog with data from SAT CSV.
+ * This script populates the operation-types catalog with data from SAT CSV.
  * This is a POPULATION script (not a seed) and runs in all environments.
  */
 
@@ -16,7 +16,7 @@ const __dirname = dirname(__filename);
 
 const CSV_URL =
 	"https://eng-assets.algenium.tools/janovix_catalogs/OPERATION_TYPE.csv";
-const CATALOG_KEY = "operation-type";
+const CATALOG_KEY = "operation-types";
 
 async function downloadCsv() {
 	console.log("📥 Downloading OPERATION_TYPE.csv...");
@@ -79,12 +79,19 @@ function generateSql(catalogId, items) {
 
 	// Insert catalog items
 	for (const item of items) {
-		// Use the key as the name (it's the code used in XML, e.g., "1", "802")
-		const name = item.key;
-		const normalizedName = name.toLowerCase().trim();
+		// name = human-readable name (e.g., "Compra de acciones o partes sociales", "Venta de vehículo nuevo")
+		const name = item.value.replace(/'/g, "''");
+		// normalizedName = normalized human-readable name for searching
+		const normalizedName = item.value
+			.normalize("NFD")
+			.replace(/[\u0300-\u036f]/g, "")
+			.toLowerCase()
+			.trim()
+			.replace(/'/g, "''");
+		// Store the code and additional info in metadata for XML generation
 		const metadata = JSON.stringify({
-			description: item.value,
-			vulnerableActivity: item.av,
+			code: item.key, // e.g., "1", "802" - used in XML
+			vulnerableActivity: item.av, // e.g., "FEP", "VEH"
 		}).replace(/'/g, "''"); // Escape single quotes
 
 		sql.push(`
@@ -113,7 +120,7 @@ async function populateOperationTypeCatalog() {
 
 	try {
 		console.log(
-			`📦 Populating operation-type catalog (${isRemote ? "remote" : "local"})...`,
+			`📦 Populating operation-types catalog (${isRemote ? "remote" : "local"})...`,
 		);
 
 		// Download and parse CSV
@@ -129,7 +136,7 @@ async function populateOperationTypeCatalog() {
 
 		// Generate SQL
 		const sql = generateSql(catalogId, items);
-		const sqlFile = join(__dirname, `temp-operation-type-${Date.now()}.sql`);
+		const sqlFile = join(__dirname, `temp-operation-types-${Date.now()}.sql`);
 
 		try {
 			writeFileSync(sqlFile, sql);
@@ -140,7 +147,7 @@ async function populateOperationTypeCatalog() {
 				: `wrangler d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
 
 			execSync(command, { stdio: "inherit" });
-			console.log("✅ Operation-type catalog populated successfully!");
+			console.log("✅ Operation-types catalog populated successfully!");
 		} finally {
 			// Clean up temp file
 			try {
@@ -150,7 +157,7 @@ async function populateOperationTypeCatalog() {
 			}
 		}
 	} catch (error) {
-		console.error("❌ Error populating operation-type catalog:", error);
+		console.error("❌ Error populating operation-types catalog:", error);
 		process.exit(1);
 	}
 }

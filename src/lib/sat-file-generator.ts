@@ -68,8 +68,8 @@ export async function generateAndUploadSatFile(
 	// Get catalog values using existing Catalog system
 	// Catalog keys should match the catalog.key field in the database
 	const tipoOperacion =
-		(await config.getCatalogValue("tipo-operacion", "802")) || "802"; // Default from example
-	const moneda = (await config.getCatalogValue("moneda", "3")) || "3"; // "3" for MXN in example
+		(await config.getCatalogValue("operation-types", "802")) || "802"; // Default from example
+	const moneda = (await config.getCatalogValue("currencies", "3")) || "3"; // "3" for MXN in example
 	// Map vehicle type
 	const vehiculoTipo =
 		transaction.vehicleType === "land"
@@ -82,7 +82,7 @@ export async function generateAndUploadSatFile(
 		(await config.getCatalogValue("vehicle-brands", transaction.brandId)) ||
 		transaction.brandId; // Fallback to brandId if not found
 	const paisNacionalidad =
-		(await config.getCatalogValue("pais", client.nationality || "MX")) ||
+		(await config.getCatalogValue("countries", client.nationality || "MX")) ||
 		client.nationality ||
 		"MX";
 	// Get payment form codes from catalog
