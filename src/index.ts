@@ -7,6 +7,7 @@ import { getScalarHtml, type AppMeta } from "./app-meta";
 import { errorHandler } from "./middleware/error";
 import { openAPISpec } from "./openapi";
 import { createRouter } from "./routes";
+import { handleServiceBindingRequest } from "./lib/alert-service-binding";
 
 export type Bindings = {
 	DB: D1Database;
@@ -71,6 +72,11 @@ app.get("/openapi.json", (c) => {
 
 app.get("/docsz", (c) => {
 	return c.html(getScalarHtml(appMeta));
+});
+
+// Service binding routes (internal worker-to-worker communication)
+app.all("/internal/*", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 
 // API routes
