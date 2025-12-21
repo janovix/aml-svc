@@ -76,32 +76,6 @@ async function createUmaValue(year, umaData, approvedBy = null) {
 	return response.json();
 }
 
-async function updateUmaValue(id, umaData, approvedBy = null) {
-	const url = `${API_BASE_URL}/api/v1/uma-values/${id}`;
-	const payload = {
-		...umaData,
-		approvedBy: approvedBy || undefined,
-	};
-
-	const response = await fetch(url, {
-		method: "PUT",
-		headers: {
-			"Content-Type": "application/json",
-			...(API_TOKEN && { Authorization: `Bearer ${API_TOKEN}` }),
-		},
-		body: JSON.stringify(payload),
-	});
-
-	if (!response.ok) {
-		const error = await response.text();
-		throw new Error(
-			`Failed to update UMA value ${id}: ${response.status} ${error}`,
-		);
-	}
-
-	return response.json();
-}
-
 async function activateUmaValue(id) {
 	const url = `${API_BASE_URL}/api/v1/uma-values/${id}/activate`;
 
