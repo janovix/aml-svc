@@ -34,6 +34,14 @@ export const openAPISpec = {
 			name: "Transactions",
 			description: "Vehicle transaction endpoints",
 		},
+		{
+			name: "Alert Rules",
+			description: "Dynamic alert rule management endpoints",
+		},
+		{
+			name: "Alerts",
+			description: "Alert detection and management endpoints",
+		},
 	],
 	paths: {
 		"/healthz": {
@@ -933,6 +941,479 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/alert-rules": {
+			get: {
+				tags: ["Alert Rules"],
+				summary: "List alert rules",
+				description:
+					"Retrieve a paginated list of alert rules with optional filters for active status and severity.",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+						description: "Page number to retrieve",
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 10 },
+						description: "Number of records per page",
+					},
+					{
+						name: "search",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by name or description",
+					},
+					{
+						name: "active",
+						in: "query",
+						schema: { type: "boolean" },
+						description: "Filter by active status",
+					},
+					{
+						name: "severity",
+						in: "query",
+						schema: {
+							type: "string",
+							enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+						},
+						description: "Filter by severity level",
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of alert rules",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/AlertRule" },
+										},
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Alert Rules"],
+				summary: "Create alert rule",
+				description: "Create a new dynamic alert rule.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertRuleCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Alert rule created successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRule" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/alert-rules/{id}": {
+			get: {
+				tags: ["Alert Rules"],
+				summary: "Get alert rule by ID",
+				description: "Retrieve a single alert rule.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert rule identifier",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Alert rule detail response",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRule" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			put: {
+				tags: ["Alert Rules"],
+				summary: "Update alert rule",
+				description: "Replace the full alert rule payload.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertRuleCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alert rule updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRule" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["Alert Rules"],
+				summary: "Patch alert rule",
+				description: "Apply a partial update to an alert rule.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertRulePatchRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alert rule updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRule" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["Alert Rules"],
+				summary: "Delete alert rule",
+				description: "Delete an alert rule.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": {
+						description: "Alert rule deleted",
+					},
+					"404": {
+						description: "Alert rule not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/alerts": {
+			get: {
+				tags: ["Alerts"],
+				summary: "List alerts",
+				description:
+					"Retrieve a paginated list of alerts with optional filters for alert rule, client, status, and severity.",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+						description: "Page number to retrieve",
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 10 },
+						description: "Number of records per page",
+					},
+					{
+						name: "alertRuleId",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by alert rule ID",
+					},
+					{
+						name: "clientId",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by client ID (RFC)",
+					},
+					{
+						name: "status",
+						in: "query",
+						schema: {
+							type: "string",
+							enum: ["PENDING", "REVIEWED", "RESOLVED", "DISMISSED"],
+						},
+						description: "Filter by alert status",
+					},
+					{
+						name: "severity",
+						in: "query",
+						schema: {
+							type: "string",
+							enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+						},
+						description: "Filter by severity level",
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of alerts",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/Alert" },
+										},
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Alerts"],
+				summary: "Create alert",
+				description:
+					"Create a new alert. The alert creation is idempotent based on the idempotencyKey.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description:
+							"Alert created successfully (or existing alert returned if idempotencyKey matches)",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Alert" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/alerts/{id}": {
+			get: {
+				tags: ["Alerts"],
+				summary: "Get alert by ID",
+				description: "Retrieve a single alert.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert identifier",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Alert detail response",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Alert" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			put: {
+				tags: ["Alerts"],
+				summary: "Update alert",
+				description: "Update alert status and metadata.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertUpdateRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alert updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Alert" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["Alerts"],
+				summary: "Patch alert",
+				description: "Apply a partial update to an alert.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertPatchRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alert updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Alert" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["Alerts"],
+				summary: "Delete alert",
+				description: "Delete an alert.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": {
+						description: "Alert deleted",
+					},
+					"404": {
+						description: "Alert not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
 	},
 	components: {
 		schemas: {
@@ -1708,6 +2189,222 @@ export const openAPISpec = {
 					error: { type: "string" },
 					message: { type: "string" },
 					details: { type: "object" },
+				},
+			},
+			AlertSeverity: {
+				type: "string",
+				enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+				description: "Alert severity levels",
+			},
+			AlertStatus: {
+				type: "string",
+				enum: ["PENDING", "REVIEWED", "RESOLVED", "DISMISSED"],
+				description: "Alert status values",
+			},
+			AlertRule: {
+				type: "object",
+				required: [
+					"id",
+					"name",
+					"active",
+					"severity",
+					"ruleConfig",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: {
+						type: "string",
+						pattern: "^[A-Za-z0-9-]{1,64}$",
+						description: "Alert rule identifier",
+					},
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					description: { type: "string", maxLength: 1000, nullable: true },
+					active: { type: "boolean" },
+					severity: { $ref: "#/components/schemas/AlertSeverity" },
+					ruleConfig: {
+						type: "object",
+						description:
+							"Dynamic rule configuration stored as JSON. Structure depends on rule type.",
+						additionalProperties: true,
+					},
+					metadata: {
+						type: "object",
+						nullable: true,
+						description: "Additional metadata as JSON",
+						additionalProperties: true,
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			AlertRuleCreateRequest: {
+				type: "object",
+				required: ["name", "severity", "ruleConfig"],
+				properties: {
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					description: { type: "string", maxLength: 1000, nullable: true },
+					active: { type: "boolean", default: true },
+					severity: {
+						$ref: "#/components/schemas/AlertSeverity",
+						default: "MEDIUM",
+					},
+					ruleConfig: {
+						type: "object",
+						description:
+							"Dynamic rule configuration. Examples: transaction_amount, transaction_count, aggregate_amount, custom",
+						additionalProperties: true,
+					},
+					metadata: {
+						type: "object",
+						nullable: true,
+						additionalProperties: true,
+					},
+				},
+			},
+			AlertRulePatchRequest: {
+				type: "object",
+				properties: {
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					description: { type: "string", maxLength: 1000, nullable: true },
+					active: { type: "boolean" },
+					severity: { $ref: "#/components/schemas/AlertSeverity" },
+					ruleConfig: {
+						type: "object",
+						additionalProperties: true,
+					},
+					metadata: {
+						type: "object",
+						nullable: true,
+						additionalProperties: true,
+					},
+				},
+			},
+			Alert: {
+				type: "object",
+				required: [
+					"id",
+					"alertRuleId",
+					"clientId",
+					"status",
+					"severity",
+					"idempotencyKey",
+					"contextHash",
+					"alertData",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: {
+						type: "string",
+						pattern: "^[A-Za-z0-9-]{1,64}$",
+						description: "Alert identifier",
+					},
+					alertRuleId: {
+						type: "string",
+						description:
+							"Reference to the alert rule that triggered this alert",
+					},
+					clientId: {
+						type: "string",
+						description: "Client ID (RFC) for which this alert was generated",
+					},
+					status: { $ref: "#/components/schemas/AlertStatus" },
+					severity: { $ref: "#/components/schemas/AlertSeverity" },
+					idempotencyKey: {
+						type: "string",
+						maxLength: 255,
+						description:
+							"Unique key ensuring idempotent alert creation. Hash of (clientId + alertRuleId + contextHash)",
+					},
+					contextHash: {
+						type: "string",
+						maxLength: 255,
+						description:
+							"Hash of the specific data that triggered this alert (transaction IDs, amounts, dates, etc.)",
+					},
+					alertData: {
+						type: "object",
+						description:
+							"Alert-specific data stored as JSON (transaction IDs, amounts, dates, etc.)",
+						additionalProperties: true,
+					},
+					triggerTransactionId: {
+						type: "string",
+						nullable: true,
+						description:
+							"Optional reference to the transaction that triggered the alert",
+					},
+					notes: { type: "string", maxLength: 1000, nullable: true },
+					reviewedAt: { type: "string", format: "date-time", nullable: true },
+					reviewedBy: { type: "string", maxLength: 100, nullable: true },
+					resolvedAt: { type: "string", format: "date-time", nullable: true },
+					resolvedBy: { type: "string", maxLength: 100, nullable: true },
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+					alertRule: {
+						$ref: "#/components/schemas/AlertRule",
+						nullable: true,
+						description:
+							"Alert rule details (included when fetching alert with relations)",
+					},
+				},
+			},
+			AlertCreateRequest: {
+				type: "object",
+				required: [
+					"alertRuleId",
+					"clientId",
+					"severity",
+					"idempotencyKey",
+					"contextHash",
+					"alertData",
+				],
+				properties: {
+					alertRuleId: { type: "string" },
+					clientId: { type: "string" },
+					severity: { $ref: "#/components/schemas/AlertSeverity" },
+					idempotencyKey: {
+						type: "string",
+						minLength: 1,
+						maxLength: 255,
+						description:
+							"Unique key ensuring idempotent alert creation. Must be hash of (clientId + alertRuleId + contextHash)",
+					},
+					contextHash: {
+						type: "string",
+						minLength: 1,
+						maxLength: 255,
+						description:
+							"Hash of the specific data that triggered this alert (transaction IDs, amounts, dates, etc.)",
+					},
+					alertData: {
+						type: "object",
+						description:
+							"Alert-specific data stored as JSON (transaction IDs, amounts, dates, etc.)",
+						additionalProperties: true,
+					},
+					triggerTransactionId: { type: "string", nullable: true },
+					notes: { type: "string", maxLength: 1000, nullable: true },
+				},
+			},
+			AlertUpdateRequest: {
+				type: "object",
+				required: ["status"],
+				properties: {
+					status: { $ref: "#/components/schemas/AlertStatus" },
+					notes: { type: "string", maxLength: 1000, nullable: true },
+					reviewedBy: { type: "string", maxLength: 100, nullable: true },
+					resolvedBy: { type: "string", maxLength: 100, nullable: true },
+				},
+			},
+			AlertPatchRequest: {
+				type: "object",
+				properties: {
+					status: { $ref: "#/components/schemas/AlertStatus" },
+					notes: { type: "string", maxLength: 1000, nullable: true },
+					reviewedBy: { type: "string", maxLength: 100, nullable: true },
+					resolvedBy: { type: "string", maxLength: 100, nullable: true },
 				},
 			},
 		},
