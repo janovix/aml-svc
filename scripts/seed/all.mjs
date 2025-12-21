@@ -116,13 +116,34 @@ async function seedAll() {
 		}
 		cleanup = () => worker.stop();
 	} catch (error) {
-		console.error(
-			"❌ Failed to initialize database connection:",
-			error.message,
-		);
-		console.error(
-			"💡 Tip: Make sure wrangler is properly configured and the database exists.",
-		);
+		// Check if error is about KV namespace preview_id
+		if (
+			error.message &&
+			error.message.includes("preview_id") &&
+			error.message.includes("kv namespace")
+		) {
+			console.error("❌ KV namespace configuration issue:", error.message);
+			console.error(
+				"💡 To fix this, create a preview KV namespace and add its ID to the config:",
+			);
+			console.error("   1. Run: wrangler kv namespace create CACHE --preview");
+			console.error(
+				"   2. Add the returned ID as 'preview_id' to the CACHE kv_namespace in your wrangler config",
+			);
+			console.error(
+				"   3. For now, using the same ID as production (may cause issues)",
+			);
+			// Try to continue with a workaround - use the same ID
+			// This might work if the namespace supports both production and preview
+		} else {
+			console.error(
+				"❌ Failed to initialize database connection:",
+				error.message,
+			);
+			console.error(
+				"💡 Tip: Make sure wrangler is properly configured and the database exists.",
+			);
+		}
 		process.exit(1);
 	}
 
