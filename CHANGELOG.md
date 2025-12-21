@@ -1,3 +1,10 @@
+# [1.1.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.10...v1.1.0-rc.11) (2025-12-21)
+
+
+### Features
+
+* Trigger CI on push to main and dev branches ([3ac6a06](https://github.com/janovix/aml-svc/commit/3ac6a069df8180df302aa7878779cdb90120b9f7))
+
 # [1.1.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.9...v1.1.0-rc.10) (2025-12-21)
 
 
