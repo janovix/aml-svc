@@ -1,3 +1,21 @@
+# [1.1.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.9...v1.1.0-rc.10) (2025-12-21)
+
+
+### Features
+
+* Add alert rules and alerts API endpoints ([b7c71f3](https://github.com/janovix/aml-svc/commit/b7c71f34d687e503332c8fa213fe18fed1093922))
+* Add alert system and UMA value tables and scripts ([4d1bbfb](https://github.com/janovix/aml-svc/commit/4d1bbfbe25908ee9f4ad9a004dbeba1ed14aeee5))
+* Add compliance organization and UMA calculation ([5f48719](https://github.com/janovix/aml-svc/commit/5f48719e6adf54911017b6764f8ec5f5d5a08b0f))
+* Add script to create alert rules and documentation ([cdd059a](https://github.com/janovix/aml-svc/commit/cdd059ae0cbad4155cc09343e16e5626853d44ed))
+* Add script to populate economic activities catalog ([3b8499b](https://github.com/janovix/aml-svc/commit/3b8499b4d5e7a190a085b397e51e9142dc23106d))
+* Add states catalog and update catalog URLs ([525bd5b](https://github.com/janovix/aml-svc/commit/525bd5b72ed7b82043b1da67399f20b7271b60bd))
+* Add UMA value management and integration ([ca0196d](https://github.com/janovix/aml-svc/commit/ca0196dbf31f20b60f20a2a7c60cd839977967ef))
+* Implement alert detection system ([bdc0490](https://github.com/janovix/aml-svc/commit/bdc04908860d36fd5577d92e9386f8232dd62532))
+* Implement SAT alert submission tracking ([ed8d388](https://github.com/janovix/aml-svc/commit/ed8d388b6560c2533f581ddf1d8c8a12b19ac301))
+* Implement SAT XML file generation and upload ([1696ec7](https://github.com/janovix/aml-svc/commit/1696ec753ac3d0068fbcba744837b8356d606893))
+* Populate SAT catalogs from CSV files ([9bb97de](https://github.com/janovix/aml-svc/commit/9bb97de569b467ea39df8c76d1136e155207b120))
+* Seed alert rules and update seeding script ([ade8a7e](https://github.com/janovix/aml-svc/commit/ade8a7e022f8c3319be4a43c88d0daf7d4f927a2))
+
 # [1.1.0-rc.9](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.8...v1.1.0-rc.9) (2025-12-19)
 
 
