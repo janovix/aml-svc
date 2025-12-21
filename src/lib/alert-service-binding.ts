@@ -151,15 +151,35 @@ export class AlertServiceBinding {
 			throw new Error("R2_BUCKET not configured");
 		}
 
+		// Import CatalogRepository for catalog lookups
+		const { CatalogRepository } = await import("../domain/catalog");
+		const catalogRepository = new CatalogRepository(prisma);
+
 		const result = await generateAndUploadSatFile(alert, client, transaction, {
 			r2Bucket: this.env.R2_BUCKET as unknown as R2Bucket, // Type assertion for compatibility
 			claveSujetoObligado: this.env.SAT_CLAVE_SUJETO_OBLIGADO || "000000000000",
-			tipoSujetoObligado: this.env.SAT_TIPO_SUJETO_OBLIGADO || "1",
+			claveActividad: this.env.SAT_CLAVE_ACTIVIDAD || "VEH",
 			claveEntidadColegiada: this.env.SAT_CLAVE_ENTIDAD_COLEGIADA,
-			getCatalogValue: async (catalogCode: string, itemCode: string) => {
-				// TODO: Implement catalog lookup from database
-				// For now, return defaults
-				return itemCode;
+			getCatalogValue: async (catalogKey: string, itemName: string) => {
+				try {
+					// Look up catalog by key
+					const catalog = await catalogRepository.findByKey(catalogKey);
+					if (!catalog) {
+						return null;
+					}
+					// Search for catalog item by name (normalized search)
+					const result = await catalogRepository.listItems(catalog.id, {
+						page: 1,
+						pageSize: 1,
+						search: itemName,
+						active: true,
+					});
+					// Return the normalizedName or name of the first matching item
+					return result.data[0]?.normalizedName || result.data[0]?.name || null;
+				} catch (error) {
+					console.error(`Error looking up catalog ${catalogKey}:`, error);
+					return null;
+				}
 			},
 		});
 

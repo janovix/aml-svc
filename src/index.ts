@@ -17,8 +17,8 @@ export type Bindings = {
 	API_VERSION?: string;
 	AUTH_SERVICE_URL?: string;
 	AUTH_JWKS_CACHE_TTL?: string;
-	SAT_CLAVE_SUJETO_OBLIGADO?: string; // 12-character obligated subject identifier
-	SAT_TIPO_SUJETO_OBLIGADO?: string; // Catalog code from CAT_TIPO_SUJETO_OBLIGADO
+	SAT_CLAVE_SUJETO_OBLIGADO?: string; // 12-character obligated subject identifier (RFC)
+	SAT_CLAVE_ACTIVIDAD?: string; // Activity code (e.g., "VEH" for vehicle notices)
 	SAT_CLAVE_ENTIDAD_COLEGIADA?: string; // Optional collegiate entity identifier
 	/** Service binding to auth-svc for worker-to-worker communication */
 	AUTH_SERVICE?: Fetcher;

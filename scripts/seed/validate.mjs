@@ -21,7 +21,6 @@ const ROOT_DIR = join(__dirname, "../..");
 // Models that don't need seeds (junction tables, enums-only, etc.)
 const EXCLUDED_MODELS = new Set([
 	"CatalogItem", // Populated via catalog population, not seeded
-	"SatCatalogItem", // Populated via catalog population, not seeded
 	"TransactionPaymentMethod", // Created via Transaction seed
 	"ClientDocument", // Created via Client seed
 	"ClientAddress", // Created via Client seed
@@ -31,7 +30,6 @@ const EXCLUDED_MODELS = new Set([
 // Models that are populated, not seeded
 const POPULATED_MODELS = new Set([
 	"Catalog", // Populated via populate scripts
-	"SatCatalog", // Populated via populate scripts
 	"UmaValue", // Populated via migration
 ]);
 

@@ -299,45 +299,6 @@ model Alert {
   @@index([submittedAt])
 }
 
-// SAT Catalog Models for Vehicle Notice XML generation
-// These catalogs store the official SAT catalog codes referenced in XML files
-
-model SatCatalog {
-  id          String   @id @default(uuid())
-  code        String   @unique // Catalog code (e.g., "CAT_TIPO_SUJETO_OBLIGADO")
-  name        String
-  description String?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  items SatCatalogItem[]
-
-  @@map("sat_catalogs")
-  @@index([code])
-  @@index([active])
-}
-
-model SatCatalogItem {
-  id          String   @id @default(uuid())
-  catalogId   String
-  code        String   // Catalog item code (the value used in XML)
-  name        String   // Human-readable name
-  description String?
-  active      Boolean  @default(true)
-  metadata    String?  // Additional metadata as JSON
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  catalog SatCatalog @relation(fields: [catalogId], references: [id], onDelete: Cascade)
-
-  @@map("sat_catalog_items")
-  @@unique([catalogId, code]) // Unique code per catalog
-  @@index([catalogId])
-  @@index([code])
-  @@index([active])
-}
-
 model UmaValue {
   id          String   @id @default(uuid())
   year        Int      @unique // Year this UMA value applies to (e.g., 2025)

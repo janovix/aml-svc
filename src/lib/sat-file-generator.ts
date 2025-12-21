@@ -40,13 +40,13 @@ import { generateAlertFileKey, uploadToR2 } from "./r2-upload";
 export interface SatFileGeneratorConfig {
 	r2Bucket: R2Bucket;
 	claveSujetoObligado: string;
-	tipoSujetoObligado: string;
+	claveActividad: string; // e.g., "VEH"
 	claveEntidadColegiada?: string;
-	// Catalog lookups (simplified - in production these should come from database)
+	// Catalog lookups using existing Catalog system
 	getCatalogValue: (
-		catalogCode: string,
-		itemCode: string,
-	) => Promise<string | null>;
+		catalogKey: string,
+		itemName: string,
+	) => Promise<string | null>; // Returns the catalog item's normalizedName or name
 }
 
 export interface SatFileGenerationResult {
@@ -65,35 +65,30 @@ export async function generateAndUploadSatFile(
 	transaction: TransactionEntity,
 	config: SatFileGeneratorConfig,
 ): Promise<SatFileGenerationResult> {
-	// Get catalog values
+	// Get catalog values using existing Catalog system
+	// Catalog keys should match the catalog.key field in the database
 	const tipoOperacion =
-		(await config.getCatalogValue("CAT_TIPO_OPERACION", "1")) || "1"; // Default to "1" (Compra)
-	const moneda = (await config.getCatalogValue("CAT_MONEDA", "MXN")) || "MXN";
-	const tipoVehiculo =
-		(await config.getCatalogValue(
-			"CAT_TIPO_VEHICULO",
-			transaction.vehicleType === "land" ? "1" : "2",
-		)) || "1";
-	// TODO: Map brandId to catalog code
+		(await config.getCatalogValue("tipo-operacion", "802")) || "802"; // Default from example
+	const moneda = (await config.getCatalogValue("moneda", "3")) || "3"; // "3" for MXN in example
+	// Map vehicle type
+	const vehiculoTipo =
+		transaction.vehicleType === "land"
+			? "terrestre"
+			: transaction.vehicleType === "marine"
+				? "maritimo"
+				: "aereo";
+	// Get brand name from catalog
 	const marca =
-		(await config.getCatalogValue("CAT_MARCA_VEHICULO", "1")) || "1";
-	const color =
-		(await config.getCatalogValue("CAT_COLOR_VEHICULO", "1")) || "1";
-	const tipoPersona =
-		client.personType === "physical"
-			? "1"
-			: client.personType === "moral"
-				? "2"
-				: "1";
+		(await config.getCatalogValue("vehicle-brands", transaction.brandId)) ||
+		transaction.brandId; // Fallback to brandId if not found
 	const paisNacionalidad =
-		(await config.getCatalogValue("CAT_PAIS", client.nationality || "MX")) ||
+		(await config.getCatalogValue("pais", client.nationality || "MX")) ||
+		client.nationality ||
 		"MX";
-	const pais =
-		(await config.getCatalogValue("CAT_PAIS", client.country || "MX")) || "MX";
-	const entidadFederativa =
-		client.country === "MX"
-			? await config.getCatalogValue("CAT_ENTIDAD_FEDERATIVA", client.stateCode)
-			: undefined;
+	// Get payment method codes from catalog
+	const formaPago =
+		(await config.getCatalogValue("payment-methods", "1")) || "1"; // Default from example
+	const instrumentoMonetario = "1"; // Default from example
 
 	// Map to SAT format
 	const satData: SatVehicleNoticeData = mapToSatVehicleNoticeData(
@@ -102,17 +97,18 @@ export async function generateAndUploadSatFile(
 		transaction,
 		{
 			claveSujetoObligado: config.claveSujetoObligado,
-			tipoSujetoObligado: config.tipoSujetoObligado,
-			claveEntidadColegiada: config.claveEntidadColegiada,
+			claveActividad: config.claveActividad,
+			referenciaAviso: alert.id,
+			prioridad: "1", // Default priority
+			tipoAlerta: "803", // Default alert type from example
 			tipoOperacion,
 			moneda,
-			tipoVehiculo,
+			tipoVehiculo: vehiculoTipo,
 			marca,
-			color,
-			tipoPersona,
 			paisNacionalidad,
-			pais,
-			entidadFederativa: entidadFederativa || undefined,
+			actividadEconomica: undefined, // Can be populated from catalog if needed
+			formaPago,
+			instrumentoMonetario,
 		},
 	);
 

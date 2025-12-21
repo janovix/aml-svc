@@ -20,8 +20,8 @@ declare namespace Cloudflare {
 		/**
 		 * SAT configuration
 		 */
-		SAT_CLAVE_SUJETO_OBLIGADO?: string; // 12-character obligated subject identifier
-		SAT_TIPO_SUJETO_OBLIGADO?: string; // Catalog code from CAT_TIPO_SUJETO_OBLIGADO
+		SAT_CLAVE_SUJETO_OBLIGADO?: string; // 12-character obligated subject identifier (RFC)
+		SAT_CLAVE_ACTIVIDAD?: string; // Activity code (e.g., "VEH" for vehicle notices)
 		SAT_CLAVE_ENTIDAD_COLEGIADA?: string; // Optional collegiate entity identifier
 	}
 }
