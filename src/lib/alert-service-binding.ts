@@ -18,6 +18,8 @@ import type { Bindings } from "../index";
 import { getPrismaClient } from "./prisma";
 import { AlertRuleRepository, AlertRepository } from "../domain/alert";
 import { AlertService, AlertRuleService } from "../domain/alert";
+import { UmaValueRepository } from "../domain/uma";
+import { UmaValueService } from "../domain/uma";
 
 /**
  * Service binding helper functions for alert operations
@@ -35,6 +37,17 @@ export class AlertServiceBinding {
 		const repository = new AlertRuleRepository(prisma);
 		const service = new AlertRuleService(repository);
 		return service.listActive();
+	}
+
+	/**
+	 * Get active UMA value
+	 * Called via: env.AML_SERVICE.fetch(new Request("https://internal/uma-values/active"))
+	 */
+	async getActiveUmaValue() {
+		const prisma = getPrismaClient(this.env.DB);
+		const repository = new UmaValueRepository(prisma);
+		const service = new UmaValueService(repository);
+		return service.getActive();
 	}
 
 	/**
@@ -108,6 +121,21 @@ export async function handleServiceBindingRequest(
 			const alert = await service.createAlert(alertData);
 			return new Response(JSON.stringify(alert), {
 				status: 201,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+
+		// Route: /internal/uma-values/active
+		if (path === "/internal/uma-values/active" && request.method === "GET") {
+			const service = new AlertServiceBinding(env);
+			const umaValue = await service.getActiveUmaValue();
+			if (!umaValue) {
+				return new Response(
+					JSON.stringify({ error: "No active UMA value found" }),
+					{ status: 404, headers: { "Content-Type": "application/json" } },
+				);
+			}
+			return new Response(JSON.stringify(umaValue), {
 				headers: { "Content-Type": "application/json" },
 			});
 		}

@@ -48,6 +48,17 @@ const response = await env.AML_SERVICE.fetch(
 const rules = await response.json(); // Array of AlertRuleEntity
 ```
 
+#### Get Active UMA Value
+
+```typescript
+const response = await env.AML_SERVICE.fetch(
+	new Request("https://internal/uma-values/active", { method: "GET" }),
+);
+const umaValue = await response.json(); // UmaValueEntity with dailyValue
+// Use umaValue.dailyValue to calculate thresholds:
+// UMBRAL_AVISO = 6420 * umaValue.dailyValue
+```
+
 #### Create Alert (Idempotent)
 
 ```typescript
@@ -350,23 +361,33 @@ interface Env {
 }
 
 async function processAlertJob(job: AlertJob, env: Env) {
-	// 1. Fetch active alert rules (using service binding)
+	// 1. Fetch active UMA value (required for threshold calculations)
+	const umaResponse = await env.AML_SERVICE.fetch(
+		new Request("https://internal/uma-values/active", { method: "GET" }),
+	);
+	const umaValue = await umaResponse.json();
+	if (!umaValue) {
+		throw new Error("No active UMA value configured");
+	}
+
+	// 2. Fetch active alert rules (using service binding)
 	const rulesResponse = await env.AML_SERVICE.fetch(
 		new Request("https://internal/alert-rules/active", { method: "GET" }),
 	);
 	const rules = await rulesResponse.json();
 
-	// 2. Fetch client context
+	// 3. Fetch client context
 	// Note: You may need HTTP endpoints or additional service binding routes for these
 	const client = await fetchClient(job.clientId, env);
 	const transactions = await fetchClientTransactions(job.clientId, env);
 
-	// 3. Evaluate each rule
+	// 4. Evaluate each rule (pass UMA value for threshold calculations)
 	for (const rule of rules) {
 		const evaluationResult = evaluateRule(
 			rule.ruleConfig,
 			client,
 			transactions,
+			umaValue, // Pass UMA value for calculations
 		);
 
 		if (evaluationResult.triggered) {

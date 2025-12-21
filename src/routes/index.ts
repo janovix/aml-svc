@@ -7,6 +7,7 @@ import { alertsRouter } from "./alerts";
 import { catalogsRouter } from "./catalogs";
 import { clientsRouter } from "./clients";
 import { transactionsRouter } from "./transactions";
+import { umaValuesRouter } from "./uma-values";
 
 export function createRouter() {
 	const router = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
@@ -16,6 +17,7 @@ export function createRouter() {
 	router.use("/transactions/*", authMiddleware());
 	router.use("/alert-rules/*", authMiddleware());
 	router.use("/alerts/*", authMiddleware());
+	router.use("/uma-values/*", authMiddleware());
 
 	// Mount resource routers
 	router.route("/catalogs", catalogsRouter);
@@ -23,6 +25,7 @@ export function createRouter() {
 	router.route("/transactions", transactionsRouter);
 	router.route("/alert-rules", alertRulesRouter);
 	router.route("/alerts", alertsRouter);
+	router.route("/uma-values", umaValuesRouter);
 
 	return router;
 }

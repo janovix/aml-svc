@@ -281,3 +281,21 @@ model Alert {
   @@index([createdAt])
   @@index([idempotencyKey])
 }
+
+model UmaValue {
+  id          String   @id @default(uuid())
+  year        Int      @unique // Year this UMA value applies to (e.g., 2025)
+  dailyValue  Decimal  // UMA daily value for the year
+  effectiveDate DateTime // Date when this UMA value becomes effective
+  endDate     DateTime? // Optional: date when this UMA value expires (usually end of year)
+  approvedBy  String?  // User who approved/configured this value (Compliance Officer)
+  notes       String?  // Optional notes about the UMA value
+  active      Boolean  @default(true) // Whether this is the current active UMA value
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("uma_values")
+  @@index([year])
+  @@index([active])
+  @@index([effectiveDate])
+}

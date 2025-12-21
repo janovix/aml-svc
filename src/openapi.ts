@@ -42,6 +42,11 @@ export const openAPISpec = {
 			name: "Alerts",
 			description: "Alert detection and management endpoints",
 		},
+		{
+			name: "UMA Values",
+			description:
+				"UMA (Unidad de Medida y Actualización) value management endpoints",
+		},
 	],
 	paths: {
 		"/healthz": {
@@ -1414,6 +1419,325 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/uma-values": {
+			get: {
+				tags: ["UMA Values"],
+				summary: "List UMA values",
+				description:
+					"Retrieve a paginated list of UMA values with optional filters for year and active status.",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+						description: "Page number to retrieve",
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 10 },
+						description: "Number of records per page",
+					},
+					{
+						name: "year",
+						in: "query",
+						schema: { type: "integer", minimum: 2000, maximum: 2100 },
+						description: "Filter by year",
+					},
+					{
+						name: "active",
+						in: "query",
+						schema: { type: "boolean" },
+						description: "Filter by active status",
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of UMA values",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/UmaValue" },
+										},
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["UMA Values"],
+				summary: "Create UMA value",
+				description:
+					"Create a new UMA value for a specific year. Only one UMA value can be active at a time.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/UmaValueCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "UMA value created successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/uma-values/active": {
+			get: {
+				tags: ["UMA Values"],
+				summary: "Get active UMA value",
+				description:
+					"Retrieve the currently active UMA value. This is the value used for threshold calculations.",
+				responses: {
+					"200": {
+						description: "Active UMA value",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"404": {
+						description: "No active UMA value found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/uma-values/year/{year}": {
+			get: {
+				tags: ["UMA Values"],
+				summary: "Get UMA value by year",
+				description: "Retrieve the UMA value for a specific year.",
+				parameters: [
+					{
+						name: "year",
+						in: "path",
+						required: true,
+						schema: { type: "integer", minimum: 2000, maximum: 2100 },
+						description: "Year to retrieve UMA value for",
+					},
+				],
+				responses: {
+					"200": {
+						description: "UMA value for the specified year",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"404": {
+						description: "UMA value for year not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/uma-values/{id}": {
+			get: {
+				tags: ["UMA Values"],
+				summary: "Get UMA value by ID",
+				description: "Retrieve a single UMA value.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "UMA value identifier",
+					},
+				],
+				responses: {
+					"200": {
+						description: "UMA value detail response",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"404": {
+						description: "UMA value not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			put: {
+				tags: ["UMA Values"],
+				summary: "Update UMA value",
+				description:
+					"Replace the full UMA value payload. If setting as active, all other UMA values will be deactivated.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/UmaValueCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "UMA value updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"404": {
+						description: "UMA value not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["UMA Values"],
+				summary: "Patch UMA value",
+				description:
+					"Apply a partial update to a UMA value. If setting as active, all other UMA values will be deactivated.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/UmaValuePatchRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "UMA value updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"404": {
+						description: "UMA value not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["UMA Values"],
+				summary: "Delete UMA value",
+				description: "Delete a UMA value.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": {
+						description: "UMA value deleted",
+					},
+					"404": {
+						description: "UMA value not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/uma-values/{id}/activate": {
+			post: {
+				tags: ["UMA Values"],
+				summary: "Activate UMA value",
+				description:
+					"Activate a UMA value. This will deactivate all other UMA values and set this one as active.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "UMA value activated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UmaValue" },
+							},
+						},
+					},
+					"404": {
+						description: "UMA value not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
 	},
 	components: {
 		schemas: {
@@ -2405,6 +2729,152 @@ export const openAPISpec = {
 					notes: { type: "string", maxLength: 1000, nullable: true },
 					reviewedBy: { type: "string", maxLength: 100, nullable: true },
 					resolvedBy: { type: "string", maxLength: 100, nullable: true },
+				},
+			},
+			UmaValue: {
+				type: "object",
+				required: [
+					"id",
+					"year",
+					"dailyValue",
+					"effectiveDate",
+					"active",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: {
+						type: "string",
+						pattern: "^[A-Za-z0-9-]{1,64}$",
+						description: "UMA value identifier",
+					},
+					year: {
+						type: "integer",
+						minimum: 2000,
+						maximum: 2100,
+						description: "Year this UMA value applies to",
+					},
+					dailyValue: {
+						type: "string",
+						description:
+							"UMA daily value for the year, stored as string to preserve precision",
+					},
+					effectiveDate: {
+						type: "string",
+						format: "date-time",
+						description: "Date when this UMA value becomes effective",
+					},
+					endDate: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description:
+							"Optional date when this UMA value expires (usually end of year)",
+					},
+					approvedBy: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description:
+							"User who approved/configured this value (Compliance Officer)",
+					},
+					notes: {
+						type: "string",
+						maxLength: 1000,
+						nullable: true,
+						description: "Optional notes about the UMA value",
+					},
+					active: {
+						type: "boolean",
+						description:
+							"Whether this is the current active UMA value (only one can be active at a time)",
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			UmaValueCreateRequest: {
+				type: "object",
+				required: ["year", "dailyValue", "effectiveDate"],
+				properties: {
+					year: {
+						type: "integer",
+						minimum: 2000,
+						maximum: 2100,
+						description: "Year this UMA value applies to",
+					},
+					dailyValue: {
+						type: "number",
+						description: "UMA daily value for the year",
+					},
+					effectiveDate: {
+						type: "string",
+						format: "date-time",
+						description: "Date when this UMA value becomes effective",
+					},
+					endDate: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description:
+							"Optional date when this UMA value expires (usually end of year)",
+					},
+					approvedBy: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+						description:
+							"User who approved/configured this value (Compliance Officer)",
+					},
+					notes: {
+						type: "string",
+						maxLength: 1000,
+						nullable: true,
+						description: "Optional notes about the UMA value",
+					},
+					active: {
+						type: "boolean",
+						default: false,
+						description:
+							"Whether to set this as active (will deactivate all others). Usually set to false initially and activated manually.",
+					},
+				},
+			},
+			UmaValuePatchRequest: {
+				type: "object",
+				properties: {
+					year: {
+						type: "integer",
+						minimum: 2000,
+						maximum: 2100,
+					},
+					dailyValue: {
+						type: "number",
+					},
+					effectiveDate: {
+						type: "string",
+						format: "date-time",
+					},
+					endDate: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+					},
+					approvedBy: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
+					},
+					notes: {
+						type: "string",
+						maxLength: 1000,
+						nullable: true,
+					},
+					active: {
+						type: "boolean",
+						description:
+							"If set to true, will deactivate all other UMA values and activate this one",
+					},
 				},
 			},
 		},
