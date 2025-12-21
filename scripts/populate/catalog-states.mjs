@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Populate Currencies Catalog
+ * Populate States Catalog (Mexican States)
  *
- * This script populates the currencies catalog with data from SAT CSV.
+ * This script populates the states catalog with data from CSV.
  * This is a POPULATION script (not a seed) and runs in all environments.
  */
 
@@ -14,11 +14,11 @@ import { writeFileSync, unlinkSync } from "node:fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const CSV_URL = "https://catalogs.janovix.ai/currencies.csv";
-const CATALOG_KEY = "currencies";
+const CSV_URL = "https://catalogs.janovix.ai/states.csv";
+const CATALOG_KEY = "states";
 
 async function downloadCsv() {
-	console.log("📥 Downloading currencies.csv...");
+	console.log("📥 Downloading states.csv...");
 	const response = await fetch(CSV_URL);
 	if (!response.ok) {
 		throw new Error(`Failed to download CSV: ${response.statusText}`);
@@ -34,7 +34,7 @@ function parseCsv(csvText) {
 		const line = lines[i].trim();
 		if (!line) continue;
 
-		// Parse CSV with quoted values
+		// Simple CSV parsing (handles quoted values)
 		const values = [];
 		let current = "";
 		let inQuotes = false;
@@ -52,12 +52,10 @@ function parseCsv(csvText) {
 		}
 		values.push(current.trim());
 
-		if (values.length >= 3) {
+		if (values.length >= 2) {
 			data.push({
-				key: values[0], // e.g., "1"
-				shortName: values[1], // e.g., "MXN"
-				name: values[2], // e.g., "Peso mexicano"
-				country: values[3] || "", // e.g., "México"
+				key: values[0], // State code
+				value: values[1], // Human-readable state name
 			});
 		}
 	}
@@ -71,7 +69,7 @@ function generateSql(catalogId, items) {
 	// Insert catalog if it doesn't exist
 	sql.push(`
 		INSERT OR IGNORE INTO catalogs (id, key, name, active, createdAt, updatedAt)
-		VALUES ('${catalogId}', '${CATALOG_KEY}', 'Monedas', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+		VALUES ('${catalogId}', '${CATALOG_KEY}', 'Estados Mexicanos', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 	`);
 
 	// Delete existing items for this catalog
@@ -79,21 +77,19 @@ function generateSql(catalogId, items) {
 
 	// Insert catalog items
 	for (const item of items) {
-		// name = human-readable name (e.g., "Peso mexicano", "Dólar estadounidense")
-		const name = item.name.replace(/'/g, "''");
+		// name = human-readable name (e.g., "Aguascalientes", "Baja California")
+		const name = item.value.replace(/'/g, "''");
 		// normalizedName = normalized human-readable name for searching
-		const normalizedName = item.name
+		const normalizedName = item.value
 			.normalize("NFD")
 			.replace(/[\u0300-\u036f]/g, "")
 			.toLowerCase()
 			.trim()
 			.replace(/'/g, "''");
-		// Store the code and additional info in metadata for XML generation
+		// Store the code in metadata for XML generation
 		const metadata = JSON.stringify({
-			code: item.key, // e.g., "1", "2", "3" - used in XML
-			shortName: item.shortName, // e.g., "MXN", "USD"
-			country: item.country,
-		}).replace(/'/g, "''"); // Escape single quotes
+			code: item.key, // State code - used in XML
+		}).replace(/'/g, "''");
 
 		sql.push(`
 			INSERT INTO catalog_items (id, catalogId, name, normalizedName, active, metadata, createdAt, updatedAt)
@@ -113,7 +109,7 @@ function generateSql(catalogId, items) {
 	return sql.join("\n");
 }
 
-async function populateCurrencyCatalog() {
+async function populateStatesCatalog() {
 	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
 	// Use WRANGLER_CONFIG if set, otherwise detect preview environment
 	let configFile = process.env.WRANGLER_CONFIG;
@@ -131,13 +127,13 @@ async function populateCurrencyCatalog() {
 
 	try {
 		console.log(
-			`📦 Populating currencies catalog (${isRemote ? "remote" : "local"})...`,
+			`📦 Populating states catalog (${isRemote ? "remote" : "local"})...`,
 		);
 
 		// Download and parse CSV
 		const csvText = await downloadCsv();
 		const items = parseCsv(csvText);
-		console.log(`✅ Parsed ${items.length} currencies from CSV`);
+		console.log(`✅ Parsed ${items.length} states from CSV`);
 
 		// Generate catalog ID (deterministic based on catalog key)
 		const catalogId = Array.from(CATALOG_KEY)
@@ -147,7 +143,7 @@ async function populateCurrencyCatalog() {
 
 		// Generate SQL
 		const sql = generateSql(catalogId, items);
-		const sqlFile = join(__dirname, `temp-currencies-${Date.now()}.sql`);
+		const sqlFile = join(__dirname, `temp-states-${Date.now()}.sql`);
 
 		try {
 			writeFileSync(sqlFile, sql);
@@ -158,7 +154,7 @@ async function populateCurrencyCatalog() {
 				: `wrangler d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
 
 			execSync(command, { stdio: "inherit" });
-			console.log("✅ Currencies catalog populated successfully!");
+			console.log("✅ States catalog populated successfully!");
 		} finally {
 			// Clean up temp file
 			try {
@@ -168,12 +164,12 @@ async function populateCurrencyCatalog() {
 			}
 		}
 	} catch (error) {
-		console.error("❌ Error populating currencies catalog:", error);
+		console.error("❌ Error populating states catalog:", error);
 		process.exit(1);
 	}
 }
 
-populateCurrencyCatalog().catch((error) => {
+populateStatesCatalog().catch((error) => {
 	console.error("Fatal error:", error);
 	process.exit(1);
 });

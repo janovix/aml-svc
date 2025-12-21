@@ -14,12 +14,11 @@ import { writeFileSync, unlinkSync } from "node:fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const CSV_URL =
-	"https://eng-assets.algenium.tools/janovix_catalogs/COUNTRY.csv";
+const CSV_URL = "https://catalogs.janovix.ai/countries.csv";
 const CATALOG_KEY = "countries";
 
 async function downloadCsv() {
-	console.log("📥 Downloading COUNTRY.csv...");
+	console.log("📥 Downloading countries.csv...");
 	const response = await fetch(CSV_URL);
 	if (!response.ok) {
 		throw new Error(`Failed to download CSV: ${response.statusText}`);
