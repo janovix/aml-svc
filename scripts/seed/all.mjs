@@ -62,12 +62,19 @@ async function seedAll() {
 
 	// Dynamically import unstable_dev to avoid build issues
 	// Only use it for local development (not in CI/build environments)
+	// Skip entirely if we detect we're in a build environment
+	const isBuildEnvironment =
+		process.env.CI === "true" ||
+		process.env.CF_PAGES === "1" ||
+		process.env.WORKERS_CI === "true" ||
+		process.env.NODE_ENV === "production";
+
 	let db;
 	let cleanup;
-	if (!isRemote && process.env.NODE_ENV !== "production") {
+	if (!isBuildEnvironment && !isRemote) {
 		try {
-			// Use dynamic import with a string to prevent static analysis
-			const wranglerModule = await import(/* @vite-ignore */ "wrangler");
+			// Use dynamic import - only executed at runtime, not during build analysis
+			const wranglerModule = await import("wrangler");
 			const { unstable_dev } = wranglerModule;
 			const worker = await unstable_dev("src/index.ts", {
 				config: configFile || undefined,
@@ -93,12 +100,12 @@ async function seedAll() {
 			process.exit(1);
 		}
 	} else {
-		// For remote/CI, we can't use unstable_dev
+		// For remote/CI/build environments, we can't use unstable_dev
 		// Seed scripts will need to handle their own database access
 		console.warn(
-			"⚠️  Remote seeding requires scripts to handle database access themselves",
+			"⚠️  Seeding skipped in build/CI environment. Run locally for seeding.",
 		);
-		process.exit(1);
+		process.exit(0); // Exit gracefully instead of error
 	}
 
 	try {
