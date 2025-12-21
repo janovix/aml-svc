@@ -6,6 +6,10 @@ if (process.env.WORKERS_CI_BRANCH === "main") {
 }
 
 execSync("pnpm run predeploy:preview", { stdio: "inherit" });
+// Populate catalogs (required for all environments)
+execSync("pnpm run populate", { stdio: "inherit" });
+// Seed synthetic data (only for dev/preview)
+execSync("pnpm run seed", { stdio: "inherit" });
 execSync("wrangler versions upload --config wrangler.preview.jsonc", {
 	stdio: "inherit",
 });
