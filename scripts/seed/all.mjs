@@ -60,52 +60,63 @@ async function seedAll() {
 
 	const configFile = getConfigFile();
 
-	// Dynamically import unstable_dev to avoid build issues
-	// Only use it for local development (not in CI/build environments)
-	// Skip entirely if we detect we're in a build environment
-	const isBuildEnvironment =
-		process.env.CI === "true" ||
-		process.env.CF_PAGES === "1" ||
-		process.env.WORKERS_CI === "true" ||
-		process.env.NODE_ENV === "production";
+	// Determine if we're in a Cloudflare Workers environment (preview or dev)
+	// We want to seed in preview and dev, but skip in production
+	const isPreviewEnvironment =
+		process.env.CF_PAGES_BRANCH ||
+		(process.env.WORKERS_CI_BRANCH &&
+			process.env.WORKERS_CI_BRANCH !== "main") ||
+		process.env.PREVIEW === "true";
+	const isDevEnvironment =
+		process.env.ENVIRONMENT === "dev" ||
+		process.env.WRANGLER_CONFIG === "wrangler.jsonc";
+	const isProduction =
+		process.env.NODE_ENV === "production" &&
+		!isPreviewEnvironment &&
+		!isDevEnvironment;
 
+	// Skip seeding only in production, allow it in preview and dev
+	if (isProduction) {
+		console.log("⏭️  Skipping seeding in production environment.");
+		process.exit(0);
+	}
+
+	// Dynamically import unstable_dev to avoid build issues
+	// Use it for both local and remote Cloudflare environments (preview/dev)
 	let db;
 	let cleanup;
-	if (!isBuildEnvironment && !isRemote) {
-		try {
-			// Use dynamic import - only executed at runtime, not during build analysis
-			const wranglerModule = await import("wrangler");
-			const { unstable_dev } = wranglerModule;
-			const worker = await unstable_dev("src/index.ts", {
-				config: configFile || undefined,
-				local: true,
-				ip: "127.0.0.1",
-				port: 8787,
-			});
+	try {
+		// Use dynamic import - only executed at runtime, not during build analysis
+		const wranglerModule = await import("wrangler");
+		const { unstable_dev } = wranglerModule;
 
-			db = worker.env?.DB;
-			if (!db) {
-				await worker.stop();
-				throw new Error("Database binding not found");
-			}
-			cleanup = () => worker.stop();
-		} catch (error) {
-			console.error(
-				"❌ Failed to initialize database connection:",
-				error.message,
-			);
-			console.error(
-				"💡 Tip: Make sure wrangler is properly configured and the database exists.",
-			);
-			process.exit(1);
+		// Determine if we should use local or remote database
+		// Use remote for Cloudflare Workers environments (preview/dev in CI)
+		// Use local for local development
+		const useLocal = !isRemote && !process.env.CI;
+
+		const worker = await unstable_dev("src/index.ts", {
+			config: configFile || undefined,
+			local: useLocal,
+			ip: "127.0.0.1",
+			port: 8787,
+		});
+
+		db = worker.env?.DB;
+		if (!db) {
+			await worker.stop();
+			throw new Error("Database binding not found");
 		}
-	} else {
-		// For remote/CI/build environments, we can't use unstable_dev
-		// Seed scripts will need to handle their own database access
-		console.warn(
-			"⚠️  Seeding skipped in build/CI environment. Run locally for seeding.",
+		cleanup = () => worker.stop();
+	} catch (error) {
+		console.error(
+			"❌ Failed to initialize database connection:",
+			error.message,
 		);
-		process.exit(0); // Exit gracefully instead of error
+		console.error(
+			"💡 Tip: Make sure wrangler is properly configured and the database exists.",
+		);
+		process.exit(1);
 	}
 
 	try {
