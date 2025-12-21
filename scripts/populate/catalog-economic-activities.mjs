@@ -14,7 +14,7 @@ import { writeFileSync, unlinkSync } from "node:fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const CSV_URL = "https://eng-seets.algenium.tools/ECONOMIC_ACTIVITY.csv";
+const CSV_URL = "https://eng-assets.algenium.tools/ECONOMIC_ACTIVITY.csv";
 const CATALOG_KEY = "economic-activities";
 
 async function downloadCsv() {
