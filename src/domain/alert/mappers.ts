@@ -105,6 +105,7 @@ export function mapPrismaAlert(prisma: PrismaAlertModel): AlertEntity {
 		triggerTransactionId: prisma.triggerTransactionId,
 		submissionDeadline: mapDateTime(prisma.submissionDeadline),
 		fileGeneratedAt: mapDateTime(prisma.fileGeneratedAt),
+		satFileUrl: prisma.satFileUrl,
 		submittedAt: mapDateTime(prisma.submittedAt),
 		satAcknowledgmentReceipt: prisma.satAcknowledgmentReceipt,
 		satFolioNumber: prisma.satFolioNumber,
@@ -191,6 +192,7 @@ export function mapAlertCreateInputToPrisma(
 			? new Date(input.submissionDeadline)
 			: null,
 		fileGeneratedAt: null,
+		satFileUrl: null,
 		submittedAt: null,
 		satAcknowledgmentReceipt: null,
 		satFolioNumber: null,

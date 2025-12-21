@@ -271,6 +271,27 @@ export class AlertRepository {
 		};
 	}
 
+	async updateSatFileUrl(id: string, satFileUrl: string): Promise<AlertEntity> {
+		await this.ensureExists(id);
+
+		const updated = await this.prisma.alert.update({
+			where: { id },
+			data: {
+				satFileUrl,
+				fileGeneratedAt: new Date(),
+				status: "FILE_GENERATED",
+			},
+			include: {
+				alertRule: true,
+			},
+		});
+
+		return {
+			...mapPrismaAlert(updated),
+			alertRule: mapPrismaAlertRule(updated.alertRule),
+		};
+	}
+
 	async update(id: string, input: AlertUpdateInput): Promise<AlertEntity> {
 		await this.ensureExists(id);
 

@@ -20,6 +20,12 @@
 			"id": "0f38527170fc41f09a967265ca262e19",
 		},
 	],
+	"r2_buckets": [
+		{
+			"binding": "R2_BUCKET",
+			"bucket_name": "sat-xml-files",
+		},
+	],
 	"services": [
 		{
 			"binding": "AUTH_SERVICE",

@@ -417,6 +417,27 @@ async function processAlertJob(job: AlertJob, env: Env) {
 			);
 			const alert = await alertResponse.json();
 			console.log("Alert created:", alert.id);
+
+			// 6. Generate and upload SAT XML file
+			// After alert is created, generate the XML file and upload to R2
+			// This is done via service binding to the AML service
+			const fileResponse = await env.AML_SERVICE.fetch(
+				new Request(`https://internal/alerts/${alert.id}/generate-file`, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+				}),
+			);
+
+			if (!fileResponse.ok) {
+				console.error(
+					`Failed to generate SAT file: ${fileResponse.statusText}`,
+				);
+				// Don't throw - alert is still created, file generation can be retried
+			} else {
+				const fileResult = await fileResponse.json();
+				console.log("SAT file generated:", fileResult.fileUrl);
+				console.log("Alert status updated to FILE_GENERATED");
+			}
 		}
 	}
 }

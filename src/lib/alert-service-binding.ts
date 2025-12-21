@@ -20,6 +20,28 @@ import { AlertRuleRepository, AlertRepository } from "../domain/alert";
 import { AlertService, AlertRuleService } from "../domain/alert";
 import { UmaValueRepository } from "../domain/uma";
 import { UmaValueService } from "../domain/uma";
+import { ClientRepository } from "../domain/client";
+import { ClientService } from "../domain/client";
+import { TransactionRepository } from "../domain/transaction";
+import { TransactionService } from "../domain/transaction";
+import { generateAndUploadSatFile } from "./sat-file-generator";
+
+// R2Bucket type for compatibility
+type R2Bucket = {
+	put(
+		key: string,
+		value: ReadableStream | ArrayBuffer | ArrayBufferView | string | null,
+		options?: {
+			httpMetadata?: {
+				contentType?: string;
+				contentEncoding?: string;
+				cacheControl?: string;
+				cacheExpiry?: Date;
+			};
+			customMetadata?: Record<string, string>;
+		},
+	): Promise<{ key: string; size: number; etag: string }>;
+};
 
 /**
  * Service binding helper functions for alert operations
@@ -88,6 +110,71 @@ export class AlertServiceBinding {
 		const repository = new AlertRepository(prisma);
 		const service = new AlertService(repository);
 		return service.create(alertData);
+	}
+
+	/**
+	 * Generate and upload SAT XML file for an alert
+	 * Called via: env.AML_SERVICE.fetch(new Request(`https://internal/alerts/${alertId}/generate-file`, { method: "POST" }))
+	 */
+	async generateSatFile(alertId: string) {
+		if (!this.env.R2_BUCKET) {
+			throw new Error("R2_BUCKET not configured");
+		}
+
+		const prisma = getPrismaClient(this.env.DB);
+		const alertRepository = new AlertRepository(prisma);
+		const alertService = new AlertService(alertRepository);
+
+		// Get alert
+		const alert = await alertService.get(alertId);
+		if (!alert.triggerTransactionId) {
+			throw new Error("Alert has no trigger transaction");
+		}
+
+		// Get client (RFC is the ID)
+		const clientRepository = new ClientRepository(prisma);
+		const clientService = new ClientService(clientRepository);
+		const client = await clientService.get(alert.clientId);
+
+		// Get transaction
+		const transactionRepository = new TransactionRepository(prisma);
+		const transactionService = new TransactionService(
+			transactionRepository,
+			clientRepository, // Reuse clientRepository
+		);
+		const transaction = await transactionService.get(
+			alert.triggerTransactionId,
+		);
+
+		// Generate and upload file
+		if (!this.env.R2_BUCKET) {
+			throw new Error("R2_BUCKET not configured");
+		}
+
+		const result = await generateAndUploadSatFile(alert, client, transaction, {
+			r2Bucket: this.env.R2_BUCKET as unknown as R2Bucket, // Type assertion for compatibility
+			claveSujetoObligado: this.env.SAT_CLAVE_SUJETO_OBLIGADO || "000000000000",
+			tipoSujetoObligado: this.env.SAT_TIPO_SUJETO_OBLIGADO || "1",
+			claveEntidadColegiada: this.env.SAT_CLAVE_ENTIDAD_COLEGIADA,
+			getCatalogValue: async (catalogCode: string, itemCode: string) => {
+				// TODO: Implement catalog lookup from database
+				// For now, return defaults
+				return itemCode;
+			},
+		});
+
+		// Update alert with file URL
+		const updatedAlert = await alertService.updateSatFileUrl(
+			alertId,
+			result.fileUrl,
+		);
+
+		return {
+			alert: updatedAlert,
+			fileUrl: result.fileUrl,
+			fileKey: result.fileKey,
+			fileSize: result.fileSize,
+		};
 	}
 }
 
@@ -164,6 +251,36 @@ export async function handleServiceBindingRequest(
 				JSON.stringify({ error: "Not implemented via service binding" }),
 				{ status: 501, headers: { "Content-Type": "application/json" } },
 			);
+		}
+
+		// Route: /internal/alerts/{alertId}/generate-file
+		if (
+			path.startsWith("/internal/alerts/") &&
+			path.endsWith("/generate-file") &&
+			request.method === "POST"
+		) {
+			const alertId = path
+				.split("/internal/alerts/")[1]
+				.split("/generate-file")[0];
+			const service = new AlertServiceBinding(env);
+			try {
+				const result = await service.generateSatFile(alertId);
+				return new Response(JSON.stringify(result), {
+					status: 200,
+					headers: { "Content-Type": "application/json" },
+				});
+			} catch (error) {
+				return new Response(
+					JSON.stringify({
+						error: "Failed to generate SAT file",
+						message: error instanceof Error ? error.message : "Unknown error",
+					}),
+					{
+						status: 500,
+						headers: { "Content-Type": "application/json" },
+					},
+				);
+			}
 		}
 
 		return new Response("Not Found", { status: 404 });

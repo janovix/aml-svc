@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS alerts (
     -- SAT Submission tracking
     submissionDeadline DATETIME, -- Deadline for SAT submission (day 17 of following month for avisos, 24h for suspicion)
     fileGeneratedAt DATETIME, -- When the SAT file was generated
+    satFileUrl TEXT, -- URL of the generated XML file in R2
     submittedAt DATETIME, -- When submitted to SAT
     satAcknowledgmentReceipt TEXT, -- File URL or reference to SAT acknowledgment (PDF/XML)
     satFolioNumber TEXT, -- Folio number from SAT acknowledgment

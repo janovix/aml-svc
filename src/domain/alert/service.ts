@@ -82,4 +82,8 @@ export class AlertService {
 	findByIdempotencyKey(idempotencyKey: string): Promise<AlertEntity | null> {
 		return this.repository.findByIdempotencyKey(idempotencyKey);
 	}
+
+	async updateSatFileUrl(id: string, satFileUrl: string): Promise<AlertEntity> {
+		return this.repository.updateSatFileUrl(id, satFileUrl);
+	}
 }
