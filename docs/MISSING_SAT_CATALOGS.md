@@ -41,11 +41,23 @@ The following catalogs are automatically populated from CSV files:
    - Population script: `scripts/populate/catalog-vulnerable-activities.mjs`
    - Note: The `name` field contains the human-readable activity name (e.g., "Vehículos aéreos, marítimos o terrestres"), code is stored in `metadata.code`
 
-6. **vehicle-brands** - Vehicle brand names ✅
+6. **vehicle-brands** - Terrestrial vehicle brand names ✅
 
-   - Used in: `<marca_fabricante>` field (e.g., "FORD", "LINCOLN")
-   - Source: Existing SQL file
+   - Used in: `<marca_fabricante>` field for land vehicles (e.g., "FORD", "LINCOLN")
+   - Source: SQL file or CSV
    - Population script: `scripts/populate/catalog-vehicle-brands.mjs`
+
+7. **maritime-brands** - Maritime vehicle brand names ✅
+
+   - Used in: `<marca_fabricante>` field for maritime vehicles (e.g., "YAMAHA", "MERCURY")
+   - Source: SQL file or CSV
+   - Population script: `scripts/populate/catalog-maritime-brands.mjs`
+
+8. **air-brands** - Aircraft brand names ✅
+
+   - Used in: `<marca_fabricante>` field for aircraft (e.g., "BOEING", "AIRBUS")
+   - Source: SQL file or CSV
+   - Population script: `scripts/populate/catalog-air-brands.mjs`
 
 ## Population Scripts
 
@@ -56,7 +68,10 @@ All catalog population scripts are located in `scripts/populate/`:
 - `catalog-operation-types.mjs` - Populates operation types
 - `catalog-payment-forms.mjs` - Populates payment forms
 - `catalog-vulnerable-activities.mjs` - Populates vulnerable activities
-- `catalog-vehicle-brands.mjs` - Populates vehicle brands
+- `catalog-vehicle-brands.mjs` - Populates terrestrial vehicle brands
+- `catalog-maritime-brands.mjs` - Populates maritime vehicle brands
+- `catalog-air-brands.mjs` - Populates aircraft brands
+- `catalog-brands-from-csv.mjs` - Populates all brand catalogs from CSV files
 - `all-catalogs.mjs` - Master script to populate all catalogs
 
 ## Running Population Scripts

@@ -12,7 +12,10 @@ Population scripts load **real catalog data** from CSV files into the database. 
 
 Catalogs are populated from CSV files. Each catalog has its own population script:
 
-- `catalog-vehicle-brands.mjs` - Vehicle brands
+- `catalog-vehicle-brands.mjs` - Terrestrial vehicle brands
+- `catalog-maritime-brands.mjs` - Maritime vehicle brands
+- `catalog-air-brands.mjs` - Aircraft brands
+- `catalog-brands-from-csv.mjs` - Populates all brand catalogs from CSV files
 - `catalog-countries.mjs` - Country codes
 - `catalog-currencies.mjs` - Currency codes
 - `catalog-operation-types.mjs` - Operation types

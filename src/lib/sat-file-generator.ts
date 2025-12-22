@@ -77,9 +77,15 @@ export async function generateAndUploadSatFile(
 			: transaction.vehicleType === "marine"
 				? "maritimo"
 				: "aereo";
-	// Get brand name from catalog
+	// Get brand name from appropriate catalog based on vehicle type
+	const brandCatalogKey =
+		transaction.vehicleType === "land"
+			? "vehicle-brands"
+			: transaction.vehicleType === "marine"
+				? "maritime-brands"
+				: "air-brands";
 	const marca =
-		(await config.getCatalogValue("vehicle-brands", transaction.brandId)) ||
+		(await config.getCatalogValue(brandCatalogKey, transaction.brandId)) ||
 		transaction.brandId; // Fallback to brandId if not found
 	const paisNacionalidad =
 		(await config.getCatalogValue("countries", client.nationality || "MX")) ||
