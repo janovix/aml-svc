@@ -144,10 +144,7 @@ async function populatePaymentMethodsCatalog() {
 
 		// Generate SQL
 		const sql = generateSql(catalogId, items);
-		const sqlFile = join(
-			__dirname,
-			`temp-payment-methods-${Date.now()}.sql`,
-		);
+		const sqlFile = join(__dirname, `temp-payment-methods-${Date.now()}.sql`);
 
 		try {
 			writeFileSync(sqlFile, sql);
