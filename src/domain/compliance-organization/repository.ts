@@ -23,15 +23,15 @@ export class ComplianceOrganizationRepository {
 	async create(
 		userId: string,
 		data: {
-			claveSujetoObligado: string;
-			claveActividad: string;
+			obligatedSubjectKey: string;
+			activityKey: string;
 		},
 	): Promise<ComplianceOrganizationEntity> {
 		const prisma = await this.prisma.complianceOrganization.create({
 			data: {
 				userId,
-				claveSujetoObligado: data.claveSujetoObligado,
-				claveActividad: data.claveActividad,
+				obligatedSubjectKey: data.obligatedSubjectKey,
+				activityKey: data.activityKey,
 			},
 		});
 
@@ -41,18 +41,18 @@ export class ComplianceOrganizationRepository {
 	async update(
 		userId: string,
 		data: {
-			claveSujetoObligado?: string;
-			claveActividad?: string;
+			obligatedSubjectKey?: string;
+			activityKey?: string;
 		},
 	): Promise<ComplianceOrganizationEntity> {
 		const prisma = await this.prisma.complianceOrganization.update({
 			where: { userId },
 			data: {
-				...(data.claveSujetoObligado !== undefined && {
-					claveSujetoObligado: data.claveSujetoObligado,
+				...(data.obligatedSubjectKey !== undefined && {
+					obligatedSubjectKey: data.obligatedSubjectKey,
 				}),
-				...(data.claveActividad !== undefined && {
-					claveActividad: data.claveActividad,
+				...(data.activityKey !== undefined && {
+					activityKey: data.activityKey,
 				}),
 			},
 		});
@@ -63,20 +63,20 @@ export class ComplianceOrganizationRepository {
 	async upsert(
 		userId: string,
 		data: {
-			claveSujetoObligado: string;
-			claveActividad: string;
+			obligatedSubjectKey: string;
+			activityKey: string;
 		},
 	): Promise<ComplianceOrganizationEntity> {
 		const prisma = await this.prisma.complianceOrganization.upsert({
 			where: { userId },
 			create: {
 				userId,
-				claveSujetoObligado: data.claveSujetoObligado,
-				claveActividad: data.claveActividad,
+				obligatedSubjectKey: data.obligatedSubjectKey,
+				activityKey: data.activityKey,
 			},
 			update: {
-				claveSujetoObligado: data.claveSujetoObligado,
-				claveActividad: data.claveActividad,
+				obligatedSubjectKey: data.obligatedSubjectKey,
+				activityKey: data.activityKey,
 			},
 		});
 

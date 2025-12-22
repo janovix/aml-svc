@@ -332,15 +332,15 @@ model UmaValue {
 // Compliance Organization - stores RFC and vulnerable activity for the compliance officer's organization
 // Linked 1:1 to user (from JWT)
 model ComplianceOrganization {
-  id              String   @id @default(uuid())
-  userId          String   @unique // User ID from JWT (compliance officer)
-  claveSujetoObligado String // RFC (clave_sujeto_obligado) - 12 characters
-  claveActividad  String   // Vulnerable activity code (e.g., "VEH") - reference to vulnerable-activities catalog
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                    String   @id @default(uuid())
+  userId                String   @unique // User ID from JWT (compliance officer)
+  obligatedSubjectKey   String   // RFC (clave_sujeto_obligado) - 12 characters
+  activityKey           String   // Vulnerable activity code (e.g., "VEH") - reference to vulnerable-activities catalog
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   @@map("compliance_organizations")
   @@index([userId])
-  @@index([claveSujetoObligado])
-  @@index([claveActividad])
+  @@index([obligatedSubjectKey])
+  @@index([activityKey])
 }
