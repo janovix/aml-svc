@@ -7,6 +7,7 @@ import { alertsRouter } from "./alerts";
 import { catalogsRouter } from "./catalogs";
 import { clientsRouter } from "./clients";
 import complianceOrganizationRouter from "./compliance-organization";
+import { curpRouter } from "./curp";
 import { transactionsRouter } from "./transactions";
 import { umaValuesRouter } from "./uma-values";
 
@@ -29,6 +30,7 @@ export function createRouter() {
 	router.route("/alerts", alertsRouter);
 	router.route("/uma-values", umaValuesRouter);
 	router.route("/compliance-organization", complianceOrganizationRouter);
+	router.route("/curp", curpRouter);
 
 	return router;
 }

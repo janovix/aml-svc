@@ -20,6 +20,12 @@
 			"id": "test-cache-id",
 		},
 	],
+	"r2_buckets": [
+		{
+			"binding": "R2_BUCKET",
+			"bucket_name": "sat-xml-files-test",
+		},
+	],
 	// No service binding for tests - falls back to regular fetch via AUTH_SERVICE_URL
 	"vars": {
 		"ENVIRONMENT": "test",

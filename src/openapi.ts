@@ -23,6 +23,11 @@ export const openAPISpec = {
 			description: "Health check endpoints",
 		},
 		{
+			name: "CURP",
+			description:
+				"CURP lookup via RENAPO (requires client-provided reCAPTCHA Enterprise token)",
+		},
+		{
 			name: "Clients",
 			description: "Client KYC data management endpoints",
 		},
@@ -74,6 +79,91 @@ export const openAPISpec = {
 										timestamp: { type: "string", format: "date-time" },
 									},
 								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/curp": {
+			post: {
+				tags: ["CURP"],
+				summary: "Get CURP data and store PDF",
+				description:
+					"Fetches RENAPO CURP data and its PDF (constancia), stores the PDF in R2 idempotently, and returns a stable download URL. Requires a reCAPTCHA Enterprise token obtained legitimately by the caller.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/GetCurpDataRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "CURP data + stored PDF URL",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/GetCurpDataResponse" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "CURP not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"502": {
+						description: "Upstream RENAPO error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/curp/pdf/{key}": {
+			get: {
+				tags: ["CURP"],
+				summary: "Download CURP PDF from R2",
+				description:
+					"Streams the previously stored CURP PDF from R2 using a stable key returned by the CURP endpoint.",
+				parameters: [
+					{
+						name: "key",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "R2 object key (URL-encoded)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "PDF stream",
+						content: {
+							"application/pdf": {
+								schema: { type: "string", format: "binary" },
+							},
+						},
+					},
+					"404": {
+						description: "PDF not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
 							},
 						},
 					},
@@ -1852,6 +1942,79 @@ export const openAPISpec = {
 	},
 	components: {
 		schemas: {
+			GetCurpDataRequest: {
+				type: "object",
+				required: ["curp", "recaptchaToken"],
+				properties: {
+					curp: {
+						type: "string",
+						maxLength: 18,
+						description: "CURP to lookup",
+						example: "AAAA000101HDFXXX09",
+					},
+					recaptchaToken: {
+						type: "string",
+						description:
+							'reCAPTCHA Enterprise token for action "CONSULTA" (obtained legitimately by client)',
+					},
+				},
+			},
+			RenapoCurpRecord: {
+				type: "object",
+				required: [
+					"curp",
+					"nombres",
+					"primerApellido",
+					"segundoApellido",
+					"sexo",
+					"fechaNacimiento",
+					"nacionalidad",
+					"entidad",
+					"docProbatorio",
+					"parametro",
+				],
+				properties: {
+					curp: { type: "string" },
+					nombres: { type: "string" },
+					primerApellido: { type: "string" },
+					segundoApellido: { type: "string" },
+					sexo: { type: "string" },
+					fechaNacimiento: { type: "string" },
+					nacionalidad: { type: "string" },
+					entidad: { type: "string" },
+					docProbatorio: { type: "integer" },
+					statusCurp: { type: "string", nullable: true },
+					parametro: { type: "string" },
+					datosDocProbatorio: {
+						type: "object",
+						nullable: true,
+						properties: {
+							anioReg: { type: "string", nullable: true },
+							numActa: { type: "string", nullable: true },
+							entidadReg: { type: "string", nullable: true },
+							municipioReg: { type: "string", nullable: true },
+							foja: { type: "string", nullable: true },
+							tomo: { type: "string", nullable: true },
+							libro: { type: "string", nullable: true },
+						},
+					},
+				},
+			},
+			GetCurpDataResponse: {
+				type: "object",
+				required: ["data", "pdf"],
+				properties: {
+					data: { $ref: "#/components/schemas/RenapoCurpRecord" },
+					pdf: {
+						type: "object",
+						required: ["key", "url"],
+						properties: {
+							key: { type: "string" },
+							url: { type: "string" },
+						},
+					},
+				},
+			},
 			PersonType: {
 				type: "string",
 				enum: ["physical", "moral", "trust"],
