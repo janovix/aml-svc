@@ -1915,8 +1915,7 @@ export const openAPISpec = {
 					country: { type: "string" },
 					stateCode: {
 						type: "string",
-						description:
-							"State code - reference to states catalog",
+						description: "State code - reference to states catalog",
 					},
 					city: { type: "string" },
 					municipality: { type: "string" },
@@ -1992,8 +1991,7 @@ export const openAPISpec = {
 					country: { type: "string" },
 					stateCode: {
 						type: "string",
-						description:
-							"State code - reference to states catalog",
+						description: "State code - reference to states catalog",
 					},
 					city: { type: "string" },
 					municipality: { type: "string" },
@@ -2042,8 +2040,7 @@ export const openAPISpec = {
 					country: { type: "string" },
 					stateCode: {
 						type: "string",
-						description:
-							"State code - reference to states catalog",
+						description: "State code - reference to states catalog",
 					},
 					city: { type: "string" },
 					municipality: { type: "string" },
@@ -2091,8 +2088,7 @@ export const openAPISpec = {
 					country: { type: "string" },
 					stateCode: {
 						type: "string",
-						description:
-							"State code - reference to states catalog",
+						description: "State code - reference to states catalog",
 					},
 					city: { type: "string" },
 					municipality: { type: "string" },
@@ -2140,8 +2136,7 @@ export const openAPISpec = {
 					country: { type: "string" },
 					stateCode: {
 						type: "string",
-						description:
-							"State code - reference to states catalog",
+						description: "State code - reference to states catalog",
 					},
 					city: { type: "string" },
 					municipality: { type: "string" },
@@ -2505,8 +2500,7 @@ export const openAPISpec = {
 					armorLevel: {
 						type: "string",
 						nullable: true,
-						description:
-							"Armor level - reference to armor-levels catalog",
+						description: "Armor level - reference to armor-levels catalog",
 					},
 					engineNumber: { type: "string", nullable: true },
 					plates: { type: "string", nullable: true },
@@ -2600,8 +2594,7 @@ export const openAPISpec = {
 					armorLevel: {
 						type: "string",
 						nullable: true,
-						description:
-							"Armor level - reference to armor-levels catalog",
+						description: "Armor level - reference to armor-levels catalog",
 					},
 					engineNumber: { type: "string", nullable: true },
 					plates: { type: "string", nullable: true },
@@ -2673,8 +2666,7 @@ export const openAPISpec = {
 					armorLevel: {
 						type: "string",
 						nullable: true,
-						description:
-							"Armor level - reference to armor-levels catalog",
+						description: "Armor level - reference to armor-levels catalog",
 					},
 					engineNumber: { type: "string", nullable: true },
 					plates: { type: "string", nullable: true },
