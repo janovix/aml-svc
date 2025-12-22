@@ -1913,7 +1913,11 @@ export const openAPISpec = {
 					email: { type: "string", format: "email" },
 					phone: { type: "string" },
 					country: { type: "string" },
-					stateCode: { type: "string" },
+					stateCode: {
+						type: "string",
+						description:
+							"State code - reference to states catalog",
+					},
 					city: { type: "string" },
 					municipality: { type: "string" },
 					neighborhood: { type: "string" },
@@ -1986,7 +1990,11 @@ export const openAPISpec = {
 					email: { type: "string", format: "email" },
 					phone: { type: "string" },
 					country: { type: "string" },
-					stateCode: { type: "string" },
+					stateCode: {
+						type: "string",
+						description:
+							"State code - reference to states catalog",
+					},
 					city: { type: "string" },
 					municipality: { type: "string" },
 					neighborhood: { type: "string" },
@@ -2032,7 +2040,11 @@ export const openAPISpec = {
 					email: { type: "string", format: "email" },
 					phone: { type: "string" },
 					country: { type: "string" },
-					stateCode: { type: "string" },
+					stateCode: {
+						type: "string",
+						description:
+							"State code - reference to states catalog",
+					},
 					city: { type: "string" },
 					municipality: { type: "string" },
 					neighborhood: { type: "string" },
@@ -2077,7 +2089,11 @@ export const openAPISpec = {
 					email: { type: "string", format: "email" },
 					phone: { type: "string" },
 					country: { type: "string" },
-					stateCode: { type: "string" },
+					stateCode: {
+						type: "string",
+						description:
+							"State code - reference to states catalog",
+					},
 					city: { type: "string" },
 					municipality: { type: "string" },
 					neighborhood: { type: "string" },
@@ -2122,7 +2138,11 @@ export const openAPISpec = {
 					email: { type: "string", format: "email" },
 					phone: { type: "string" },
 					country: { type: "string" },
-					stateCode: { type: "string" },
+					stateCode: {
+						type: "string",
+						description:
+							"State code - reference to states catalog",
+					},
 					city: { type: "string" },
 					municipality: { type: "string" },
 					neighborhood: { type: "string" },
@@ -2475,10 +2495,19 @@ export const openAPISpec = {
 						pattern: "^\\d{4,10}$",
 					},
 					vehicleType: { $ref: "#/components/schemas/TransactionVehicleType" },
-					brandId: { type: "string" },
+					brandId: {
+						type: "string",
+						description:
+							"Vehicle brand identifier - reference to vehicle-brands catalog",
+					},
 					model: { type: "string" },
 					year: { type: "integer" },
-					armorLevel: { type: "string", nullable: true },
+					armorLevel: {
+						type: "string",
+						nullable: true,
+						description:
+							"Armor level - reference to armor-levels catalog",
+					},
 					engineNumber: { type: "string", nullable: true },
 					plates: { type: "string", nullable: true },
 					registrationNumber: { type: "string", nullable: true },
@@ -2561,10 +2590,19 @@ export const openAPISpec = {
 						pattern: "^\\d{4,10}$",
 					},
 					vehicleType: { $ref: "#/components/schemas/TransactionVehicleType" },
-					brandId: { type: "string" },
+					brandId: {
+						type: "string",
+						description:
+							"Vehicle brand identifier - reference to vehicle-brands catalog",
+					},
 					model: { type: "string" },
 					year: { type: "integer", minimum: 1900, maximum: 2100 },
-					armorLevel: { type: "string", nullable: true },
+					armorLevel: {
+						type: "string",
+						nullable: true,
+						description:
+							"Armor level - reference to armor-levels catalog",
+					},
 					engineNumber: { type: "string", nullable: true },
 					plates: { type: "string", nullable: true },
 					registrationNumber: { type: "string", nullable: true },
@@ -2625,10 +2663,19 @@ export const openAPISpec = {
 						pattern: "^\\d{4,10}$",
 					},
 					vehicleType: { $ref: "#/components/schemas/TransactionVehicleType" },
-					brandId: { type: "string" },
+					brandId: {
+						type: "string",
+						description:
+							"Vehicle brand identifier - reference to vehicle-brands catalog",
+					},
 					model: { type: "string" },
 					year: { type: "integer", minimum: 1900, maximum: 2100 },
-					armorLevel: { type: "string", nullable: true },
+					armorLevel: {
+						type: "string",
+						nullable: true,
+						description:
+							"Armor level - reference to armor-levels catalog",
+					},
 					engineNumber: { type: "string", nullable: true },
 					plates: { type: "string", nullable: true },
 					registrationNumber: { type: "string", nullable: true },
