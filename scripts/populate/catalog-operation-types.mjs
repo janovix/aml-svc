@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Populate Operation Types Catalog
+ * Populate Vehicle Operation Types Catalog
  *
- * This script populates the operation-types catalog with data from SAT CSV.
+ * This script populates the veh-operation-types catalog with data from SAT CSV.
  * This is a POPULATION script (not a seed) and runs in all environments.
  */
 
@@ -14,11 +14,11 @@ import { writeFileSync, unlinkSync } from "node:fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const CSV_URL = "https://catalogs.janovix.ai/operation-types.csv";
-const CATALOG_KEY = "operation-types";
+const CSV_URL = "https://catalogs.janovix.ai/veh-operation-types.csv";
+const CATALOG_KEY = "veh-operation-types";
 
 async function downloadCsv() {
-	console.log("📥 Downloading operation-types.csv...");
+	console.log("📥 Downloading veh-operation-types.csv...");
 	const response = await fetch(CSV_URL);
 	if (!response.ok) {
 		throw new Error(`Failed to download CSV: ${response.statusText}`);
@@ -130,7 +130,7 @@ async function populateOperationTypeCatalog() {
 
 	try {
 		console.log(
-			`📦 Populating operation-types catalog (${isRemote ? "remote" : "local"})...`,
+			`📦 Populating veh-operation-types catalog (${isRemote ? "remote" : "local"})...`,
 		);
 
 		// Download and parse CSV
@@ -146,7 +146,10 @@ async function populateOperationTypeCatalog() {
 
 		// Generate SQL
 		const sql = generateSql(catalogId, items);
-		const sqlFile = join(__dirname, `temp-operation-types-${Date.now()}.sql`);
+		const sqlFile = join(
+			__dirname,
+			`temp-veh-operation-types-${Date.now()}.sql`,
+		);
 
 		try {
 			writeFileSync(sqlFile, sql);
@@ -157,7 +160,7 @@ async function populateOperationTypeCatalog() {
 				: `wrangler d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
 
 			execSync(command, { stdio: "inherit" });
-			console.log("✅ Operation-types catalog populated successfully!");
+			console.log("✅ Veh-operation-types catalog populated successfully!");
 		} finally {
 			// Clean up temp file
 			try {
@@ -167,7 +170,7 @@ async function populateOperationTypeCatalog() {
 			}
 		}
 	} catch (error) {
-		console.error("❌ Error populating operation-types catalog:", error);
+		console.error("❌ Error populating veh-operation-types catalog:", error);
 		process.exit(1);
 	}
 }

@@ -15,7 +15,7 @@ Catalogs are populated from CSV files. Each catalog has its own population scrip
 - `catalog-vehicle-brands.mjs` - Vehicle brands
 - `catalog-countries.mjs` - Country codes
 - `catalog-currencies.mjs` - Currency codes
-- `catalog-operation-types.mjs` - Operation types
+- `catalog-operation-types.mjs` - Vehicle operation types (veh-operation-types)
 - `catalog-payment-forms.mjs` - Payment forms
 - `catalog-vulnerable-activities.mjs` - Vulnerable activities
 

@@ -210,7 +210,7 @@ CREATE INDEX IF NOT EXISTS idx_clients_countryCode ON clients(countryCode);
 CREATE INDEX IF NOT EXISTS idx_clients_economicActivityCode ON clients(economicActivityCode);
 
 -- Add catalog reference fields and UMA value to transactions table
-ALTER TABLE transactions ADD COLUMN operationTypeCode TEXT; -- Reference to operation-types catalog (metadata.code, e.g., "802")
+ALTER TABLE transactions ADD COLUMN operationTypeCode TEXT; -- Reference to veh-operation-types catalog (metadata.code, e.g., "802")
 ALTER TABLE transactions ADD COLUMN currencyCode TEXT; -- Reference to currencies catalog (metadata.code, e.g., "3" for MXN)
 ALTER TABLE transactions ADD COLUMN umaValue NUMERIC; -- Calculated: amount / umaDailyValue for the transaction date
 

@@ -20,10 +20,10 @@ The following catalogs are automatically populated from CSV files:
    - Population script: `scripts/populate/catalog-currencies.mjs`
    - Note: The `name` field contains the human-readable currency name (e.g., "Peso mexicano"), code is stored in `metadata.code`
 
-3. **operation-types** - Type of operation ✅
+3. **veh-operation-types** - Vehicle operation types ✅
 
    - Used in: `<tipo_operacion>` field (e.g., "802")
-   - Source: `OPERATION_TYPE.csv`
+   - Source: `veh-operation-types.csv`
    - Population script: `scripts/populate/catalog-operation-types.mjs`
    - Note: The `name` field contains the human-readable operation description (e.g., "Venta de vehículo nuevo"), code is stored in `metadata.code`
 
@@ -53,7 +53,7 @@ All catalog population scripts are located in `scripts/populate/`:
 
 - `catalog-countries.mjs` - Populates country codes
 - `catalog-currencies.mjs` - Populates currency codes
-- `catalog-operation-types.mjs` - Populates operation types
+- `catalog-operation-types.mjs` - Populates vehicle operation types (veh-operation-types)
 - `catalog-payment-forms.mjs` - Populates payment forms
 - `catalog-vulnerable-activities.mjs` - Populates vulnerable activities
 - `catalog-vehicle-brands.mjs` - Populates vehicle brands

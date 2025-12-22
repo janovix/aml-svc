@@ -62,7 +62,7 @@ const BaseTransactionSchema = z.object({
 	armorLevel: z.string().min(1).max(50).optional().nullable(),
 	amount: AmountSchema,
 	currency: CurrencySchema,
-	operationTypeCode: z.string().optional().nullable(), // Reference to operation-types catalog (metadata.code)
+	operationTypeCode: z.string().optional().nullable(), // Reference to veh-operation-types catalog (metadata.code)
 	currencyCode: z.string().optional().nullable(), // Reference to currencies catalog (metadata.code)
 	paymentMethods: z
 		.array(PaymentMethodSchema)

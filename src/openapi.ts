@@ -2489,7 +2489,7 @@ export const openAPISpec = {
 						type: "string",
 						nullable: true,
 						description:
-							"Reference to operation-types catalog (metadata.code, e.g., '802') for XML generation",
+							"Reference to veh-operation-types catalog (metadata.code, e.g., '802') for XML generation",
 					},
 					currencyCode: {
 						type: "string",
@@ -2584,7 +2584,7 @@ export const openAPISpec = {
 						type: "string",
 						nullable: true,
 						description:
-							"Reference to operation-types catalog (metadata.code, e.g., '802') for XML generation",
+							"Reference to veh-operation-types catalog (metadata.code, e.g., '802') for XML generation",
 					},
 					currencyCode: {
 						type: "string",
@@ -2648,7 +2648,7 @@ export const openAPISpec = {
 						type: "string",
 						nullable: true,
 						description:
-							"Reference to operation-types catalog (metadata.code, e.g., '802') for XML generation",
+							"Reference to veh-operation-types catalog (metadata.code, e.g., '802') for XML generation",
 					},
 					currencyCode: {
 						type: "string",
