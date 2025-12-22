@@ -76,8 +76,8 @@ router.put("/", async (c) => {
 	const data = parseWithZod(complianceOrganizationCreateSchema, body);
 
 	const org = await service.createOrUpdate(user.id, {
-		claveSujetoObligado: data.claveSujetoObligado,
-		claveActividad: data.claveActividad,
+		obligatedSubjectKey: data.obligatedSubjectKey,
+		activityKey: data.activityKey,
 	});
 
 	return c.json(org, 200);
@@ -110,8 +110,8 @@ router.patch("/", async (c) => {
 	const body = await c.req.json();
 	const data = parseWithZod(complianceOrganizationUpdateSchema, body);
 	const org = await repository.update(user.id, {
-		claveSujetoObligado: data.claveSujetoObligado,
-		claveActividad: data.claveActividad,
+		obligatedSubjectKey: data.obligatedSubjectKey,
+		activityKey: data.activityKey,
 	});
 
 	return c.json(org);

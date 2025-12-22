@@ -13,8 +13,8 @@ export class ComplianceOrganizationService {
 	async createOrUpdate(
 		userId: string,
 		data: {
-			claveSujetoObligado: string;
-			claveActividad: string;
+			obligatedSubjectKey: string;
+			activityKey: string;
 		},
 	): Promise<ComplianceOrganizationEntity> {
 		return this.repository.upsert(userId, data);

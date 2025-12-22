@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Populate Vehicle Operation Types Catalog
+ * Populate Business Activities Catalog (Giro Mercantil)
  *
- * This script populates the veh-operation-types catalog with data from SAT CSV.
+ * This script populates the business-activities catalog with data from SAT CSV.
  * This is a POPULATION script (not a seed) and runs in all environments.
  */
 
@@ -14,11 +14,11 @@ import { writeFileSync, unlinkSync } from "node:fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const CSV_URL = "https://catalogs.janovix.ai/veh-operation-types.csv";
-const CATALOG_KEY = "veh-operation-types";
+const CSV_URL = "https://catalogs.janovix.ai/business-activities.csv";
+const CATALOG_KEY = "business-activities";
 
 async function downloadCsv() {
-	console.log("📥 Downloading veh-operation-types.csv...");
+	console.log("📥 Downloading business-activities.csv...");
 	const response = await fetch(CSV_URL);
 	if (!response.ok) {
 		throw new Error(`Failed to download CSV: ${response.statusText}`);
@@ -54,9 +54,8 @@ function parseCsv(csvText) {
 
 		if (values.length >= 2) {
 			data.push({
-				key: values[0], // e.g., "1", "802"
-				value: values[1], // e.g., "Compra de acciones o partes sociales"
-				av: values[2] || "", // Vulnerable activity code, e.g., "FEP", "VEH"
+				key: values[0], // Business activity code (7-digit code)
+				value: values[1], // Human-readable name
 			});
 		}
 	}
@@ -70,7 +69,7 @@ function generateSql(catalogId, items) {
 	// Insert catalog if it doesn't exist
 	sql.push(`
 		INSERT OR IGNORE INTO catalogs (id, key, name, active, createdAt, updatedAt)
-		VALUES ('${catalogId}', '${CATALOG_KEY}', 'Tipos de Operación', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+		VALUES ('${catalogId}', '${CATALOG_KEY}', 'Giro Mercantil', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 	`);
 
 	// Delete existing items for this catalog
@@ -78,7 +77,7 @@ function generateSql(catalogId, items) {
 
 	// Insert catalog items
 	for (const item of items) {
-		// name = human-readable name (e.g., "Compra de acciones o partes sociales", "Venta de vehículo nuevo")
+		// name = human-readable name (e.g., "SECTOR PRIMARIO - AGRICULTURA")
 		const name = item.value.replace(/'/g, "''");
 		// normalizedName = normalized human-readable name for searching
 		const normalizedName = item.value
@@ -87,11 +86,10 @@ function generateSql(catalogId, items) {
 			.toLowerCase()
 			.trim()
 			.replace(/'/g, "''");
-		// Store the code and additional info in metadata for XML generation
+		// Store the code in metadata for XML generation
 		const metadata = JSON.stringify({
-			code: item.key, // e.g., "1", "802" - used in XML
-			vulnerableActivity: item.av, // e.g., "FEP", "VEH"
-		}).replace(/'/g, "''"); // Escape single quotes
+			code: item.key, // 7-digit business activity code - used in XML
+		}).replace(/'/g, "''");
 
 		sql.push(`
 			INSERT INTO catalog_items (id, catalogId, name, normalizedName, active, metadata, createdAt, updatedAt)
@@ -111,7 +109,7 @@ function generateSql(catalogId, items) {
 	return sql.join("\n");
 }
 
-async function populateOperationTypeCatalog() {
+async function populateBusinessActivitiesCatalog() {
 	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
 	// Use WRANGLER_CONFIG if set, otherwise detect based on branch
 	// Setup: main → wrangler.prod.jsonc, dev → wrangler.jsonc, others → wrangler.preview.jsonc
@@ -130,13 +128,13 @@ async function populateOperationTypeCatalog() {
 
 	try {
 		console.log(
-			`📦 Populating veh-operation-types catalog (${isRemote ? "remote" : "local"})...`,
+			`📦 Populating business-activities catalog (${isRemote ? "remote" : "local"})...`,
 		);
 
 		// Download and parse CSV
 		const csvText = await downloadCsv();
 		const items = parseCsv(csvText);
-		console.log(`✅ Parsed ${items.length} operation types from CSV`);
+		console.log(`✅ Parsed ${items.length} business activities from CSV`);
 
 		// Generate catalog ID (deterministic based on catalog key)
 		const catalogId = Array.from(CATALOG_KEY)
@@ -148,7 +146,7 @@ async function populateOperationTypeCatalog() {
 		const sql = generateSql(catalogId, items);
 		const sqlFile = join(
 			__dirname,
-			`temp-veh-operation-types-${Date.now()}.sql`,
+			`temp-business-activities-${Date.now()}.sql`,
 		);
 
 		try {
@@ -160,7 +158,7 @@ async function populateOperationTypeCatalog() {
 				: `wrangler d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
 
 			execSync(command, { stdio: "inherit" });
-			console.log("✅ Veh-operation-types catalog populated successfully!");
+			console.log("✅ Business-activities catalog populated successfully!");
 		} finally {
 			// Clean up temp file
 			try {
@@ -170,12 +168,12 @@ async function populateOperationTypeCatalog() {
 			}
 		}
 	} catch (error) {
-		console.error("❌ Error populating veh-operation-types catalog:", error);
+		console.error("❌ Error populating business-activities catalog:", error);
 		process.exit(1);
 	}
 }
 
-populateOperationTypeCatalog().catch((error) => {
+populateBusinessActivitiesCatalog().catch((error) => {
 	console.error("Fatal error:", error);
 	process.exit(1);
 });

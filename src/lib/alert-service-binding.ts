@@ -162,9 +162,9 @@ export class AlertServiceBinding {
 
 		const result = await generateAndUploadSatFile(alert, client, transaction, {
 			r2Bucket: this.env.R2_BUCKET as unknown as R2Bucket, // Type assertion for compatibility
-			claveSujetoObligado: this.env.SAT_CLAVE_SUJETO_OBLIGADO || "000000000000",
-			claveActividad: this.env.SAT_CLAVE_ACTIVIDAD || "VEH",
-			claveEntidadColegiada: this.env.SAT_CLAVE_ENTIDAD_COLEGIADA,
+			obligatedSubjectKey: this.env.SAT_CLAVE_SUJETO_OBLIGADO || "000000000000",
+			activityKey: this.env.SAT_CLAVE_ACTIVIDAD || "VEH",
+			collegiateEntityKey: this.env.SAT_CLAVE_ENTIDAD_COLEGIADA,
 			getCatalogValue: async (catalogKey: string, code: string) => {
 				try {
 					// Look up catalog by key

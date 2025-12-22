@@ -39,9 +39,9 @@ import { generateAlertFileKey, uploadToR2 } from "./r2-upload";
 
 export interface SatFileGeneratorConfig {
 	r2Bucket: R2Bucket;
-	claveSujetoObligado: string;
-	claveActividad: string; // e.g., "VEH"
-	claveEntidadColegiada?: string;
+	obligatedSubjectKey: string;
+	activityKey: string; // e.g., "VEH"
+	collegiateEntityKey?: string;
 	// Catalog lookups using existing Catalog system
 	getCatalogValue: (
 		catalogKey: string,
@@ -67,27 +67,28 @@ export async function generateAndUploadSatFile(
 ): Promise<SatFileGenerationResult> {
 	// Get catalog values using existing Catalog system
 	// Catalog keys should match the catalog.key field in the database
-	const tipoOperacion =
-		(await config.getCatalogValue("operation-types", "802")) || "802"; // Default from example
-	const moneda = (await config.getCatalogValue("currencies", "3")) || "3"; // "3" for MXN in example
+	const operationType =
+		(await config.getCatalogValue("veh-operation-types", "802")) || "802"; // Default from example
+	const currency = (await config.getCatalogValue("currencies", "3")) || "3"; // "3" for MXN in example
 	// Map vehicle type
-	const vehiculoTipo =
+	const vehicleType =
 		transaction.vehicleType === "land"
 			? "terrestre"
 			: transaction.vehicleType === "marine"
 				? "maritimo"
 				: "aereo";
 	// Get brand name from catalog
-	const marca =
+	const brand =
 		(await config.getCatalogValue("vehicle-brands", transaction.brandId)) ||
 		transaction.brandId; // Fallback to brandId if not found
-	const paisNacionalidad =
+	const nationalityCountry =
 		(await config.getCatalogValue("countries", client.nationality || "MX")) ||
 		client.nationality ||
 		"MX";
 	// Get payment form codes from catalog
-	const formaPago = (await config.getCatalogValue("payment-forms", "1")) || "1"; // Default from example
-	const instrumentoMonetario = "1"; // Default from example
+	const paymentForm =
+		(await config.getCatalogValue("payment-forms", "1")) || "1"; // Default from example
+	const monetaryInstrument = "1"; // Default from example
 
 	// Map to SAT format
 	const satData: SatVehicleNoticeData = mapToSatVehicleNoticeData(
@@ -95,19 +96,19 @@ export async function generateAndUploadSatFile(
 		client,
 		transaction,
 		{
-			claveSujetoObligado: config.claveSujetoObligado,
-			claveActividad: config.claveActividad,
-			referenciaAviso: alert.id,
-			prioridad: "1", // Default priority
-			tipoAlerta: "803", // Default alert type from example
-			tipoOperacion,
-			moneda,
-			tipoVehiculo: vehiculoTipo,
-			marca,
-			paisNacionalidad,
-			actividadEconomica: undefined, // Can be populated from catalog if needed
-			formaPago,
-			instrumentoMonetario,
+			obligatedSubjectKey: config.obligatedSubjectKey,
+			activityKey: config.activityKey,
+			noticeReference: alert.id,
+			priority: "1", // Default priority
+			alertType: "803", // Default alert type from example
+			operationType,
+			currency,
+			vehicleType,
+			brand,
+			nationalityCountry,
+			economicActivity: undefined, // Can be populated from catalog if needed
+			paymentForm,
+			monetaryInstrument,
 		},
 	);
 

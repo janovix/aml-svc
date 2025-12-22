@@ -8,8 +8,8 @@ export function mapPrismaComplianceOrganization(
 	return {
 		id: prisma.id,
 		userId: prisma.userId,
-		claveSujetoObligado: prisma.claveSujetoObligado,
-		claveActividad: prisma.claveActividad,
+		obligatedSubjectKey: prisma.obligatedSubjectKey,
+		activityKey: prisma.activityKey,
 		createdAt: prisma.createdAt.toISOString(),
 		updatedAt: prisma.updatedAt.toISOString(),
 	};
@@ -17,27 +17,27 @@ export function mapPrismaComplianceOrganization(
 
 export function mapComplianceOrganizationCreateInputToPrisma(input: {
 	userId: string;
-	claveSujetoObligado: string;
-	claveActividad: string;
+	obligatedSubjectKey: string;
+	activityKey: string;
 }): Prisma.ComplianceOrganizationCreateInput {
 	return {
 		userId: input.userId,
-		claveSujetoObligado: input.claveSujetoObligado,
-		claveActividad: input.claveActividad,
+		obligatedSubjectKey: input.obligatedSubjectKey,
+		activityKey: input.activityKey,
 	};
 }
 
 export function mapComplianceOrganizationUpdateInputToPrisma(input: {
-	claveSujetoObligado?: string;
-	claveActividad?: string;
+	obligatedSubjectKey?: string;
+	activityKey?: string;
 }): Prisma.ComplianceOrganizationUpdateInput {
 	const update: Prisma.ComplianceOrganizationUpdateInput = {};
 
-	if (input.claveSujetoObligado !== undefined) {
-		update.claveSujetoObligado = input.claveSujetoObligado;
+	if (input.obligatedSubjectKey !== undefined) {
+		update.obligatedSubjectKey = input.obligatedSubjectKey;
 	}
-	if (input.claveActividad !== undefined) {
-		update.claveActividad = input.claveActividad;
+	if (input.activityKey !== undefined) {
+		update.activityKey = input.activityKey;
 	}
 
 	return update;

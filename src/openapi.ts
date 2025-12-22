@@ -2489,7 +2489,7 @@ export const openAPISpec = {
 						type: "string",
 						nullable: true,
 						description:
-							"Reference to operation-types catalog (metadata.code, e.g., '802') for XML generation",
+							"Reference to veh-operation-types catalog (metadata.code, e.g., '802') for XML generation",
 					},
 					currencyCode: {
 						type: "string",
@@ -2584,7 +2584,7 @@ export const openAPISpec = {
 						type: "string",
 						nullable: true,
 						description:
-							"Reference to operation-types catalog (metadata.code, e.g., '802') for XML generation",
+							"Reference to veh-operation-types catalog (metadata.code, e.g., '802') for XML generation",
 					},
 					currencyCode: {
 						type: "string",
@@ -2648,7 +2648,7 @@ export const openAPISpec = {
 						type: "string",
 						nullable: true,
 						description:
-							"Reference to operation-types catalog (metadata.code, e.g., '802') for XML generation",
+							"Reference to veh-operation-types catalog (metadata.code, e.g., '802') for XML generation",
 					},
 					currencyCode: {
 						type: "string",
@@ -3208,8 +3208,8 @@ export const openAPISpec = {
 				required: [
 					"id",
 					"userId",
-					"claveSujetoObligado",
-					"claveActividad",
+					"obligatedSubjectKey",
+					"activityKey",
 					"createdAt",
 					"updatedAt",
 				],
@@ -3224,7 +3224,7 @@ export const openAPISpec = {
 						description:
 							"User ID from JWT (compliance officer) - unique, 1:1 relationship",
 					},
-					claveSujetoObligado: {
+					obligatedSubjectKey: {
 						type: "string",
 						pattern: "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$",
 						minLength: 12,
@@ -3232,7 +3232,7 @@ export const openAPISpec = {
 						description:
 							"RFC (clave_sujeto_obligado) - 12 characters for legal entities",
 					},
-					claveActividad: {
+					activityKey: {
 						type: "string",
 						minLength: 1,
 						maxLength: 10,
@@ -3245,9 +3245,9 @@ export const openAPISpec = {
 			},
 			ComplianceOrganizationCreateRequest: {
 				type: "object",
-				required: ["claveSujetoObligado", "claveActividad"],
+				required: ["obligatedSubjectKey", "activityKey"],
 				properties: {
-					claveSujetoObligado: {
+					obligatedSubjectKey: {
 						type: "string",
 						pattern: "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$",
 						minLength: 12,
@@ -3255,7 +3255,7 @@ export const openAPISpec = {
 						description:
 							"RFC (clave_sujeto_obligado) - 12 characters for legal entities",
 					},
-					claveActividad: {
+					activityKey: {
 						type: "string",
 						minLength: 1,
 						maxLength: 10,
@@ -3267,7 +3267,7 @@ export const openAPISpec = {
 			ComplianceOrganizationUpdateRequest: {
 				type: "object",
 				properties: {
-					claveSujetoObligado: {
+					obligatedSubjectKey: {
 						type: "string",
 						pattern: "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$",
 						minLength: 12,
@@ -3275,7 +3275,7 @@ export const openAPISpec = {
 						description:
 							"RFC (clave_sujeto_obligado) - 12 characters for legal entities",
 					},
-					claveActividad: {
+					activityKey: {
 						type: "string",
 						minLength: 1,
 						maxLength: 10,
