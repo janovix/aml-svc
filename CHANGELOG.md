@@ -1,3 +1,10 @@
+# [1.1.0-rc.12](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.11...v1.1.0-rc.12) (2025-12-22)
+
+
+### Features
+
+* Add scripts to populate new catalogs ([27df78e](https://github.com/janovix/aml-svc/commit/27df78e60a576705fed079a2a4755c53a27a8fbb))
+
 # [1.1.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.10...v1.1.0-rc.11) (2025-12-21)
 
 
