@@ -13,14 +13,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const catalogScripts = [
-	"catalog-vehicle-brands.mjs",
+	"catalog-armor-levels.mjs",
+	"catalog-business-activities.mjs",
 	"catalog-countries.mjs",
 	"catalog-currencies.mjs",
+	"catalog-economic-activities.mjs",
 	"catalog-operation-types.mjs",
 	"catalog-payment-forms.mjs",
-	"catalog-vulnerable-activities.mjs",
-	"catalog-economic-activities.mjs",
+	"catalog-payment-methods.mjs",
 	"catalog-states.mjs",
+	"catalog-vehicle-brands.mjs",
+	"catalog-vulnerable-activities.mjs",
 ];
 
 async function populateAllCatalogs() {
