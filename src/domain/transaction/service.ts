@@ -49,4 +49,13 @@ export class TransactionService {
 			throw new Error("CLIENT_NOT_FOUND");
 		}
 	}
+
+	getStats(): Promise<{
+		transactionsToday: number;
+		suspiciousTransactions: number;
+		totalVolume: string;
+		totalVehicles: number;
+	}> {
+		return this.repository.getStats();
+	}
 }

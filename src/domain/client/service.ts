@@ -106,4 +106,12 @@ export class ClientService {
 	deleteAddress(clientId: string, addressId: string): Promise<void> {
 		return this.repository.deleteAddress(clientId, addressId);
 	}
+
+	getStats(): Promise<{
+		totalClients: number;
+		openAlerts: number;
+		urgentReviews: number;
+	}> {
+		return this.repository.getStats();
+	}
 }

@@ -77,10 +77,8 @@ export async function generateAndUploadSatFile(
 			: transaction.vehicleType === "marine"
 				? "maritimo"
 				: "aereo";
-	// Get brand name from catalog
-	const brand =
-		(await config.getCatalogValue("vehicle-brands", transaction.brandId)) ||
-		transaction.brandId; // Fallback to brandId if not found
+	// Use brand directly as text field (no catalog lookup)
+	const brand = transaction.brand;
 	const nationalityCountry =
 		(await config.getCatalogValue("countries", client.nationality || "MX")) ||
 		client.nationality ||

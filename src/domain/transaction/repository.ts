@@ -190,4 +190,75 @@ export class TransactionRepository {
 			throw new Error("TRANSACTION_NOT_FOUND");
 		}
 	}
+
+	async getStats(): Promise<{
+		transactionsToday: number;
+		suspiciousTransactions: number;
+		totalVolume: string;
+		totalVehicles: number;
+	}> {
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const tomorrow = new Date(today);
+		tomorrow.setDate(tomorrow.getDate() + 1);
+
+		const [
+			transactionsToday,
+			suspiciousTransactions,
+			totalVolumeResult,
+			allTransactions,
+		] = await Promise.all([
+			this.prisma.transaction.count({
+				where: {
+					deletedAt: null,
+					operationDate: {
+						gte: today,
+						lt: tomorrow,
+					},
+				},
+			}),
+			this.prisma.alert.count({
+				where: {
+					status: { in: ["DETECTED", "FILE_GENERATED"] },
+				},
+			}),
+			this.prisma.transaction.aggregate({
+				where: {
+					deletedAt: null,
+				},
+				_sum: {
+					amount: true,
+				},
+			}),
+			this.prisma.transaction.findMany({
+				where: {
+					deletedAt: null,
+				},
+				select: {
+					brandId: true,
+					model: true,
+					year: true,
+				},
+			}),
+		]);
+
+		// Count unique vehicles (brand + model + year combination)
+		const uniqueVehicles = new Set(
+			allTransactions.map(
+				(t: { brandId: string; model: string; year: number }) =>
+					`${t.brandId}|${t.model}|${t.year}`,
+			),
+		).size;
+
+		const totalVolume = totalVolumeResult._sum.amount
+			? totalVolumeResult._sum.amount.toString()
+			: "0";
+
+		return {
+			transactionsToday,
+			suspiciousTransactions,
+			totalVolume,
+			totalVehicles: uniqueVehicles,
+		};
+	}
 }

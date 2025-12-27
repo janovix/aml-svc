@@ -430,7 +430,7 @@ export function mapToSatVehicleNoticeData(
 		operationType: string; // From alert rule or transaction
 		currency: string; // Usually "3" for MXN
 		vehicleType: "terrestre" | "maritimo" | "aereo"; // Map from transaction.vehicleType
-		brand: string; // From transaction.brandId -> catalog lookup
+		brand: string; // From transaction.brand (text field)
 		nationalityCountry?: string; // From client.nationality -> CAT_PAIS
 		economicActivity?: string; // Economic activity code
 		paymentForm?: string; // Payment method code

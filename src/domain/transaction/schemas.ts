@@ -52,7 +52,11 @@ const BaseTransactionSchema = z.object({
 	operationDate: IsoDateSchema,
 	operationType: OperationTypeSchema,
 	branchPostalCode: z.string().regex(POSTAL_CODE_REGEX, "Invalid postal code"),
-	brandId: z.string().min(1),
+	brand: z
+		.string()
+		.min(1)
+		.max(120)
+		.transform((value) => value.trim()),
 	model: z
 		.string()
 		.min(1)
@@ -198,7 +202,7 @@ export const TransactionEntitySchema = z.object({
 	operationType: OperationTypeSchema,
 	branchPostalCode: z.string().regex(POSTAL_CODE_REGEX),
 	vehicleType: VehicleTypeSchema,
-	brandId: z.string().min(1),
+	brand: z.string().min(1),
 	model: z.string().min(1),
 	year: z.number().int(),
 	armorLevel: z.string().nullable().optional(),

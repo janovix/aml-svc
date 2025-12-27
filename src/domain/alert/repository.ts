@@ -186,10 +186,16 @@ export class AlertRepository {
 		const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
 		return {
-			data: records.map((record) => ({
-				...mapPrismaAlert(record),
-				alertRule: mapPrismaAlertRule(record.alertRule),
-			})),
+			data: records.map(
+				(
+					record: Parameters<typeof mapPrismaAlert>[0] & {
+						alertRule: Parameters<typeof mapPrismaAlertRule>[0];
+					},
+				) => ({
+					...mapPrismaAlert(record),
+					alertRule: mapPrismaAlertRule(record.alertRule),
+				}),
+			),
 			pagination: {
 				page,
 				limit,

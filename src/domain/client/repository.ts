@@ -274,4 +274,33 @@ export class ClientRepository {
 			throw new Error("ADDRESS_NOT_FOUND");
 		}
 	}
+
+	async getStats(): Promise<{
+		totalClients: number;
+		openAlerts: number;
+		urgentReviews: number;
+	}> {
+		const [totalClients, openAlerts, urgentReviews] = await Promise.all([
+			this.prisma.client.count({
+				where: { deletedAt: null },
+			}),
+			this.prisma.alert.count({
+				where: {
+					status: "DETECTED",
+				},
+			}),
+			this.prisma.alert.count({
+				where: {
+					severity: "CRITICAL",
+					status: { in: ["DETECTED", "FILE_GENERATED"] },
+				},
+			}),
+		]);
+
+		return {
+			totalClients,
+			openAlerts,
+			urgentReviews,
+		};
+	}
 }

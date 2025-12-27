@@ -236,3 +236,9 @@ clientsRouter.delete("/:clientId/addresses/:addressId", async (c) => {
 		.catch(handleServiceError);
 	return c.body(null, 204);
 });
+
+clientsRouter.get("/stats", async (c) => {
+	const service = getService(c);
+	const stats = await service.getStats().catch(handleServiceError);
+	return c.json(stats);
+});
