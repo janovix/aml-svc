@@ -118,7 +118,7 @@ export function mapCreateInputToPrisma(
 		operationType: toPrismaOperationType(input.operationType),
 		branchPostalCode: input.branchPostalCode,
 		vehicleType: toPrismaVehicleType(input.vehicleType),
-		brandId: input.brandId,
+		brandId: input.brand, // Map brand to brandId for database
 		model: input.model,
 		year: input.year,
 		armorLevel: normalizeNullable(input.armorLevel),
@@ -149,7 +149,7 @@ export function mapUpdateInputToPrisma(
 		operationType: toPrismaOperationType(input.operationType),
 		branchPostalCode: input.branchPostalCode,
 		vehicleType: toPrismaVehicleType(input.vehicleType),
-		brandId: input.brandId,
+		brandId: input.brand, // Map brand to brandId for database
 		model: input.model,
 		year: input.year,
 		armorLevel: normalizeNullable(input.armorLevel),
@@ -194,7 +194,7 @@ export function mapPrismaTransaction(
 		operationType: fromPrismaOperationType(record.operationType),
 		branchPostalCode: record.branchPostalCode,
 		vehicleType: fromPrismaVehicleType(record.vehicleType),
-		brandId: record.brandId,
+		brand: record.brandId, // Map brandId from database to brand for API
 		model: record.model,
 		year: record.year,
 		armorLevel: record.armorLevel ?? null,

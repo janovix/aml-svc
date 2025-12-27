@@ -8,7 +8,7 @@ function buildBasePayload(overrides: Record<string, unknown> = {}) {
 		operationDate: "2024-11-20",
 		operationType: "purchase",
 		branchPostalCode: "06140",
-		brandId: "brand-001",
+		brand: "Brand 001",
 		model: "Armored SUV",
 		year: 2023,
 		armorLevel: null,

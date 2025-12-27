@@ -16,7 +16,7 @@ export interface TransactionEntity {
 	operationType: OperationType;
 	branchPostalCode: string;
 	vehicleType: VehicleType;
-	brandId: string;
+	brand: string;
 	model: string;
 	year: number;
 	armorLevel: string | null;

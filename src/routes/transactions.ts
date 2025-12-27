@@ -110,3 +110,9 @@ transactionsRouter.delete("/:id", async (c) => {
 
 	return c.body(null, 204);
 });
+
+transactionsRouter.get("/stats", async (c) => {
+	const service = getService(c);
+	const stats = await service.getStats().catch(handleServiceError);
+	return c.json(stats);
+});
