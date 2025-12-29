@@ -4,9 +4,12 @@
  * Handles queueing of alert detection jobs to the aml-alert-worker
  */
 
-type AlertJobType = "client.created" | "client.updated" | "transaction.created";
+export type AlertJobType =
+	| "client.created"
+	| "client.updated"
+	| "transaction.created";
 
-interface AlertJob {
+export interface AlertJob {
 	type: AlertJobType;
 	clientId: string;
 	transactionId?: string;

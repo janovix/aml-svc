@@ -8,21 +8,7 @@ import { errorHandler } from "./middleware/error";
 import { openAPISpec } from "./openapi";
 import { createRouter } from "./routes";
 import { handleServiceBindingRequest } from "./lib/alert-service-binding";
-
-/**
- * Alert job types for queue messages
- */
-type AlertJobType = "client.created" | "client.updated" | "transaction.created";
-
-/**
- * Alert job payload for queue messages
- */
-interface AlertJob {
-	type: AlertJobType;
-	clientId: string;
-	transactionId?: string;
-	timestamp: string;
-}
+import type { AlertJob } from "./lib/alert-queue";
 
 export type Bindings = {
 	DB: D1Database;

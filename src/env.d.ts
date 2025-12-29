@@ -1,17 +1,4 @@
-/**
- * Alert job types for queue messages
- */
-type AlertJobType = "client.created" | "client.updated" | "transaction.created";
-
-/**
- * Alert job payload for queue messages
- */
-interface AlertJob {
-	type: AlertJobType;
-	clientId: string;
-	transactionId?: string;
-	timestamp: string;
-}
+import type { AlertJob } from "./lib/alert-queue";
 
 /**
  * Environment bindings for Cloudflare Workers
