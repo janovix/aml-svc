@@ -71,6 +71,13 @@ transactionsRouter.get("/", async (c) => {
 	return c.json(result);
 });
 
+// IMPORTANT: /stats must be defined BEFORE /:id to avoid "stats" being matched as an id parameter
+transactionsRouter.get("/stats", async (c) => {
+	const service = getService(c);
+	const stats = await service.getStats().catch(handleServiceError);
+	return c.json(stats);
+});
+
 transactionsRouter.get("/:id", async (c) => {
 	const params = parseWithZod(TransactionIdParamSchema, c.req.param());
 
@@ -114,10 +121,4 @@ transactionsRouter.delete("/:id", async (c) => {
 	await service.delete(params.id).catch(handleServiceError);
 
 	return c.body(null, 204);
-});
-
-transactionsRouter.get("/stats", async (c) => {
-	const service = getService(c);
-	const stats = await service.getStats().catch(handleServiceError);
-	return c.json(stats);
 });

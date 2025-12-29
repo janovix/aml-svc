@@ -72,6 +72,13 @@ clientsRouter.get("/", async (c) => {
 	return c.json(result);
 });
 
+// IMPORTANT: /stats must be defined BEFORE /:id to avoid "stats" being matched as an id parameter
+clientsRouter.get("/stats", async (c) => {
+	const service = getService(c);
+	const stats = await service.getStats().catch(handleServiceError);
+	return c.json(stats);
+});
+
 clientsRouter.get("/:id", async (c) => {
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 
@@ -248,10 +255,4 @@ clientsRouter.delete("/:clientId/addresses/:addressId", async (c) => {
 		.deleteAddress(params.clientId, params.addressId)
 		.catch(handleServiceError);
 	return c.body(null, 204);
-});
-
-clientsRouter.get("/stats", async (c) => {
-	const service = getService(c);
-	const stats = await service.getStats().catch(handleServiceError);
-	return c.json(stats);
 });
