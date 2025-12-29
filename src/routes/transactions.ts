@@ -13,6 +13,7 @@ import {
 } from "../domain/transaction";
 import { UmaValueRepository } from "../domain/uma";
 import type { Bindings } from "../index";
+import { createAlertQueueService } from "../lib/alert-queue";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 
@@ -85,6 +86,10 @@ transactionsRouter.post("/", async (c) => {
 
 	const service = getService(c);
 	const created = await service.create(payload).catch(handleServiceError);
+
+	// Queue alert detection job
+	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
+	await alertQueue.queueTransactionCreated(created.clientId, created.id);
 
 	return c.json(created, 201);
 });

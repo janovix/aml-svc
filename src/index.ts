@@ -9,6 +9,21 @@ import { openAPISpec } from "./openapi";
 import { createRouter } from "./routes";
 import { handleServiceBindingRequest } from "./lib/alert-service-binding";
 
+/**
+ * Alert job types for queue messages
+ */
+type AlertJobType = "client.created" | "client.updated" | "transaction.created";
+
+/**
+ * Alert job payload for queue messages
+ */
+interface AlertJob {
+	type: AlertJobType;
+	clientId: string;
+	transactionId?: string;
+	timestamp: string;
+}
+
 export type Bindings = {
 	DB: D1Database;
 	CACHE?: KVNamespace;
@@ -22,6 +37,8 @@ export type Bindings = {
 	SAT_CLAVE_ENTIDAD_COLEGIADA?: string; // Optional collegiate entity identifier
 	/** Service binding to auth-svc for worker-to-worker communication */
 	AUTH_SERVICE?: Fetcher;
+	/** Queue for alert detection jobs */
+	ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
 };
 
 // Start a Hono app

@@ -33,6 +33,14 @@
 			"service": "auth-svc",
 		},
 	],
+	"queues": {
+		"producers": [
+			{
+				"binding": "ALERT_DETECTION_QUEUE",
+				"queue": "alert-detection-queue",
+			},
+		],
+	},
 	"vars": {
 		"ENVIRONMENT": "dev",
 		"AUTH_SERVICE_URL": "https://auth-svc.janovix.workers.dev",
