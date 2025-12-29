@@ -1,3 +1,11 @@
+# [1.1.0-rc.13](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.12...v1.1.0-rc.13) (2025-12-29)
+
+
+### Features
+
+* add alert detection queue and job types for client and transaction events ([aa007cf](https://github.com/janovix/aml-svc/commit/aa007cf56acf5ae89f0c8d64979530ad3782b492))
+* add client and transaction statistics endpoints and schemas ([68d4e39](https://github.com/janovix/aml-svc/commit/68d4e39dd90c37e9ca032b53955bbb1e96aa611e))
+
 # [1.1.0-rc.12](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.11...v1.1.0-rc.12) (2025-12-22)
 
 
