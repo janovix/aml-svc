@@ -64,6 +64,8 @@ const BaseTransactionSchema = z.object({
 		.transform((value) => value.trim()),
 	year: z.coerce.number().int().min(1900).max(2100),
 	armorLevel: z.string().min(1).max(50).optional().nullable(),
+	vin: z.string().min(1).max(17).optional().nullable(), // Vehicle Identification Number (17 characters)
+	repuve: z.string().min(1).max(8).optional().nullable(), // REPUVE (Registro Público Vehicular, 8 characters)
 	amount: AmountSchema,
 	currency: CurrencySchema,
 	operationTypeCode: z.string().optional().nullable(), // Reference to veh-operation-types catalog (metadata.code)
@@ -75,12 +77,14 @@ const BaseTransactionSchema = z.object({
 
 const LandVehicleSchema = z.object({
 	vehicleType: z.literal("land"),
-	engineNumber: z.string().min(3),
+	engineNumber: z.string().min(3).optional().nullable(),
 	plates: z
 		.string()
 		.min(5)
 		.max(20)
-		.transform((value) => value.toUpperCase()),
+		.transform((value) => value.toUpperCase())
+		.optional()
+		.nullable(),
 	registrationNumber: z.string().min(3).optional().nullable(),
 	flagCountryId: z
 		.string()
@@ -123,21 +127,40 @@ const VehicleSpecificSchema = z.discriminatedUnion("vehicleType", [
 
 export const TransactionCreateSchema = BaseTransactionSchema.and(
 	VehicleSpecificSchema,
-).refine(
-	(data) => {
-		const totalPaymentAmount = data.paymentMethods.reduce(
-			(sum, pm) => sum + parseFloat(pm.amount),
-			0,
-		);
-		const transactionAmount = parseFloat(data.amount);
-		return Math.abs(totalPaymentAmount - transactionAmount) < 0.01;
-	},
-	{
-		message:
-			"The sum of payment method amounts must equal the transaction amount",
-		path: ["paymentMethods"],
-	},
-);
+)
+	.refine(
+		(data) => {
+			// For land vehicles, at least one of plates, VIN, or engineNumber must be provided
+			if (data.vehicleType === "land") {
+				const hasPlates = data.plates && data.plates.trim().length > 0;
+				const hasVIN = data.vin && data.vin.trim().length > 0;
+				const hasEngineNumber =
+					data.engineNumber && data.engineNumber.trim().length > 0;
+				return hasPlates || hasVIN || hasEngineNumber;
+			}
+			return true;
+		},
+		{
+			message:
+				"For land vehicles, at least one of plates, VIN, or engineNumber must be provided",
+			path: ["plates"],
+		},
+	)
+	.refine(
+		(data) => {
+			const totalPaymentAmount = data.paymentMethods.reduce(
+				(sum, pm) => sum + parseFloat(pm.amount),
+				0,
+			);
+			const transactionAmount = parseFloat(data.amount);
+			return Math.abs(totalPaymentAmount - transactionAmount) < 0.01;
+		},
+		{
+			message:
+				"The sum of payment method amounts must equal the transaction amount",
+			path: ["paymentMethods"],
+		},
+	);
 
 const TransactionUpdateBaseSchema = BaseTransactionSchema.omit({
 	clientId: true,
@@ -145,21 +168,40 @@ const TransactionUpdateBaseSchema = BaseTransactionSchema.omit({
 
 export const TransactionUpdateSchema = TransactionUpdateBaseSchema.and(
 	VehicleSpecificSchema,
-).refine(
-	(data) => {
-		const totalPaymentAmount = data.paymentMethods.reduce(
-			(sum, pm) => sum + parseFloat(pm.amount),
-			0,
-		);
-		const transactionAmount = parseFloat(data.amount);
-		return Math.abs(totalPaymentAmount - transactionAmount) < 0.01;
-	},
-	{
-		message:
-			"The sum of payment method amounts must equal the transaction amount",
-		path: ["paymentMethods"],
-	},
-);
+)
+	.refine(
+		(data) => {
+			// For land vehicles, at least one of plates, VIN, or engineNumber must be provided
+			if (data.vehicleType === "land") {
+				const hasPlates = data.plates && data.plates.trim().length > 0;
+				const hasVIN = data.vin && data.vin.trim().length > 0;
+				const hasEngineNumber =
+					data.engineNumber && data.engineNumber.trim().length > 0;
+				return hasPlates || hasVIN || hasEngineNumber;
+			}
+			return true;
+		},
+		{
+			message:
+				"For land vehicles, at least one of plates, VIN, or engineNumber must be provided",
+			path: ["plates"],
+		},
+	)
+	.refine(
+		(data) => {
+			const totalPaymentAmount = data.paymentMethods.reduce(
+				(sum, pm) => sum + parseFloat(pm.amount),
+				0,
+			);
+			const transactionAmount = parseFloat(data.amount);
+			return Math.abs(totalPaymentAmount - transactionAmount) < 0.01;
+		},
+		{
+			message:
+				"The sum of payment method amounts must equal the transaction amount",
+			path: ["paymentMethods"],
+		},
+	);
 
 export const TransactionIdParamSchema = z.object({
 	id: ResourceIdSchema,
@@ -206,6 +248,8 @@ export const TransactionEntitySchema = z.object({
 	model: z.string().min(1),
 	year: z.number().int(),
 	armorLevel: z.string().nullable().optional(),
+	vin: z.string().nullable().optional(),
+	repuve: z.string().nullable().optional(),
 	engineNumber: z.string().nullable().optional(),
 	plates: z.string().nullable().optional(),
 	registrationNumber: z.string().nullable().optional(),

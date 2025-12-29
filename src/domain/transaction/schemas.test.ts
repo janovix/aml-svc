@@ -12,6 +12,8 @@ function buildBasePayload(overrides: Record<string, unknown> = {}) {
 		model: "Armored SUV",
 		year: 2023,
 		armorLevel: null,
+		vin: "1HGBH41JXMN109186",
+		repuve: null,
 		amount: "3500000.75",
 		currency: "MXN",
 		paymentMethods: [{ method: "wire", amount: "3500000.75" }],
@@ -30,16 +32,43 @@ describe("TransactionCreateSchema", () => {
 		expect(() => TransactionCreateSchema.parse(payload)).not.toThrow();
 	});
 
-	it("requires plates for land vehicles", () => {
-		const payload = buildBasePayload({ plates: undefined });
-		expect(() => TransactionCreateSchema.parse(payload)).toThrow(/plates/i);
+	it("requires at least one of plates, VIN, or engineNumber for land vehicles", () => {
+		// Should fail when all three are missing
+		const payload = buildBasePayload({
+			plates: undefined,
+			engineNumber: undefined,
+			vin: undefined,
+		});
+		expect(() => TransactionCreateSchema.parse(payload)).toThrow(
+			/at least one of plates, VIN, or engineNumber/i,
+		);
 	});
 
-	it("requires engineNumber for land vehicles", () => {
-		const payload = buildBasePayload({ engineNumber: undefined });
-		expect(() => TransactionCreateSchema.parse(payload)).toThrow(
-			/engineNumber/i,
-		);
+	it("accepts land vehicle with only plates", () => {
+		const payload = buildBasePayload({
+			plates: "ABC1234",
+			engineNumber: undefined,
+			vin: undefined,
+		});
+		expect(() => TransactionCreateSchema.parse(payload)).not.toThrow();
+	});
+
+	it("accepts land vehicle with only VIN", () => {
+		const payload = buildBasePayload({
+			plates: undefined,
+			engineNumber: undefined,
+			vin: "1HGBH41JXMN109186",
+		});
+		expect(() => TransactionCreateSchema.parse(payload)).not.toThrow();
+	});
+
+	it("accepts land vehicle with only engineNumber", () => {
+		const payload = buildBasePayload({
+			plates: undefined,
+			engineNumber: "ENG-ABC",
+			vin: undefined,
+		});
+		expect(() => TransactionCreateSchema.parse(payload)).not.toThrow();
 	});
 
 	it("requires registrationNumber and flagCountryId for marine vehicles", () => {

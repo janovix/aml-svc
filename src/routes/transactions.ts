@@ -13,6 +13,7 @@ import {
 } from "../domain/transaction";
 import { UmaValueRepository } from "../domain/uma";
 import type { Bindings } from "../index";
+import { createAlertQueueService } from "../lib/alert-queue";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 
@@ -70,6 +71,13 @@ transactionsRouter.get("/", async (c) => {
 	return c.json(result);
 });
 
+// IMPORTANT: /stats must be defined BEFORE /:id to avoid "stats" being matched as an id parameter
+transactionsRouter.get("/stats", async (c) => {
+	const service = getService(c);
+	const stats = await service.getStats().catch(handleServiceError);
+	return c.json(stats);
+});
+
 transactionsRouter.get("/:id", async (c) => {
 	const params = parseWithZod(TransactionIdParamSchema, c.req.param());
 
@@ -85,6 +93,10 @@ transactionsRouter.post("/", async (c) => {
 
 	const service = getService(c);
 	const created = await service.create(payload).catch(handleServiceError);
+
+	// Queue alert detection job
+	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
+	await alertQueue.queueTransactionCreated(created.clientId, created.id);
 
 	return c.json(created, 201);
 });
@@ -109,10 +121,4 @@ transactionsRouter.delete("/:id", async (c) => {
 	await service.delete(params.id).catch(handleServiceError);
 
 	return c.body(null, 204);
-});
-
-transactionsRouter.get("/stats", async (c) => {
-	const service = getService(c);
-	const stats = await service.getStats().catch(handleServiceError);
-	return c.json(stats);
 });

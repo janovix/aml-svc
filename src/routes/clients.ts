@@ -20,6 +20,7 @@ import {
 	ClientRepository,
 } from "../domain/client";
 import type { Bindings } from "../index";
+import { createAlertQueueService } from "../lib/alert-queue";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 
@@ -71,6 +72,13 @@ clientsRouter.get("/", async (c) => {
 	return c.json(result);
 });
 
+// IMPORTANT: /stats must be defined BEFORE /:id to avoid "stats" being matched as an id parameter
+clientsRouter.get("/stats", async (c) => {
+	const service = getService(c);
+	const stats = await service.getStats().catch(handleServiceError);
+	return c.json(stats);
+});
+
 clientsRouter.get("/:id", async (c) => {
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 
@@ -87,6 +95,10 @@ clientsRouter.post("/", async (c) => {
 	const service = getService(c);
 	const created = await service.create(payload).catch(handleServiceError);
 
+	// Queue alert detection job for new client
+	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
+	await alertQueue.queueClientCreated(created.id);
+
 	return c.json(created, 201);
 });
 
@@ -99,6 +111,10 @@ clientsRouter.put("/:id", async (c) => {
 	const updated = await service
 		.update(params.id, payload)
 		.catch(handleServiceError);
+
+	// Queue alert detection job for updated client
+	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
+	await alertQueue.queueClientUpdated(updated.id);
 
 	return c.json(updated);
 });
@@ -116,6 +132,10 @@ clientsRouter.patch("/:id", async (c) => {
 	const updated = await service
 		.patch(params.id, payload)
 		.catch(handleServiceError);
+
+	// Queue alert detection job for updated client
+	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
+	await alertQueue.queueClientUpdated(updated.id);
 
 	return c.json(updated);
 });
@@ -235,10 +255,4 @@ clientsRouter.delete("/:clientId/addresses/:addressId", async (c) => {
 		.deleteAddress(params.clientId, params.addressId)
 		.catch(handleServiceError);
 	return c.body(null, 204);
-});
-
-clientsRouter.get("/stats", async (c) => {
-	const service = getService(c);
-	const stats = await service.getStats().catch(handleServiceError);
-	return c.json(stats);
 });

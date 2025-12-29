@@ -8,6 +8,7 @@ import { errorHandler } from "./middleware/error";
 import { openAPISpec } from "./openapi";
 import { createRouter } from "./routes";
 import { handleServiceBindingRequest } from "./lib/alert-service-binding";
+import type { AlertJob } from "./lib/alert-queue";
 
 export type Bindings = {
 	DB: D1Database;
@@ -22,6 +23,8 @@ export type Bindings = {
 	SAT_CLAVE_ENTIDAD_COLEGIADA?: string; // Optional collegiate entity identifier
 	/** Service binding to auth-svc for worker-to-worker communication */
 	AUTH_SERVICE?: Fetcher;
+	/** Queue for alert detection jobs */
+	ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
 };
 
 // Start a Hono app

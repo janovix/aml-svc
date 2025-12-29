@@ -173,6 +173,24 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/clients/stats": {
+			get: {
+				tags: ["Clients"],
+				summary: "Get client statistics",
+				description:
+					"Retrieve aggregate statistics for clients including total count, open alerts, and urgent reviews.",
+				responses: {
+					"200": {
+						description: "Client statistics",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/ClientStats" },
+							},
+						},
+					},
+				},
+			},
+		},
 		"/api/v1/clients/{id}": {
 			get: {
 				tags: ["Clients"],
@@ -830,6 +848,24 @@ export const openAPISpec = {
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/transactions/stats": {
+			get: {
+				tags: ["Transactions"],
+				summary: "Get transaction statistics",
+				description:
+					"Retrieve aggregate statistics for transactions including today's count, suspicious transactions, total volume, and unique vehicles.",
+				responses: {
+					"200": {
+						description: "Transaction statistics",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/TransactionStats" },
 							},
 						},
 					},
@@ -2708,6 +2744,61 @@ export const openAPISpec = {
 					limit: { type: "integer" },
 					total: { type: "integer" },
 					totalPages: { type: "integer" },
+				},
+			},
+			ClientStats: {
+				type: "object",
+				required: ["totalClients", "openAlerts", "urgentReviews"],
+				properties: {
+					totalClients: {
+						type: "integer",
+						description: "Total number of active clients",
+						example: 150,
+					},
+					openAlerts: {
+						type: "integer",
+						description: "Number of alerts with DETECTED status",
+						example: 5,
+					},
+					urgentReviews: {
+						type: "integer",
+						description:
+							"Number of CRITICAL severity alerts with DETECTED or FILE_GENERATED status",
+						example: 2,
+					},
+				},
+			},
+			TransactionStats: {
+				type: "object",
+				required: [
+					"transactionsToday",
+					"suspiciousTransactions",
+					"totalVolume",
+					"totalVehicles",
+				],
+				properties: {
+					transactionsToday: {
+						type: "integer",
+						description: "Number of transactions created today",
+						example: 25,
+					},
+					suspiciousTransactions: {
+						type: "integer",
+						description:
+							"Number of alerts with DETECTED or FILE_GENERATED status",
+						example: 3,
+					},
+					totalVolume: {
+						type: "string",
+						description:
+							"Total sum of all transaction amounts (string to preserve precision)",
+						example: "15000000.50",
+					},
+					totalVehicles: {
+						type: "integer",
+						description: "Number of unique vehicles (brand + model + year)",
+						example: 120,
+					},
 				},
 			},
 			Error: {

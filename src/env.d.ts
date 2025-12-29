@@ -1,3 +1,5 @@
+import type { AlertJob } from "./lib/alert-queue";
+
 /**
  * Environment bindings for Cloudflare Workers
  */
@@ -23,5 +25,9 @@ declare namespace Cloudflare {
 		SAT_CLAVE_SUJETO_OBLIGADO?: string; // 12-character obligated subject identifier (RFC)
 		SAT_CLAVE_ACTIVIDAD?: string; // Activity code (e.g., "VEH" for vehicle notices)
 		SAT_CLAVE_ENTIDAD_COLEGIADA?: string; // Optional collegiate entity identifier
+		/**
+		 * Queue for alert detection jobs
+		 */
+		ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
 	}
 }
