@@ -1,3 +1,10 @@
+# [1.1.0-rc.16](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.15...v1.1.0-rc.16) (2025-12-30)
+
+
+### Bug Fixes
+
+* add validation for GitHub Secrets in synthetic data generation workflow ([ba12a45](https://github.com/janovix/aml-svc/commit/ba12a45e593b644c69715658551a223ee872aa5b))
+
 # [1.1.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.14...v1.1.0-rc.15) (2025-12-30)
 
 
