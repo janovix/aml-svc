@@ -25,6 +25,8 @@ export type Bindings = {
 	AUTH_SERVICE?: Fetcher;
 	/** Queue for alert detection jobs */
 	ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
+	/** Secret token for synthetic data generation (internal use only) */
+	SYNTHETIC_DATA_SECRET?: string;
 };
 
 // Start a Hono app
@@ -84,6 +86,134 @@ app.get("/docsz", (c) => {
 // Service binding routes (internal worker-to-worker communication)
 app.all("/internal/*", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+
+// Internal synthetic data generation endpoint (not in public API)
+// Only accessible with SYNTETIC_DATA_SECRET token
+app.post("/internal/synthetic-data", async (c) => {
+	const secret = c.req.header("X-Synthetic-Data-Secret");
+	const expectedSecret = c.env.SYNTHETIC_DATA_SECRET;
+
+	if (!expectedSecret) {
+		return c.json(
+			{
+				success: false,
+				error: "Configuration Error",
+				message: "Synthetic data generation is not configured",
+			},
+			500,
+		);
+	}
+
+	if (secret !== expectedSecret) {
+		return c.json(
+			{
+				success: false,
+				error: "Unauthorized",
+				message: "Invalid secret token",
+			},
+			401,
+		);
+	}
+
+	// Check if we're in production (should not allow in production)
+	const environment = c.env.ENVIRONMENT || "development";
+	if (environment === "production" || environment === "prod") {
+		return c.json(
+			{
+				success: false,
+				error: "Forbidden",
+				message: "Synthetic data generation is not allowed in production",
+			},
+			403,
+		);
+	}
+
+	try {
+		const body = await c.req.json();
+		const { userId, models, options } = body;
+
+		if (!userId || !models || !Array.isArray(models)) {
+			return c.json(
+				{
+					success: false,
+					error: "Validation Error",
+					message: "userId and models are required",
+				},
+				400,
+			);
+		}
+
+		// Import the generator dynamically to avoid circular dependencies
+		const syntheticDataModule = await import("./lib/synthetic-data-generator");
+		const { getPrismaClient } = await import("./lib/prisma");
+
+		const prisma = getPrismaClient(c.env.DB);
+		const generator = new syntheticDataModule.SyntheticDataGenerator(prisma);
+
+		// Build options based on requested models
+		const syntheticOptions: {
+			clients?: {
+				count: number;
+				includeDocuments?: boolean;
+				includeAddresses?: boolean;
+			};
+			transactions?: {
+				count: number;
+				perClient?: number;
+			};
+		} = {};
+
+		if (models.includes("clients")) {
+			syntheticOptions.clients = {
+				count: options?.clients?.count ?? 10,
+				includeDocuments: options?.clients?.includeDocuments ?? false,
+				includeAddresses: options?.clients?.includeAddresses ?? false,
+			};
+		}
+
+		if (models.includes("transactions")) {
+			syntheticOptions.transactions = {
+				count: options?.transactions?.count ?? 50,
+				perClient: options?.transactions?.perClient,
+			};
+		}
+
+		const result = await generator.generate(syntheticOptions);
+
+		return c.json(
+			{
+				success: true,
+				userId,
+				generated: result,
+				summary: {
+					clientsCreated: result.clients.created,
+					transactionsCreated: result.transactions.created,
+				},
+			},
+			201,
+		);
+	} catch (error) {
+		console.error("Error generating synthetic data:", error);
+		if (error instanceof Error) {
+			return c.json(
+				{
+					success: false,
+					error: "Generation failed",
+					message: error.message,
+				},
+				500,
+			);
+		}
+		return c.json(
+			{
+				success: false,
+				error: "Generation failed",
+				message: "Unknown error",
+			},
+			500,
+		);
+	}
 });
 
 // API routes
