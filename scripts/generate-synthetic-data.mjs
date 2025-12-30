@@ -266,8 +266,16 @@ function createRemoteD1Database(accountId, databaseId, apiToken) {
 			return this.executeQuery();
 		}
 
-		async raw() {
+		async raw(options) {
 			const result = await this.executeQuery();
+			if (options?.columnNames) {
+				// If columnNames is true, return [columnNames[], ...rows[]]
+				if (result.results && result.results.length > 0) {
+					const columnNames = Object.keys(result.results[0]);
+					return [columnNames, ...result.results];
+				}
+				return [[]];
+			}
 			return result.results || [];
 		}
 
@@ -299,31 +307,52 @@ function createRemoteD1Database(accountId, databaseId, apiToken) {
 			const data = await response.json();
 
 			// Cloudflare D1 REST API returns: { success: true, meta: {...}, results: [...] }
-			// Handle both direct response and wrapped response formats
-			const result = data.result || data;
+			// The response might be wrapped in a "result" array for batch operations
+			// For single queries, it's usually direct: { success: true, meta: {...}, results: [...] }
+			let result = data;
+			if (Array.isArray(data.result) && data.result.length > 0) {
+				result = data.result[0];
+			} else if (data.result && !Array.isArray(data.result)) {
+				result = data.result;
+			}
 
 			// Ensure all required meta fields are present with proper types
+			// D1Meta requires: duration, size_after, rows_read, rows_written, last_row_id, changed_db, changes
 			const meta = result.meta || {};
 
-			return {
-				success: result.success !== false,
+			// Build the result object matching D1Result<T> interface exactly
+			const d1Result = {
+				success: true, // Must be exactly true
 				meta: {
 					duration: Number(meta.duration) || 0,
+					size_after: Number(meta.size_after) || 0,
 					rows_read: Number(meta.rows_read) || 0,
 					rows_written: Number(meta.rows_written) || 0,
 					last_row_id: Number(meta.last_row_id) || 0,
 					changed_db: Boolean(meta.changed_db),
 					changes: Number(meta.changes) || 0,
-					size_after: Number(meta.size_after) || 0,
+					// Optional fields that might be present
+					...(meta.served_by_region && {
+						served_by_region: meta.served_by_region,
+					}),
+					...(meta.served_by_primary !== undefined && {
+						served_by_primary: Boolean(meta.served_by_primary),
+					}),
+					...(meta.timings && { timings: meta.timings }),
+					...(meta.total_attempts !== undefined && {
+						total_attempts: Number(meta.total_attempts),
+					}),
 				},
 				results: Array.isArray(result.results) ? result.results : [],
 			};
+
+			return d1Result;
 		}
 	}
 
-	return {
+	const db = {
 		prepare(query) {
-			return new RemoteD1PreparedStatement(query, this);
+			return new RemoteD1PreparedStatement(query, db);
 		},
 
 		async exec(query) {
@@ -344,9 +373,11 @@ function createRemoteD1Database(accountId, databaseId, apiToken) {
 			}
 
 			const data = await response.json();
+			const result = data.result || data;
+			const meta = result.meta || {};
 			return {
-				count: data.meta?.changes ?? 0,
-				duration: data.meta?.duration ?? 0,
+				count: Number(meta.changes) || 0,
+				duration: Number(meta.duration) || 0,
 			};
 		},
 
@@ -360,7 +391,23 @@ function createRemoteD1Database(accountId, databaseId, apiToken) {
 			}
 			return results;
 		},
+
+		withSession() {
+			// Return a session that wraps this database
+			// For REST API, we can't really implement sessions, so return the same db
+			return {
+				prepare: (query) => db.prepare(query),
+				batch: (statements) => db.batch(statements),
+				getBookmark: () => null,
+			};
+		},
+
+		async dump() {
+			throw new Error("dump() is not supported via REST API");
+		},
 	};
+
+	return db;
 }
 
 async function generateSyntheticData() {
