@@ -56,7 +56,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
-        working-directory: aml-svc
 
       - name: Generate synthetic data
         env:
@@ -72,4 +71,3 @@ jobs:
           WRANGLER_CONFIG: wrangler.preview.jsonc
           REMOTE: "true"
         run: node scripts/generate-synthetic-data.mjs
-        working-directory: aml-svc
