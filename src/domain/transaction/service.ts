@@ -15,12 +15,15 @@ export class TransactionService {
 		private readonly umaRepository: UmaValueRepository,
 	) {}
 
-	list(filters: TransactionFilters): Promise<TransactionListResult> {
-		return this.repository.list(filters);
+	list(
+		organizationId: string,
+		filters: TransactionFilters,
+	): Promise<TransactionListResult> {
+		return this.repository.list(organizationId, filters);
 	}
 
-	async get(id: string): Promise<TransactionEntity> {
-		const record = await this.repository.getById(id);
+	async get(organizationId: string, id: string): Promise<TransactionEntity> {
+		const record = await this.repository.getById(organizationId, id);
 		if (!record) {
 			throw new Error("TRANSACTION_NOT_FOUND");
 		}
@@ -36,14 +39,15 @@ export class TransactionService {
 	}
 
 	update(
+		organizationId: string,
 		id: string,
 		input: TransactionUpdateInput,
 	): Promise<TransactionEntity> {
-		return this.repository.update(id, input);
+		return this.repository.update(organizationId, id, input);
 	}
 
-	delete(id: string): Promise<void> {
-		return this.repository.delete(id);
+	delete(organizationId: string, id: string): Promise<void> {
+		return this.repository.delete(organizationId, id);
 	}
 
 	private async ensureClientExists(
@@ -59,12 +63,12 @@ export class TransactionService {
 		}
 	}
 
-	getStats(): Promise<{
+	getStats(organizationId: string): Promise<{
 		transactionsToday: number;
 		suspiciousTransactions: number;
 		totalVolume: string;
 		totalVehicles: number;
 	}> {
-		return this.repository.getStats();
+		return this.repository.getStats(organizationId);
 	}
 }

@@ -53,21 +53,27 @@ function handleServiceError(error: unknown): never {
 }
 
 alertsRouter.get("/", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = Object.fromEntries(url.searchParams.entries());
 	const filters = parseWithZod(AlertFilterSchema, queryObject);
 
 	const service = getService(c);
-	const result = await service.list(filters).catch(handleServiceError);
+	const result = await service
+		.list(organizationId, filters)
+		.catch(handleServiceError);
 
 	return c.json(result);
 });
 
 alertsRouter.get("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AlertIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	const alert = await service.get(params.id).catch(handleServiceError);
+	const alert = await service
+		.get(organizationId, params.id)
+		.catch(handleServiceError);
 
 	return c.json(alert);
 });
@@ -87,19 +93,21 @@ alertsRouter.post("/", async (c) => {
 });
 
 alertsRouter.put("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AlertIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(AlertUpdateSchema, body);
 
 	const service = getService(c);
 	const updated = await service
-		.update(params.id, payload)
+		.update(organizationId, params.id, payload)
 		.catch(handleServiceError);
 
 	return c.json(updated);
 });
 
 alertsRouter.patch("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AlertIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(AlertPatchSchema, body);
@@ -110,17 +118,18 @@ alertsRouter.patch("/:id", async (c) => {
 
 	const service = getService(c);
 	const updated = await service
-		.patch(params.id, payload)
+		.patch(organizationId, params.id, payload)
 		.catch(handleServiceError);
 
 	return c.json(updated);
 });
 
 alertsRouter.delete("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AlertIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	await service.delete(params.id).catch(handleServiceError);
+	await service.delete(organizationId, params.id).catch(handleServiceError);
 
 	return c.body(null, 204);
 });

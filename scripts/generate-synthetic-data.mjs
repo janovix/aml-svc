@@ -10,6 +10,7 @@
  *
  * Environment Variables:
  *   USER_ID - User ID for which to generate data (required)
+ *   ORGANIZATION_ID - Organization ID for which to generate data (required)
  *   MODELS - Comma-separated list of models to generate: clients,transactions (required)
  *   CLIENTS_COUNT - Number of clients to generate (default: 10)
  *   CLIENTS_INCLUDE_DOCUMENTS - Include documents for clients (default: false)
@@ -30,6 +31,7 @@ const __dirname = dirname(__filename);
 
 // Parse environment variables
 const userId = process.env.USER_ID;
+const organizationId = process.env.ORGANIZATION_ID;
 const modelsStr = process.env.MODELS || "";
 const clientsCount = parseInt(process.env.CLIENTS_COUNT || "10", 10);
 const clientsIncludeDocuments =
@@ -49,6 +51,11 @@ const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
 // Validate required parameters
 if (!userId) {
 	console.error("❌ Error: USER_ID environment variable is required");
+	process.exit(1);
+}
+
+if (!organizationId) {
+	console.error("❌ Error: ORGANIZATION_ID environment variable is required");
 	process.exit(1);
 }
 
@@ -377,6 +384,7 @@ function createRemoteD1Database(accountId, databaseId, apiToken) {
 
 async function generateSyntheticData() {
 	console.log(`🔧 Generating synthetic data for user: ${userId}`);
+	console.log(`   Organization: ${organizationId}`);
 	console.log(`   Environment: ${isRemote ? "remote" : "local"}`);
 	console.log(`   Models: ${models.join(", ")}`);
 	console.log("");
@@ -417,7 +425,7 @@ async function generateSyntheticData() {
 
 		// Create Prisma client with D1 adapter
 		const prisma = getPrismaClient(db);
-		const generator = new SyntheticDataGenerator(prisma);
+		const generator = new SyntheticDataGenerator(prisma, organizationId);
 
 		// Generate synthetic data
 		console.log("⏳ Generating synthetic data...");

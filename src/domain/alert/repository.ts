@@ -25,10 +25,15 @@ import type { AlertEntity, AlertRuleEntity, ListResult } from "./types";
 export class AlertRuleRepository {
 	constructor(private readonly prisma: PrismaClient) {}
 
-	async list(filters: AlertRuleFilters): Promise<ListResult<AlertRuleEntity>> {
+	async list(
+		organizationId: string,
+		filters: AlertRuleFilters,
+	): Promise<ListResult<AlertRuleEntity>> {
 		const { page, limit, search, active, severity } = filters;
 
-		const where: Prisma.AlertRuleWhereInput = {};
+		const where: Prisma.AlertRuleWhereInput = {
+			organizationId,
+		};
 
 		if (active !== undefined) {
 			where.active = active;
@@ -66,9 +71,12 @@ export class AlertRuleRepository {
 		};
 	}
 
-	async getById(id: string): Promise<AlertRuleEntity | null> {
-		const record = await this.prisma.alertRule.findUnique({
-			where: { id },
+	async getById(
+		organizationId: string,
+		id: string,
+	): Promise<AlertRuleEntity | null> {
+		const record = await this.prisma.alertRule.findFirst({
+			where: { id, organizationId },
 		});
 		return record ? mapPrismaAlertRule(record) : null;
 	}
@@ -84,10 +92,11 @@ export class AlertRuleRepository {
 	}
 
 	async update(
+		organizationId: string,
 		id: string,
 		input: AlertRuleUpdateInput,
 	): Promise<AlertRuleEntity> {
-		await this.ensureExists(id);
+		await this.ensureExists(organizationId, id);
 
 		const updated = await this.prisma.alertRule.update({
 			where: { id },
@@ -98,10 +107,11 @@ export class AlertRuleRepository {
 	}
 
 	async patch(
+		organizationId: string,
 		id: string,
 		input: AlertRulePatchInput,
 	): Promise<AlertRuleEntity> {
-		await this.ensureExists(id);
+		await this.ensureExists(organizationId, id);
 
 		const payload = mapAlertRulePatchInputToPrisma(
 			input,
@@ -115,22 +125,25 @@ export class AlertRuleRepository {
 		return mapPrismaAlertRule(updated);
 	}
 
-	async delete(id: string): Promise<void> {
-		await this.ensureExists(id);
+	async delete(organizationId: string, id: string): Promise<void> {
+		await this.ensureExists(organizationId, id);
 		await this.prisma.alertRule.delete({ where: { id } });
 	}
 
-	async listActive(): Promise<AlertRuleEntity[]> {
+	async listActive(organizationId: string): Promise<AlertRuleEntity[]> {
 		const records = await this.prisma.alertRule.findMany({
-			where: { active: true },
+			where: { organizationId, active: true },
 			orderBy: { createdAt: "desc" },
 		});
 		return records.map(mapPrismaAlertRule);
 	}
 
-	private async ensureExists(id: string): Promise<void> {
-		const exists = await this.prisma.alertRule.findUnique({
-			where: { id },
+	private async ensureExists(
+		organizationId: string,
+		id: string,
+	): Promise<void> {
+		const exists = await this.prisma.alertRule.findFirst({
+			where: { id, organizationId },
 			select: { id: true },
 		});
 
@@ -143,11 +156,16 @@ export class AlertRuleRepository {
 export class AlertRepository {
 	constructor(private readonly prisma: PrismaClient) {}
 
-	async list(filters: AlertFilters): Promise<ListResult<AlertEntity>> {
+	async list(
+		organizationId: string,
+		filters: AlertFilters,
+	): Promise<ListResult<AlertEntity>> {
 		const { page, limit, alertRuleId, clientId, status, severity, isOverdue } =
 			filters;
 
-		const where: Prisma.AlertWhereInput = {};
+		const where: Prisma.AlertWhereInput = {
+			organizationId,
+		};
 
 		if (alertRuleId) {
 			where.alertRuleId = alertRuleId;
@@ -171,7 +189,7 @@ export class AlertRepository {
 
 		// Update overdue status for alerts that have passed their deadline
 		// This ensures we always have current overdue status
-		await this.updateOverdueStatus();
+		await this.updateOverdueStatus(organizationId);
 
 		const [total, records] = await Promise.all([
 			this.prisma.alert.count({ where }),
@@ -212,10 +230,11 @@ export class AlertRepository {
 	 * Update overdue status for alerts that have passed their submission deadline
 	 * This should be called periodically or before listing alerts
 	 */
-	private async updateOverdueStatus(): Promise<void> {
+	private async updateOverdueStatus(organizationId: string): Promise<void> {
 		const now = new Date();
 		await this.prisma.alert.updateMany({
 			where: {
+				organizationId,
 				submissionDeadline: { lte: now },
 				status: { notIn: ["SUBMITTED", "CANCELLED", "OVERDUE"] },
 				isOverdue: false,
@@ -227,9 +246,12 @@ export class AlertRepository {
 		});
 	}
 
-	async getById(id: string): Promise<AlertEntity | null> {
-		const record = await this.prisma.alert.findUnique({
-			where: { id },
+	async getById(
+		organizationId: string,
+		id: string,
+	): Promise<AlertEntity | null> {
+		const record = await this.prisma.alert.findFirst({
+			where: { id, organizationId },
 			include: {
 				alertRule: true,
 			},
@@ -283,8 +305,12 @@ export class AlertRepository {
 		};
 	}
 
-	async updateSatFileUrl(id: string, satFileUrl: string): Promise<AlertEntity> {
-		await this.ensureExists(id);
+	async updateSatFileUrl(
+		organizationId: string,
+		id: string,
+		satFileUrl: string,
+	): Promise<AlertEntity> {
+		await this.ensureExists(organizationId, id);
 
 		const updated = await this.prisma.alert.update({
 			where: { id },
@@ -304,8 +330,12 @@ export class AlertRepository {
 		};
 	}
 
-	async update(id: string, input: AlertUpdateInput): Promise<AlertEntity> {
-		await this.ensureExists(id);
+	async update(
+		organizationId: string,
+		id: string,
+		input: AlertUpdateInput,
+	): Promise<AlertEntity> {
+		await this.ensureExists(organizationId, id);
 
 		// Get current alert to check submissionDeadline
 		const current = await this.prisma.alert.findUnique({
@@ -352,8 +382,12 @@ export class AlertRepository {
 		};
 	}
 
-	async patch(id: string, input: AlertPatchInput): Promise<AlertEntity> {
-		await this.ensureExists(id);
+	async patch(
+		organizationId: string,
+		id: string,
+		input: AlertPatchInput,
+	): Promise<AlertEntity> {
+		await this.ensureExists(organizationId, id);
 
 		// Get current alert to check submissionDeadline
 		const current = await this.prisma.alert.findUnique({
@@ -404,16 +438,17 @@ export class AlertRepository {
 		};
 	}
 
-	async delete(id: string): Promise<void> {
-		await this.ensureExists(id);
+	async delete(organizationId: string, id: string): Promise<void> {
+		await this.ensureExists(organizationId, id);
 		await this.prisma.alert.delete({ where: { id } });
 	}
 
 	async findByIdempotencyKey(
+		organizationId: string,
 		idempotencyKey: string,
 	): Promise<AlertEntity | null> {
-		const record = await this.prisma.alert.findUnique({
-			where: { idempotencyKey },
+		const record = await this.prisma.alert.findFirst({
+			where: { idempotencyKey, organizationId },
 			include: {
 				alertRule: true,
 			},
@@ -425,9 +460,12 @@ export class AlertRepository {
 		};
 	}
 
-	private async ensureExists(id: string): Promise<void> {
-		const exists = await this.prisma.alert.findUnique({
-			where: { id },
+	private async ensureExists(
+		organizationId: string,
+		id: string,
+	): Promise<void> {
+		const exists = await this.prisma.alert.findFirst({
+			where: { id, organizationId },
 			select: { id: true },
 		});
 

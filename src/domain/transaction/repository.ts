@@ -22,7 +22,10 @@ export class TransactionRepository {
 		private readonly umaRepository: UmaValueRepository,
 	) {}
 
-	async list(filters: TransactionFilters): Promise<TransactionListResult> {
+	async list(
+		organizationId: string,
+		filters: TransactionFilters,
+	): Promise<TransactionListResult> {
 		const {
 			page,
 			limit,
@@ -35,6 +38,7 @@ export class TransactionRepository {
 		} = filters;
 
 		const where: Prisma.TransactionWhereInput = {
+			organizationId,
 			deletedAt: null,
 		};
 
@@ -91,9 +95,12 @@ export class TransactionRepository {
 		};
 	}
 
-	async getById(id: string): Promise<TransactionEntity | null> {
+	async getById(
+		organizationId: string,
+		id: string,
+	): Promise<TransactionEntity | null> {
 		const record = await this.prisma.transaction.findFirst({
-			where: { id, deletedAt: null },
+			where: { id, organizationId, deletedAt: null },
 			include: { paymentMethods: true },
 		});
 
@@ -118,10 +125,11 @@ export class TransactionRepository {
 	}
 
 	async update(
+		organizationId: string,
 		id: string,
 		input: TransactionUpdateInput,
 	): Promise<TransactionEntity> {
-		await this.ensureExists(id);
+		await this.ensureExists(organizationId, id);
 
 		// Calculate UMA value for the transaction date
 		const umaValue = await this.calculateUmaValue(
@@ -175,17 +183,20 @@ export class TransactionRepository {
 		}
 	}
 
-	async delete(id: string): Promise<void> {
-		await this.ensureExists(id);
+	async delete(organizationId: string, id: string): Promise<void> {
+		await this.ensureExists(organizationId, id);
 		await this.prisma.transaction.update({
 			where: { id },
 			data: { deletedAt: new Date() },
 		});
 	}
 
-	private async ensureExists(id: string): Promise<void> {
+	private async ensureExists(
+		organizationId: string,
+		id: string,
+	): Promise<void> {
 		const exists = await this.prisma.transaction.findFirst({
-			where: { id, deletedAt: null },
+			where: { id, organizationId, deletedAt: null },
 			select: { id: true },
 		});
 
@@ -194,7 +205,7 @@ export class TransactionRepository {
 		}
 	}
 
-	async getStats(): Promise<{
+	async getStats(organizationId: string): Promise<{
 		transactionsToday: number;
 		suspiciousTransactions: number;
 		totalVolume: string;
@@ -213,6 +224,7 @@ export class TransactionRepository {
 		] = await Promise.all([
 			this.prisma.transaction.count({
 				where: {
+					organizationId,
 					deletedAt: null,
 					operationDate: {
 						gte: today,
@@ -222,11 +234,13 @@ export class TransactionRepository {
 			}),
 			this.prisma.alert.count({
 				where: {
+					organizationId,
 					status: { in: ["DETECTED", "FILE_GENERATED"] },
 				},
 			}),
 			this.prisma.transaction.aggregate({
 				where: {
+					organizationId,
 					deletedAt: null,
 				},
 				_sum: {
@@ -235,6 +249,7 @@ export class TransactionRepository {
 			}),
 			this.prisma.transaction.findMany({
 				where: {
+					organizationId,
 					deletedAt: null,
 				},
 				select: {

@@ -67,28 +67,37 @@ function handleServiceError(error: unknown): never {
 }
 
 transactionsRouter.get("/", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = Object.fromEntries(url.searchParams.entries());
 	const filters = parseWithZod(TransactionFilterSchema, queryObject);
 
 	const service = getService(c);
-	const result = await service.list(filters).catch(handleServiceError);
+	const result = await service
+		.list(organizationId, filters)
+		.catch(handleServiceError);
 
 	return c.json(result);
 });
 
 // IMPORTANT: /stats must be defined BEFORE /:id to avoid "stats" being matched as an id parameter
 transactionsRouter.get("/stats", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const service = getService(c);
-	const stats = await service.getStats().catch(handleServiceError);
+	const stats = await service
+		.getStats(organizationId)
+		.catch(handleServiceError);
 	return c.json(stats);
 });
 
 transactionsRouter.get("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(TransactionIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	const record = await service.get(params.id).catch(handleServiceError);
+	const record = await service
+		.get(organizationId, params.id)
+		.catch(handleServiceError);
 
 	return c.json(record);
 });
@@ -111,23 +120,25 @@ transactionsRouter.post("/", async (c) => {
 });
 
 transactionsRouter.put("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(TransactionIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(TransactionUpdateSchema, body);
 
 	const service = getService(c);
 	const updated = await service
-		.update(params.id, payload)
+		.update(organizationId, params.id, payload)
 		.catch(handleServiceError);
 
 	return c.json(updated);
 });
 
 transactionsRouter.delete("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(TransactionIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	await service.delete(params.id).catch(handleServiceError);
+	await service.delete(organizationId, params.id).catch(handleServiceError);
 
 	return c.body(null, 204);
 });

@@ -51,14 +51,14 @@ export class AlertServiceBinding {
 	constructor(private readonly env: Bindings) {}
 
 	/**
-	 * Get all active alert rules
-	 * Called via: env.AML_SERVICE.fetch(new Request("https://internal/alert-rules/active"))
+	 * Get all active alert rules for an organization
+	 * Called via: env.AML_SERVICE.fetch(new Request("https://internal/alert-rules/active?organizationId=xxx"))
 	 */
-	async getActiveAlertRules() {
+	async getActiveAlertRules(organizationId: string) {
 		const prisma = getPrismaClient(this.env.DB);
 		const repository = new AlertRuleRepository(prisma);
 		const service = new AlertRuleService(repository);
-		return service.listActive();
+		return service.listActive(organizationId);
 	}
 
 	/**
@@ -133,17 +133,8 @@ export class AlertServiceBinding {
 		}
 
 		const prisma = getPrismaClient(this.env.DB);
-		const alertRepository = new AlertRepository(prisma);
-		const alertService = new AlertService(alertRepository);
 
-		// Get alert
-		const alert = await alertService.get(alertId);
-		if (!alert.triggerTransactionId) {
-			throw new Error("Alert has no trigger transaction");
-		}
-
-		// Get client (RFC is the ID)
-		// Get organizationId from alert (it should have it from Prisma)
+		// Get organizationId from alert first (it should have it from Prisma)
 		const alertWithOrg = await prisma.alert.findUnique({
 			where: { id: alertId },
 			select: { organizationId: true },
@@ -151,12 +142,21 @@ export class AlertServiceBinding {
 		if (!alertWithOrg) {
 			throw new Error(`Alert not found: ${alertId}`);
 		}
+		const organizationId = alertWithOrg.organizationId;
+
+		const alertRepository = new AlertRepository(prisma);
+		const alertService = new AlertService(alertRepository);
+
+		// Get alert with organization context
+		const alert = await alertService.get(organizationId, alertId);
+		if (!alert.triggerTransactionId) {
+			throw new Error("Alert has no trigger transaction");
+		}
+
+		// Get client (RFC is the ID)
 		const clientRepository = new ClientRepository(prisma);
 		const clientService = new ClientService(clientRepository);
-		const client = await clientService.get(
-			alertWithOrg.organizationId,
-			alert.clientId,
-		);
+		const client = await clientService.get(organizationId, alert.clientId);
 
 		// Get transaction
 		const umaRepository = new UmaValueRepository(prisma);
@@ -170,6 +170,7 @@ export class AlertServiceBinding {
 			umaRepository,
 		);
 		const transaction = await transactionService.get(
+			organizationId,
 			alert.triggerTransactionId,
 		);
 
@@ -221,6 +222,7 @@ export class AlertServiceBinding {
 
 		// Update alert with file URL
 		const updatedAlert = await alertService.updateSatFileUrl(
+			organizationId,
 			alertId,
 			result.fileUrl,
 		);
@@ -248,8 +250,15 @@ export async function handleServiceBindingRequest(
 	try {
 		// Route: /internal/alert-rules/active
 		if (path === "/internal/alert-rules/active" && request.method === "GET") {
+			const organizationId = url.searchParams.get("organizationId");
+			if (!organizationId) {
+				return new Response(
+					JSON.stringify({ error: "organizationId is required" }),
+					{ status: 400, headers: { "Content-Type": "application/json" } },
+				);
+			}
 			const service = new AlertServiceBinding(env);
-			const rules = await service.getActiveAlertRules();
+			const rules = await service.getActiveAlertRules(organizationId);
 			return new Response(JSON.stringify(rules), {
 				headers: { "Content-Type": "application/json" },
 			});

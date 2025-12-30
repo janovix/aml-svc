@@ -73,7 +73,6 @@
 		"seed:validate": "node ./scripts/seed/validate.mjs",
 		"populate": "node ./scripts/populate/all.mjs",
 		"populate:catalogs": "node ./scripts/populate/all-catalogs.mjs",
-		"populate:catalog:vehicle-brands": "node ./scripts/populate/catalog-vehicle-brands.mjs",
 		"populate:catalog:terrestrial-vehicle-brands": "node ./scripts/populate/catalog-terrestrial-vehicle-brands.mjs",
 		"populate:catalog:maritime-vehicle-brands": "node ./scripts/populate/catalog-maritime-vehicle-brands.mjs",
 		"populate:catalog:air-vehicle-brands": "node ./scripts/populate/catalog-air-vehicle-brands.mjs",
