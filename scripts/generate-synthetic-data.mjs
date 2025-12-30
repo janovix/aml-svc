@@ -21,9 +21,10 @@
  *   CLOUDFLARE_ACCOUNT_ID - Cloudflare account ID (required for remote)
  */
 
+import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { readFileSync } from "node:fs";
+import { writeFileSync, unlinkSync } from "node:fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -69,346 +70,649 @@ if (invalidModels.length > 0) {
 	process.exit(1);
 }
 
-/**
- * Creates a D1Database instance
- * For remote: uses Cloudflare REST API
- * For local: requires wrangler dev to be running
- */
-async function getD1Database() {
-	// Read wrangler config
-	const configPath = join(__dirname, "..", wranglerConfigFile);
-	let config;
-	try {
-		const configContent = readFileSync(configPath, "utf-8");
+// =========================================================================
+// SQL Helper Functions
+// =========================================================================
 
-		// Parse JSONC manually - handle comments and trailing commas
-		// This is a simple parser that handles the common cases
-		let jsonContent = configContent;
-		let inString = false;
-		let escapeNext = false;
-		let result = "";
+function escapeSqlString(str) {
+	if (str === null || str === undefined) return "NULL";
+	return `'${String(str).replace(/'/g, "''")}'`;
+}
 
-		// Process character by character to properly handle strings
-		for (let i = 0; i < jsonContent.length; i++) {
-			const char = jsonContent[i];
-			const nextChar = jsonContent[i + 1];
+function formatDateForSql(date) {
+	if (!date) return "NULL";
+	const d = typeof date === "string" ? new Date(date) : date;
+	return escapeSqlString(d.toISOString());
+}
 
-			if (escapeNext) {
-				result += char;
-				escapeNext = false;
-				continue;
-			}
+// =========================================================================
+// Data Generation Constants
+// =========================================================================
 
-			if (char === "\\" && inString) {
-				result += char;
-				escapeNext = true;
-				continue;
-			}
+const FIRST_NAMES = [
+	"Juan",
+	"María",
+	"José",
+	"Ana",
+	"Carlos",
+	"Laura",
+	"Miguel",
+	"Patricia",
+	"Roberto",
+	"Guadalupe",
+	"Francisco",
+	"Carmen",
+	"Luis",
+	"Rosa",
+	"Antonio",
+	"Verónica",
+	"Pedro",
+	"Mónica",
+	"Manuel",
+	"Alejandra",
+	"Ricardo",
+	"Sofía",
+	"Fernando",
+	"Daniela",
+	"Javier",
+	"Andrea",
+	"Eduardo",
+	"Paola",
+	"Sergio",
+	"Gabriela",
+];
 
-			if (char === '"' && !escapeNext) {
-				inString = !inString;
-				result += char;
-				continue;
-			}
+const LAST_NAMES = [
+	"García",
+	"Rodríguez",
+	"González",
+	"López",
+	"Martínez",
+	"Hernández",
+	"Pérez",
+	"Sánchez",
+	"Ramírez",
+	"Torres",
+	"Flores",
+	"Rivera",
+	"Gómez",
+	"Díaz",
+	"Cruz",
+	"Morales",
+	"Ortiz",
+	"Gutiérrez",
+	"Chávez",
+	"Ramos",
+	"Mendoza",
+	"Ruiz",
+	"Vargas",
+	"Castillo",
+	"Jiménez",
+	"Moreno",
+	"Romero",
+	"Álvarez",
+	"Méndez",
+	"Guerrero",
+];
 
-			// Outside strings, handle comments and trailing commas
-			if (!inString) {
-				// Single-line comment
-				if (char === "/" && nextChar === "/") {
-					// Skip until end of line
-					while (i < jsonContent.length && jsonContent[i] !== "\n") {
-						i++;
-					}
-					continue;
-				}
+const BUSINESS_NAMES = [
+	"Automotriz del Norte",
+	"Vehículos Premium",
+	"Autos y Más",
+	"Concesionaria Central",
+	"Distribuidora Automotriz",
+	"Grupo Vehícular",
+	"Autoservicio Nacional",
+	"Comercializadora de Vehículos",
+	"Importadora Automotriz",
+	"Venta de Autos SA",
+];
 
-				// Multi-line comment
-				if (char === "/" && nextChar === "*") {
-					// Skip until */
-					i += 2;
-					while (i < jsonContent.length - 1) {
-						if (jsonContent[i] === "*" && jsonContent[i + 1] === "/") {
-							i++;
-							break;
-						}
-						i++;
-					}
-					continue;
-				}
+const MEXICAN_STATES = [
+	"AGU",
+	"BCN",
+	"BCS",
+	"CAM",
+	"CHP",
+	"CHH",
+	"COA",
+	"COL",
+	"DIF",
+	"DUR",
+	"GUA",
+	"GRO",
+	"HID",
+	"JAL",
+	"MEX",
+	"MIC",
+	"MOR",
+	"NAY",
+	"NLE",
+	"OAX",
+	"PUE",
+	"QUE",
+	"ROO",
+	"SLP",
+	"SIN",
+	"SON",
+	"TAB",
+	"TAM",
+	"TLA",
+	"VER",
+	"YUC",
+	"ZAC",
+];
 
-				// Remove trailing commas before } or ]
-				if (char === ",") {
-					// Look ahead to see if next non-whitespace is } or ]
-					let j = i + 1;
-					let isTrailing = false;
-					while (j < jsonContent.length) {
-						const next = jsonContent[j];
-						if (next === "}" || next === "]") {
-							isTrailing = true;
-							break;
-						}
-						if (
-							next !== " " &&
-							next !== "\t" &&
-							next !== "\n" &&
-							next !== "\r"
-						) {
-							break;
-						}
-						j++;
-					}
-					if (isTrailing) {
-						// Skip trailing comma
-						continue;
-					}
-				}
-			}
+const CITIES = [
+	"Ciudad de México",
+	"Guadalajara",
+	"Monterrey",
+	"Puebla",
+	"Tijuana",
+	"León",
+	"Juárez",
+	"Torreón",
+	"Querétaro",
+	"San Luis Potosí",
+	"Mérida",
+	"Mexicali",
+	"Aguascalientes",
+	"Tampico",
+	"Culiacán",
+	"Cuernavaca",
+	"Acapulco",
+	"Toluca",
+	"Morelia",
+	"Chihuahua",
+];
 
-			result += char;
-		}
+const VEHICLE_BRANDS = [
+	"Toyota",
+	"Nissan",
+	"Volkswagen",
+	"Chevrolet",
+	"Ford",
+	"Honda",
+	"Hyundai",
+	"Kia",
+	"Mazda",
+	"BMW",
+	"Mercedes-Benz",
+	"Audi",
+	"Jeep",
+	"Ram",
+	"GMC",
+];
 
-		jsonContent = result;
-		config = JSON.parse(jsonContent);
-	} catch (error) {
-		console.error(
-			`❌ Error reading wrangler config from ${wranglerConfigFile}:`,
-			error,
-		);
-		if (error instanceof SyntaxError) {
-			console.error(
-				"   Tip: Make sure the config file is valid JSONC (JSON with Comments)",
-			);
-		}
-		process.exit(1);
-	}
+const VEHICLE_MODELS = [
+	"Sentra",
+	"Versa",
+	"Altima",
+	"Civic",
+	"Corolla",
+	"Camry",
+	"Jetta",
+	"Golf",
+	"Silverado",
+	"F-150",
+	"Ranger",
+	"Tacoma",
+	"Tundra",
+	"Wrangler",
+	"Grand Cherokee",
+];
 
-	// Get D1 database config
-	const d1Database = config.d1_databases?.find((db) => db.binding === "DB");
-	if (!d1Database) {
-		console.error("❌ Error: No D1 database with binding 'DB' found in config");
-		process.exit(1);
-	}
+const PAYMENT_METHODS = [
+	"Efectivo",
+	"Transferencia bancaria",
+	"Cheque",
+	"Tarjeta de crédito",
+	"Tarjeta de débito",
+	"Crédito",
+	"Financiamiento",
+];
 
-	if (isRemote) {
-		console.log(
-			`📡 Connecting to remote D1 database: ${d1Database.database_name}`,
-		);
+// =========================================================================
+// Data Generation Functions
+// =========================================================================
 
-		if (!process.env.CLOUDFLARE_API_TOKEN) {
-			throw new Error(
-				"CLOUDFLARE_API_TOKEN is required for remote D1 connection",
-			);
-		}
-		if (!process.env.CLOUDFLARE_ACCOUNT_ID) {
-			throw new Error(
-				"CLOUDFLARE_ACCOUNT_ID is required for remote D1 connection",
-			);
-		}
-
-		// Create remote D1Database implementation using Cloudflare REST API
-		return createRemoteD1Database(
-			process.env.CLOUDFLARE_ACCOUNT_ID,
-			d1Database.database_id,
-			process.env.CLOUDFLARE_API_TOKEN,
-		);
-	} else {
-		console.log(
-			`💾 Connecting to local D1 database: ${d1Database.database_name}`,
-		);
-		console.log("   Note: This requires wrangler dev to be running");
-
-		// For local, we need wrangler dev to be running
-		// We can't easily create a local D1 instance without wrangler dev
-		// So we'll throw an error and suggest using REMOTE=true
-		throw new Error(
-			"Local D1 connection requires wrangler dev to be running.\n" +
-				"   For GitHub Actions, use REMOTE=true with CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID",
-		);
-	}
+function randomChoice(arr) {
+	return arr[Math.floor(Math.random() * arr.length)];
 }
 
 /**
- * Creates a D1Database instance that connects to Cloudflare D1 via REST API
- * This implementation matches the Workers runtime D1Database interface
+ * Generates a random RFC for physical persons (13 characters)
  */
-function createRemoteD1Database(accountId, databaseId, apiToken) {
-	const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}`;
+function generatePhysicalRFC() {
+	const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	const numbers = "0123456789";
 
-	class RemoteD1PreparedStatement {
-		constructor(query, db) {
-			this.query = query;
-			this.db = db;
-			this.boundValues = [];
-		}
+	const part1 = Array.from(
+		{ length: 4 },
+		() => letters[Math.floor(Math.random() * letters.length)],
+	).join("");
 
-		bind(...values) {
-			this.boundValues = values;
-			return this;
-		}
+	const part2 = Array.from(
+		{ length: 6 },
+		() => numbers[Math.floor(Math.random() * numbers.length)],
+	).join("");
 
-		async first(colName) {
-			const result = await this.all();
-			if (!result.results || result.results.length === 0) {
-				return null;
-			}
-			const first = result.results[0];
-			if (colName) {
-				return first[colName] ?? null;
-			}
-			return first;
-		}
+	const part3 = Array.from({ length: 3 }, () => {
+		const chars = letters + numbers;
+		return chars[Math.floor(Math.random() * chars.length)];
+	}).join("");
 
-		async run() {
-			return this.executeQuery();
-		}
+	return `${part1}${part2}${part3}`;
+}
 
-		async all() {
-			return this.executeQuery();
-		}
+/**
+ * Generates a random RFC for legal entities (12 characters)
+ */
+function generateMoralRFC() {
+	const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	const numbers = "0123456789";
 
-		async raw(options) {
-			const result = await this.executeQuery();
-			if (options?.columnNames) {
-				// If columnNames is true, return [columnNames[], ...rows[]]
-				if (result.results && result.results.length > 0) {
-					const columnNames = Object.keys(result.results[0]);
-					return [columnNames, ...result.results];
-				}
-				return [[]];
-			}
-			return result.results || [];
-		}
+	const part1 = Array.from(
+		{ length: 3 },
+		() => letters[Math.floor(Math.random() * letters.length)],
+	).join("");
 
-		async executeQuery() {
-			const response = await fetch(`${baseUrl}/query`, {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${apiToken}`,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					sql: this.query,
-					params: this.boundValues,
-				}),
-			});
+	const part2 = Array.from(
+		{ length: 6 },
+		() => numbers[Math.floor(Math.random() * numbers.length)],
+	).join("");
 
-			if (!response.ok) {
-				const errorText = await response.text();
-				let errorMessage = `D1 query failed: ${errorText}`;
-				try {
-					const errorJson = JSON.parse(errorText);
-					errorMessage = errorJson.errors?.[0]?.message || errorMessage;
-				} catch {
-					// Use the text as-is
-				}
-				throw new Error(errorMessage);
-			}
+	const part3 = Array.from({ length: 3 }, () => {
+		const chars = letters + numbers;
+		return chars[Math.floor(Math.random() * chars.length)];
+	}).join("");
 
-			const data = await response.json();
+	return `${part1}${part2}${part3}`;
+}
 
-			// Cloudflare D1 REST API returns: { success: true, meta: {...}, results: [...] }
-			// The response might be wrapped in a "result" array for batch operations
-			// For single queries, it's usually direct: { success: true, meta: {...}, results: [...] }
-			let result = data;
-			if (Array.isArray(data.result) && data.result.length > 0) {
-				result = data.result[0];
-			} else if (data.result && !Array.isArray(data.result)) {
-				result = data.result;
-			}
+/**
+ * Generates a random CURP (18 characters)
+ */
+function generateCURP() {
+	const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	const numbers = "0123456789";
 
-			// Ensure all required meta fields are present with proper types
-			// D1Meta requires: duration, size_after, rows_read, rows_written, last_row_id, changed_db, changes
-			const meta = result.meta || {};
+	const part1 = Array.from(
+		{ length: 4 },
+		() => letters[Math.floor(Math.random() * letters.length)],
+	).join("");
 
-			// Build the result object matching D1Result<T> interface exactly
-			const d1Result = {
-				success: true, // Must be exactly true
-				meta: {
-					duration: Number(meta.duration) || 0,
-					size_after: Number(meta.size_after) || 0,
-					rows_read: Number(meta.rows_read) || 0,
-					rows_written: Number(meta.rows_written) || 0,
-					last_row_id: Number(meta.last_row_id) || 0,
-					changed_db: Boolean(meta.changed_db),
-					changes: Number(meta.changes) || 0,
-					// Optional fields that might be present
-					...(meta.served_by_region && {
-						served_by_region: meta.served_by_region,
-					}),
-					...(meta.served_by_primary !== undefined && {
-						served_by_primary: Boolean(meta.served_by_primary),
-					}),
-					...(meta.timings && { timings: meta.timings }),
-					...(meta.total_attempts !== undefined && {
-						total_attempts: Number(meta.total_attempts),
-					}),
-				},
-				results: Array.isArray(result.results) ? result.results : [],
-			};
+	const part2 = Array.from(
+		{ length: 6 },
+		() => numbers[Math.floor(Math.random() * numbers.length)],
+	).join("");
 
-			return d1Result;
-		}
-	}
+	const part3 = letters[Math.floor(Math.random() * letters.length)];
 
-	const db = {
-		prepare(query) {
-			return new RemoteD1PreparedStatement(query, db);
-		},
+	const part4 = Array.from(
+		{ length: 5 },
+		() => letters[Math.floor(Math.random() * letters.length)],
+	).join("");
 
-		async exec(query) {
-			const response = await fetch(`${baseUrl}/query`, {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${apiToken}`,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					sql: query,
-				}),
-			});
+	const part5 = Array.from(
+		{ length: 2 },
+		() => numbers[Math.floor(Math.random() * numbers.length)],
+	).join("");
 
-			if (!response.ok) {
-				const error = await response.text();
-				throw new Error(`D1 exec failed: ${error}`);
-			}
+	return `${part1}${part2}${part3}${part4}${part5}`;
+}
 
-			const data = await response.json();
-			const result = data.result || data;
-			const meta = result.meta || {};
-			return {
-				count: Number(meta.changes) || 0,
-				duration: Number(meta.duration) || 0,
-			};
-		},
+function generateUUID() {
+	return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+		const r = (Math.random() * 16) | 0;
+		const v = c === "x" ? r : (r & 0x3) | 0x8;
+		return v.toString(16);
+	});
+}
 
-		async batch(statements) {
-			// Execute statements sequentially since Cloudflare D1 REST API doesn't have a true batch endpoint
-			// Prisma will call this for transactions, so we need to handle them properly
-			const results = [];
-			for (const stmt of statements) {
-				const result = await stmt.run();
-				results.push(result);
-			}
-			return results;
-		},
+/**
+ * Generates a synthetic physical client
+ */
+function generatePhysicalClient(index) {
+	const firstName = randomChoice(FIRST_NAMES);
+	const lastName = randomChoice(LAST_NAMES);
+	const secondLastName = Math.random() > 0.3 ? randomChoice(LAST_NAMES) : null;
 
-		withSession() {
-			// Return a session that wraps this database
-			// For REST API, we can't really implement sessions, so return the same db
-			return {
-				prepare: (query) => db.prepare(query),
-				batch: (statements) => db.batch(statements),
-				getBookmark: () => null,
-			};
-		},
+	const birthYear = 1950 + Math.floor(Math.random() * 50);
+	const birthMonth = Math.floor(Math.random() * 12) + 1;
+	const birthDay = Math.floor(Math.random() * 28) + 1;
+	const birthDate = new Date(birthYear, birthMonth - 1, birthDay);
 
-		async dump() {
-			throw new Error("dump() is not supported via REST API");
-		},
+	const rfc = generatePhysicalRFC();
+	const curp = generateCURP();
+	const stateCode = randomChoice(MEXICAN_STATES);
+	const city = randomChoice(CITIES);
+
+	return {
+		rfc,
+		personType: "PHYSICAL",
+		firstName,
+		lastName,
+		secondLastName,
+		birthDate,
+		curp,
+		businessName: null,
+		incorporationDate: null,
+		nationality: "MX",
+		email: `client${index}.${rfc.toLowerCase()}@example.com`,
+		phone: `+52${Math.floor(Math.random() * 9000000000) + 1000000000}`,
+		country: "MX",
+		stateCode,
+		city,
+		municipality: city,
+		neighborhood: `Colonia ${Math.floor(Math.random() * 100)}`,
+		street: `Calle ${Math.floor(Math.random() * 200)}`,
+		externalNumber: String(Math.floor(Math.random() * 9999) + 1),
+		internalNumber:
+			Math.random() > 0.7 ? String(Math.floor(Math.random() * 99) + 1) : null,
+		postalCode: String(Math.floor(Math.random() * 90000) + 10000),
 	};
-
-	return db;
 }
+
+/**
+ * Generates a synthetic legal entity client (moral)
+ */
+function generateMoralClient(index) {
+	const businessName = `${randomChoice(BUSINESS_NAMES)} ${index + 1}`;
+	const rfc = generateMoralRFC();
+
+	const incorporationYear = 2000 + Math.floor(Math.random() * 24);
+	const incorporationMonth = Math.floor(Math.random() * 12) + 1;
+	const incorporationDay = Math.floor(Math.random() * 28) + 1;
+	const incorporationDate = new Date(
+		incorporationYear,
+		incorporationMonth - 1,
+		incorporationDay,
+	);
+
+	const stateCode = randomChoice(MEXICAN_STATES);
+	const city = randomChoice(CITIES);
+
+	return {
+		rfc,
+		personType: "MORAL",
+		firstName: null,
+		lastName: null,
+		secondLastName: null,
+		birthDate: null,
+		curp: null,
+		businessName,
+		incorporationDate,
+		nationality: null,
+		email: `empresa${index}.${rfc.toLowerCase()}@example.com`,
+		phone: `+52${Math.floor(Math.random() * 9000000000) + 1000000000}`,
+		country: "MX",
+		stateCode,
+		city,
+		municipality: city,
+		neighborhood: `Colonia ${Math.floor(Math.random() * 100)}`,
+		street: `Avenida ${Math.floor(Math.random() * 200)}`,
+		externalNumber: String(Math.floor(Math.random() * 9999) + 1),
+		internalNumber:
+			Math.random() > 0.5 ? String(Math.floor(Math.random() * 99) + 1) : null,
+		postalCode: String(Math.floor(Math.random() * 90000) + 10000),
+	};
+}
+
+/**
+ * Generates a synthetic transaction
+ */
+function generateTransaction(clientRfc, _index) {
+	const operationYear = 2020 + Math.floor(Math.random() * 5);
+	const operationMonth = Math.floor(Math.random() * 12) + 1;
+	const operationDay = Math.floor(Math.random() * 28) + 1;
+	const operationDate = new Date(
+		operationYear,
+		operationMonth - 1,
+		operationDay,
+	);
+
+	const operationType = Math.random() > 0.5 ? "PURCHASE" : "SALE";
+	const vehicleTypes = ["LAND", "MARINE", "AIR"];
+	const vehicleType = randomChoice(vehicleTypes);
+	const brand = randomChoice(VEHICLE_BRANDS);
+	const model = randomChoice(VEHICLE_MODELS);
+	const year = 2015 + Math.floor(Math.random() * 10);
+
+	const amount = Math.floor(Math.random() * 5000000) + 100000;
+	const currency = "MXN";
+
+	// Generate engine number for land vehicles
+	let engineNumber = null;
+	let plates = null;
+	let registrationNumber = null;
+	let flagCountryId = null;
+
+	if (vehicleType === "LAND") {
+		engineNumber = Array.from({ length: 17 }, () => {
+			const chars = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789";
+			return chars[Math.floor(Math.random() * chars.length)];
+		}).join("");
+		plates = `${String.fromCharCode(65 + Math.floor(Math.random() * 26))}${String.fromCharCode(65 + Math.floor(Math.random() * 26))}-${Math.floor(Math.random() * 9000) + 1000}`;
+	} else {
+		registrationNumber = `REG${Math.floor(Math.random() * 999999)}`;
+		flagCountryId = randomChoice(["MX", "US", "PA"]);
+	}
+
+	// Generate payment methods
+	const paymentMethodCount = Math.floor(Math.random() * 3) + 1;
+	const paymentMethods = [];
+	let remainingAmount = amount;
+
+	for (let i = 0; i < paymentMethodCount; i++) {
+		const isLast = i === paymentMethodCount - 1;
+		const methodAmount = isLast
+			? remainingAmount
+			: Math.floor(remainingAmount / (paymentMethodCount - i));
+		remainingAmount -= methodAmount;
+
+		paymentMethods.push({
+			method: randomChoice(PAYMENT_METHODS),
+			amount: methodAmount,
+		});
+	}
+
+	return {
+		id: generateUUID(),
+		clientId: clientRfc,
+		operationDate,
+		operationType,
+		branchPostalCode: String(Math.floor(Math.random() * 90000) + 10000),
+		vehicleType,
+		brandId: brand,
+		model,
+		year,
+		armorLevel:
+			Math.random() > 0.7 ? `Nivel ${Math.floor(Math.random() * 5) + 1}` : null,
+		engineNumber,
+		plates,
+		registrationNumber,
+		flagCountryId,
+		amount,
+		currency,
+		paymentMethods,
+	};
+}
+
+/**
+ * Generates client document
+ */
+function generateClientDocument(clientRfc) {
+	const documentTypes = [
+		"NATIONAL_ID",
+		"PASSPORT",
+		"DRIVERS_LICENSE",
+		"TAX_ID",
+	];
+	const docType = randomChoice(documentTypes);
+	const docNumber = `${docType.substring(0, 3)}${Math.floor(Math.random() * 9999999)}`;
+
+	const issueYear = 2020 + Math.floor(Math.random() * 5);
+	const issueMonth = Math.floor(Math.random() * 12) + 1;
+	const issueDay = Math.floor(Math.random() * 28) + 1;
+	const issueDate = new Date(issueYear, issueMonth - 1, issueDay);
+	const expiryDate = new Date(
+		issueDate.getTime() + 365 * 24 * 60 * 60 * 1000 * 5,
+	);
+
+	return {
+		id: generateUUID(),
+		clientId: clientRfc,
+		documentType: docType,
+		documentNumber: docNumber,
+		issuingCountry: "MX",
+		issueDate,
+		expiryDate,
+		status: Math.random() > 0.3 ? "VERIFIED" : "PENDING",
+	};
+}
+
+/**
+ * Generates client address
+ */
+function generateClientAddress(clientRfc, index) {
+	const addressTypes = ["RESIDENTIAL", "BUSINESS", "MAILING"];
+	const stateCode = randomChoice(MEXICAN_STATES);
+	const city = randomChoice(CITIES);
+
+	return {
+		id: generateUUID(),
+		clientId: clientRfc,
+		addressType: addressTypes[index % addressTypes.length],
+		street1: `Calle ${Math.floor(Math.random() * 200)}`,
+		street2:
+			Math.random() > 0.5 ? `Colonia ${Math.floor(Math.random() * 100)}` : null,
+		city,
+		state: stateCode,
+		postalCode: String(Math.floor(Math.random() * 90000) + 10000),
+		country: "MX",
+		isPrimary: index === 0,
+	};
+}
+
+// =========================================================================
+// SQL Generation Functions
+// =========================================================================
+
+function generateClientInsertSql(client) {
+	return `INSERT INTO clients (
+		rfc, personType, firstName, lastName, secondLastName, birthDate, curp,
+		businessName, incorporationDate, nationality, email, phone, country,
+		stateCode, city, municipality, neighborhood, street, externalNumber,
+		internalNumber, postalCode, createdAt, updatedAt
+	) VALUES (
+		${escapeSqlString(client.rfc)},
+		${escapeSqlString(client.personType)},
+		${escapeSqlString(client.firstName)},
+		${escapeSqlString(client.lastName)},
+		${escapeSqlString(client.secondLastName)},
+		${formatDateForSql(client.birthDate)},
+		${escapeSqlString(client.curp)},
+		${escapeSqlString(client.businessName)},
+		${formatDateForSql(client.incorporationDate)},
+		${escapeSqlString(client.nationality)},
+		${escapeSqlString(client.email)},
+		${escapeSqlString(client.phone)},
+		${escapeSqlString(client.country)},
+		${escapeSqlString(client.stateCode)},
+		${escapeSqlString(client.city)},
+		${escapeSqlString(client.municipality)},
+		${escapeSqlString(client.neighborhood)},
+		${escapeSqlString(client.street)},
+		${escapeSqlString(client.externalNumber)},
+		${escapeSqlString(client.internalNumber)},
+		${escapeSqlString(client.postalCode)},
+		CURRENT_TIMESTAMP,
+		CURRENT_TIMESTAMP
+	);`;
+}
+
+function generateTransactionInsertSql(transaction) {
+	return `INSERT INTO transactions (
+		id, clientId, operationDate, operationType, branchPostalCode, vehicleType,
+		brandId, model, year, armorLevel, engineNumber, plates, registrationNumber,
+		flagCountryId, amount, currency, createdAt, updatedAt
+	) VALUES (
+		${escapeSqlString(transaction.id)},
+		${escapeSqlString(transaction.clientId)},
+		${formatDateForSql(transaction.operationDate)},
+		${escapeSqlString(transaction.operationType)},
+		${escapeSqlString(transaction.branchPostalCode)},
+		${escapeSqlString(transaction.vehicleType)},
+		${escapeSqlString(transaction.brandId)},
+		${escapeSqlString(transaction.model)},
+		${transaction.year},
+		${escapeSqlString(transaction.armorLevel)},
+		${escapeSqlString(transaction.engineNumber)},
+		${escapeSqlString(transaction.plates)},
+		${escapeSqlString(transaction.registrationNumber)},
+		${escapeSqlString(transaction.flagCountryId)},
+		${transaction.amount},
+		${escapeSqlString(transaction.currency)},
+		CURRENT_TIMESTAMP,
+		CURRENT_TIMESTAMP
+	);`;
+}
+
+function generatePaymentMethodInsertSql(transactionId, paymentMethod) {
+	return `INSERT INTO transaction_payment_methods (
+		id, transactionId, method, amount, createdAt, updatedAt
+	) VALUES (
+		${escapeSqlString(generateUUID())},
+		${escapeSqlString(transactionId)},
+		${escapeSqlString(paymentMethod.method)},
+		${paymentMethod.amount},
+		CURRENT_TIMESTAMP,
+		CURRENT_TIMESTAMP
+	);`;
+}
+
+function generateDocumentInsertSql(doc) {
+	return `INSERT INTO client_documents (
+		id, clientId, documentType, documentNumber, issuingCountry,
+		issueDate, expiryDate, status, createdAt, updatedAt
+	) VALUES (
+		${escapeSqlString(doc.id)},
+		${escapeSqlString(doc.clientId)},
+		${escapeSqlString(doc.documentType)},
+		${escapeSqlString(doc.documentNumber)},
+		${escapeSqlString(doc.issuingCountry)},
+		${formatDateForSql(doc.issueDate)},
+		${formatDateForSql(doc.expiryDate)},
+		${escapeSqlString(doc.status)},
+		CURRENT_TIMESTAMP,
+		CURRENT_TIMESTAMP
+	);`;
+}
+
+function generateAddressInsertSql(addr) {
+	return `INSERT INTO client_addresses (
+		id, clientId, addressType, street1, street2, city, state,
+		postalCode, country, isPrimary, createdAt, updatedAt
+	) VALUES (
+		${escapeSqlString(addr.id)},
+		${escapeSqlString(addr.clientId)},
+		${escapeSqlString(addr.addressType)},
+		${escapeSqlString(addr.street1)},
+		${escapeSqlString(addr.street2)},
+		${escapeSqlString(addr.city)},
+		${escapeSqlString(addr.state)},
+		${escapeSqlString(addr.postalCode)},
+		${escapeSqlString(addr.country)},
+		${addr.isPrimary ? 1 : 0},
+		CURRENT_TIMESTAMP,
+		CURRENT_TIMESTAMP
+	);`;
+}
+
+// =========================================================================
+// Main Script
+// =========================================================================
 
 async function generateSyntheticData() {
 	console.log(`🔧 Generating synthetic data for user: ${userId}`);
@@ -417,50 +721,150 @@ async function generateSyntheticData() {
 	console.log("");
 
 	// Build options
-	const options = {};
-
 	if (models.includes("clients")) {
-		options.clients = {
-			count: clientsCount,
-			includeDocuments: clientsIncludeDocuments,
-			includeAddresses: clientsIncludeAddresses,
-		};
 		console.log(
 			`   Clients: ${clientsCount} (documents: ${clientsIncludeDocuments}, addresses: ${clientsIncludeAddresses})`,
 		);
 	}
 	if (models.includes("transactions")) {
-		options.transactions = {
-			count: transactionsCount,
-			perClient: transactionsPerClient,
-		};
 		console.log(
 			`   Transactions: ${transactionsCount}${transactionsPerClient ? ` (${transactionsPerClient} per client)` : ""}`,
 		);
 	}
 	console.log("");
 
+	const configFlag = wranglerConfigFile ? `--config ${wranglerConfigFile}` : "";
+
 	try {
-		// Get D1 database connection
-		const db = await getD1Database();
-
-		// Import the generator and Prisma client
-		const { SyntheticDataGenerator } = await import(
-			"../src/lib/synthetic-data-generator.ts"
-		);
-		const { getPrismaClient } = await import("../src/lib/prisma.ts");
-
-		// Create Prisma client with D1 adapter
-		const prisma = getPrismaClient(db);
-		const generator = new SyntheticDataGenerator(prisma);
-
-		// Generate synthetic data
 		console.log("⏳ Generating synthetic data...");
-		const result = await generator.generate(options);
 
-		console.log("✅ Synthetic data generation completed!");
-		console.log(`   Clients created: ${result.clients.created}`);
-		console.log(`   Transactions created: ${result.transactions.created}`);
+		const sqlStatements = [];
+		const generatedClients = [];
+
+		// Generate clients if requested
+		if (models.includes("clients") && clientsCount > 0) {
+			console.log(`   📝 Generating ${clientsCount} clients...`);
+
+			for (let i = 0; i < clientsCount; i++) {
+				// Mix of physical and moral clients (70% physical, 30% moral)
+				const isPhysical = Math.random() > 0.3;
+				const client = isPhysical
+					? generatePhysicalClient(i)
+					: generateMoralClient(i);
+
+				generatedClients.push(client);
+				sqlStatements.push(generateClientInsertSql(client));
+
+				// Generate documents if requested (only for physical clients)
+				if (clientsIncludeDocuments && isPhysical) {
+					const docCount = Math.floor(Math.random() * 3) + 1;
+					for (let d = 0; d < docCount; d++) {
+						const doc = generateClientDocument(client.rfc);
+						sqlStatements.push(generateDocumentInsertSql(doc));
+					}
+				}
+
+				// Generate addresses if requested
+				if (clientsIncludeAddresses) {
+					const addrCount = Math.floor(Math.random() * 2) + 1;
+					for (let a = 0; a < addrCount; a++) {
+						const addr = generateClientAddress(client.rfc, a);
+						sqlStatements.push(generateAddressInsertSql(addr));
+					}
+				}
+			}
+		}
+
+		// Generate transactions if requested
+		if (models.includes("transactions") && transactionsCount > 0) {
+			console.log(`   📝 Generating ${transactionsCount} transactions...`);
+
+			// If no clients were generated, we need to generate some first
+			if (generatedClients.length === 0) {
+				const minClients = Math.min(5, transactionsCount);
+				console.log(
+					`   📝 No clients in request, generating ${minClients} clients first...`,
+				);
+
+				for (let i = 0; i < minClients; i++) {
+					const isPhysical = Math.random() > 0.3;
+					const client = isPhysical
+						? generatePhysicalClient(i)
+						: generateMoralClient(i);
+					generatedClients.push(client);
+					sqlStatements.push(generateClientInsertSql(client));
+				}
+			}
+
+			const transactionsPerClientActual =
+				transactionsPerClient ||
+				Math.ceil(transactionsCount / generatedClients.length);
+
+			let transactionsCreated = 0;
+			for (const client of generatedClients) {
+				const clientTxCount = Math.min(
+					transactionsPerClientActual,
+					transactionsCount - transactionsCreated,
+				);
+
+				for (
+					let t = 0;
+					t < clientTxCount && transactionsCreated < transactionsCount;
+					t++
+				) {
+					const transaction = generateTransaction(
+						client.rfc,
+						transactionsCreated,
+					);
+					sqlStatements.push(generateTransactionInsertSql(transaction));
+
+					// Generate payment methods for the transaction
+					for (const pm of transaction.paymentMethods) {
+						sqlStatements.push(
+							generatePaymentMethodInsertSql(transaction.id, pm),
+						);
+					}
+
+					transactionsCreated++;
+				}
+
+				if (transactionsCreated >= transactionsCount) break;
+			}
+		}
+
+		if (sqlStatements.length === 0) {
+			console.log("⚠️ No data to generate based on the provided options.");
+			process.exit(0);
+		}
+
+		// Write SQL to temp file
+		const sql = sqlStatements.join("\n");
+		const sqlFile = join(__dirname, `temp-synthetic-data-${Date.now()}.sql`);
+
+		try {
+			writeFileSync(sqlFile, sql);
+
+			// Execute SQL via wrangler
+			console.log(
+				`   🚀 Executing ${sqlStatements.length} SQL statements via wrangler...`,
+			);
+			const command = isRemote
+				? `wrangler d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
+				: `wrangler d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
+
+			execSync(command, { stdio: "inherit" });
+
+			console.log("✅ Synthetic data generation completed!");
+			console.log(`   Clients created: ${generatedClients.length}`);
+			console.log(`   Total SQL statements: ${sqlStatements.length}`);
+		} finally {
+			// Clean up temp file
+			try {
+				unlinkSync(sqlFile);
+			} catch {
+				// Ignore cleanup errors
+			}
+		}
 
 		process.exit(0);
 	} catch (error) {
