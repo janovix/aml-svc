@@ -39,5 +39,14 @@ export const CatalogListQuerySchema = z.object({
 	active: booleanFromQuery.optional(),
 });
 
+export const CatalogItemCreateSchema = z.object({
+	name: z
+		.string()
+		.trim()
+		.min(1, "name is required")
+		.max(200, "name must be at most 200 characters long"),
+});
+
 export type CatalogListQueryInput = z.infer<typeof CatalogListQuerySchema>;
 export type CatalogKeyInput = z.infer<typeof CatalogKeySchema>;
+export type CatalogItemCreateInput = z.infer<typeof CatalogItemCreateSchema>;

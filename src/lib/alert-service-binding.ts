@@ -109,7 +109,18 @@ export class AlertServiceBinding {
 		const prisma = getPrismaClient(this.env.DB);
 		const repository = new AlertRepository(prisma);
 		const service = new AlertService(repository);
-		return service.create(alertData);
+
+		// Get organizationId from client
+		const client = await prisma.client.findUnique({
+			where: { rfc: alertData.clientId },
+			select: { organizationId: true },
+		});
+
+		if (!client) {
+			throw new Error(`Client not found: ${alertData.clientId}`);
+		}
+
+		return service.create(alertData, client.organizationId);
 	}
 
 	/**
@@ -132,9 +143,20 @@ export class AlertServiceBinding {
 		}
 
 		// Get client (RFC is the ID)
+		// Get organizationId from alert (it should have it from Prisma)
+		const alertWithOrg = await prisma.alert.findUnique({
+			where: { id: alertId },
+			select: { organizationId: true },
+		});
+		if (!alertWithOrg) {
+			throw new Error(`Alert not found: ${alertId}`);
+		}
 		const clientRepository = new ClientRepository(prisma);
 		const clientService = new ClientService(clientRepository);
-		const client = await clientService.get(alert.clientId);
+		const client = await clientService.get(
+			alertWithOrg.organizationId,
+			alert.clientId,
+		);
 
 		// Get transaction
 		const umaRepository = new UmaValueRepository(prisma);

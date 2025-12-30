@@ -14,8 +14,12 @@ import {
 import type { Bindings } from "../index";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
+import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 
-export const alertsRouter = new Hono<{ Bindings: Bindings }>();
+export const alertsRouter = new Hono<{
+	Bindings: Bindings;
+	Variables: AuthVariables;
+}>();
 
 function parseWithZod<T>(
 	schema: { parse: (input: unknown) => T },
@@ -31,7 +35,9 @@ function parseWithZod<T>(
 	}
 }
 
-function getService(c: Context<{ Bindings: Bindings }>) {
+function getService(
+	c: Context<{ Bindings: Bindings; Variables: AuthVariables }>,
+) {
 	const prisma = getPrismaClient(c.env.DB);
 	const repository = new AlertRepository(prisma);
 	return new AlertService(repository);
@@ -67,12 +73,15 @@ alertsRouter.get("/:id", async (c) => {
 });
 
 alertsRouter.post("/", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const body = await c.req.json();
 	const payload = parseWithZod(AlertCreateSchema, body);
 
 	const service = getService(c);
 	// The service handles idempotency via idempotencyKey
-	const created = await service.create(payload).catch(handleServiceError);
+	const created = await service
+		.create(payload, organizationId)
+		.catch(handleServiceError);
 
 	return c.json(created, 201);
 });

@@ -1,6 +1,7 @@
 export interface ClientEntity {
 	id: string; // RFC is now the ID
 	rfc: string; // Keep RFC field for backward compatibility/API clarity
+	organizationId: string; // Organization this client belongs to
 	personType: "physical" | "moral" | "trust";
 	firstName?: string;
 	lastName?: string;

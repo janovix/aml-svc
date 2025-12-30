@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const complianceOrganizationCreateSchema = z.object({
+export const organizationSettingsCreateSchema = z.object({
 	obligatedSubjectKey: z
 		.string()
 		.length(12, "obligatedSubjectKey must be exactly 12 characters")
@@ -14,12 +14,12 @@ export const complianceOrganizationCreateSchema = z.object({
 		.max(10, "activityKey must be at most 10 characters"),
 });
 
-export const complianceOrganizationUpdateSchema =
-	complianceOrganizationCreateSchema.partial();
+export const organizationSettingsUpdateSchema =
+	organizationSettingsCreateSchema.partial();
 
-export type ComplianceOrganizationCreateInput = z.infer<
-	typeof complianceOrganizationCreateSchema
+export type OrganizationSettingsCreateInput = z.infer<
+	typeof organizationSettingsCreateSchema
 >;
-export type ComplianceOrganizationUpdateInput = z.infer<
-	typeof complianceOrganizationUpdateSchema
+export type OrganizationSettingsUpdateInput = z.infer<
+	typeof organizationSettingsUpdateSchema
 >;

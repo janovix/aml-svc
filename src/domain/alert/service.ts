@@ -26,8 +26,11 @@ export class AlertRuleService {
 		return rule;
 	}
 
-	create(input: AlertRuleCreateInput): Promise<AlertRuleEntity> {
-		return this.repository.create(input);
+	create(
+		input: AlertRuleCreateInput,
+		organizationId: string,
+	): Promise<AlertRuleEntity> {
+		return this.repository.create(input, organizationId);
 	}
 
 	update(id: string, input: AlertRuleUpdateInput): Promise<AlertRuleEntity> {
@@ -62,9 +65,12 @@ export class AlertService {
 		return alert;
 	}
 
-	create(input: AlertCreateInput): Promise<AlertEntity> {
+	create(
+		input: AlertCreateInput,
+		organizationId: string,
+	): Promise<AlertEntity> {
 		// The repository handles idempotency via idempotencyKey
-		return this.repository.create(input);
+		return this.repository.create(input, organizationId);
 	}
 
 	update(id: string, input: AlertUpdateInput): Promise<AlertEntity> {

@@ -16,8 +16,12 @@ import type { Bindings } from "../index";
 import { createAlertQueueService } from "../lib/alert-queue";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
+import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 
-export const transactionsRouter = new Hono<{ Bindings: Bindings }>();
+export const transactionsRouter = new Hono<{
+	Bindings: Bindings;
+	Variables: AuthVariables;
+}>();
 
 function parseWithZod<T>(
 	schema: { parse: (input: unknown) => T },
@@ -33,7 +37,9 @@ function parseWithZod<T>(
 	}
 }
 
-function getService(c: Context<{ Bindings: Bindings }>) {
+function getService(
+	c: Context<{ Bindings: Bindings; Variables: AuthVariables }>,
+) {
 	const prisma = getPrismaClient(c.env.DB);
 	const umaRepository = new UmaValueRepository(prisma);
 	const transactionRepository = new TransactionRepository(
@@ -88,11 +94,14 @@ transactionsRouter.get("/:id", async (c) => {
 });
 
 transactionsRouter.post("/", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const body = await c.req.json();
 	const payload = parseWithZod(TransactionCreateSchema, body);
 
 	const service = getService(c);
-	const created = await service.create(payload).catch(handleServiceError);
+	const created = await service
+		.create(payload, organizationId)
+		.catch(handleServiceError);
 
 	// Queue alert detection job
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);

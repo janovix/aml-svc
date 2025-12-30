@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import { ZodError } from "zod";
 
 import {
+	CatalogItemCreateSchema,
 	CatalogKeyParamSchema,
 	CatalogListQuerySchema,
 	CatalogQueryService,
@@ -35,8 +36,15 @@ function getService(c: Context<{ Bindings: Bindings }>) {
 }
 
 function handleServiceError(error: unknown): never {
-	if (error instanceof Error && error.message === "CATALOG_NOT_FOUND") {
-		throw new APIError(404, "Catalog not found");
+	if (error instanceof Error) {
+		switch (error.message) {
+			case "CATALOG_NOT_FOUND":
+				throw new APIError(404, "Catalog not found");
+			case "CATALOG_NOT_OPEN":
+				throw new APIError(403, "This catalog does not allow adding new items");
+			case "CATALOG_ITEM_ALREADY_EXISTS":
+				throw new APIError(409, "An item with this name already exists");
+		}
 	}
 	throw error;
 }
@@ -53,4 +61,17 @@ catalogsRouter.get("/:catalogKey", async (c) => {
 		.catch(handleServiceError);
 
 	return c.json(result);
+});
+
+catalogsRouter.post("/:catalogKey/items", async (c) => {
+	const params = parseWithZod(CatalogKeyParamSchema, c.req.param());
+	const body = await c.req.json();
+	const input = parseWithZod(CatalogItemCreateSchema, body);
+
+	const service = getService(c);
+	const item = await service
+		.createItem(params.catalogKey, input.name)
+		.catch(handleServiceError);
+
+	return c.json(item, 201);
 });

@@ -110,9 +110,11 @@ function toPrismaDecimal(value: string | number): Prisma.Decimal {
 
 export function mapCreateInputToPrisma(
 	input: TransactionCreateInput,
+	organizationId: string,
 	umaValue?: Prisma.Decimal | null,
 ) {
 	return {
+		organizationId,
 		clientId: input.clientId,
 		operationDate: toPrismaDateOnly(input.operationDate),
 		operationType: toPrismaOperationType(input.operationType),

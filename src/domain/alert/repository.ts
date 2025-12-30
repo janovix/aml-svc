@@ -73,9 +73,12 @@ export class AlertRuleRepository {
 		return record ? mapPrismaAlertRule(record) : null;
 	}
 
-	async create(input: AlertRuleCreateInput): Promise<AlertRuleEntity> {
+	async create(
+		input: AlertRuleCreateInput,
+		organizationId: string,
+	): Promise<AlertRuleEntity> {
 		const created = await this.prisma.alertRule.create({
-			data: mapAlertRuleCreateInputToPrisma(input),
+			data: mapAlertRuleCreateInputToPrisma(input, organizationId),
 		});
 		return mapPrismaAlertRule(created);
 	}
@@ -238,7 +241,10 @@ export class AlertRepository {
 		};
 	}
 
-	async create(input: AlertCreateInput): Promise<AlertEntity> {
+	async create(
+		input: AlertCreateInput,
+		organizationId: string,
+	): Promise<AlertEntity> {
 		// Check if alert with same idempotency key already exists
 		const existing = await this.prisma.alert.findUnique({
 			where: { idempotencyKey: input.idempotencyKey },
@@ -255,7 +261,7 @@ export class AlertRepository {
 			};
 		}
 
-		const prismaData = mapAlertCreateInputToPrisma(input);
+		const prismaData = mapAlertCreateInputToPrisma(input, organizationId);
 
 		// Calculate isOverdue if submissionDeadline is provided
 		if (prismaData.submissionDeadline) {

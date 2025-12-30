@@ -730,6 +730,79 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/catalogs/{catalogKey}/items": {
+			post: {
+				tags: ["Catalogs"],
+				summary: "Create a new catalog item",
+				description:
+					"Add a new item to an open catalog (one that allows new items to be added). Returns 403 if the catalog is closed.",
+				parameters: [
+					{
+						name: "catalogKey",
+						in: "path",
+						required: true,
+						schema: {
+							type: "string",
+							minLength: 3,
+							maxLength: 64,
+							pattern: "^[a-zA-Z0-9-]+$",
+						},
+						description:
+							"Identifier of the catalog to add the item to (e.g., `terrestrial-vehicle-brands`).",
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/CatalogItemCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Catalog item created successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/CatalogItem" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"403": {
+						description: "Catalog does not allow adding new items",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "Catalog not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"409": {
+						description: "An item with this name already exists",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
 		"/api/v1/transactions": {
 			get: {
 				tags: ["Transactions"],
@@ -2423,7 +2496,7 @@ export const openAPISpec = {
 				properties: {
 					catalog: {
 						type: "object",
-						required: ["id", "key", "name"],
+						required: ["id", "key", "name", "allowNewItems"],
 						properties: {
 							id: {
 								type: "string",
@@ -2439,6 +2512,11 @@ export const openAPISpec = {
 								type: "string",
 								description: "Human readable catalog name",
 							},
+							allowNewItems: {
+								type: "boolean",
+								description:
+									"When true, users can add new items to this catalog dynamically",
+							},
 						},
 					},
 					data: {
@@ -2446,6 +2524,18 @@ export const openAPISpec = {
 						items: { $ref: "#/components/schemas/CatalogItem" },
 					},
 					pagination: { $ref: "#/components/schemas/CatalogPagination" },
+				},
+			},
+			CatalogItemCreateRequest: {
+				type: "object",
+				required: ["name"],
+				properties: {
+					name: {
+						type: "string",
+						minLength: 1,
+						maxLength: 200,
+						description: "The name of the new catalog item",
+					},
 				},
 			},
 			PaymentMethod: {

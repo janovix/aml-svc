@@ -100,7 +100,10 @@ export class TransactionRepository {
 		return record ? mapPrismaTransaction(record) : null;
 	}
 
-	async create(input: TransactionCreateInput): Promise<TransactionEntity> {
+	async create(
+		input: TransactionCreateInput,
+		organizationId: string,
+	): Promise<TransactionEntity> {
 		// Calculate UMA value for the transaction date
 		const umaValue = await this.calculateUmaValue(
 			input.operationDate,
@@ -108,7 +111,7 @@ export class TransactionRepository {
 		);
 
 		const created = await this.prisma.transaction.create({
-			data: mapCreateInputToPrisma(input, umaValue),
+			data: mapCreateInputToPrisma(input, organizationId, umaValue),
 			include: { paymentMethods: true },
 		});
 		return mapPrismaTransaction(created);

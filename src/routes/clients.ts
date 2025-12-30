@@ -22,9 +22,13 @@ import {
 import type { Bindings } from "../index";
 import { createAlertQueueService } from "../lib/alert-queue";
 import { getPrismaClient } from "../lib/prisma";
+import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { APIError } from "../middleware/error";
 
-export const clientsRouter = new Hono<{ Bindings: Bindings }>();
+export const clientsRouter = new Hono<{
+	Bindings: Bindings;
+	Variables: AuthVariables;
+}>();
 
 function parseWithZod<T>(
 	schema: { parse: (input: unknown) => T },
@@ -40,7 +44,9 @@ function parseWithZod<T>(
 	}
 }
 
-function getService(c: Context<{ Bindings: Bindings }>) {
+function getService(
+	c: Context<{ Bindings: Bindings; Variables: AuthVariables }>,
+) {
 	const prisma = getPrismaClient(c.env.DB);
 	const repository = new ClientRepository(prisma);
 	return new ClientService(repository);
@@ -62,38 +68,50 @@ function handleServiceError(error: unknown): never {
 }
 
 clientsRouter.get("/", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = Object.fromEntries(url.searchParams.entries());
 	const filters = parseWithZod(ClientFilterSchema, queryObject);
 
 	const service = getService(c);
-	const result = await service.list(filters).catch(handleServiceError);
+	const result = await service
+		.list(organizationId, filters)
+		.catch(handleServiceError);
 
 	return c.json(result);
 });
 
 // IMPORTANT: /stats must be defined BEFORE /:id to avoid "stats" being matched as an id parameter
 clientsRouter.get("/stats", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const service = getService(c);
-	const stats = await service.getStats().catch(handleServiceError);
+	const stats = await service
+		.getStats(organizationId)
+		.catch(handleServiceError);
 	return c.json(stats);
 });
 
 clientsRouter.get("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	const client = await service.get(params.id).catch(handleServiceError);
+	const client = await service
+		.get(organizationId, params.id)
+		.catch(handleServiceError);
 
 	return c.json(client);
 });
 
 clientsRouter.post("/", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientCreateSchema, body);
 
 	const service = getService(c);
-	const created = await service.create(payload).catch(handleServiceError);
+	const created = await service
+		.create(organizationId, payload)
+		.catch(handleServiceError);
 
 	// Queue alert detection job for new client
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
@@ -103,13 +121,14 @@ clientsRouter.post("/", async (c) => {
 });
 
 clientsRouter.put("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientUpdateSchema, body);
 
 	const service = getService(c);
 	const updated = await service
-		.update(params.id, payload)
+		.update(organizationId, params.id, payload)
 		.catch(handleServiceError);
 
 	// Queue alert detection job for updated client
@@ -120,6 +139,7 @@ clientsRouter.put("/:id", async (c) => {
 });
 
 clientsRouter.patch("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientPatchSchema, body);
@@ -130,7 +150,7 @@ clientsRouter.patch("/:id", async (c) => {
 
 	const service = getService(c);
 	const updated = await service
-		.patch(params.id, payload)
+		.patch(organizationId, params.id, payload)
 		.catch(handleServiceError);
 
 	// Queue alert detection job for updated client
@@ -141,24 +161,27 @@ clientsRouter.patch("/:id", async (c) => {
 });
 
 clientsRouter.delete("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	await service.delete(params.id).catch(handleServiceError);
+	await service.delete(organizationId, params.id).catch(handleServiceError);
 
 	return c.body(null, 204);
 });
 
 clientsRouter.get("/:id/documents", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 	const service = getService(c);
 	const documents = await service
-		.listDocuments(params.id)
+		.listDocuments(organizationId, params.id)
 		.catch(handleServiceError);
 	return c.json({ data: documents });
 });
 
 clientsRouter.post("/:id/documents", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientDocumentCreateSchema, {
@@ -167,52 +190,57 @@ clientsRouter.post("/:id/documents", async (c) => {
 	});
 	const service = getService(c);
 	const created = await service
-		.createDocument(payload)
+		.createDocument(organizationId, payload)
 		.catch(handleServiceError);
 	return c.json(created, 201);
 });
 
 clientsRouter.put("/:clientId/documents/:documentId", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(DocumentIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientDocumentUpdateSchema, body);
 	const service = getService(c);
 	const updated = await service
-		.updateDocument(params.clientId, params.documentId, payload)
+		.updateDocument(organizationId, params.clientId, params.documentId, payload)
 		.catch(handleServiceError);
 	return c.json(updated);
 });
 
 clientsRouter.patch("/:clientId/documents/:documentId", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(DocumentIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientDocumentPatchSchema, body);
 	const service = getService(c);
 	const updated = await service
-		.patchDocument(params.clientId, params.documentId, payload)
+		.patchDocument(organizationId, params.clientId, params.documentId, payload)
 		.catch(handleServiceError);
 	return c.json(updated);
 });
 
 clientsRouter.delete("/:clientId/documents/:documentId", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(DocumentIdParamSchema, c.req.param());
 	const service = getService(c);
 	await service
-		.deleteDocument(params.clientId, params.documentId)
+		.deleteDocument(organizationId, params.clientId, params.documentId)
 		.catch(handleServiceError);
 	return c.body(null, 204);
 });
 
 clientsRouter.get("/:id/addresses", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 	const service = getService(c);
 	const addresses = await service
-		.listAddresses(params.id)
+		.listAddresses(organizationId, params.id)
 		.catch(handleServiceError);
 	return c.json({ data: addresses });
 });
 
 clientsRouter.post("/:id/addresses", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientAddressCreateSchema, {
@@ -221,38 +249,41 @@ clientsRouter.post("/:id/addresses", async (c) => {
 	});
 	const service = getService(c);
 	const created = await service
-		.createAddress(payload)
+		.createAddress(organizationId, payload)
 		.catch(handleServiceError);
 	return c.json(created, 201);
 });
 
 clientsRouter.put("/:clientId/addresses/:addressId", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AddressIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientAddressUpdateSchema, body);
 	const service = getService(c);
 	const updated = await service
-		.updateAddress(params.clientId, params.addressId, payload)
+		.updateAddress(organizationId, params.clientId, params.addressId, payload)
 		.catch(handleServiceError);
 	return c.json(updated);
 });
 
 clientsRouter.patch("/:clientId/addresses/:addressId", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AddressIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientAddressPatchSchema, body);
 	const service = getService(c);
 	const updated = await service
-		.patchAddress(params.clientId, params.addressId, payload)
+		.patchAddress(organizationId, params.clientId, params.addressId, payload)
 		.catch(handleServiceError);
 	return c.json(updated);
 });
 
 clientsRouter.delete("/:clientId/addresses/:addressId", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AddressIdParamSchema, c.req.param());
 	const service = getService(c);
 	await service
-		.deleteAddress(params.clientId, params.addressId)
+		.deleteAddress(organizationId, params.clientId, params.addressId)
 		.catch(handleServiceError);
 	return c.body(null, 204);
 });

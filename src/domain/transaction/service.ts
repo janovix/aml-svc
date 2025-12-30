@@ -27,9 +27,12 @@ export class TransactionService {
 		return record;
 	}
 
-	async create(input: TransactionCreateInput): Promise<TransactionEntity> {
-		await this.ensureClientExists(input.clientId);
-		return this.repository.create(input);
+	async create(
+		input: TransactionCreateInput,
+		organizationId: string,
+	): Promise<TransactionEntity> {
+		await this.ensureClientExists(organizationId, input.clientId);
+		return this.repository.create(input, organizationId);
 	}
 
 	update(
@@ -43,8 +46,14 @@ export class TransactionService {
 		return this.repository.delete(id);
 	}
 
-	private async ensureClientExists(clientId: string): Promise<void> {
-		const client = await this.clientRepository.getById(clientId);
+	private async ensureClientExists(
+		organizationId: string,
+		clientId: string,
+	): Promise<void> {
+		const client = await this.clientRepository.getById(
+			organizationId,
+			clientId,
+		);
 		if (!client) {
 			throw new Error("CLIENT_NOT_FOUND");
 		}
