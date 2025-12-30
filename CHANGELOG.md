@@ -1,3 +1,11 @@
+# [1.1.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.13...v1.1.0-rc.14) (2025-12-30)
+
+
+### Features
+
+* add GitHub Actions workflow for generating synthetic data ([88f86eb](https://github.com/janovix/aml-svc/commit/88f86eb36e1fb364a2673450b7128a375c746476))
+* add synthetic data generation script and documentation ([698ba58](https://github.com/janovix/aml-svc/commit/698ba5873e7dc833f9294bd08028b1d956a59fda))
+
 # [1.1.0-rc.13](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.12...v1.1.0-rc.13) (2025-12-29)
 
 
