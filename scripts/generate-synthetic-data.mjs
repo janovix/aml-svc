@@ -92,7 +92,6 @@ async function getD1Database() {
 		for (let i = 0; i < jsonContent.length; i++) {
 			const char = jsonContent[i];
 			const nextChar = jsonContent[i + 1];
-			const prevChar = i > 0 ? jsonContent[i - 1] : "";
 
 			if (escapeNext) {
 				result += char;
