@@ -80,8 +80,17 @@ async function getD1Database() {
 	let config;
 	try {
 		const configContent = readFileSync(configPath, "utf-8");
-		// Remove comments from JSONC
-		const jsonContent = configContent.replace(/\/\/.*$/gm, "");
+		// Parse JSONC (JSON with Comments) by:
+		// 1. Removing single-line comments (// ...)
+		// 2. Removing multi-line comments (/* ... */)
+		// 3. Removing trailing commas before } or ]
+		let jsonContent = configContent
+			// Remove single-line comments
+			.replace(/\/\/.*$/gm, "")
+			// Remove multi-line comments
+			.replace(/\/\*[\s\S]*?\*\//g, "")
+			// Remove trailing commas before } or ]
+			.replace(/,(\s*[}\]])/g, "$1");
 		config = JSON.parse(jsonContent);
 	} catch (error) {
 		console.error(
