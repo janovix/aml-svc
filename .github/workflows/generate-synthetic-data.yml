@@ -1,0 +1,75 @@
+name: Generate Synthetic Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: "User ID for which to generate data"
+        required: true
+        type: string
+      models:
+        description: "Models to generate (comma-separated: clients,transactions)"
+        required: true
+        type: string
+        default: "clients,transactions"
+      clients_count:
+        description: "Number of clients to generate"
+        required: false
+        type: number
+        default: 10
+      clients_include_documents:
+        description: "Include documents for clients"
+        required: false
+        type: boolean
+        default: false
+      clients_include_addresses:
+        description: "Include addresses for clients"
+        required: false
+        type: boolean
+        default: false
+      transactions_count:
+        description: "Number of transactions to generate"
+        required: false
+        type: number
+        default: 50
+      transactions_per_client:
+        description: "Number of transactions per client (optional)"
+        required: false
+        type: number
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install
+        working-directory: aml-svc
+
+      - name: Generate synthetic data
+        env:
+          USER_ID: ${{ inputs.user_id }}
+          MODELS: ${{ inputs.models }}
+          CLIENTS_COUNT: ${{ inputs.clients_count }}
+          CLIENTS_INCLUDE_DOCUMENTS: ${{ inputs.clients_include_documents }}
+          CLIENTS_INCLUDE_ADDRESSES: ${{ inputs.clients_include_addresses }}
+          TRANSACTIONS_COUNT: ${{ inputs.transactions_count }}
+          TRANSACTIONS_PER_CLIENT: ${{ inputs.transactions_per_client }}
+          SYNTHETIC_DATA_SECRET: ${{ secrets.SYNTHETIC_DATA_SECRET }}
+          WORKER_URL: ${{ secrets.WORKER_URL }}
+          WRANGLER_CONFIG: wrangler.preview.jsonc
+          REMOTE: "true"
+        run: node scripts/generate-synthetic-data.mjs
+        working-directory: aml-svc

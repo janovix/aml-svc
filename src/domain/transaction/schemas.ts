@@ -1,0 +1,270 @@
+import { z } from "zod";
+
+export const OPERATION_TYPE_VALUES = ["purchase", "sale"] as const;
+export const VEHICLE_TYPE_VALUES = ["land", "marine", "air"] as const;
+
+export const OperationTypeSchema = z.enum(OPERATION_TYPE_VALUES);
+export const VehicleTypeSchema = z.enum(VEHICLE_TYPE_VALUES);
+
+const RESOURCE_ID_REGEX = /^[A-Za-z0-9-]+$/;
+const POSTAL_CODE_REGEX = /^\d{4,10}$/;
+
+const ResourceIdSchema = z
+	.string()
+	.trim()
+	.min(1, "Invalid ID format")
+	.max(64, "Invalid ID format")
+	.regex(RESOURCE_ID_REGEX, "Invalid ID format");
+
+const IsoDateTimeSchema = z.string().datetime({ offset: true });
+const IsoDateSchema = z
+	.string()
+	.regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (expected YYYY-MM-DD)");
+
+const CurrencySchema = z
+	.string()
+	.trim()
+	.min(3)
+	.max(3)
+	.transform((value) => value.toUpperCase());
+
+const AmountSchema = z
+	.union([
+		z.number().positive(),
+		z
+			.string()
+			.trim()
+			.regex(/^\d+(\.\d{1,2})?$/, "Invalid amount format"),
+	])
+	.transform((value) => value.toString());
+
+const PaymentMethodSchema = z.object({
+	method: z
+		.string()
+		.min(2)
+		.max(80)
+		.transform((value) => value.trim()),
+	amount: AmountSchema,
+});
+
+const BaseTransactionSchema = z.object({
+	clientId: ResourceIdSchema,
+	operationDate: IsoDateSchema,
+	operationType: OperationTypeSchema,
+	branchPostalCode: z.string().regex(POSTAL_CODE_REGEX, "Invalid postal code"),
+	brand: z
+		.string()
+		.min(1)
+		.max(120)
+		.transform((value) => value.trim()),
+	model: z
+		.string()
+		.min(1)
+		.max(120)
+		.transform((value) => value.trim()),
+	year: z.coerce.number().int().min(1900).max(2100),
+	armorLevel: z.string().min(1).max(50).optional().nullable(),
+	vin: z.string().min(1).max(17).optional().nullable(), // Vehicle Identification Number (17 characters)
+	repuve: z.string().min(1).max(8).optional().nullable(), // REPUVE (Registro Público Vehicular, 8 characters)
+	amount: AmountSchema,
+	currency: CurrencySchema,
+	operationTypeCode: z.string().optional().nullable(), // Reference to veh-operation-types catalog (metadata.code)
+	currencyCode: z.string().optional().nullable(), // Reference to currencies catalog (metadata.code)
+	paymentMethods: z
+		.array(PaymentMethodSchema)
+		.min(1, "At least one payment method is required"),
+});
+
+const LandVehicleSchema = z.object({
+	vehicleType: z.literal("land"),
+	engineNumber: z.string().min(3).optional().nullable(),
+	plates: z
+		.string()
+		.min(5)
+		.max(20)
+		.transform((value) => value.toUpperCase())
+		.optional()
+		.nullable(),
+	registrationNumber: z.string().min(3).optional().nullable(),
+	flagCountryId: z
+		.string()
+		.min(2)
+		.max(3)
+		.transform((value) => value.toUpperCase())
+		.optional()
+		.nullable(),
+});
+
+const MarineVehicleSchema = z.object({
+	vehicleType: z.literal("marine"),
+	engineNumber: z.string().min(3).optional().nullable(),
+	plates: z.string().optional().nullable(),
+	registrationNumber: z.string().min(3),
+	flagCountryId: z
+		.string()
+		.min(2)
+		.max(3)
+		.transform((value) => value.toUpperCase()),
+});
+
+const AirVehicleSchema = z.object({
+	vehicleType: z.literal("air"),
+	engineNumber: z.string().min(3).optional().nullable(),
+	plates: z.string().optional().nullable(),
+	registrationNumber: z.string().min(3),
+	flagCountryId: z
+		.string()
+		.min(2)
+		.max(3)
+		.transform((value) => value.toUpperCase()),
+});
+
+const VehicleSpecificSchema = z.discriminatedUnion("vehicleType", [
+	LandVehicleSchema,
+	MarineVehicleSchema,
+	AirVehicleSchema,
+]);
+
+export const TransactionCreateSchema = BaseTransactionSchema.and(
+	VehicleSpecificSchema,
+)
+	.refine(
+		(data) => {
+			// For land vehicles, at least one of plates, VIN, or engineNumber must be provided
+			if (data.vehicleType === "land") {
+				const hasPlates = data.plates && data.plates.trim().length > 0;
+				const hasVIN = data.vin && data.vin.trim().length > 0;
+				const hasEngineNumber =
+					data.engineNumber && data.engineNumber.trim().length > 0;
+				return hasPlates || hasVIN || hasEngineNumber;
+			}
+			return true;
+		},
+		{
+			message:
+				"For land vehicles, at least one of plates, VIN, or engineNumber must be provided",
+			path: ["plates"],
+		},
+	)
+	.refine(
+		(data) => {
+			const totalPaymentAmount = data.paymentMethods.reduce(
+				(sum, pm) => sum + parseFloat(pm.amount),
+				0,
+			);
+			const transactionAmount = parseFloat(data.amount);
+			return Math.abs(totalPaymentAmount - transactionAmount) < 0.01;
+		},
+		{
+			message:
+				"The sum of payment method amounts must equal the transaction amount",
+			path: ["paymentMethods"],
+		},
+	);
+
+const TransactionUpdateBaseSchema = BaseTransactionSchema.omit({
+	clientId: true,
+});
+
+export const TransactionUpdateSchema = TransactionUpdateBaseSchema.and(
+	VehicleSpecificSchema,
+)
+	.refine(
+		(data) => {
+			// For land vehicles, at least one of plates, VIN, or engineNumber must be provided
+			if (data.vehicleType === "land") {
+				const hasPlates = data.plates && data.plates.trim().length > 0;
+				const hasVIN = data.vin && data.vin.trim().length > 0;
+				const hasEngineNumber =
+					data.engineNumber && data.engineNumber.trim().length > 0;
+				return hasPlates || hasVIN || hasEngineNumber;
+			}
+			return true;
+		},
+		{
+			message:
+				"For land vehicles, at least one of plates, VIN, or engineNumber must be provided",
+			path: ["plates"],
+		},
+	)
+	.refine(
+		(data) => {
+			const totalPaymentAmount = data.paymentMethods.reduce(
+				(sum, pm) => sum + parseFloat(pm.amount),
+				0,
+			);
+			const transactionAmount = parseFloat(data.amount);
+			return Math.abs(totalPaymentAmount - transactionAmount) < 0.01;
+		},
+		{
+			message:
+				"The sum of payment method amounts must equal the transaction amount",
+			path: ["paymentMethods"],
+		},
+	);
+
+export const TransactionIdParamSchema = z.object({
+	id: ResourceIdSchema,
+});
+
+export const TransactionFilterSchema = z
+	.object({
+		clientId: ResourceIdSchema.optional(),
+		operationType: OperationTypeSchema.optional(),
+		vehicleType: VehicleTypeSchema.optional(),
+		branchPostalCode: z.string().regex(POSTAL_CODE_REGEX).optional(),
+		startDate: IsoDateSchema.optional(),
+		endDate: IsoDateSchema.optional(),
+		page: z.coerce.number().int().min(1).default(1),
+		limit: z.coerce.number().int().min(1).max(100).default(10),
+	})
+	.refine(
+		(data) => {
+			if (!data.startDate || !data.endDate) return true;
+			return data.startDate <= data.endDate;
+		},
+		{
+			message: "startDate must be before or equal to endDate",
+			path: ["endDate"],
+		},
+	);
+
+export const PaymentMethodEntitySchema = z.object({
+	id: ResourceIdSchema,
+	method: z.string().min(2),
+	amount: z.string(),
+	createdAt: IsoDateTimeSchema,
+	updatedAt: IsoDateTimeSchema,
+});
+
+export const TransactionEntitySchema = z.object({
+	id: ResourceIdSchema,
+	clientId: ResourceIdSchema,
+	operationDate: IsoDateSchema,
+	operationType: OperationTypeSchema,
+	branchPostalCode: z.string().regex(POSTAL_CODE_REGEX),
+	vehicleType: VehicleTypeSchema,
+	brand: z.string().min(1),
+	model: z.string().min(1),
+	year: z.number().int(),
+	armorLevel: z.string().nullable().optional(),
+	vin: z.string().nullable().optional(),
+	repuve: z.string().nullable().optional(),
+	engineNumber: z.string().nullable().optional(),
+	plates: z.string().nullable().optional(),
+	registrationNumber: z.string().nullable().optional(),
+	flagCountryId: z.string().nullable().optional(),
+	amount: z.string(),
+	currency: CurrencySchema,
+	operationTypeCode: z.string().nullable().optional(),
+	currencyCode: z.string().nullable().optional(),
+	umaValue: z.string().nullable().optional(),
+	paymentMethods: z.array(PaymentMethodEntitySchema),
+	createdAt: IsoDateTimeSchema,
+	updatedAt: IsoDateTimeSchema,
+	deletedAt: IsoDateTimeSchema.nullable().optional(),
+});
+
+export type TransactionCreateInput = z.infer<typeof TransactionCreateSchema>;
+export type TransactionUpdateInput = z.infer<typeof TransactionUpdateSchema>;
+export type TransactionFilters = z.infer<typeof TransactionFilterSchema>;

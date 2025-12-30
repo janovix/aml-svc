@@ -1,14 +1,33 @@
+import type { AlertJob } from "./lib/alert-queue";
+
 /**
- * KV namespace used to cache Tasks reads.
- * Bound via `wrangler*.jsonc` as `TASKS_KV`.
+ * Environment bindings for Cloudflare Workers
  */
 declare namespace Cloudflare {
 	interface Env {
-		TASKS_KV: KVNamespace;
+		DB: D1Database;
+		CACHE?: KVNamespace;
+		R2_BUCKET?: R2Bucket; // R2 bucket for storing SAT XML files
+		ENVIRONMENT?: string;
+		API_VERSION?: string;
 		/**
-		 * Optional override for tasks cache TTL (seconds).
-		 * Must be >= 60. Defaults to 60.
+		 * URL of the auth-svc for JWKS verification
+		 * Example: https://auth-svc.janovix.workers.dev
 		 */
-		TASKS_CACHE_TTL_SECONDS?: string;
+		AUTH_SERVICE_URL?: string;
+		/**
+		 * Cache TTL for JWKS in seconds (default: 3600)
+		 */
+		AUTH_JWKS_CACHE_TTL?: string;
+		/**
+		 * SAT configuration
+		 */
+		SAT_CLAVE_SUJETO_OBLIGADO?: string; // 12-character obligated subject identifier (RFC)
+		SAT_CLAVE_ACTIVIDAD?: string; // Activity code (e.g., "VEH" for vehicle notices)
+		SAT_CLAVE_ENTIDAD_COLEGIADA?: string; // Optional collegiate entity identifier
+		/**
+		 * Queue for alert detection jobs
+		 */
+		ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
 	}
 }

@@ -1,5 +1,7 @@
 npx lint-staged
 pnpm run lint
 pnpm run format:check
+pnpm run prisma:generate
 pnpm run typecheck
+pnpm run seed:validate
 pnpm run vitest:coverage
