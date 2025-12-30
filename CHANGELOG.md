@@ -1,3 +1,10 @@
+# [1.1.0-rc.19](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.18...v1.1.0-rc.19) (2025-12-30)
+
+
+### Bug Fixes
+
+* implement synthetic data generation for clients and transactions with SQL output ([e3eb469](https://github.com/janovix/aml-svc/commit/e3eb469b4421b2dae969c1cd7aa2c3c374100781))
+
 # [1.1.0-rc.18](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.17...v1.1.0-rc.18) (2025-12-30)
 
 
