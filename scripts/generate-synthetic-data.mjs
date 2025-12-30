@@ -3,7 +3,7 @@
  * Generate Synthetic Data
  *
  * Generates synthetic data (clients, transactions, etc.) for a user account.
- * This script is intended to be run from GitHub Actions via workflow_dispatch.
+ * This script can be run locally or from GitHub Actions.
  *
  * Usage:
  *   node scripts/generate-synthetic-data.mjs
@@ -16,14 +16,14 @@
  *   CLIENTS_INCLUDE_ADDRESSES - Include addresses for clients (default: false)
  *   TRANSACTIONS_COUNT - Number of transactions to generate (default: 50)
  *   TRANSACTIONS_PER_CLIENT - Number of transactions per client (optional)
- *   WRANGLER_CONFIG - Wrangler config file (optional, auto-detected)
- *   REMOTE - Set to "true" to use remote database (default: false)
- *   SYNTHETIC_DATA_SECRET - Secret token for authentication (required)
- *   WORKER_URL - URL of the worker (optional, will use wrangler dev if not set)
+ *   WRANGLER_CONFIG - Wrangler config file (optional, defaults to wrangler.preview.jsonc)
+ *   CLOUDFLARE_API_TOKEN - Cloudflare API token for D1 access (required for remote)
+ *   CLOUDFLARE_ACCOUNT_ID - Cloudflare account ID (required for remote)
  */
 
 import { fileURLToPath } from "node:url";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { readFileSync } from "node:fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -40,8 +40,11 @@ const transactionsCount = parseInt(process.env.TRANSACTIONS_COUNT || "50", 10);
 const transactionsPerClient = process.env.TRANSACTIONS_PER_CLIENT
 	? parseInt(process.env.TRANSACTIONS_PER_CLIENT, 10)
 	: undefined;
-const secret = process.env.SYNTHETIC_DATA_SECRET;
-const workerUrl = process.env.WORKER_URL;
+const wranglerConfigFile =
+	process.env.WRANGLER_CONFIG || "wrangler.preview.jsonc";
+
+// Determine if we're running locally or remotely
+const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
 
 // Validate required parameters
 if (!userId) {
@@ -52,13 +55,6 @@ if (!userId) {
 if (!modelsStr) {
 	console.error("❌ Error: MODELS environment variable is required");
 	console.error("   Example: MODELS=clients,transactions");
-	process.exit(1);
-}
-
-if (!secret) {
-	console.error(
-		"❌ Error: SYNTHETIC_DATA_SECRET environment variable is required",
-	);
 	process.exit(1);
 }
 
@@ -73,24 +69,232 @@ if (invalidModels.length > 0) {
 	process.exit(1);
 }
 
-// Determine if we're running locally or remotely
-const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
+/**
+ * Creates a D1Database instance
+ * For remote: uses Cloudflare REST API
+ * For local: requires wrangler dev to be running
+ */
+async function getD1Database() {
+	// Read wrangler config
+	const configPath = join(__dirname, "..", wranglerConfigFile);
+	let config;
+	try {
+		const configContent = readFileSync(configPath, "utf-8");
+		// Remove comments from JSONC
+		const jsonContent = configContent.replace(/\/\/.*$/gm, "");
+		config = JSON.parse(jsonContent);
+	} catch (error) {
+		console.error(
+			`❌ Error reading wrangler config from ${wranglerConfigFile}:`,
+			error,
+		);
+		process.exit(1);
+	}
 
-function generateSyntheticData() {
+	// Get D1 database config
+	const d1Database = config.d1_databases?.find((db) => db.binding === "DB");
+	if (!d1Database) {
+		console.error("❌ Error: No D1 database with binding 'DB' found in config");
+		process.exit(1);
+	}
+
+	if (isRemote) {
+		console.log(
+			`📡 Connecting to remote D1 database: ${d1Database.database_name}`,
+		);
+
+		if (!process.env.CLOUDFLARE_API_TOKEN) {
+			throw new Error(
+				"CLOUDFLARE_API_TOKEN is required for remote D1 connection",
+			);
+		}
+		if (!process.env.CLOUDFLARE_ACCOUNT_ID) {
+			throw new Error(
+				"CLOUDFLARE_ACCOUNT_ID is required for remote D1 connection",
+			);
+		}
+
+		// Create remote D1Database implementation using Cloudflare REST API
+		return createRemoteD1Database(
+			process.env.CLOUDFLARE_ACCOUNT_ID,
+			d1Database.database_id,
+			process.env.CLOUDFLARE_API_TOKEN,
+		);
+	} else {
+		console.log(
+			`💾 Connecting to local D1 database: ${d1Database.database_name}`,
+		);
+		console.log("   Note: This requires wrangler dev to be running");
+
+		// For local, we need wrangler dev to be running
+		// We can't easily create a local D1 instance without wrangler dev
+		// So we'll throw an error and suggest using REMOTE=true
+		throw new Error(
+			"Local D1 connection requires wrangler dev to be running.\n" +
+				"   For GitHub Actions, use REMOTE=true with CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID",
+		);
+	}
+}
+
+/**
+ * Creates a D1Database instance that connects to Cloudflare D1 via REST API
+ * This implementation matches the Workers runtime D1Database interface
+ */
+function createRemoteD1Database(accountId, databaseId, apiToken) {
+	const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}`;
+
+	class RemoteD1PreparedStatement {
+		constructor(query, db) {
+			this.query = query;
+			this.db = db;
+			this.boundValues = [];
+		}
+
+		bind(...values) {
+			this.boundValues = values;
+			return this;
+		}
+
+		async first(colName) {
+			const result = await this.all();
+			if (!result.results || result.results.length === 0) {
+				return null;
+			}
+			const first = result.results[0];
+			if (colName) {
+				return first[colName] ?? null;
+			}
+			return first;
+		}
+
+		async run() {
+			return this.executeQuery();
+		}
+
+		async all() {
+			return this.executeQuery();
+		}
+
+		async raw() {
+			const result = await this.executeQuery();
+			return result.results || [];
+		}
+
+		async executeQuery() {
+			const response = await fetch(`${baseUrl}/query`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${apiToken}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					sql: this.query,
+					params: this.boundValues,
+				}),
+			});
+
+			if (!response.ok) {
+				const error = await response.text();
+				throw new Error(`D1 query failed: ${error}`);
+			}
+
+			const data = await response.json();
+			return {
+				success: data.success ?? true,
+				meta: {
+					duration: data.meta?.duration ?? 0,
+					rows_read: data.meta?.rows_read ?? 0,
+					rows_written: data.meta?.rows_written ?? 0,
+					last_row_id: data.meta?.last_row_id ?? 0,
+					changed_db: data.meta?.changed_db ?? false,
+					changes: data.meta?.changes ?? 0,
+					size_after: data.meta?.size_after ?? 0,
+				},
+				results: data.results || [],
+			};
+		}
+	}
+
+	return {
+		prepare(query) {
+			return new RemoteD1PreparedStatement(query, this);
+		},
+
+		async exec(query) {
+			const response = await fetch(`${baseUrl}/query`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${apiToken}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					sql: query,
+				}),
+			});
+
+			if (!response.ok) {
+				const error = await response.text();
+				throw new Error(`D1 exec failed: ${error}`);
+			}
+
+			const data = await response.json();
+			return {
+				count: data.meta?.changes ?? 0,
+				duration: data.meta?.duration ?? 0,
+			};
+		},
+
+		async batch(statements) {
+			const queries = statements.map((stmt) => {
+				return {
+					sql: stmt.query,
+					params: stmt.boundValues,
+				};
+			});
+
+			const response = await fetch(`${baseUrl}/batch`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${apiToken}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(queries),
+			});
+
+			if (!response.ok) {
+				const error = await response.text();
+				throw new Error(`D1 batch failed: ${error}`);
+			}
+
+			const data = await response.json();
+			return (data.results || []).map((result) => ({
+				success: true,
+				meta: {
+					duration: 0,
+					rows_read: 0,
+					rows_written: 0,
+					last_row_id: 0,
+					changed_db: false,
+					changes: 0,
+					size_after: 0,
+				},
+				results: result || [],
+			}));
+		},
+	};
+}
+
+async function generateSyntheticData() {
 	console.log(`🔧 Generating synthetic data for user: ${userId}`);
 	console.log(`   Environment: ${isRemote ? "remote" : "local"}`);
 	console.log(`   Models: ${models.join(", ")}`);
 	console.log("");
 
-	// Build the request body
-	const requestBody = {
-		userId,
-		models,
-		options: {},
-	};
+	// Build options
+	const options = {};
 
 	if (models.includes("clients")) {
-		requestBody.options.clients = {
+		options.clients = {
 			count: clientsCount,
 			includeDocuments: clientsIncludeDocuments,
 			includeAddresses: clientsIncludeAddresses,
@@ -100,7 +304,7 @@ function generateSyntheticData() {
 		);
 	}
 	if (models.includes("transactions")) {
-		requestBody.options.transactions = {
+		options.transactions = {
 			count: transactionsCount,
 			perClient: transactionsPerClient,
 		};
@@ -110,82 +314,37 @@ function generateSyntheticData() {
 	}
 	console.log("");
 
-	// If WORKER_URL is provided, use it directly
-	if (workerUrl) {
-		console.log(`⏳ Calling worker at ${workerUrl}...`);
-		fetch(`${workerUrl}/internal/synthetic-data`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"X-Synthetic-Data-Secret": secret,
-			},
-			body: JSON.stringify(requestBody),
-		})
-			.then(async (response) => {
-				const result = await response.json();
+	try {
+		// Get D1 database connection
+		const db = await getD1Database();
 
-				if (!response.ok) {
-					console.error("❌ Error:", result.error || result.message);
-					process.exit(1);
-				}
-
-				console.log("✅ Synthetic data generation completed!");
-				console.log(`   Clients created: ${result.summary.clientsCreated}`);
-				console.log(
-					`   Transactions created: ${result.summary.transactionsCreated}`,
-				);
-				process.exit(0);
-			})
-			.catch((error) => {
-				console.error("❌ Error calling worker:", error);
-				process.exit(1);
-			});
-		return;
-	}
-
-	// Otherwise, try to make request to localhost if not remote
-	if (!isRemote) {
-		const localUrl = "http://localhost:8787";
-		console.log(`⏳ Attempting to call worker at ${localUrl}...`);
-		console.log("   (Make sure the worker is running: pnpm dev)");
-
-		fetch(`${localUrl}/internal/synthetic-data`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"X-Synthetic-Data-Secret": secret,
-			},
-			body: JSON.stringify(requestBody),
-		})
-			.then(async (response) => {
-				const result = await response.json();
-
-				if (!response.ok) {
-					console.error("❌ Error:", result.error || result.message);
-					console.error("   Make sure the worker is running: pnpm dev");
-					process.exit(1);
-				}
-
-				console.log("✅ Synthetic data generation completed!");
-				console.log(`   Clients created: ${result.summary.clientsCreated}`);
-				console.log(
-					`   Transactions created: ${result.summary.transactionsCreated}`,
-				);
-				process.exit(0);
-			})
-			.catch((error) => {
-				console.error("❌ Error calling worker:", error.message);
-				console.error("   Make sure the worker is running: pnpm dev");
-				console.error("   Or set WORKER_URL to the worker URL");
-				process.exit(1);
-			});
-	} else {
-		// For remote, WORKER_URL is required
-		console.error("❌ Remote execution requires WORKER_URL to be set");
-		console.error("   Set WORKER_URL to your deployed worker URL");
-		console.error(
-			"   Example: WORKER_URL=https://aml-svc.your-domain.workers.dev",
+		// Import the generator and Prisma client
+		const { SyntheticDataGenerator } = await import(
+			"../src/lib/synthetic-data-generator.ts"
 		);
+		const { getPrismaClient } = await import("../src/lib/prisma.ts");
+
+		// Create Prisma client with D1 adapter
+		const prisma = getPrismaClient(db);
+		const generator = new SyntheticDataGenerator(prisma);
+
+		// Generate synthetic data
+		console.log("⏳ Generating synthetic data...");
+		const result = await generator.generate(options);
+
+		console.log("✅ Synthetic data generation completed!");
+		console.log(`   Clients created: ${result.clients.created}`);
+		console.log(`   Transactions created: ${result.transactions.created}`);
+
+		process.exit(0);
+	} catch (error) {
+		console.error("❌ Error generating synthetic data:", error);
+		if (error instanceof Error) {
+			console.error("   Message:", error.message);
+			if (error.stack) {
+				console.error("   Stack:", error.stack);
+			}
+		}
 		process.exit(1);
 	}
 }

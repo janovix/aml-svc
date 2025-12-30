@@ -25,7 +25,7 @@ export type Bindings = {
 	AUTH_SERVICE?: Fetcher;
 	/** Queue for alert detection jobs */
 	ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
-	/** Secret token for synthetic data generation (internal use only) */
+	/** Secret token for synthetic data generation HTTP endpoint (local development only) */
 	SYNTHETIC_DATA_SECRET?: string;
 };
 
@@ -88,8 +88,9 @@ app.all("/internal/*", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 
-// Internal synthetic data generation endpoint (not in public API)
-// Only accessible with SYNTETIC_DATA_SECRET token
+// Internal synthetic data generation endpoint (for local development only)
+// Note: GitHub Actions uses the script directly, not this endpoint
+// Only accessible with SYNTHETIC_DATA_SECRET token
 app.post("/internal/synthetic-data", async (c) => {
 	const secret = c.req.header("X-Synthetic-Data-Secret");
 	const expectedSecret = c.env.SYNTHETIC_DATA_SECRET;
