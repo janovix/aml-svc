@@ -50,13 +50,10 @@ jobs:
           node-version: "20"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 10
+        uses: pnpm/action-setup@v4
 
       - name: Install dependencies
-        working-directory: aml-svc
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Validate secrets
         run: |
@@ -73,7 +70,6 @@ jobs:
           echo "✅ Secrets are configured"
 
       - name: Generate synthetic data
-        working-directory: aml-svc
         env:
           USER_ID: ${{ inputs.user_id }}
           MODELS: ${{ inputs.models }}
