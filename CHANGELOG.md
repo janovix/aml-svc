@@ -1,3 +1,10 @@
+# [1.1.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.14...v1.1.0-rc.15) (2025-12-30)
+
+
+### Bug Fixes
+
+* remove working-directory specification for synthetic data generation in GitHub Actions workflow ([58f9cd7](https://github.com/janovix/aml-svc/commit/58f9cd7ae55c43e2defff4b2ec148d15c6d62cd9))
+
 # [1.1.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.13...v1.1.0-rc.14) (2025-12-30)
 
 
