@@ -1,3 +1,10 @@
+# [1.1.0-rc.18](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.17...v1.1.0-rc.18) (2025-12-30)
+
+
+### Bug Fixes
+
+* improve JSONC parsing in synthetic data generation script to handle edge cases with comments and trailing commas ([7c87c47](https://github.com/janovix/aml-svc/commit/7c87c4719994044cea7267647c03d355caef16a7))
+
 # [1.1.0-rc.17](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.16...v1.1.0-rc.17) (2025-12-30)
 
 
