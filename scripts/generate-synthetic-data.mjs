@@ -16,7 +16,7 @@
  *   CLIENTS_INCLUDE_ADDRESSES - Include addresses for clients (default: false)
  *   TRANSACTIONS_COUNT - Number of transactions to generate (default: 50)
  *   TRANSACTIONS_PER_CLIENT - Number of transactions per client (optional)
- *   WRANGLER_CONFIG - Wrangler config file (optional, defaults to wrangler.preview.jsonc)
+ *   WRANGLER_CONFIG - Wrangler config file (optional, auto-detected based on environment)
  *   CLOUDFLARE_API_TOKEN - Cloudflare API token for D1 access (required for remote)
  *   CLOUDFLARE_ACCOUNT_ID - Cloudflare account ID (required for remote)
  */
@@ -41,11 +41,24 @@ const transactionsCount = parseInt(process.env.TRANSACTIONS_COUNT || "50", 10);
 const transactionsPerClient = process.env.TRANSACTIONS_PER_CLIENT
 	? parseInt(process.env.TRANSACTIONS_PER_CLIENT, 10)
 	: undefined;
-const wranglerConfigFile =
-	process.env.WRANGLER_CONFIG || "wrangler.preview.jsonc";
 
 // Determine if we're running locally or remotely
 const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
+
+// Determine wrangler config file based on environment
+// Use WRANGLER_CONFIG if set, otherwise detect preview environment
+let wranglerConfigFile = process.env.WRANGLER_CONFIG;
+if (!wranglerConfigFile) {
+	if (
+		process.env.CF_PAGES_BRANCH ||
+		(process.env.WORKERS_CI_BRANCH &&
+			process.env.WORKERS_CI_BRANCH !== "main") ||
+		process.env.PREVIEW === "true"
+	) {
+		wranglerConfigFile = "wrangler.preview.jsonc";
+	}
+	// If none of the above, wranglerConfigFile stays undefined and wrangler uses default (wrangler.jsonc)
+}
 
 // Validate required parameters
 if (!userId) {
@@ -717,6 +730,7 @@ function generateAddressInsertSql(addr) {
 async function generateSyntheticData() {
 	console.log(`🔧 Generating synthetic data for user: ${userId}`);
 	console.log(`   Environment: ${isRemote ? "remote" : "local"}`);
+	console.log(`   Config: ${wranglerConfigFile || "wrangler.jsonc (default)"}`);
 	console.log(`   Models: ${models.join(", ")}`);
 	console.log("");
 
