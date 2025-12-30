@@ -80,23 +80,106 @@ async function getD1Database() {
 	let config;
 	try {
 		const configContent = readFileSync(configPath, "utf-8");
-		// Parse JSONC (JSON with Comments) by:
-		// 1. Removing single-line comments (// ...)
-		// 2. Removing multi-line comments (/* ... */)
-		// 3. Removing trailing commas before } or ]
-		let jsonContent = configContent
-			// Remove single-line comments
-			.replace(/\/\/.*$/gm, "")
-			// Remove multi-line comments
-			.replace(/\/\*[\s\S]*?\*\//g, "")
-			// Remove trailing commas before } or ]
-			.replace(/,(\s*[}\]])/g, "$1");
+
+		// Parse JSONC manually - handle comments and trailing commas
+		// This is a simple parser that handles the common cases
+		let jsonContent = configContent;
+		let inString = false;
+		let escapeNext = false;
+		let result = "";
+
+		// Process character by character to properly handle strings
+		for (let i = 0; i < jsonContent.length; i++) {
+			const char = jsonContent[i];
+			const nextChar = jsonContent[i + 1];
+			const prevChar = i > 0 ? jsonContent[i - 1] : "";
+
+			if (escapeNext) {
+				result += char;
+				escapeNext = false;
+				continue;
+			}
+
+			if (char === "\\" && inString) {
+				result += char;
+				escapeNext = true;
+				continue;
+			}
+
+			if (char === '"' && !escapeNext) {
+				inString = !inString;
+				result += char;
+				continue;
+			}
+
+			// Outside strings, handle comments and trailing commas
+			if (!inString) {
+				// Single-line comment
+				if (char === "/" && nextChar === "/") {
+					// Skip until end of line
+					while (i < jsonContent.length && jsonContent[i] !== "\n") {
+						i++;
+					}
+					continue;
+				}
+
+				// Multi-line comment
+				if (char === "/" && nextChar === "*") {
+					// Skip until */
+					i += 2;
+					while (i < jsonContent.length - 1) {
+						if (jsonContent[i] === "*" && jsonContent[i + 1] === "/") {
+							i++;
+							break;
+						}
+						i++;
+					}
+					continue;
+				}
+
+				// Remove trailing commas before } or ]
+				if (char === ",") {
+					// Look ahead to see if next non-whitespace is } or ]
+					let j = i + 1;
+					let isTrailing = false;
+					while (j < jsonContent.length) {
+						const next = jsonContent[j];
+						if (next === "}" || next === "]") {
+							isTrailing = true;
+							break;
+						}
+						if (
+							next !== " " &&
+							next !== "\t" &&
+							next !== "\n" &&
+							next !== "\r"
+						) {
+							break;
+						}
+						j++;
+					}
+					if (isTrailing) {
+						// Skip trailing comma
+						continue;
+					}
+				}
+			}
+
+			result += char;
+		}
+
+		jsonContent = result;
 		config = JSON.parse(jsonContent);
 	} catch (error) {
 		console.error(
 			`❌ Error reading wrangler config from ${wranglerConfigFile}:`,
 			error,
 		);
+		if (error instanceof SyntaxError) {
+			console.error(
+				"   Tip: Make sure the config file is valid JSONC (JSON with Comments)",
+			);
+		}
 		process.exit(1);
 	}
 
