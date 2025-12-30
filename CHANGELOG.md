@@ -1,3 +1,10 @@
+# [1.1.0-rc.20](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.19...v1.1.0-rc.20) (2025-12-30)
+
+
+### Features
+
+* add target environment input and dynamic wrangler config selection for synthetic data generation ([066d0cb](https://github.com/janovix/aml-svc/commit/066d0cb7503657bee2867021d88a1614659217be))
+
 # [1.1.0-rc.19](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.18...v1.1.0-rc.19) (2025-12-30)
 
 
