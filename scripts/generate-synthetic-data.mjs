@@ -285,23 +285,38 @@ function createRemoteD1Database(accountId, databaseId, apiToken) {
 			});
 
 			if (!response.ok) {
-				const error = await response.text();
-				throw new Error(`D1 query failed: ${error}`);
+				const errorText = await response.text();
+				let errorMessage = `D1 query failed: ${errorText}`;
+				try {
+					const errorJson = JSON.parse(errorText);
+					errorMessage = errorJson.errors?.[0]?.message || errorMessage;
+				} catch {
+					// Use the text as-is
+				}
+				throw new Error(errorMessage);
 			}
 
 			const data = await response.json();
+
+			// Cloudflare D1 REST API returns: { success: true, meta: {...}, results: [...] }
+			// Handle both direct response and wrapped response formats
+			const result = data.result || data;
+
+			// Ensure all required meta fields are present with proper types
+			const meta = result.meta || {};
+
 			return {
-				success: data.success ?? true,
+				success: result.success !== false,
 				meta: {
-					duration: data.meta?.duration ?? 0,
-					rows_read: data.meta?.rows_read ?? 0,
-					rows_written: data.meta?.rows_written ?? 0,
-					last_row_id: data.meta?.last_row_id ?? 0,
-					changed_db: data.meta?.changed_db ?? false,
-					changes: data.meta?.changes ?? 0,
-					size_after: data.meta?.size_after ?? 0,
+					duration: Number(meta.duration) || 0,
+					rows_read: Number(meta.rows_read) || 0,
+					rows_written: Number(meta.rows_written) || 0,
+					last_row_id: Number(meta.last_row_id) || 0,
+					changed_db: Boolean(meta.changed_db),
+					changes: Number(meta.changes) || 0,
+					size_after: Number(meta.size_after) || 0,
 				},
-				results: data.results || [],
+				results: Array.isArray(result.results) ? result.results : [],
 			};
 		}
 	}
@@ -336,41 +351,14 @@ function createRemoteD1Database(accountId, databaseId, apiToken) {
 		},
 
 		async batch(statements) {
-			const queries = statements.map((stmt) => {
-				return {
-					sql: stmt.query,
-					params: stmt.boundValues,
-				};
-			});
-
-			const response = await fetch(`${baseUrl}/batch`, {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${apiToken}`,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(queries),
-			});
-
-			if (!response.ok) {
-				const error = await response.text();
-				throw new Error(`D1 batch failed: ${error}`);
+			// Execute statements sequentially since Cloudflare D1 REST API doesn't have a true batch endpoint
+			// Prisma will call this for transactions, so we need to handle them properly
+			const results = [];
+			for (const stmt of statements) {
+				const result = await stmt.run();
+				results.push(result);
 			}
-
-			const data = await response.json();
-			return (data.results || []).map((result) => ({
-				success: true,
-				meta: {
-					duration: 0,
-					rows_read: 0,
-					rows_written: 0,
-					last_row_id: 0,
-					changed_db: false,
-					changes: 0,
-					size_after: 0,
-				},
-				results: result || [],
-			}));
+			return results;
 		},
 	};
 }
