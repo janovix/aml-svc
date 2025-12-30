@@ -55,6 +55,7 @@ jobs:
           version: 10
 
       - name: Install dependencies
+        working-directory: aml-svc
         run: pnpm install
 
       - name: Validate secrets
@@ -72,6 +73,7 @@ jobs:
           echo "✅ Secrets are configured"
 
       - name: Generate synthetic data
+        working-directory: aml-svc
         env:
           USER_ID: ${{ inputs.user_id }}
           MODELS: ${{ inputs.models }}
