@@ -48,9 +48,9 @@ export const openAPISpec = {
 				"UMA (Unidad de Medida y Actualización) value management endpoints",
 		},
 		{
-			name: "Compliance Organization",
+			name: "Organization Settings",
 			description:
-				"Compliance organization management endpoints (RFC and vulnerable activity for compliance officer)",
+				"Organization settings management endpoints (RFC and vulnerable activity for compliance officer)",
 		},
 	],
 	paths: {
@@ -1858,25 +1858,25 @@ export const openAPISpec = {
 				},
 			},
 		},
-		"/api/v1/compliance-organization": {
+		"/api/v1/organization-settings": {
 			get: {
-				tags: ["Compliance Organization"],
-				summary: "Get compliance organization",
+				tags: ["Organization Settings"],
+				summary: "Get organization settings",
 				description:
-					"Retrieve the compliance organization (RFC and vulnerable activity) for the authenticated user.",
+					"Retrieve the organization settings (RFC and vulnerable activity) for the authenticated user's organization.",
 				responses: {
 					"200": {
-						description: "Compliance organization",
+						description: "Organization settings",
 						content: {
 							"application/json": {
 								schema: {
-									$ref: "#/components/schemas/ComplianceOrganization",
+									$ref: "#/components/schemas/OrganizationSettings",
 								},
 							},
 						},
 					},
 					"404": {
-						description: "Compliance organization not found",
+						description: "Organization settings not found",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
@@ -1886,27 +1886,27 @@ export const openAPISpec = {
 				},
 			},
 			put: {
-				tags: ["Compliance Organization"],
-				summary: "Create or update compliance organization",
+				tags: ["Organization Settings"],
+				summary: "Create or update organization settings",
 				description:
-					"Create or update the compliance organization (RFC and vulnerable activity) for the authenticated user.",
+					"Create or update the organization settings (RFC and vulnerable activity) for the authenticated user's organization.",
 				requestBody: {
 					required: true,
 					content: {
 						"application/json": {
 							schema: {
-								$ref: "#/components/schemas/ComplianceOrganizationCreateRequest",
+								$ref: "#/components/schemas/OrganizationSettingsCreateRequest",
 							},
 						},
 					},
 				},
 				responses: {
 					"200": {
-						description: "Compliance organization created or updated",
+						description: "Organization settings created or updated",
 						content: {
 							"application/json": {
 								schema: {
-									$ref: "#/components/schemas/ComplianceOrganization",
+									$ref: "#/components/schemas/OrganizationSettings",
 								},
 							},
 						},
@@ -1922,33 +1922,33 @@ export const openAPISpec = {
 				},
 			},
 			patch: {
-				tags: ["Compliance Organization"],
-				summary: "Update compliance organization",
+				tags: ["Organization Settings"],
+				summary: "Update organization settings",
 				description:
-					"Partially update the compliance organization for the authenticated user.",
+					"Partially update the organization settings for the authenticated user's organization.",
 				requestBody: {
 					required: true,
 					content: {
 						"application/json": {
 							schema: {
-								$ref: "#/components/schemas/ComplianceOrganizationUpdateRequest",
+								$ref: "#/components/schemas/OrganizationSettingsUpdateRequest",
 							},
 						},
 					},
 				},
 				responses: {
 					"200": {
-						description: "Compliance organization updated",
+						description: "Organization settings updated",
 						content: {
 							"application/json": {
 								schema: {
-									$ref: "#/components/schemas/ComplianceOrganization",
+									$ref: "#/components/schemas/OrganizationSettings",
 								},
 							},
 						},
 					},
 					"404": {
-						description: "Compliance organization not found",
+						description: "Organization settings not found",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
@@ -3399,11 +3399,11 @@ export const openAPISpec = {
 					},
 				},
 			},
-			ComplianceOrganization: {
+			OrganizationSettings: {
 				type: "object",
 				required: [
 					"id",
-					"userId",
+					"organizationId",
 					"obligatedSubjectKey",
 					"activityKey",
 					"createdAt",
@@ -3413,12 +3413,12 @@ export const openAPISpec = {
 					id: {
 						type: "string",
 						pattern: "^[A-Za-z0-9-]{1,64}$",
-						description: "Compliance organization identifier",
+						description: "Organization settings identifier",
 					},
-					userId: {
+					organizationId: {
 						type: "string",
 						description:
-							"User ID from JWT (compliance officer) - unique, 1:1 relationship",
+							"Organization ID from auth-svc (better-auth organization plugin)",
 					},
 					obligatedSubjectKey: {
 						type: "string",
@@ -3439,7 +3439,7 @@ export const openAPISpec = {
 					updatedAt: { type: "string", format: "date-time" },
 				},
 			},
-			ComplianceOrganizationCreateRequest: {
+			OrganizationSettingsCreateRequest: {
 				type: "object",
 				required: ["obligatedSubjectKey", "activityKey"],
 				properties: {
@@ -3460,7 +3460,7 @@ export const openAPISpec = {
 					},
 				},
 			},
-			ComplianceOrganizationUpdateRequest: {
+			OrganizationSettingsUpdateRequest: {
 				type: "object",
 				properties: {
 					obligatedSubjectKey: {
