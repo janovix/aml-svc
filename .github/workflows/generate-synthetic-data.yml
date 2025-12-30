@@ -57,6 +57,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.SYNTHETIC_DATA_SECRET }}" ]; then
+            echo "❌ Error: SYNTHETIC_DATA_SECRET is not set in GitHub Secrets"
+            echo "Please add it at: Settings > Secrets and variables > Actions"
+            exit 1
+          fi
+          if [ -z "${{ secrets.WORKER_URL }}" ]; then
+            echo "❌ Error: WORKER_URL is not set in GitHub Secrets"
+            echo "Please add it at: Settings > Secrets and variables > Actions"
+            exit 1
+          fi
+          echo "✅ Secrets are configured"
+
       - name: Generate synthetic data
         env:
           USER_ID: ${{ inputs.user_id }}
