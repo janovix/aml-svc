@@ -82,4 +82,4 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_CONFIG: wrangler.preview.jsonc
           REMOTE: "true"
-        run: node scripts/generate-synthetic-data.mjs
+        run: pnpm tsx scripts/generate-synthetic-data.mjs
