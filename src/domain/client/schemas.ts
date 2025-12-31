@@ -135,24 +135,40 @@ const ContactSchema = z.object({
 
 // RFC validation function based on person type
 const validateRFC = (personType: "physical" | "moral" | "trust") => {
+	const expectedLength = personType === "physical" ? 13 : 12;
+	const expectedFormat =
+		personType === "physical"
+			? "4 letters + 6 digits + 3 alphanumeric"
+			: "3 letters + 6 digits + 3 alphanumeric";
+	const example = personType === "physical" ? "ABCD123456EF1" : "ABC123456EF1";
+	const entityType =
+		personType === "physical" ? "physical persons" : "legal entities";
+
 	return z
 		.string()
 		.transform((value) => value.toUpperCase())
-		.refine(
-			(value) => {
-				if (personType === "physical") {
-					return RFC_PHYSICAL_REGEX.test(value) && value.length === 13;
+		.superRefine((value, ctx) => {
+			const actualLength = value.length;
+			const isValidLength = actualLength === expectedLength;
+			const isValidFormat =
+				personType === "physical"
+					? RFC_PHYSICAL_REGEX.test(value)
+					: RFC_MORAL_REGEX.test(value);
+
+			if (!isValidLength || !isValidFormat) {
+				if (!isValidLength) {
+					ctx.addIssue({
+						code: z.ZodIssueCode.custom,
+						message: `RFC for ${entityType} must be exactly ${expectedLength} characters (got ${actualLength}). Format: ${expectedFormat} (e.g., ${example})`,
+					});
+				} else {
+					ctx.addIssue({
+						code: z.ZodIssueCode.custom,
+						message: `RFC for ${entityType} must match format: ${expectedFormat} (e.g., ${example})`,
+					});
 				}
-				// MORAL or TRUST
-				return RFC_MORAL_REGEX.test(value) && value.length === 12;
-			},
-			{
-				message:
-					personType === "physical"
-						? "RFC for physical persons must be 13 characters"
-						: "RFC for legal entities must be 12 characters",
-			},
-		);
+			}
+		});
 };
 
 // Common schema with optional nationality (for moral/trust)
