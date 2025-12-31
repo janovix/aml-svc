@@ -1,3 +1,10 @@
+# [1.1.0-rc.23](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.22...v1.1.0-rc.23) (2025-12-31)
+
+
+### Features
+
+* implement catalog enrichment service for transactions ([9733c34](https://github.com/janovix/aml-svc/commit/9733c348064080618467cb221d964f1755fbd4a7))
+
 # [1.1.0-rc.22](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.21...v1.1.0-rc.22) (2025-12-31)
 
 
