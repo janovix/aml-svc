@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { ZodError } from "zod";
 
+import { CatalogRepository } from "../domain/catalog/repository";
+import { CatalogEnrichmentService } from "../domain/catalog/enrichment-service";
 import { ClientRepository } from "../domain/client";
 import {
 	TransactionCreateSchema,
@@ -42,9 +44,14 @@ function getService(
 ) {
 	const prisma = getPrismaClient(c.env.DB);
 	const umaRepository = new UmaValueRepository(prisma);
+	const catalogRepository = new CatalogRepository(prisma);
+	const catalogEnrichmentService = new CatalogEnrichmentService(
+		catalogRepository,
+	);
 	const transactionRepository = new TransactionRepository(
 		prisma,
 		umaRepository,
+		catalogEnrichmentService,
 	);
 	const clientRepository = new ClientRepository(prisma);
 	return new TransactionService(

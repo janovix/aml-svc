@@ -25,6 +25,8 @@ import { ClientService } from "../domain/client";
 import { TransactionRepository } from "../domain/transaction";
 import { TransactionService } from "../domain/transaction";
 import { generateAndUploadSatFile } from "./sat-file-generator";
+import { CatalogRepository } from "../domain/catalog/repository";
+import { CatalogEnrichmentService } from "../domain/catalog/enrichment-service";
 
 // R2Bucket type for compatibility
 type R2Bucket = {
@@ -160,9 +162,14 @@ export class AlertServiceBinding {
 
 		// Get transaction
 		const umaRepository = new UmaValueRepository(prisma);
+		const catalogRepository = new CatalogRepository(prisma);
+		const catalogEnrichmentService = new CatalogEnrichmentService(
+			catalogRepository,
+		);
 		const transactionRepository = new TransactionRepository(
 			prisma,
 			umaRepository,
+			catalogEnrichmentService,
 		);
 		const transactionService = new TransactionService(
 			transactionRepository,
@@ -179,10 +186,7 @@ export class AlertServiceBinding {
 			throw new Error("R2_BUCKET not configured");
 		}
 
-		// Import CatalogRepository for catalog lookups
-		const { CatalogRepository } = await import("../domain/catalog");
-		const catalogRepository = new CatalogRepository(prisma);
-
+		// Use the catalogRepository already created above for SAT file generation
 		const result = await generateAndUploadSatFile(alert, client, transaction, {
 			r2Bucket: this.env.R2_BUCKET as unknown as R2Bucket, // Type assertion for compatibility
 			obligatedSubjectKey: this.env.SAT_CLAVE_SUJETO_OBLIGADO || "000000000000",
