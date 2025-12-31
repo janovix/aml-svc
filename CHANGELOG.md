@@ -1,3 +1,10 @@
+# [1.1.0-rc.25](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.24...v1.1.0-rc.25) (2025-12-31)
+
+
+### Features
+
+* implement custom ID generation for clients and related entities ([82aac9d](https://github.com/janovix/aml-svc/commit/82aac9dd5da51c11ae0f8fc4a50ab99be07dacfe))
+
 # [1.1.0-rc.24](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.23...v1.1.0-rc.24) (2025-12-31)
 
 
