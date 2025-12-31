@@ -123,8 +123,10 @@ export function mapPrismaAlert(prisma: PrismaAlertModel): AlertEntity {
 
 export function mapAlertRuleCreateInputToPrisma(
 	input: AlertRuleCreateInput,
+	organizationId: string,
 ): Omit<PrismaAlertRuleModel, "id" | "createdAt" | "updatedAt"> {
 	return {
+		organizationId,
 		name: input.name,
 		description: input.description ?? null,
 		active: input.active,
@@ -178,8 +180,10 @@ export function mapAlertRulePatchInputToPrisma(
 
 export function mapAlertCreateInputToPrisma(
 	input: AlertCreateInput,
+	organizationId: string,
 ): Omit<PrismaAlertModel, "id" | "createdAt" | "updatedAt"> {
 	return {
+		organizationId,
 		alertRuleId: input.alertRuleId,
 		clientId: input.clientId,
 		status: "DETECTED",

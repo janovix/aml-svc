@@ -132,14 +132,14 @@ app.post("/internal/synthetic-data", async (c) => {
 
 	try {
 		const body = await c.req.json();
-		const { userId, models, options } = body;
+		const { userId, organizationId, models, options } = body;
 
-		if (!userId || !models || !Array.isArray(models)) {
+		if (!userId || !organizationId || !models || !Array.isArray(models)) {
 			return c.json(
 				{
 					success: false,
 					error: "Validation Error",
-					message: "userId and models are required",
+					message: "userId, organizationId, and models are required",
 				},
 				400,
 			);
@@ -150,7 +150,10 @@ app.post("/internal/synthetic-data", async (c) => {
 		const { getPrismaClient } = await import("./lib/prisma");
 
 		const prisma = getPrismaClient(c.env.DB);
-		const generator = new syntheticDataModule.SyntheticDataGenerator(prisma);
+		const generator = new syntheticDataModule.SyntheticDataGenerator(
+			prisma,
+			organizationId,
+		);
 
 		// Build options based on requested models
 		const syntheticOptions: {

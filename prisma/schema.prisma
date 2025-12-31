@@ -52,6 +52,7 @@ enum TransactionVehicleType {
 
 model Client {
   rfc               String     @id
+  organizationId    String     // Organization this client belongs to (from auth-svc)
   personType        PersonType
   firstName         String?
   lastName          String?
@@ -87,6 +88,7 @@ model Client {
   alerts Alert[]
 
   @@map("clients")
+  @@index([organizationId])
   @@index([personType])
   @@index([deletedAt])
   @@index([countryCode])
@@ -141,12 +143,13 @@ model ClientAddress {
 }
 
 model Catalog {
-  id        String        @id @default(uuid())
-  key       String        @unique
-  name      String
-  active    Boolean       @default(true)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id            String        @id @default(uuid())
+  key           String        @unique
+  name          String
+  active        Boolean       @default(true)
+  allowNewItems Boolean       @default(false) // When true, users can add new items to this catalog
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   items CatalogItem[]
 
@@ -174,6 +177,7 @@ model CatalogItem {
 
 model Transaction {
   id                String                     @id @default(uuid())
+  organizationId    String                     // Organization this transaction belongs to (from auth-svc)
   clientId          String
   operationDate     DateTime
   operationType     TransactionOperationType
@@ -202,6 +206,7 @@ model Transaction {
   paymentMethods    TransactionPaymentMethod[]
 
   @@map("transactions")
+  @@index([organizationId])
   @@index([clientId])
   @@index([operationDate])
   @@index([operationType])
@@ -240,27 +245,30 @@ enum AlertSeverity {
 }
 
 model AlertRule {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  active      Boolean  @default(true)
-  severity    AlertSeverity @default(MEDIUM)
+  id             String   @id @default(uuid())
+  organizationId String   // Organization this rule belongs to (from auth-svc)
+  name           String
+  description    String?
+  active         Boolean  @default(true)
+  severity       AlertSeverity @default(MEDIUM)
   // Dynamic rule configuration stored as JSON
   // Example: { "conditions": [...], "aggregations": {...}, "thresholds": {...} }
-  ruleConfig  String   // JSON string containing the dynamic rule configuration
-  metadata    String?  // Additional metadata as JSON
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  ruleConfig     String   // JSON string containing the dynamic rule configuration
+  metadata       String?  // Additional metadata as JSON
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   alerts Alert[]
 
   @@map("alert_rules")
+  @@index([organizationId])
   @@index([active])
   @@index([severity])
 }
 
 model Alert {
   id                String      @id @default(uuid())
+  organizationId    String      // Organization this alert belongs to (from auth-svc)
   alertRuleId       String
   clientId          String
   status            AlertStatus @default(DETECTED)
@@ -300,6 +308,7 @@ model Alert {
   client    Client    @relation(fields: [clientId], references: [rfc], onDelete: Cascade)
 
   @@map("alerts")
+  @@index([organizationId])
   @@index([alertRuleId])
   @@index([clientId])
   @@index([status])
@@ -329,18 +338,18 @@ model UmaValue {
   @@index([effectiveDate])
 }
 
-// Compliance Organization - stores RFC and vulnerable activity for the compliance officer's organization
-// Linked 1:1 to user (from JWT)
-model ComplianceOrganization {
+// Organization Settings - stores RFC and vulnerable activity for the organization
+// Linked 1:1 to organization (from auth-svc better-auth organization plugin)
+model OrganizationSettings {
   id                    String   @id @default(uuid())
-  userId                String   @unique // User ID from JWT (compliance officer)
+  organizationId        String   @unique // Organization ID from auth-svc
   obligatedSubjectKey   String   // RFC (clave_sujeto_obligado) - 12 characters
   activityKey           String   // Vulnerable activity code (e.g., "VEH") - reference to vulnerable-activities catalog
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  @@map("compliance_organizations")
-  @@index([userId])
+  @@map("organization_settings")
+  @@index([organizationId])
   @@index([obligatedSubjectKey])
   @@index([activityKey])
 }

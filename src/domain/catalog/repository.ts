@@ -30,9 +30,18 @@ function mapCatalog(record: PrismaCatalog): CatalogEntity {
 		key: record.key,
 		name: record.name,
 		active: record.active,
+		allowNewItems: record.allowNewItems,
 		createdAt: toIsoString(record.createdAt),
 		updatedAt: toIsoString(record.updatedAt),
 	};
+}
+
+function normalizeName(value: string): string {
+	return value
+		.normalize("NFD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.toLowerCase()
+		.trim();
 }
 
 function mapCatalogItem(record: PrismaCatalogItem): CatalogItemEntity {
@@ -148,5 +157,37 @@ export class CatalogRepository {
 			data: records.map(mapCatalogItem),
 			pagination: buildPagination({ page, pageSize, total }),
 		};
+	}
+
+	async findItemByNormalizedName(
+		catalogId: string,
+		normalizedName: string,
+	): Promise<CatalogItemEntity | null> {
+		const item = await this.prisma.catalogItem.findFirst({
+			where: {
+				catalogId,
+				normalizedName,
+			},
+		});
+
+		return item ? mapCatalogItem(item) : null;
+	}
+
+	async createItem(
+		catalogId: string,
+		name: string,
+	): Promise<CatalogItemEntity> {
+		const normalizedName = normalizeName(name);
+
+		const item = await this.prisma.catalogItem.create({
+			data: {
+				catalogId,
+				name: name.trim(),
+				normalizedName,
+				active: true,
+			},
+		});
+
+		return mapCatalogItem(item);
 	}
 }

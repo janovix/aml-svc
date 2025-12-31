@@ -22,7 +22,9 @@ const catalogScripts = [
 	"catalog-payment-forms.mjs",
 	"catalog-payment-methods.mjs",
 	"catalog-states.mjs",
-	"catalog-vehicle-brands.mjs",
+	"catalog-terrestrial-vehicle-brands.mjs",
+	"catalog-maritime-vehicle-brands.mjs",
+	"catalog-air-vehicle-brands.mjs",
 	"catalog-vulnerable-activities.mjs",
 ];
 

@@ -494,7 +494,14 @@ function generateTransaction(
  * Synthetic Data Generator Service
  */
 export class SyntheticDataGenerator {
-	constructor(private readonly prisma: PrismaClient) {}
+	private readonly organizationId: string;
+
+	constructor(
+		private readonly prisma: PrismaClient,
+		organizationId: string,
+	) {
+		this.organizationId = organizationId;
+	}
 
 	/**
 	 * Generates synthetic data based on the provided options
@@ -565,6 +572,7 @@ export class SyntheticDataGenerator {
 				const client = await this.prisma.client.create({
 					data: {
 						rfc: clientData.rfc,
+						organizationId: this.organizationId,
 						personType: clientData.personType.toUpperCase() as
 							| "PHYSICAL"
 							| "MORAL"
@@ -658,6 +666,7 @@ export class SyntheticDataGenerator {
 					// Note: UMA value is left null for synthetic data (can be calculated later if needed)
 					const transaction = await this.prisma.transaction.create({
 						data: {
+							organizationId: this.organizationId,
 							clientId: transactionData.clientId,
 							operationDate: new Date(transactionData.operationDate),
 							operationType: transactionData.operationType.toUpperCase() as

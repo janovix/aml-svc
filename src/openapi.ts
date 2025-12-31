@@ -48,9 +48,9 @@ export const openAPISpec = {
 				"UMA (Unidad de Medida y Actualización) value management endpoints",
 		},
 		{
-			name: "Compliance Organization",
+			name: "Organization Settings",
 			description:
-				"Compliance organization management endpoints (RFC and vulnerable activity for compliance officer)",
+				"Organization settings management endpoints (RFC and vulnerable activity for compliance officer)",
 		},
 	],
 	paths: {
@@ -721,6 +721,79 @@ export const openAPISpec = {
 					},
 					"404": {
 						description: "Catalog not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/catalogs/{catalogKey}/items": {
+			post: {
+				tags: ["Catalogs"],
+				summary: "Create a new catalog item",
+				description:
+					"Add a new item to an open catalog (one that allows new items to be added). Returns 403 if the catalog is closed.",
+				parameters: [
+					{
+						name: "catalogKey",
+						in: "path",
+						required: true,
+						schema: {
+							type: "string",
+							minLength: 3,
+							maxLength: 64,
+							pattern: "^[a-zA-Z0-9-]+$",
+						},
+						description:
+							"Identifier of the catalog to add the item to (e.g., `terrestrial-vehicle-brands`).",
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/CatalogItemCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Catalog item created successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/CatalogItem" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"403": {
+						description: "Catalog does not allow adding new items",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "Catalog not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"409": {
+						description: "An item with this name already exists",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
@@ -1785,25 +1858,25 @@ export const openAPISpec = {
 				},
 			},
 		},
-		"/api/v1/compliance-organization": {
+		"/api/v1/organization-settings": {
 			get: {
-				tags: ["Compliance Organization"],
-				summary: "Get compliance organization",
+				tags: ["Organization Settings"],
+				summary: "Get organization settings",
 				description:
-					"Retrieve the compliance organization (RFC and vulnerable activity) for the authenticated user.",
+					"Retrieve the organization settings (RFC and vulnerable activity) for the authenticated user's organization.",
 				responses: {
 					"200": {
-						description: "Compliance organization",
+						description: "Organization settings",
 						content: {
 							"application/json": {
 								schema: {
-									$ref: "#/components/schemas/ComplianceOrganization",
+									$ref: "#/components/schemas/OrganizationSettings",
 								},
 							},
 						},
 					},
 					"404": {
-						description: "Compliance organization not found",
+						description: "Organization settings not found",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
@@ -1813,27 +1886,27 @@ export const openAPISpec = {
 				},
 			},
 			put: {
-				tags: ["Compliance Organization"],
-				summary: "Create or update compliance organization",
+				tags: ["Organization Settings"],
+				summary: "Create or update organization settings",
 				description:
-					"Create or update the compliance organization (RFC and vulnerable activity) for the authenticated user.",
+					"Create or update the organization settings (RFC and vulnerable activity) for the authenticated user's organization.",
 				requestBody: {
 					required: true,
 					content: {
 						"application/json": {
 							schema: {
-								$ref: "#/components/schemas/ComplianceOrganizationCreateRequest",
+								$ref: "#/components/schemas/OrganizationSettingsCreateRequest",
 							},
 						},
 					},
 				},
 				responses: {
 					"200": {
-						description: "Compliance organization created or updated",
+						description: "Organization settings created or updated",
 						content: {
 							"application/json": {
 								schema: {
-									$ref: "#/components/schemas/ComplianceOrganization",
+									$ref: "#/components/schemas/OrganizationSettings",
 								},
 							},
 						},
@@ -1849,33 +1922,33 @@ export const openAPISpec = {
 				},
 			},
 			patch: {
-				tags: ["Compliance Organization"],
-				summary: "Update compliance organization",
+				tags: ["Organization Settings"],
+				summary: "Update organization settings",
 				description:
-					"Partially update the compliance organization for the authenticated user.",
+					"Partially update the organization settings for the authenticated user's organization.",
 				requestBody: {
 					required: true,
 					content: {
 						"application/json": {
 							schema: {
-								$ref: "#/components/schemas/ComplianceOrganizationUpdateRequest",
+								$ref: "#/components/schemas/OrganizationSettingsUpdateRequest",
 							},
 						},
 					},
 				},
 				responses: {
 					"200": {
-						description: "Compliance organization updated",
+						description: "Organization settings updated",
 						content: {
 							"application/json": {
 								schema: {
-									$ref: "#/components/schemas/ComplianceOrganization",
+									$ref: "#/components/schemas/OrganizationSettings",
 								},
 							},
 						},
 					},
 					"404": {
-						description: "Compliance organization not found",
+						description: "Organization settings not found",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
@@ -2423,7 +2496,7 @@ export const openAPISpec = {
 				properties: {
 					catalog: {
 						type: "object",
-						required: ["id", "key", "name"],
+						required: ["id", "key", "name", "allowNewItems"],
 						properties: {
 							id: {
 								type: "string",
@@ -2439,6 +2512,11 @@ export const openAPISpec = {
 								type: "string",
 								description: "Human readable catalog name",
 							},
+							allowNewItems: {
+								type: "boolean",
+								description:
+									"When true, users can add new items to this catalog dynamically",
+							},
 						},
 					},
 					data: {
@@ -2446,6 +2524,18 @@ export const openAPISpec = {
 						items: { $ref: "#/components/schemas/CatalogItem" },
 					},
 					pagination: { $ref: "#/components/schemas/CatalogPagination" },
+				},
+			},
+			CatalogItemCreateRequest: {
+				type: "object",
+				required: ["name"],
+				properties: {
+					name: {
+						type: "string",
+						minLength: 1,
+						maxLength: 200,
+						description: "The name of the new catalog item",
+					},
 				},
 			},
 			PaymentMethod: {
@@ -3309,11 +3399,11 @@ export const openAPISpec = {
 					},
 				},
 			},
-			ComplianceOrganization: {
+			OrganizationSettings: {
 				type: "object",
 				required: [
 					"id",
-					"userId",
+					"organizationId",
 					"obligatedSubjectKey",
 					"activityKey",
 					"createdAt",
@@ -3323,12 +3413,12 @@ export const openAPISpec = {
 					id: {
 						type: "string",
 						pattern: "^[A-Za-z0-9-]{1,64}$",
-						description: "Compliance organization identifier",
+						description: "Organization settings identifier",
 					},
-					userId: {
+					organizationId: {
 						type: "string",
 						description:
-							"User ID from JWT (compliance officer) - unique, 1:1 relationship",
+							"Organization ID from auth-svc (better-auth organization plugin)",
 					},
 					obligatedSubjectKey: {
 						type: "string",
@@ -3349,7 +3439,7 @@ export const openAPISpec = {
 					updatedAt: { type: "string", format: "date-time" },
 				},
 			},
-			ComplianceOrganizationCreateRequest: {
+			OrganizationSettingsCreateRequest: {
 				type: "object",
 				required: ["obligatedSubjectKey", "activityKey"],
 				properties: {
@@ -3370,7 +3460,7 @@ export const openAPISpec = {
 					},
 				},
 			},
-			ComplianceOrganizationUpdateRequest: {
+			OrganizationSettingsUpdateRequest: {
 				type: "object",
 				properties: {
 					obligatedSubjectKey: {

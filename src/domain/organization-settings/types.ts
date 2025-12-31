@@ -1,6 +1,6 @@
-export interface ComplianceOrganizationEntity {
+export interface OrganizationSettingsEntity {
 	id: string;
-	userId: string; // User ID from JWT (compliance officer)
+	organizationId: string; // Organization ID from auth-svc (better-auth organization plugin)
 	obligatedSubjectKey: string; // RFC (clave_sujeto_obligado) - 12 characters
 	activityKey: string; // Vulnerable activity code (e.g., "VEH")
 	createdAt: string;

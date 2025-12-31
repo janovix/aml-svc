@@ -217,6 +217,7 @@ export function mapPrismaClient(
 	return {
 		id: record.rfc,
 		rfc: record.rfc,
+		organizationId: record.organizationId,
 		personType: fromPrismaPersonType(record.personType),
 		firstName: record.firstName ?? undefined,
 		lastName: record.lastName ?? undefined,
