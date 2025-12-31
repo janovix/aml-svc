@@ -31,7 +31,7 @@
 		"producers": [
 			{
 				"binding": "ALERT_DETECTION_QUEUE",
-				"queue": "alert-detection-queue-preview",
+				"queue": "alert-detection-preview",
 			},
 		],
 	},
