@@ -1,3 +1,10 @@
+# [1.1.0-rc.21](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.20...v1.1.0-rc.21) (2025-12-31)
+
+
+### Features
+
+* Improve RFC validation and add tests ([1fb6a8f](https://github.com/janovix/aml-svc/commit/1fb6a8f2f2f9fda0858780a2f03d4a4acbb074e6))
+
 # [1.1.0-rc.20](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.19...v1.1.0-rc.20) (2025-12-30)
 
 
