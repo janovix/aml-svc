@@ -343,13 +343,15 @@ export const ClientFilterSchema = z.object({
 	limit: z.coerce.number().int().min(1).max(100).default(10),
 });
 
-// RFC is now the primary key, so we use it as the ID parameter
+// Client ID format: CLT + 9 base62 characters (12 characters total)
+const CLIENT_ID_REGEX = /^CLT[A-Za-z0-9]{9}$/;
+
 export const ClientIdParamSchema = z.object({
 	id: z
 		.string()
-		.refine(
-			(value) => RFC_PHYSICAL_REGEX.test(value) || RFC_MORAL_REGEX.test(value),
-			"Invalid RFC format",
+		.regex(
+			CLIENT_ID_REGEX,
+			"Invalid Client ID format (expected: CLT + 9 characters)",
 		)
 		.transform((value) => value.toUpperCase()),
 });
@@ -357,9 +359,9 @@ export const ClientIdParamSchema = z.object({
 export const DocumentIdParamSchema = z.object({
 	clientId: z
 		.string()
-		.refine(
-			(value) => RFC_PHYSICAL_REGEX.test(value) || RFC_MORAL_REGEX.test(value),
-			"Invalid RFC format",
+		.regex(
+			CLIENT_ID_REGEX,
+			"Invalid Client ID format (expected: CLT + 9 characters)",
 		)
 		.transform((value) => value.toUpperCase()),
 	documentId: ResourceIdSchema,
@@ -368,9 +370,9 @@ export const DocumentIdParamSchema = z.object({
 export const AddressIdParamSchema = z.object({
 	clientId: z
 		.string()
-		.refine(
-			(value) => RFC_PHYSICAL_REGEX.test(value) || RFC_MORAL_REGEX.test(value),
-			"Invalid RFC format",
+		.regex(
+			CLIENT_ID_REGEX,
+			"Invalid Client ID format (expected: CLT + 9 characters)",
 		)
 		.transform((value) => value.toUpperCase()),
 	addressId: ResourceIdSchema,
@@ -379,9 +381,9 @@ export const AddressIdParamSchema = z.object({
 export const ClientDocumentCreateSchema = z.object({
 	clientId: z
 		.string()
-		.refine(
-			(value) => RFC_PHYSICAL_REGEX.test(value) || RFC_MORAL_REGEX.test(value),
-			"Invalid RFC format",
+		.regex(
+			CLIENT_ID_REGEX,
+			"Invalid Client ID format (expected: CLT + 9 characters)",
 		)
 		.transform((value) => value.toUpperCase()),
 	documentType: DocumentTypeSchema,
@@ -428,9 +430,9 @@ export const ClientDocumentPatchSchema = z
 export const ClientAddressCreateSchema = z.object({
 	clientId: z
 		.string()
-		.refine(
-			(value) => RFC_PHYSICAL_REGEX.test(value) || RFC_MORAL_REGEX.test(value),
-			"Invalid RFC format",
+		.regex(
+			CLIENT_ID_REGEX,
+			"Invalid Client ID format (expected: CLT + 9 characters)",
 		)
 		.transform((value) => value.toUpperCase()),
 	addressType: AddressTypeSchema.default("RESIDENTIAL"),
