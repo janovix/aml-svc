@@ -117,7 +117,7 @@ describe("Multi-Tenant Security", () => {
 	}
 
 	describe("Organization Requirement", () => {
-		it("should reject requests without organizationId in JWT", async () => {
+		it("should reject requests without organizationId in JWT with 409 status", async () => {
 			const app = createTestApp({ requireOrganization: true });
 
 			const token = await createTestJWT(keyPair.privateKey, {
@@ -135,9 +135,12 @@ describe("Multi-Tenant Security", () => {
 				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
 			);
 
-			expect(res.status).toBe(403);
-			const body = (await res.json()) as ErrorResponse;
+			// 409 Conflict is used to distinguish from 403 Forbidden (access denied)
+			// This allows frontend to detect "no org selected" vs "unauthorized"
+			expect(res.status).toBe(409);
+			const body = (await res.json()) as ErrorResponse & { code?: string };
 			expect(body.error).toBe("Organization Required");
+			expect(body.code).toBe("ORGANIZATION_REQUIRED");
 		});
 
 		it("should accept requests with organizationId in JWT", async () => {
@@ -230,9 +233,11 @@ describe("Multi-Tenant Security", () => {
 				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
 			);
 
-			expect(res.status).toBe(403);
-			const body = (await res.json()) as ErrorResponse;
+			// 409 Conflict is used to distinguish from 403 Forbidden (access denied)
+			expect(res.status).toBe(409);
+			const body = (await res.json()) as ErrorResponse & { code?: string };
 			expect(body.error).toBe("Organization Required");
+			expect(body.code).toBe("ORGANIZATION_REQUIRED");
 		});
 
 		it("should handle undefined organizationId as missing", async () => {
@@ -253,9 +258,11 @@ describe("Multi-Tenant Security", () => {
 				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
 			);
 
-			expect(res.status).toBe(403);
-			const body = (await res.json()) as ErrorResponse;
+			// 409 Conflict is used to distinguish from 403 Forbidden (access denied)
+			expect(res.status).toBe(409);
+			const body = (await res.json()) as ErrorResponse & { code?: string };
 			expect(body.error).toBe("Organization Required");
+			expect(body.code).toBe("ORGANIZATION_REQUIRED");
 		});
 	});
 
