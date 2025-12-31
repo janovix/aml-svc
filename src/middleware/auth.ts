@@ -265,15 +265,18 @@ export function authMiddleware(options?: {
 			c.set("tokenPayload", payload);
 
 			// Check if organization is required but not present
+			// Return 409 Conflict to distinguish from 403 Forbidden (access denied)
+			// This allows the frontend to detect "no org selected" vs "unauthorized"
 			if (requireOrganization && !organization) {
 				return c.json(
 					{
 						success: false,
 						error: "Organization Required",
+						code: "ORGANIZATION_REQUIRED",
 						message:
 							"An active organization must be selected. Please switch to an organization first.",
 					},
-					403,
+					409,
 				);
 			}
 
