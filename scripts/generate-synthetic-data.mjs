@@ -17,7 +17,7 @@
  *   CLIENTS_INCLUDE_ADDRESSES - Include addresses for clients (default: false)
  *   TRANSACTIONS_COUNT - Number of transactions to generate (default: 50)
  *   TRANSACTIONS_PER_CLIENT - Number of transactions per client (optional)
- *   WRANGLER_CONFIG - Wrangler config file (optional, defaults to wrangler.preview.jsonc)
+ *   WRANGLER_CONFIG - Wrangler config file (optional, auto-detected based on environment)
  *   CLOUDFLARE_API_TOKEN - Cloudflare API token for D1 access (required for remote)
  *   CLOUDFLARE_ACCOUNT_ID - Cloudflare account ID (required for remote)
  */
@@ -42,8 +42,18 @@ const transactionsCount = parseInt(process.env.TRANSACTIONS_COUNT || "50", 10);
 const transactionsPerClient = process.env.TRANSACTIONS_PER_CLIENT
 	? parseInt(process.env.TRANSACTIONS_PER_CLIENT, 10)
 	: undefined;
-const wranglerConfigFile =
-	process.env.WRANGLER_CONFIG || "wrangler.preview.jsonc";
+let wranglerConfigFile = process.env.WRANGLER_CONFIG;
+if (!wranglerConfigFile) {
+	if (
+		process.env.CF_PAGES_BRANCH ||
+		(process.env.WORKERS_CI_BRANCH &&
+			process.env.WORKERS_CI_BRANCH !== "main") ||
+		process.env.PREVIEW === "true"
+	) {
+		wranglerConfigFile = "wrangler.preview.jsonc";
+	}
+}
+const resolvedWranglerConfigFile = wranglerConfigFile || "wrangler.jsonc";
 
 // Determine if we're running locally or remotely
 const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
@@ -83,7 +93,7 @@ if (invalidModels.length > 0) {
  */
 async function getD1Database() {
 	// Read wrangler config
-	const configPath = join(__dirname, "..", wranglerConfigFile);
+	const configPath = join(__dirname, "..", resolvedWranglerConfigFile);
 	let config;
 	try {
 		const configContent = readFileSync(configPath, "utf-8");
@@ -178,7 +188,7 @@ async function getD1Database() {
 		config = JSON.parse(jsonContent);
 	} catch (error) {
 		console.error(
-			`❌ Error reading wrangler config from ${wranglerConfigFile}:`,
+			`❌ Error reading wrangler config from ${resolvedWranglerConfigFile}:`,
 			error,
 		);
 		if (error instanceof SyntaxError) {
@@ -386,6 +396,7 @@ async function generateSyntheticData() {
 	console.log(`🔧 Generating synthetic data for user: ${userId}`);
 	console.log(`   Organization: ${organizationId}`);
 	console.log(`   Environment: ${isRemote ? "remote" : "local"}`);
+	console.log(`   Config: ${resolvedWranglerConfigFile}`);
 	console.log(`   Models: ${models.join(", ")}`);
 	console.log("");
 

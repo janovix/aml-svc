@@ -1,3 +1,24 @@
+# [1.1.0-rc.21](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.20...v1.1.0-rc.21) (2025-12-31)
+
+
+### Features
+
+* Improve RFC validation and add tests ([1fb6a8f](https://github.com/janovix/aml-svc/commit/1fb6a8f2f2f9fda0858780a2f03d4a4acbb074e6))
+
+# [1.1.0-rc.20](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.19...v1.1.0-rc.20) (2025-12-30)
+
+
+### Features
+
+* add target environment input and dynamic wrangler config selection for synthetic data generation ([066d0cb](https://github.com/janovix/aml-svc/commit/066d0cb7503657bee2867021d88a1614659217be))
+
+# [1.1.0-rc.19](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.18...v1.1.0-rc.19) (2025-12-30)
+
+
+### Bug Fixes
+
+* implement synthetic data generation for clients and transactions with SQL output ([e3eb469](https://github.com/janovix/aml-svc/commit/e3eb469b4421b2dae969c1cd7aa2c3c374100781))
+
 # [1.1.0-rc.18](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.17...v1.1.0-rc.18) (2025-12-30)
 
 

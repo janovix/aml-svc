@@ -1,6 +1,6 @@
 {
 	"name": "aml-svc",
-	"version": "1.1.0-rc.18",
+	"version": "1.1.0-rc.21",
 	"description": "Complete backend API template using Hono + Chanfana + D1 + Vitest.",
 	"cloudflare": {
 		"label": "Backend OpenAPI Template",
@@ -44,6 +44,7 @@
 		"prettier": "3.4.2",
 		"prisma": "^6.17.1",
 		"semantic-release": "24.2.1",
+		"tsx": "^4.19.2",
 		"typescript": "5.9.3",
 		"typescript-eslint": "8.49.0",
 		"vitest": "3.2.4",
