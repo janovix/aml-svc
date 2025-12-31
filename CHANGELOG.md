@@ -1,3 +1,10 @@
+# [1.1.0-rc.24](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.23...v1.1.0-rc.24) (2025-12-31)
+
+
+### Bug Fixes
+
+* update auth middleware to return 409 Conflict for missing organization ([f6f633a](https://github.com/janovix/aml-svc/commit/f6f633abce89e15e400145137279a38b629417e7))
+
 # [1.1.0-rc.23](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.22...v1.1.0-rc.23) (2025-12-31)
 
 
