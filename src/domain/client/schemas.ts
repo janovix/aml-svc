@@ -149,8 +149,8 @@ const validateRFC = (personType: "physical" | "moral" | "trust") => {
 			{
 				message:
 					personType === "physical"
-						? "RFC for physical persons must be 13 characters"
-						: "RFC for legal entities must be 12 characters",
+						? "RFC for physical persons must be exactly 13 characters and match format: 4 letters + 6 digits + 3 alphanumeric (e.g., ABCD123456EF1)"
+						: "RFC for legal entities must be exactly 12 characters and match format: 3 letters + 6 digits + 3 alphanumeric (e.g., ABC123456EF1)",
 			},
 		);
 };
