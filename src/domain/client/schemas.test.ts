@@ -54,7 +54,7 @@ describe("Client Schema Validation", () => {
 					postalCode: "03100",
 				};
 				expect(() => ClientPhysicalSchema.parse(payload)).toThrow(
-					/RFC for physical persons must be exactly 13 characters/i,
+					/RFC for physical persons must be exactly 13 characters \(got 12\)/i,
 				);
 			});
 
@@ -79,7 +79,7 @@ describe("Client Schema Validation", () => {
 					postalCode: "03100",
 				};
 				expect(() => ClientPhysicalSchema.parse(payload)).toThrow(
-					/RFC for physical persons must be exactly 13 characters/i,
+					/RFC for physical persons must match format/i,
 				);
 			});
 
@@ -147,7 +147,7 @@ describe("Client Schema Validation", () => {
 					postalCode: "03100",
 				};
 				expect(() => ClientMoralSchema.parse(payload)).toThrow(
-					/RFC for legal entities must be exactly 12 characters/i,
+					/RFC for legal entities must be exactly 12 characters \(got 11\)/i,
 				);
 			});
 
@@ -169,7 +169,7 @@ describe("Client Schema Validation", () => {
 					postalCode: "03100",
 				};
 				expect(() => ClientMoralSchema.parse(payload)).toThrow(
-					/RFC for legal entities must be exactly 12 characters/i,
+					/RFC for legal entities must match format/i,
 				);
 			});
 
