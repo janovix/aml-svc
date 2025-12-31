@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import type { UmaValue as PrismaUmaValueModel } from "@prisma/client";
 
+import { generateId } from "../../lib/id-generator";
 import type {
 	UmaValueCreateInput,
 	UmaValuePatchInput,
@@ -50,8 +51,9 @@ export function mapPrismaUmaValue(prisma: PrismaUmaValueModel): UmaValueEntity {
 
 export function mapUmaValueCreateInputToPrisma(
 	input: UmaValueCreateInput,
-): Omit<PrismaUmaValueModel, "id" | "createdAt" | "updatedAt"> {
+): Omit<PrismaUmaValueModel, "createdAt" | "updatedAt"> {
 	return {
+		id: generateId("UMA_VALUE"),
 		year: input.year,
 		dailyValue: toPrismaDecimal(input.dailyValue),
 		effectiveDate: new Date(input.effectiveDate),

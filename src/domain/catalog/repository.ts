@@ -5,6 +5,7 @@ import type {
 } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 
+import { generateId } from "../../lib/id-generator";
 import type {
 	CatalogEntity,
 	CatalogItemEntity,
@@ -201,6 +202,7 @@ export class CatalogRepository {
 
 		const item = await this.prisma.catalogItem.create({
 			data: {
+				id: generateId("CATALOG_ITEM"),
 				catalogId,
 				name: name.trim(),
 				normalizedName,

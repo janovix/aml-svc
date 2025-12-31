@@ -114,7 +114,7 @@ export class AlertServiceBinding {
 
 		// Get organizationId from client
 		const client = await prisma.client.findUnique({
-			where: { rfc: alertData.clientId },
+			where: { id: alertData.clientId },
 			select: { organizationId: true },
 		});
 

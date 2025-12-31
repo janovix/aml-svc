@@ -51,7 +51,8 @@ enum TransactionVehicleType {
 }
 
 model Client {
-  rfc               String     @id
+  id                String     @id
+  rfc               String     @unique
   organizationId    String     // Organization this client belongs to (from auth-svc)
   personType        PersonType
   firstName         String?
@@ -96,7 +97,7 @@ model Client {
 }
 
 model ClientDocument {
-  id             String         @id @default(uuid())
+  id             String         @id
   clientId       String
   documentType   DocumentType
   documentNumber String
@@ -109,7 +110,7 @@ model ClientDocument {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  client Client @relation(fields: [clientId], references: [rfc], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("client_documents")
   @@index([clientId])
@@ -119,7 +120,7 @@ model ClientDocument {
 }
 
 model ClientAddress {
-  id          String      @id @default(uuid())
+  id          String      @id
   clientId    String
   addressType AddressType @default(RESIDENTIAL)
   street1     String
@@ -134,7 +135,7 @@ model ClientAddress {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  client Client @relation(fields: [clientId], references: [rfc], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("client_addresses")
   @@index([clientId])
@@ -143,7 +144,7 @@ model ClientAddress {
 }
 
 model Catalog {
-  id            String        @id @default(uuid())
+  id            String        @id
   key           String        @unique
   name          String
   active        Boolean       @default(true)
@@ -158,7 +159,7 @@ model Catalog {
 }
 
 model CatalogItem {
-  id             String   @id @default(uuid())
+  id             String   @id
   catalogId      String
   name           String
   normalizedName String
@@ -176,7 +177,7 @@ model CatalogItem {
 }
 
 model Transaction {
-  id                String                     @id @default(uuid())
+  id                String                     @id
   organizationId    String                     // Organization this transaction belongs to (from auth-svc)
   clientId          String
   operationDate     DateTime
@@ -202,7 +203,7 @@ model Transaction {
   updatedAt         DateTime                   @updatedAt
   deletedAt         DateTime?
 
-  client Client @relation(fields: [clientId], references: [rfc], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
   paymentMethods    TransactionPaymentMethod[]
 
   @@map("transactions")
@@ -216,7 +217,7 @@ model Transaction {
 }
 
 model TransactionPaymentMethod {
-  id            String      @id @default(uuid())
+  id            String      @id
   transactionId String
   method        String
   amount        Decimal
@@ -245,7 +246,7 @@ enum AlertSeverity {
 }
 
 model AlertRule {
-  id             String   @id @default(uuid())
+  id             String   @id
   organizationId String   // Organization this rule belongs to (from auth-svc)
   name           String
   description    String?
@@ -267,7 +268,7 @@ model AlertRule {
 }
 
 model Alert {
-  id                String      @id @default(uuid())
+  id                String      @id
   organizationId    String      // Organization this alert belongs to (from auth-svc)
   alertRuleId       String
   clientId          String
@@ -305,7 +306,7 @@ model Alert {
   updatedAt         DateTime    @updatedAt
 
   alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Restrict)
-  client    Client    @relation(fields: [clientId], references: [rfc], onDelete: Cascade)
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("alerts")
   @@index([organizationId])
@@ -321,7 +322,7 @@ model Alert {
 }
 
 model UmaValue {
-  id          String   @id @default(uuid())
+  id          String   @id
   year        Int      @unique // Year this UMA value applies to (e.g., 2025)
   dailyValue  Decimal  // UMA daily value for the year
   effectiveDate DateTime // Date when this UMA value becomes effective
@@ -341,7 +342,7 @@ model UmaValue {
 // Organization Settings - stores RFC and vulnerable activity for the organization
 // Linked 1:1 to organization (from auth-svc better-auth organization plugin)
 model OrganizationSettings {
-  id                    String   @id @default(uuid())
+  id                    String   @id
   organizationId        String   @unique // Organization ID from auth-svc
   obligatedSubjectKey   String   // RFC (clave_sujeto_obligado) - 12 characters
   activityKey           String   // Vulnerable activity code (e.g., "VEH") - reference to vulnerable-activities catalog

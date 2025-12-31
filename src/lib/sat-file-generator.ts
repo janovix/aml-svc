@@ -124,7 +124,7 @@ export async function generateAndUploadSatFile(
 		contentType: "application/xml",
 		metadata: {
 			alertId: alert.id,
-			clientId: client.rfc,
+			clientId: client.id,
 			transactionId: transaction.id,
 			generatedAt: new Date().toISOString(),
 		},

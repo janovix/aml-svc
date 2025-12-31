@@ -5,6 +5,7 @@ import type {
 	AlertStatus as PrismaAlertStatus,
 } from "@prisma/client";
 
+import { generateId } from "../../lib/id-generator";
 import type {
 	AlertCreateInput,
 	AlertPatchInput,
@@ -124,8 +125,9 @@ export function mapPrismaAlert(prisma: PrismaAlertModel): AlertEntity {
 export function mapAlertRuleCreateInputToPrisma(
 	input: AlertRuleCreateInput,
 	organizationId: string,
-): Omit<PrismaAlertRuleModel, "id" | "createdAt" | "updatedAt"> {
+): Omit<PrismaAlertRuleModel, "createdAt" | "updatedAt"> {
 	return {
+		id: generateId("ALERT_RULE"),
 		organizationId,
 		name: input.name,
 		description: input.description ?? null,
@@ -181,8 +183,9 @@ export function mapAlertRulePatchInputToPrisma(
 export function mapAlertCreateInputToPrisma(
 	input: AlertCreateInput,
 	organizationId: string,
-): Omit<PrismaAlertModel, "id" | "createdAt" | "updatedAt"> {
+): Omit<PrismaAlertModel, "createdAt" | "updatedAt"> {
 	return {
+		id: generateId("ALERT"),
 		organizationId,
 		alertRuleId: input.alertRuleId,
 		clientId: input.clientId,

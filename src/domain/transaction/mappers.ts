@@ -6,6 +6,7 @@ import type {
 	TransactionPaymentMethod as PrismaPaymentMethod,
 } from "@prisma/client";
 
+import { generateId } from "../../lib/id-generator";
 import type { TransactionCreateInput, TransactionUpdateInput } from "./schemas";
 import type {
 	OperationType,
@@ -114,6 +115,7 @@ export function mapCreateInputToPrisma(
 	umaValue?: Prisma.Decimal | null,
 ) {
 	return {
+		id: generateId("TRANSACTION"),
 		organizationId,
 		clientId: input.clientId,
 		operationDate: toPrismaDateOnly(input.operationDate),
@@ -135,6 +137,7 @@ export function mapCreateInputToPrisma(
 		umaValue: umaValue ?? null,
 		paymentMethods: {
 			create: input.paymentMethods.map((pm) => ({
+				id: generateId("TRANSACTION_PAYMENT_METHOD"),
 				method: pm.method,
 				amount: toPrismaDecimal(pm.amount),
 			})),
@@ -167,6 +170,7 @@ export function mapUpdateInputToPrisma(
 		paymentMethods: {
 			deleteMany: {},
 			create: input.paymentMethods.map((pm) => ({
+				id: generateId("TRANSACTION_PAYMENT_METHOD"),
 				method: pm.method,
 				amount: toPrismaDecimal(pm.amount),
 			})),

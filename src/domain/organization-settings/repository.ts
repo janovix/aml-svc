@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 
+import { generateId } from "../../lib/id-generator";
 import type { OrganizationSettingsEntity } from "./types";
 import { mapPrismaOrganizationSettings } from "./mappers";
 
@@ -29,6 +30,7 @@ export class OrganizationSettingsRepository {
 	): Promise<OrganizationSettingsEntity> {
 		const prisma = await this.prisma.organizationSettings.create({
 			data: {
+				id: generateId("ORGANIZATION_SETTINGS"),
 				organizationId,
 				obligatedSubjectKey: data.obligatedSubjectKey,
 				activityKey: data.activityKey,
@@ -70,6 +72,7 @@ export class OrganizationSettingsRepository {
 		const prisma = await this.prisma.organizationSettings.upsert({
 			where: { organizationId },
 			create: {
+				id: generateId("ORGANIZATION_SETTINGS"),
 				organizationId,
 				obligatedSubjectKey: data.obligatedSubjectKey,
 				activityKey: data.activityKey,

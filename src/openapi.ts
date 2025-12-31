@@ -202,8 +202,7 @@ export const openAPISpec = {
 						in: "path",
 						required: true,
 						schema: { type: "string" },
-						description:
-							"Client RFC (Registro Federal de Contribuyentes) - Primary key",
+						description: "Client ID",
 					},
 				],
 				responses: {
@@ -1320,7 +1319,7 @@ export const openAPISpec = {
 						name: "clientId",
 						in: "query",
 						schema: { type: "string" },
-						description: "Filter by client ID (RFC)",
+						description: "Filter by client ID",
 					},
 					{
 						name: "status",
@@ -2274,7 +2273,7 @@ export const openAPISpec = {
 					},
 					clientId: {
 						type: "string",
-						description: "FK to the owning client (RFC - Primary key)",
+						description: "FK to the owning client",
 					},
 					documentType: {
 						type: "string",
@@ -2379,7 +2378,7 @@ export const openAPISpec = {
 					},
 					clientId: {
 						type: "string",
-						description: "FK to the owning client (RFC - Primary key)",
+						description: "FK to the owning client",
 					},
 					addressType: {
 						type: "string",
@@ -3102,7 +3101,7 @@ export const openAPISpec = {
 					},
 					clientId: {
 						type: "string",
-						description: "Client ID (RFC) for which this alert was generated",
+						description: "Client ID for which this alert was generated",
 					},
 					status: { $ref: "#/components/schemas/AlertStatus" },
 					severity: { $ref: "#/components/schemas/AlertSeverity" },

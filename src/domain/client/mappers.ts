@@ -5,6 +5,7 @@ import type {
 	PersonType as PrismaPersonType,
 } from "@prisma/client";
 
+import { generateId } from "../../lib/id-generator";
 import type {
 	ClientAddressCreateInput,
 	ClientAddressPatchInput,
@@ -142,8 +143,8 @@ function basePrismaPayload(input: ClientCreateInput | ClientUpdateInput) {
 
 export function mapCreateInputToPrisma(input: ClientCreateInput) {
 	const payload = basePrismaPayload(input);
-	// RFC is now the primary key, so we use it as the id
 	return {
+		id: generateId("CLIENT"),
 		...payload,
 		rfc: input.rfc.toUpperCase(),
 	};
@@ -213,9 +214,8 @@ export function mapPrismaClient(
 		addresses?: PrismaClientAddressModel[];
 	},
 ): ClientEntity {
-	// RFC is now the primary key, so id = rfc
 	return {
-		id: record.rfc,
+		id: record.id,
 		rfc: record.rfc,
 		organizationId: record.organizationId,
 		personType: fromPrismaPersonType(record.personType),
@@ -254,6 +254,7 @@ export function mapDocumentCreateInputToPrisma(
 	input: ClientDocumentCreateInput,
 ) {
 	return {
+		id: generateId("CLIENT_DOCUMENT"),
 		clientId: input.clientId,
 		documentType: input.documentType,
 		documentNumber: input.documentNumber,
@@ -321,6 +322,7 @@ export function mapPrismaDocument(
 
 export function mapAddressCreateInputToPrisma(input: ClientAddressCreateInput) {
 	return {
+		id: generateId("CLIENT_ADDRESS"),
 		clientId: input.clientId,
 		addressType: input.addressType ?? "RESIDENTIAL",
 		street1: input.street1,
