@@ -352,8 +352,7 @@ export const ClientIdParamSchema = z.object({
 		.regex(
 			CLIENT_ID_REGEX,
 			"Invalid Client ID format (expected: CLT + 9 characters)",
-		)
-		.transform((value) => value.toUpperCase()),
+		),
 });
 
 export const DocumentIdParamSchema = z.object({
@@ -362,8 +361,7 @@ export const DocumentIdParamSchema = z.object({
 		.regex(
 			CLIENT_ID_REGEX,
 			"Invalid Client ID format (expected: CLT + 9 characters)",
-		)
-		.transform((value) => value.toUpperCase()),
+		),
 	documentId: ResourceIdSchema,
 });
 
@@ -373,8 +371,7 @@ export const AddressIdParamSchema = z.object({
 		.regex(
 			CLIENT_ID_REGEX,
 			"Invalid Client ID format (expected: CLT + 9 characters)",
-		)
-		.transform((value) => value.toUpperCase()),
+		),
 	addressId: ResourceIdSchema,
 });
 
@@ -384,8 +381,7 @@ export const ClientDocumentCreateSchema = z.object({
 		.regex(
 			CLIENT_ID_REGEX,
 			"Invalid Client ID format (expected: CLT + 9 characters)",
-		)
-		.transform((value) => value.toUpperCase()),
+		),
 	documentType: DocumentTypeSchema,
 	documentNumber: z.string().min(3),
 	issuingCountry: z
@@ -433,8 +429,7 @@ export const ClientAddressCreateSchema = z.object({
 		.regex(
 			CLIENT_ID_REGEX,
 			"Invalid Client ID format (expected: CLT + 9 characters)",
-		)
-		.transform((value) => value.toUpperCase()),
+		),
 	addressType: AddressTypeSchema.default("RESIDENTIAL"),
 	street1: z.string().min(1),
 	street2: z.string().optional().nullable(),
