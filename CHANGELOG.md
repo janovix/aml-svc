@@ -1,3 +1,12 @@
+# [1.1.0-rc.22](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.21...v1.1.0-rc.22) (2025-12-31)
+
+
+### Features
+
+* add organization ID support in synthetic data generation and update related services ([a5573c0](https://github.com/janovix/aml-svc/commit/a5573c04454d5c77457b116347c969907cf2d962))
+* Add target environment to synthetic data generation ([1ea0117](https://github.com/janovix/aml-svc/commit/1ea0117eb51d34e9b4db852d1fca780c2e8a8097))
+* new vehicle brand catalogs and organization settings ([209b64d](https://github.com/janovix/aml-svc/commit/209b64d7a6e522375a48e6328ec1322906b8a9b7))
+
 # [1.1.0-rc.21](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.20...v1.1.0-rc.21) (2025-12-31)
 
 
