@@ -2480,6 +2480,61 @@ export const openAPISpec = {
 					updatedAt: { type: "string", format: "date-time" },
 				},
 			},
+			EnrichedCatalogItem: {
+				type: "object",
+				description:
+					"Catalog item with additional catalogKey field, used when enriching entities with catalog data",
+				required: [
+					"id",
+					"catalogId",
+					"name",
+					"normalizedName",
+					"active",
+					"catalogKey",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: {
+						type: "string",
+						pattern: "^[A-Za-z0-9-]{1,64}$",
+						description:
+							"Unique identifier for the catalog item (UUID or deterministic ID)",
+					},
+					catalogId: {
+						type: "string",
+						pattern: "^[A-Za-z0-9-]{1,64}$",
+						description: "Identifier of the owning catalog",
+					},
+					name: {
+						type: "string",
+						description: "Display name shown to end users",
+					},
+					normalizedName: {
+						type: "string",
+						description:
+							"Lowercased and accent-free version used for search and ordering",
+					},
+					active: {
+						type: "boolean",
+						description: "Indicates if the item is available for selection",
+					},
+					metadata: {
+						type: "object",
+						nullable: true,
+						additionalProperties: true,
+						description:
+							"Custom metadata for the catalog item (e.g., code, originCountry, etc.)",
+					},
+					catalogKey: {
+						type: "string",
+						description:
+							"The key of the catalog this item belongs to (e.g., 'terrestrial-vehicle-brands')",
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
 			CatalogPagination: {
 				type: "object",
 				required: ["page", "pageSize", "total", "totalPages"],
@@ -2643,6 +2698,30 @@ export const openAPISpec = {
 					createdAt: { type: "string", format: "date-time" },
 					updatedAt: { type: "string", format: "date-time" },
 					deletedAt: { type: "string", format: "date-time", nullable: true },
+					brandCatalog: {
+						allOf: [{ $ref: "#/components/schemas/EnrichedCatalogItem" }],
+						nullable: true,
+						description:
+							"Enriched catalog item for the vehicle brand, including full metadata",
+					},
+					flagCountryCatalog: {
+						allOf: [{ $ref: "#/components/schemas/EnrichedCatalogItem" }],
+						nullable: true,
+						description:
+							"Enriched catalog item for the flag country (for marine/air vehicles)",
+					},
+					operationTypeCatalog: {
+						allOf: [{ $ref: "#/components/schemas/EnrichedCatalogItem" }],
+						nullable: true,
+						description:
+							"Enriched catalog item for the operation type (looked up by operationTypeCode)",
+					},
+					currencyCatalog: {
+						allOf: [{ $ref: "#/components/schemas/EnrichedCatalogItem" }],
+						nullable: true,
+						description:
+							"Enriched catalog item for the currency (looked up by currencyCode)",
+					},
 				},
 			},
 			PaymentMethodInput: {

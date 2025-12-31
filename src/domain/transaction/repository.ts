@@ -15,11 +15,14 @@ import type {
 } from "./schemas";
 import type { TransactionEntity, TransactionListResult } from "./types";
 import type { UmaValueRepository } from "../uma/repository";
+import type { CatalogEnrichmentService } from "../catalog/enrichment-service";
+import { TRANSACTION_ENRICHMENT_CONFIG } from "./enrichment";
 
 export class TransactionRepository {
 	constructor(
 		private readonly prisma: PrismaClient,
 		private readonly umaRepository: UmaValueRepository,
+		private readonly catalogEnrichmentService?: CatalogEnrichmentService,
 	) {}
 
 	async list(
@@ -84,8 +87,19 @@ export class TransactionRepository {
 
 		const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
+		// Map to entity objects
+		let data: TransactionEntity[] = records.map(mapPrismaTransaction);
+
+		// Enrich with catalog items if enrichment service is available
+		if (this.catalogEnrichmentService && data.length > 0) {
+			data = (await this.catalogEnrichmentService.enrichEntities(
+				data as unknown as Record<string, unknown>[],
+				TRANSACTION_ENRICHMENT_CONFIG,
+			)) as unknown as TransactionEntity[];
+		}
+
 		return {
-			data: records.map(mapPrismaTransaction),
+			data,
 			pagination: {
 				page,
 				limit,
@@ -104,7 +118,21 @@ export class TransactionRepository {
 			include: { paymentMethods: true },
 		});
 
-		return record ? mapPrismaTransaction(record) : null;
+		if (!record) {
+			return null;
+		}
+
+		let entity: TransactionEntity = mapPrismaTransaction(record);
+
+		// Enrich with catalog items if enrichment service is available
+		if (this.catalogEnrichmentService) {
+			entity = (await this.catalogEnrichmentService.enrichEntity(
+				entity as unknown as Record<string, unknown>,
+				TRANSACTION_ENRICHMENT_CONFIG,
+			)) as unknown as TransactionEntity;
+		}
+
+		return entity;
 	}
 
 	async create(

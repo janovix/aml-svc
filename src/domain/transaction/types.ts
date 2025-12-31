@@ -1,3 +1,5 @@
+import type { EnrichedCatalogItem } from "../catalog/enrichment";
+
 export type OperationType = "purchase" | "sale";
 export type VehicleType = "land" | "marine" | "air";
 
@@ -33,6 +35,11 @@ export interface TransactionEntity {
 	createdAt: string;
 	updatedAt: string;
 	deletedAt: string | null;
+	// Enriched catalog items (optional, populated when enrichment is enabled)
+	brandCatalog?: EnrichedCatalogItem | null;
+	flagCountryCatalog?: EnrichedCatalogItem | null;
+	operationTypeCatalog?: EnrichedCatalogItem | null;
+	currencyCatalog?: EnrichedCatalogItem | null;
 }
 
 export interface Pagination {

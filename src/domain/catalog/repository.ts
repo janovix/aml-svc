@@ -11,6 +11,7 @@ import type {
 	CatalogListQuery,
 	CatalogPagination,
 } from "./types";
+import type { EnrichedCatalogItem } from "./enrichment";
 
 function normalizeSearchTerm(value: string): string {
 	return value
@@ -56,6 +57,25 @@ function mapCatalogItem(record: PrismaCatalogItem): CatalogItemEntity {
 		metadata,
 		createdAt: toIsoString(record.createdAt),
 		updatedAt: toIsoString(record.updatedAt),
+	};
+}
+
+function mapCatalogItemWithKey(
+	record: PrismaCatalogItem & { catalog?: { key: string } },
+	catalogKey?: string,
+): EnrichedCatalogItem {
+	const metadata = parseMetadata(record.metadata);
+
+	return {
+		id: record.id,
+		catalogId: record.catalogId,
+		name: record.name,
+		normalizedName: record.normalizedName,
+		active: record.active,
+		metadata,
+		createdAt: toIsoString(record.createdAt),
+		updatedAt: toIsoString(record.updatedAt),
+		catalogKey: catalogKey ?? record.catalog?.key ?? "",
 	};
 }
 
@@ -189,5 +209,168 @@ export class CatalogRepository {
 		});
 
 		return mapCatalogItem(item);
+	}
+
+	/**
+	 * Batch lookup catalog items by their IDs
+	 * Optionally filter by catalog keys
+	 * @param ids - Array of catalog item IDs to look up
+	 * @param catalogKeys - Optional array of catalog keys to filter by
+	 * @param includeInactive - Whether to include inactive items (default: false)
+	 * @returns Map of ID to EnrichedCatalogItem
+	 */
+	async findItemsByIds(
+		ids: string[],
+		catalogKeys?: string[],
+		includeInactive = false,
+	): Promise<Map<string, EnrichedCatalogItem>> {
+		if (ids.length === 0) {
+			return new Map();
+		}
+
+		// Remove duplicates
+		const uniqueIds = [...new Set(ids)];
+
+		const where: Prisma.CatalogItemWhereInput = {
+			id: { in: uniqueIds },
+		};
+
+		if (!includeInactive) {
+			where.active = true;
+		}
+
+		if (catalogKeys && catalogKeys.length > 0) {
+			where.catalog = {
+				key: { in: catalogKeys },
+			};
+		}
+
+		const items = await this.prisma.catalogItem.findMany({
+			where,
+			include: {
+				catalog: {
+					select: { key: true },
+				},
+			},
+		});
+
+		const resultMap = new Map<string, EnrichedCatalogItem>();
+		for (const item of items) {
+			resultMap.set(item.id, mapCatalogItemWithKey(item));
+		}
+
+		return resultMap;
+	}
+
+	/**
+	 * Batch lookup catalog items by their metadata.code values within a specific catalog
+	 * @param catalogKey - The catalog key to search in
+	 * @param codes - Array of codes to look up (from metadata.code)
+	 * @param includeInactive - Whether to include inactive items (default: false)
+	 * @returns Map of code to EnrichedCatalogItem
+	 */
+	async findItemsByCodes(
+		catalogKey: string,
+		codes: string[],
+		includeInactive = false,
+	): Promise<Map<string, EnrichedCatalogItem>> {
+		if (codes.length === 0) {
+			return new Map();
+		}
+
+		// Remove duplicates
+		const uniqueCodes = [...new Set(codes)];
+
+		// First, find the catalog
+		const catalog = await this.prisma.catalog.findUnique({
+			where: { key: catalogKey },
+		});
+
+		if (!catalog) {
+			return new Map();
+		}
+
+		const where: Prisma.CatalogItemWhereInput = {
+			catalogId: catalog.id,
+		};
+
+		if (!includeInactive) {
+			where.active = true;
+		}
+
+		// Fetch all items from this catalog
+		// Note: We fetch all items because D1/SQLite JSON queries are limited
+		// For large catalogs, consider adding a 'code' column for direct indexing
+		const items = await this.prisma.catalogItem.findMany({
+			where,
+		});
+
+		const resultMap = new Map<string, EnrichedCatalogItem>();
+		for (const item of items) {
+			const metadata = parseMetadata(item.metadata);
+			if (metadata && typeof metadata.code === "string") {
+				if (uniqueCodes.includes(metadata.code)) {
+					resultMap.set(metadata.code, mapCatalogItemWithKey(item, catalogKey));
+				}
+			}
+		}
+
+		return resultMap;
+	}
+
+	/**
+	 * Batch lookup catalog items by their metadata.code values across multiple catalogs
+	 * @param catalogKeys - Array of catalog keys to search in
+	 * @param codes - Array of codes to look up (from metadata.code)
+	 * @param includeInactive - Whether to include inactive items (default: false)
+	 * @returns Map of code to EnrichedCatalogItem
+	 */
+	async findItemsByCodesMultipleCatalogs(
+		catalogKeys: string[],
+		codes: string[],
+		includeInactive = false,
+	): Promise<Map<string, EnrichedCatalogItem>> {
+		if (codes.length === 0 || catalogKeys.length === 0) {
+			return new Map();
+		}
+
+		const uniqueCodes = [...new Set(codes)];
+
+		// Find all matching catalogs
+		const catalogs = await this.prisma.catalog.findMany({
+			where: { key: { in: catalogKeys } },
+		});
+
+		if (catalogs.length === 0) {
+			return new Map();
+		}
+
+		const catalogIdToKey = new Map(catalogs.map((c) => [c.id, c.key]));
+		const catalogIds = catalogs.map((c) => c.id);
+
+		const where: Prisma.CatalogItemWhereInput = {
+			catalogId: { in: catalogIds },
+		};
+
+		if (!includeInactive) {
+			where.active = true;
+		}
+
+		const items = await this.prisma.catalogItem.findMany({
+			where,
+		});
+
+		const resultMap = new Map<string, EnrichedCatalogItem>();
+		for (const item of items) {
+			const metadata = parseMetadata(item.metadata);
+			if (metadata && typeof metadata.code === "string") {
+				if (uniqueCodes.includes(metadata.code)) {
+					const catalogKey = catalogIdToKey.get(item.catalogId) ?? "";
+					resultMap.set(metadata.code, mapCatalogItemWithKey(item, catalogKey));
+				}
+			}
+		}
+
+		return resultMap;
 	}
 }

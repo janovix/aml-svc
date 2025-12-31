@@ -213,5 +213,10 @@ export function mapPrismaTransaction(
 		createdAt: mapDate(record.createdAt),
 		updatedAt: mapDate(record.updatedAt),
 		deletedAt: mapNullableDate(record.deletedAt),
+		// Catalog enrichment fields - populated by CatalogEnrichmentService after mapping
+		brandCatalog: undefined,
+		flagCountryCatalog: undefined,
+		operationTypeCatalog: undefined,
+		currencyCatalog: undefined,
 	};
 }
