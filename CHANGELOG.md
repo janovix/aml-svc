@@ -1,3 +1,10 @@
+# [1.1.0-rc.27](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.26...v1.1.0-rc.27) (2026-01-02)
+
+
+### Bug Fixes
+
+* ensure correct order of alert rule and config seeding scripts ([0b0e392](https://github.com/janovix/aml-svc/commit/0b0e39263215a829131ce4bcb9316faeed5446dc))
+
 # [1.1.0-rc.26](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.25...v1.1.0-rc.26) (2026-01-02)
 
 
