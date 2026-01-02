@@ -3002,40 +3002,75 @@ export const openAPISpec = {
 					"name",
 					"active",
 					"severity",
-					"ruleConfig",
+					"isManualOnly",
+					"activityCode",
 					"createdAt",
 					"updatedAt",
 				],
 				properties: {
 					id: {
 						type: "string",
-						pattern: "^[A-Za-z0-9-]{1,64}$",
-						description: "Alert rule identifier",
+						pattern: "^[A-Za-z0-9-_]{1,64}$",
+						description:
+							"Alert rule identifier/code (e.g., '2501', 'AUTO_UMA')",
 					},
 					name: { type: "string", minLength: 1, maxLength: 200 },
 					description: { type: "string", maxLength: 1000, nullable: true },
 					active: { type: "boolean" },
 					severity: { $ref: "#/components/schemas/AlertSeverity" },
-					ruleConfig: {
-						type: "object",
+					ruleType: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
 						description:
-							"Dynamic rule configuration stored as JSON. Structure depends on rule type.",
-						additionalProperties: true,
+							"Matches seeker's ruleType (null for manual-only rules)",
+					},
+					isManualOnly: {
+						type: "boolean",
+						description: "True if this rule can only be triggered manually",
+					},
+					activityCode: {
+						type: "string",
+						maxLength: 10,
+						description: "Vulnerable activity code: VEH, JYS, INM, JOY, ART",
 					},
 					metadata: {
 						type: "object",
 						nullable: true,
-						description: "Additional metadata as JSON",
+						description:
+							"Additional metadata as JSON (legal basis, category, etc.)",
 						additionalProperties: true,
 					},
 					createdAt: { type: "string", format: "date-time" },
 					updatedAt: { type: "string", format: "date-time" },
 				},
 			},
+			AlertRuleConfig: {
+				type: "object",
+				required: ["id", "alertRuleId", "key", "value", "isHardcoded"],
+				properties: {
+					id: { type: "string" },
+					alertRuleId: { type: "string" },
+					key: { type: "string", maxLength: 100 },
+					value: { type: "string", description: "JSON string value" },
+					isHardcoded: {
+						type: "boolean",
+						description: "True if this config cannot be updated via API",
+					},
+					description: { type: "string", maxLength: 500, nullable: true },
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
 			AlertRuleCreateRequest: {
 				type: "object",
-				required: ["name", "severity", "ruleConfig"],
+				required: ["name", "severity"],
 				properties: {
+					id: {
+						type: "string",
+						maxLength: 64,
+						description: "Alert code (e.g., '2501', 'AUTO_UMA')",
+					},
 					name: { type: "string", minLength: 1, maxLength: 200 },
 					description: { type: "string", maxLength: 1000, nullable: true },
 					active: { type: "boolean", default: true },
@@ -3043,12 +3078,9 @@ export const openAPISpec = {
 						$ref: "#/components/schemas/AlertSeverity",
 						default: "MEDIUM",
 					},
-					ruleConfig: {
-						type: "object",
-						description:
-							"Dynamic rule configuration. Examples: transaction_amount, transaction_count, aggregate_amount, custom",
-						additionalProperties: true,
-					},
+					ruleType: { type: "string", maxLength: 100, nullable: true },
+					isManualOnly: { type: "boolean", default: false },
+					activityCode: { type: "string", maxLength: 10, default: "VEH" },
 					metadata: {
 						type: "object",
 						nullable: true,
@@ -3063,15 +3095,31 @@ export const openAPISpec = {
 					description: { type: "string", maxLength: 1000, nullable: true },
 					active: { type: "boolean" },
 					severity: { $ref: "#/components/schemas/AlertSeverity" },
-					ruleConfig: {
-						type: "object",
-						additionalProperties: true,
-					},
+					ruleType: { type: "string", maxLength: 100, nullable: true },
+					isManualOnly: { type: "boolean" },
+					activityCode: { type: "string", maxLength: 10 },
 					metadata: {
 						type: "object",
 						nullable: true,
 						additionalProperties: true,
 					},
+				},
+			},
+			AlertRuleConfigCreateRequest: {
+				type: "object",
+				required: ["key", "value"],
+				properties: {
+					key: { type: "string", minLength: 1, maxLength: 100 },
+					value: { type: "string", description: "JSON string value" },
+					isHardcoded: { type: "boolean", default: false },
+					description: { type: "string", maxLength: 500, nullable: true },
+				},
+			},
+			AlertRuleConfigUpdateRequest: {
+				type: "object",
+				properties: {
+					value: { type: "string" },
+					description: { type: "string", maxLength: 500, nullable: true },
 				},
 			},
 			Alert: {
@@ -3084,7 +3132,8 @@ export const openAPISpec = {
 					"severity",
 					"idempotencyKey",
 					"contextHash",
-					"alertData",
+					"metadata",
+					"isManual",
 					"createdAt",
 					"updatedAt",
 				],
@@ -3117,17 +3166,21 @@ export const openAPISpec = {
 						description:
 							"Hash of the specific data that triggered this alert (transaction IDs, amounts, dates, etc.)",
 					},
-					alertData: {
+					metadata: {
 						type: "object",
 						description:
 							"Alert-specific data stored as JSON (transaction IDs, amounts, dates, etc.)",
 						additionalProperties: true,
 					},
-					triggerTransactionId: {
+					transactionId: {
 						type: "string",
 						nullable: true,
 						description:
 							"Optional reference to the transaction that triggered the alert",
+					},
+					isManual: {
+						type: "boolean",
+						description: "True if the alert was manually created",
 					},
 					submissionDeadline: {
 						type: "string",
@@ -3205,7 +3258,7 @@ export const openAPISpec = {
 					"severity",
 					"idempotencyKey",
 					"contextHash",
-					"alertData",
+					"metadata",
 				],
 				properties: {
 					alertRuleId: { type: "string" },
@@ -3225,13 +3278,18 @@ export const openAPISpec = {
 						description:
 							"Hash of the specific data that triggered this alert (transaction IDs, amounts, dates, etc.)",
 					},
-					alertData: {
+					metadata: {
 						type: "object",
 						description:
 							"Alert-specific data stored as JSON (transaction IDs, amounts, dates, etc.)",
 						additionalProperties: true,
 					},
-					triggerTransactionId: { type: "string", nullable: true },
+					transactionId: { type: "string", nullable: true },
+					isManual: {
+						type: "boolean",
+						default: false,
+						description: "True if manually created",
+					},
 					submissionDeadline: {
 						type: "string",
 						format: "date-time",

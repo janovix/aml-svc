@@ -7,8 +7,11 @@ import {
 	mapAlertRuleCreateInputToPrisma,
 	mapAlertRulePatchInputToPrisma,
 	mapAlertRuleUpdateInputToPrisma,
+	mapAlertRuleConfigCreateInputToPrisma,
+	mapAlertRuleConfigUpdateInputToPrisma,
 	mapPrismaAlert,
 	mapPrismaAlertRule,
+	mapPrismaAlertRuleConfig,
 } from "./mappers";
 import type {
 	AlertCreateInput,
@@ -19,21 +22,34 @@ import type {
 	AlertRulePatchInput,
 	AlertRuleUpdateInput,
 	AlertUpdateInput,
+	AlertRuleConfigCreateInput,
+	AlertRuleConfigUpdateInput,
 } from "./schemas";
-import type { AlertEntity, AlertRuleEntity, ListResult } from "./types";
+import type {
+	AlertEntity,
+	AlertRuleEntity,
+	AlertRuleConfigEntity,
+	ListResult,
+} from "./types";
 
+/**
+ * AlertRuleRepository - Global alert rules (no organizationId filtering)
+ */
 export class AlertRuleRepository {
 	constructor(private readonly prisma: PrismaClient) {}
 
-	async list(
-		organizationId: string,
-		filters: AlertRuleFilters,
-	): Promise<ListResult<AlertRuleEntity>> {
-		const { page, limit, search, active, severity } = filters;
+	async list(filters: AlertRuleFilters): Promise<ListResult<AlertRuleEntity>> {
+		const {
+			page,
+			limit,
+			search,
+			active,
+			severity,
+			activityCode,
+			isManualOnly,
+		} = filters;
 
-		const where: Prisma.AlertRuleWhereInput = {
-			organizationId,
-		};
+		const where: Prisma.AlertRuleWhereInput = {};
 
 		if (active !== undefined) {
 			where.active = active;
@@ -41,6 +57,14 @@ export class AlertRuleRepository {
 
 		if (severity) {
 			where.severity = severity;
+		}
+
+		if (activityCode) {
+			where.activityCode = activityCode;
+		}
+
+		if (isManualOnly !== undefined) {
+			where.isManualOnly = isManualOnly;
 		}
 
 		if (search) {
@@ -71,32 +95,32 @@ export class AlertRuleRepository {
 		};
 	}
 
-	async getById(
-		organizationId: string,
-		id: string,
-	): Promise<AlertRuleEntity | null> {
-		const record = await this.prisma.alertRule.findFirst({
-			where: { id, organizationId },
+	async getById(id: string): Promise<AlertRuleEntity | null> {
+		const record = await this.prisma.alertRule.findUnique({
+			where: { id },
 		});
 		return record ? mapPrismaAlertRule(record) : null;
 	}
 
-	async create(
-		input: AlertRuleCreateInput,
-		organizationId: string,
-	): Promise<AlertRuleEntity> {
+	async getByRuleType(ruleType: string): Promise<AlertRuleEntity | null> {
+		const record = await this.prisma.alertRule.findFirst({
+			where: { ruleType, active: true },
+		});
+		return record ? mapPrismaAlertRule(record) : null;
+	}
+
+	async create(input: AlertRuleCreateInput): Promise<AlertRuleEntity> {
 		const created = await this.prisma.alertRule.create({
-			data: mapAlertRuleCreateInputToPrisma(input, organizationId),
+			data: mapAlertRuleCreateInputToPrisma(input),
 		});
 		return mapPrismaAlertRule(created);
 	}
 
 	async update(
-		organizationId: string,
 		id: string,
 		input: AlertRuleUpdateInput,
 	): Promise<AlertRuleEntity> {
-		await this.ensureExists(organizationId, id);
+		await this.ensureExists(id);
 
 		const updated = await this.prisma.alertRule.update({
 			where: { id },
@@ -107,11 +131,10 @@ export class AlertRuleRepository {
 	}
 
 	async patch(
-		organizationId: string,
 		id: string,
 		input: AlertRulePatchInput,
 	): Promise<AlertRuleEntity> {
-		await this.ensureExists(organizationId, id);
+		await this.ensureExists(id);
 
 		const payload = mapAlertRulePatchInputToPrisma(
 			input,
@@ -125,25 +148,31 @@ export class AlertRuleRepository {
 		return mapPrismaAlertRule(updated);
 	}
 
-	async delete(organizationId: string, id: string): Promise<void> {
-		await this.ensureExists(organizationId, id);
+	async delete(id: string): Promise<void> {
+		await this.ensureExists(id);
 		await this.prisma.alertRule.delete({ where: { id } });
 	}
 
-	async listActive(organizationId: string): Promise<AlertRuleEntity[]> {
+	async listActive(): Promise<AlertRuleEntity[]> {
 		const records = await this.prisma.alertRule.findMany({
-			where: { organizationId, active: true },
+			where: { active: true },
 			orderBy: { createdAt: "desc" },
 		});
 		return records.map(mapPrismaAlertRule);
 	}
 
-	private async ensureExists(
-		organizationId: string,
-		id: string,
-	): Promise<void> {
-		const exists = await this.prisma.alertRule.findFirst({
-			where: { id, organizationId },
+	async listActiveForSeeker(): Promise<AlertRuleEntity[]> {
+		// Return only rules that have seekers (not manual-only)
+		const records = await this.prisma.alertRule.findMany({
+			where: { active: true, isManualOnly: false },
+			orderBy: { createdAt: "desc" },
+		});
+		return records.map(mapPrismaAlertRule);
+	}
+
+	private async ensureExists(id: string): Promise<void> {
+		const exists = await this.prisma.alertRule.findUnique({
+			where: { id },
 			select: { id: true },
 		});
 
@@ -153,6 +182,89 @@ export class AlertRuleRepository {
 	}
 }
 
+/**
+ * AlertRuleConfigRepository - Configuration values for alert rules
+ */
+export class AlertRuleConfigRepository {
+	constructor(private readonly prisma: PrismaClient) {}
+
+	async listByAlertRuleId(
+		alertRuleId: string,
+	): Promise<AlertRuleConfigEntity[]> {
+		const records = await this.prisma.alertRuleConfig.findMany({
+			where: { alertRuleId },
+			orderBy: { key: "asc" },
+		});
+		return records.map(mapPrismaAlertRuleConfig);
+	}
+
+	async getByKey(
+		alertRuleId: string,
+		key: string,
+	): Promise<AlertRuleConfigEntity | null> {
+		const record = await this.prisma.alertRuleConfig.findFirst({
+			where: { alertRuleId, key },
+		});
+		return record ? mapPrismaAlertRuleConfig(record) : null;
+	}
+
+	async create(
+		alertRuleId: string,
+		input: AlertRuleConfigCreateInput,
+	): Promise<AlertRuleConfigEntity> {
+		const created = await this.prisma.alertRuleConfig.create({
+			data: mapAlertRuleConfigCreateInputToPrisma(input, alertRuleId),
+		});
+		return mapPrismaAlertRuleConfig(created);
+	}
+
+	async update(
+		alertRuleId: string,
+		key: string,
+		input: AlertRuleConfigUpdateInput,
+	): Promise<AlertRuleConfigEntity> {
+		const existing = await this.prisma.alertRuleConfig.findFirst({
+			where: { alertRuleId, key },
+		});
+
+		if (!existing) {
+			throw new Error("ALERT_RULE_CONFIG_NOT_FOUND");
+		}
+
+		if (existing.isHardcoded) {
+			throw new Error("ALERT_RULE_CONFIG_IS_HARDCODED");
+		}
+
+		const updateData = mapAlertRuleConfigUpdateInputToPrisma(input);
+
+		const updated = await this.prisma.alertRuleConfig.update({
+			where: { id: existing.id },
+			data: updateData,
+		});
+
+		return mapPrismaAlertRuleConfig(updated);
+	}
+
+	async delete(alertRuleId: string, key: string): Promise<void> {
+		const existing = await this.prisma.alertRuleConfig.findFirst({
+			where: { alertRuleId, key },
+		});
+
+		if (!existing) {
+			throw new Error("ALERT_RULE_CONFIG_NOT_FOUND");
+		}
+
+		if (existing.isHardcoded) {
+			throw new Error("ALERT_RULE_CONFIG_IS_HARDCODED");
+		}
+
+		await this.prisma.alertRuleConfig.delete({ where: { id: existing.id } });
+	}
+}
+
+/**
+ * AlertRepository - Organization-specific alerts
+ */
 export class AlertRepository {
 	constructor(private readonly prisma: PrismaClient) {}
 
@@ -160,8 +272,16 @@ export class AlertRepository {
 		organizationId: string,
 		filters: AlertFilters,
 	): Promise<ListResult<AlertEntity>> {
-		const { page, limit, alertRuleId, clientId, status, severity, isOverdue } =
-			filters;
+		const {
+			page,
+			limit,
+			alertRuleId,
+			clientId,
+			status,
+			severity,
+			isOverdue,
+			isManual,
+		} = filters;
 
 		const where: Prisma.AlertWhereInput = {
 			organizationId,
@@ -185,6 +305,10 @@ export class AlertRepository {
 
 		if (isOverdue !== undefined) {
 			where.isOverdue = isOverdue;
+		}
+
+		if (isManual !== undefined) {
+			where.isManual = isManual;
 		}
 
 		// Update overdue status for alerts that have passed their deadline
@@ -281,6 +405,20 @@ export class AlertRepository {
 				...mapPrismaAlert(existing),
 				alertRule: mapPrismaAlertRule(existing.alertRule),
 			};
+		}
+
+		// Validate alert rule exists and check if manual creation is allowed
+		const alertRule = await this.prisma.alertRule.findUnique({
+			where: { id: input.alertRuleId },
+		});
+
+		if (!alertRule) {
+			throw new Error("ALERT_RULE_NOT_FOUND");
+		}
+
+		// If not manual creation but rule is manual-only, reject
+		if (!input.isManual && alertRule.isManualOnly) {
+			throw new Error("ALERT_RULE_IS_MANUAL_ONLY");
 		}
 
 		const prismaData = mapAlertCreateInputToPrisma(input, organizationId);

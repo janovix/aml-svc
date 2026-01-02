@@ -48,6 +48,15 @@ function handleServiceError(error: unknown): never {
 		if (error.message === "ALERT_NOT_FOUND") {
 			throw new APIError(404, "Alert not found");
 		}
+		if (error.message === "ALERT_RULE_NOT_FOUND") {
+			throw new APIError(404, "Alert rule not found");
+		}
+		if (error.message === "ALERT_RULE_IS_MANUAL_ONLY") {
+			throw new APIError(
+				400,
+				"This alert rule can only be triggered manually. Set isManual to true.",
+			);
+		}
 	}
 	throw error;
 }

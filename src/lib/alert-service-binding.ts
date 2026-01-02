@@ -16,8 +16,16 @@
 
 import type { Bindings } from "../index";
 import { getPrismaClient } from "./prisma";
-import { AlertRuleRepository, AlertRepository } from "../domain/alert";
-import { AlertService, AlertRuleService } from "../domain/alert";
+import {
+	AlertRuleRepository,
+	AlertRepository,
+	AlertRuleConfigRepository,
+} from "../domain/alert";
+import {
+	AlertService,
+	AlertRuleService,
+	AlertRuleConfigService,
+} from "../domain/alert";
 import { UmaValueRepository } from "../domain/uma";
 import { UmaValueService } from "../domain/uma";
 import { ClientRepository } from "../domain/client";
@@ -53,14 +61,40 @@ export class AlertServiceBinding {
 	constructor(private readonly env: Bindings) {}
 
 	/**
-	 * Get all active alert rules for an organization
-	 * Called via: env.AML_SERVICE.fetch(new Request("https://internal/alert-rules/active?organizationId=xxx"))
+	 * Get all active alert rules (global - no organizationId required)
+	 * Called via: env.AML_SERVICE.fetch(new Request("https://internal/alert-rules/active"))
 	 */
-	async getActiveAlertRules(organizationId: string) {
+	async getActiveAlertRules() {
 		const prisma = getPrismaClient(this.env.DB);
 		const repository = new AlertRuleRepository(prisma);
 		const service = new AlertRuleService(repository);
-		return service.listActive(organizationId);
+		return service.listActiveForSeeker();
+	}
+
+	/**
+	 * Get all active alert rules including manual-only rules
+	 * Called via: env.AML_SERVICE.fetch(new Request("https://internal/alert-rules/all-active"))
+	 */
+	async getAllActiveAlertRules() {
+		const prisma = getPrismaClient(this.env.DB);
+		const repository = new AlertRuleRepository(prisma);
+		const service = new AlertRuleService(repository);
+		return service.listActive();
+	}
+
+	/**
+	 * Get alert rule config by key
+	 * Called via: env.AML_SERVICE.fetch(new Request("https://internal/alert-rules/{id}/config/{key}"))
+	 */
+	async getAlertRuleConfig(alertRuleId: string, key: string) {
+		const prisma = getPrismaClient(this.env.DB);
+		const repository = new AlertRuleConfigRepository(prisma);
+		const service = new AlertRuleConfigService(repository);
+		try {
+			return await service.getByKey(alertRuleId, key);
+		} catch {
+			return null;
+		}
 	}
 
 	/**
@@ -104,8 +138,9 @@ export class AlertServiceBinding {
 		severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 		idempotencyKey: string;
 		contextHash: string;
-		alertData: Record<string, unknown>;
-		triggerTransactionId?: string | null;
+		metadata: Record<string, unknown>; // Renamed from alertData
+		transactionId?: string | null; // Renamed from triggerTransactionId
+		isManual: boolean;
 		notes?: string | null;
 	}) {
 		const prisma = getPrismaClient(this.env.DB);
@@ -151,7 +186,7 @@ export class AlertServiceBinding {
 
 		// Get alert with organization context
 		const alert = await alertService.get(organizationId, alertId);
-		if (!alert.triggerTransactionId) {
+		if (!alert.transactionId) {
 			throw new Error("Alert has no trigger transaction");
 		}
 
@@ -178,7 +213,7 @@ export class AlertServiceBinding {
 		);
 		const transaction = await transactionService.get(
 			organizationId,
-			alert.triggerTransactionId,
+			alert.transactionId,
 		);
 
 		// Generate and upload file
@@ -252,18 +287,42 @@ export async function handleServiceBindingRequest(
 	const path = url.pathname;
 
 	try {
-		// Route: /internal/alert-rules/active
+		// Route: /internal/alert-rules/active (global - no organizationId required)
 		if (path === "/internal/alert-rules/active" && request.method === "GET") {
-			const organizationId = url.searchParams.get("organizationId");
-			if (!organizationId) {
-				return new Response(
-					JSON.stringify({ error: "organizationId is required" }),
-					{ status: 400, headers: { "Content-Type": "application/json" } },
-				);
-			}
 			const service = new AlertServiceBinding(env);
-			const rules = await service.getActiveAlertRules(organizationId);
+			const rules = await service.getActiveAlertRules();
 			return new Response(JSON.stringify(rules), {
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+
+		// Route: /internal/alert-rules/all-active (includes manual-only rules)
+		if (
+			path === "/internal/alert-rules/all-active" &&
+			request.method === "GET"
+		) {
+			const service = new AlertServiceBinding(env);
+			const rules = await service.getAllActiveAlertRules();
+			return new Response(JSON.stringify(rules), {
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+
+		// Route: /internal/alert-rules/{id}/config/{key}
+		const configMatch = path.match(
+			/^\/internal\/alert-rules\/([^/]+)\/config\/([^/]+)$/,
+		);
+		if (configMatch && request.method === "GET") {
+			const [, alertRuleId, key] = configMatch;
+			const service = new AlertServiceBinding(env);
+			const config = await service.getAlertRuleConfig(alertRuleId, key);
+			if (!config) {
+				return new Response(JSON.stringify({ error: "Config not found" }), {
+					status: 404,
+					headers: { "Content-Type": "application/json" },
+				});
+			}
+			return new Response(JSON.stringify(config), {
 				headers: { "Content-Type": "application/json" },
 			});
 		}
