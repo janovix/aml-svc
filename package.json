@@ -57,7 +57,7 @@
 		"deploy": "wrangler deploy",
 		"deploy:prod": "wrangler deploy --config wrangler.prod.jsonc",
 		"deploy:dev": "wrangler deploy --config wrangler.jsonc",
-		"predeploy:dev": "wrangler d1 migrations apply DB --remote --config wrangler.jsonc && pnpm run populate",
+		"predeploy:dev": "wrangler d1 migrations apply DB --remote --config wrangler.jsonc && pnpm run populate && REMOTE=true WRANGLER_CONFIG=wrangler.jsonc pnpm run seed",
 		"dev": "npm run seedLocalDb && pnpm run populate && pnpm run seed && wrangler dev",
 		"format": "prettier . --write",
 		"format:check": "prettier . --check",
