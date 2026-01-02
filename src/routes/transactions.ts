@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 
 import { CatalogRepository } from "../domain/catalog/repository";
@@ -70,6 +71,27 @@ function handleServiceError(error: unknown): never {
 			throw new APIError(404, "Client not found");
 		}
 	}
+
+	// Handle Prisma foreign key constraint violations
+	if (error instanceof Prisma.PrismaClientKnownRequestError) {
+		if (error.code === "P2003") {
+			// Foreign key constraint failed
+			const field = error.meta?.field_name as string | undefined;
+			if (field === "clientId" || field?.includes("clientId")) {
+				throw new APIError(404, "Client not found", {
+					field: "clientId",
+					message:
+						"The specified client does not exist or belongs to a different organization",
+				});
+			}
+			throw new APIError(400, "Foreign key constraint violation", {
+				field: field || "unknown",
+				message: "A referenced record does not exist",
+				details: error.meta,
+			});
+		}
+	}
+
 	throw error;
 }
 

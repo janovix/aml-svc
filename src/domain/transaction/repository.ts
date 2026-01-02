@@ -145,11 +145,25 @@ export class TransactionRepository {
 			input.amount,
 		);
 
-		const created = await this.prisma.transaction.create({
-			data: mapCreateInputToPrisma(input, organizationId, umaValue),
-			include: { paymentMethods: true },
-		});
-		return mapPrismaTransaction(created);
+		try {
+			const created = await this.prisma.transaction.create({
+				data: mapCreateInputToPrisma(input, organizationId, umaValue),
+				include: { paymentMethods: true },
+			});
+			return mapPrismaTransaction(created);
+		} catch (error) {
+			// Re-throw Prisma foreign key errors with more context
+			if (
+				error instanceof Prisma.PrismaClientKnownRequestError &&
+				error.code === "P2003"
+			) {
+				const field = error.meta?.field_name as string | undefined;
+				if (field === "clientId" || field?.includes("clientId")) {
+					throw new Error("CLIENT_NOT_FOUND");
+				}
+			}
+			throw error;
+		}
 	}
 
 	async update(
