@@ -21,6 +21,10 @@ const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
 
 // Determine config file based on environment
 function getConfigFile() {
+	// Check if config is explicitly set (this takes precedence)
+	if (process.env.WRANGLER_CONFIG) {
+		return process.env.WRANGLER_CONFIG;
+	}
 	// Check if we're in preview environment
 	if (
 		process.env.CF_PAGES_BRANCH ||
@@ -29,10 +33,6 @@ function getConfigFile() {
 		process.env.PREVIEW === "true"
 	) {
 		return "wrangler.preview.jsonc";
-	}
-	// Check if config is explicitly set
-	if (process.env.WRANGLER_CONFIG) {
-		return process.env.WRANGLER_CONFIG;
 	}
 	return "";
 }

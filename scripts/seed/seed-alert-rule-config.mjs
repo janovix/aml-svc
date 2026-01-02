@@ -174,7 +174,9 @@ VALUES (
 
 async function seedAlertRuleConfig() {
 	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
+	// Check if config is explicitly set (this takes precedence)
 	let configFile = process.env.WRANGLER_CONFIG;
+	// If not explicitly set, check if we're in preview environment
 	if (!configFile) {
 		if (
 			process.env.CF_PAGES_BRANCH ||
