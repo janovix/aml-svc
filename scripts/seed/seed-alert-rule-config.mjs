@@ -137,11 +137,23 @@ function generateId() {
 function generateSql() {
 	const sql = [];
 
-	// Clear existing configs before inserting
-	sql.push(`
--- Clear existing alert rule configs before inserting new ones
-DELETE FROM alert_rule_config;
+	// Get unique set of alert rule IDs we're seeding configs for
+	const alertRuleIds = [
+		...new Set(alertRuleConfigs.map((config) => config.alertRuleId)),
+	];
+
+	// Delete existing configs only for the alert rules we're seeding
+	// This preserves configs for other alert rules that might exist
+	if (alertRuleIds.length > 0) {
+		const alertRuleIdsList = alertRuleIds
+			.map((id) => escapeSqlString(id))
+			.join(", ");
+		sql.push(`
+-- Clear existing configs for alert rules we're seeding (preserves other configs)
+DELETE FROM alert_rule_config
+WHERE alertRuleId IN (${alertRuleIdsList});
 `);
+	}
 
 	// Insert configs
 	for (const config of alertRuleConfigs) {

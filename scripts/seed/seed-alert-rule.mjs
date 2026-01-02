@@ -490,13 +490,9 @@ function escapeSqlString(str) {
 function generateSql() {
 	const sql = [];
 
-	// Delete existing alert rules (fresh start with codes as IDs)
-	sql.push(`
--- Clear existing alert rules before inserting new ones
-DELETE FROM alert_rules;
-`);
-
-	// Insert alert rules
+	// Use INSERT OR REPLACE to update existing rules or insert new ones
+	// This preserves existing alerts that reference these rules (onDelete: Restrict)
+	// Note: createdAt is preserved for existing records, updatedAt is always updated
 	for (const rule of alertRules) {
 		const id = escapeSqlString(rule.id);
 		const name = escapeSqlString(rule.name);
@@ -513,7 +509,7 @@ DELETE FROM alert_rules;
 			: "NULL";
 
 		sql.push(`
-INSERT INTO alert_rules (id, name, description, active, severity, ruleType, isManualOnly, activityCode, metadata, createdAt, updatedAt)
+INSERT OR REPLACE INTO alert_rules (id, name, description, active, severity, ruleType, isManualOnly, activityCode, metadata, createdAt, updatedAt)
 VALUES (
 	${id},
 	${name},
@@ -524,7 +520,7 @@ VALUES (
 	${isManualOnly},
 	${activityCode},
 	${metadata},
-	CURRENT_TIMESTAMP,
+	COALESCE((SELECT createdAt FROM alert_rules WHERE id = ${id}), CURRENT_TIMESTAMP),
 	CURRENT_TIMESTAMP
 );
 `);
