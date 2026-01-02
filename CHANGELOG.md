@@ -1,3 +1,10 @@
+# [1.1.0-rc.26](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.25...v1.1.0-rc.26) (2026-01-02)
+
+
+### Features
+
+* implement global alert rules architecture and configuration management ([e115073](https://github.com/janovix/aml-svc/commit/e115073466330c27428355b2cacd45829490c080))
+
 # [1.1.0-rc.25](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.24...v1.1.0-rc.25) (2025-12-31)
 
 
