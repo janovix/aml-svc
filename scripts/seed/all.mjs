@@ -51,6 +51,25 @@ async function seedAll() {
 		)
 		.sort();
 
+	// Ensure alert rules are seeded before alert rule configs (dependency order)
+	// seed-alert-rule-config.mjs depends on seed-alert-rule.mjs
+	const alertRuleIndex = seedScripts.indexOf("seed-alert-rule.mjs");
+	const alertRuleConfigIndex = seedScripts.indexOf(
+		"seed-alert-rule-config.mjs",
+	);
+
+	if (
+		alertRuleIndex !== -1 &&
+		alertRuleConfigIndex !== -1 &&
+		alertRuleConfigIndex < alertRuleIndex
+	) {
+		// Move alert rule config to after alert rule
+		const configScript = seedScripts.splice(alertRuleConfigIndex, 1)[0];
+		// After removal, alertRuleIndex needs to be adjusted
+		const newAlertRuleIndex = alertRuleIndex - 1;
+		seedScripts.splice(newAlertRuleIndex + 1, 0, configScript);
+	}
+
 	if (seedScripts.length === 0) {
 		console.log("⚠️  No seed scripts found.");
 		console.log("Run 'pnpm seed:validate' to check requirements.\n");
