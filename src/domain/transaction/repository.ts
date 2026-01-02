@@ -189,26 +189,35 @@ export class TransactionRepository {
 
 	/**
 	 * Calculates UMA value for a transaction: amount / umaDailyValue
-	 * Uses the active UMA value for the transaction date's year
+	 * Uses the UMA value effective for the transaction date (checks effectiveDate and endDate)
+	 * This ensures correct UMA is used even when new UMA values don't start on January 1st
 	 */
 	private async calculateUmaValue(
 		operationDate: string,
 		amount: string,
 	): Promise<Prisma.Decimal | null> {
 		try {
-			// Get the year from the operation date
+			// Parse the operation date
 			const date = new Date(operationDate + "T00:00:00.000Z");
-			const year = date.getFullYear();
 
-			// Get UMA value for the transaction year (prefer active, fallback to year-specific)
-			let umaValue = await this.umaRepository.getActive();
-			if (!umaValue || umaValue.year !== year) {
+			// Get UMA value effective for this specific date
+			// This checks effectiveDate <= date and (endDate is null or endDate >= date)
+			let umaValue = await this.umaRepository.getByDate(date);
+
+			// Fallback: if no date-based match, try by year (for backwards compatibility)
+			if (!umaValue) {
+				const year = date.getFullYear();
 				umaValue = await this.umaRepository.getByYear(year);
+			}
+
+			// Final fallback: use active UMA value
+			if (!umaValue) {
+				umaValue = await this.umaRepository.getActive();
 			}
 
 			if (!umaValue) {
 				console.warn(
-					`No UMA value found for year ${year}, skipping UMA calculation`,
+					`No UMA value found for date ${operationDate}, skipping UMA calculation`,
 				);
 				return null;
 			}

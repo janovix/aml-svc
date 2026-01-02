@@ -16,14 +16,21 @@ const API_TOKEN = process.env.API_TOKEN || "";
 
 // UMA values from INEGI
 // Source: https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2025/uma/uma2025.pdf
-// TODO: Update these values with exact data from the INEGI PDF
+// IMPORTANT: 2026 UMA kicks in on February 1st, not January 1st
 const UMA_VALUES = {
 	2025: {
-		dailyValue: 108.57, // PLACEHOLDER - Update with exact value from PDF
+		dailyValue: 113.14, // Updated UMA value for 2025
 		effectiveDate: "2025-01-01T00:00:00Z",
-		endDate: "2025-12-31T23:59:59Z",
+		endDate: "2026-01-31T23:59:59Z", // Ends January 31, 2026 (2026 UMA starts Feb 1)
 		notes:
-			"UMA value for 2025 - Source: INEGI. Verified against official PDF: https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2025/uma/uma2025.pdf",
+			"UMA value for 2025 - Source: INEGI. Verified against official PDF: https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2025/uma/uma2025.pdf. Note: 2026 UMA starts February 1st.",
+	},
+	2026: {
+		dailyValue: 0, // PLACEHOLDER - Update with exact value when available
+		effectiveDate: "2026-02-01T00:00:00Z", // Starts February 1st, not January 1st
+		endDate: "2026-12-31T23:59:59Z",
+		notes:
+			"UMA value for 2026 - Starts February 1st, 2026. Update dailyValue when official value is published.",
 	},
 	2024: {
 		dailyValue: 108.57,
@@ -111,12 +118,23 @@ async function main() {
 
 	for (const [yearStr, umaData] of Object.entries(UMA_VALUES)) {
 		const year = parseInt(yearStr, 10);
-		try {
-			console.log(`Creating UMA value for year ${year}...`);
-			const created = await createUmaValue(year, umaData, approvedBy);
-			console.log(`✓ Created UMA value for ${year}: ${created.dailyValue}\n`);
 
-			// Activate 2025 if it's the current year
+		// Skip placeholder values (dailyValue === 0)
+		if (umaData.dailyValue === 0) {
+			console.log(
+				`⏭️  Skipping ${year} - placeholder value (update when official value is published)\n`,
+			);
+			continue;
+		}
+
+		try {
+			console.log(`Creating/updating UMA value for year ${year}...`);
+			const created = await createUmaValue(year, umaData, approvedBy);
+			console.log(
+				`✓ Created/updated UMA value for ${year}: ${created.dailyValue}\n`,
+			);
+
+			// Activate 2025 if it's the current year (or if it's the most recent valid UMA)
 			if (year === 2025) {
 				console.log(`Activating UMA value for ${year}...`);
 				await activateUmaValue(created.id);

@@ -65,6 +65,18 @@ function parseCsv(csvText) {
 	return data;
 }
 
+// Generate deterministic ID based on catalogId and normalizedName
+function generateDeterministicId(catalogId, normalizedName) {
+	const combined = `${catalogId}-${normalizedName}`;
+	let hash = 0;
+	for (let i = 0; i < combined.length; i++) {
+		const char = combined.charCodeAt(i);
+		hash = (hash << 5) - hash + char;
+		hash = hash & hash;
+	}
+	return Math.abs(hash).toString(16).padStart(32, "0");
+}
+
 function generateSql(catalogId, items) {
 	const sql = [];
 
@@ -74,10 +86,7 @@ function generateSql(catalogId, items) {
 		VALUES ('${catalogId}', '${CATALOG_KEY}', 'Monedas', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 	`);
 
-	// Delete existing items for this catalog
-	sql.push(`DELETE FROM catalog_items WHERE catalogId = '${catalogId}';`);
-
-	// Insert catalog items
+	// Insert or replace catalog items using deterministic IDs
 	for (const item of items) {
 		// name = human-readable name (e.g., "Peso mexicano", "Dólar estadounidense")
 		const name = item.name.replace(/'/g, "''");
@@ -94,17 +103,18 @@ function generateSql(catalogId, items) {
 			shortName: item.shortName, // e.g., "MXN", "USD"
 			country: item.country,
 		}).replace(/'/g, "''"); // Escape single quotes
+		const itemId = generateDeterministicId(catalogId, normalizedName);
 
 		sql.push(`
-			INSERT INTO catalog_items (id, catalogId, name, normalizedName, active, metadata, createdAt, updatedAt)
+			INSERT OR REPLACE INTO catalog_items (id, catalogId, name, normalizedName, active, metadata, createdAt, updatedAt)
 			VALUES (
-				lower(hex(randomblob(16))),
+				'${itemId}',
 				'${catalogId}',
 				'${name}',
 				'${normalizedName}',
 				1,
 				'${metadata}',
-				CURRENT_TIMESTAMP,
+				COALESCE((SELECT createdAt FROM catalog_items WHERE id = '${itemId}'), CURRENT_TIMESTAMP),
 				CURRENT_TIMESTAMP
 			);
 		`);

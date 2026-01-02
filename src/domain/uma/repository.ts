@@ -75,6 +75,32 @@ export class UmaValueRepository {
 		return record ? mapPrismaUmaValue(record) : null;
 	}
 
+	/**
+	 * Gets the UMA value effective for a specific date
+	 * Checks effectiveDate and endDate to find the correct UMA value
+	 * Returns the most recent UMA value that is effective on the given date
+	 */
+	async getByDate(date: Date): Promise<UmaValueEntity | null> {
+		const records = await this.prisma.umaValue.findMany({
+			where: {
+				AND: [
+					{ effectiveDate: { lte: date } },
+					{
+						OR: [{ endDate: null }, { endDate: { gte: date } }],
+					},
+				],
+			},
+			orderBy: { effectiveDate: "desc" },
+			take: 1,
+		});
+
+		if (records.length === 0) {
+			return null;
+		}
+
+		return mapPrismaUmaValue(records[0]);
+	}
+
 	async create(input: UmaValueCreateInput): Promise<UmaValueEntity> {
 		// If setting as active, deactivate all others
 		if (input.active) {
