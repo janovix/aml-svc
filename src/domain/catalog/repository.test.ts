@@ -359,4 +359,105 @@ describe("CatalogRepository", () => {
 			});
 		});
 	});
+
+	describe("findItemById", () => {
+		it("returns catalog item when found", async () => {
+			const mockItem = {
+				id: "item-1",
+				catalogId: "catalog-1",
+				name: "Toyota",
+				normalizedName: "toyota",
+				active: true,
+				metadata: '{"originCountry": "JP"}',
+				createdAt: new Date("2024-01-01"),
+				updatedAt: new Date("2024-01-01"),
+			};
+
+			vi.mocked(mockPrisma.catalogItem.findFirst).mockResolvedValue(
+				mockItem as never,
+			);
+
+			const result = await repository.findItemById("catalog-1", "item-1");
+
+			expect(result).toMatchObject({
+				id: "item-1",
+				catalogId: "catalog-1",
+				name: "Toyota",
+				normalizedName: "toyota",
+				active: true,
+				metadata: { originCountry: "JP" },
+			});
+
+			expect(mockPrisma.catalogItem.findFirst).toHaveBeenCalledWith({
+				where: {
+					id: "item-1",
+					catalogId: "catalog-1",
+					active: true,
+				},
+			});
+		});
+
+		it("returns null when item not found", async () => {
+			vi.mocked(mockPrisma.catalogItem.findFirst).mockResolvedValue(null);
+
+			const result = await repository.findItemById("catalog-1", "nonexistent");
+
+			expect(result).toBeNull();
+		});
+
+		it("filters active items by default", async () => {
+			vi.mocked(mockPrisma.catalogItem.findFirst).mockResolvedValue(null);
+
+			await repository.findItemById("catalog-1", "item-1");
+
+			expect(mockPrisma.catalogItem.findFirst).toHaveBeenCalledWith(
+				expect.objectContaining({
+					where: expect.objectContaining({
+						active: true,
+					}),
+				}),
+			);
+		});
+
+		it("includes inactive items when includeInactive is true", async () => {
+			const mockItem = {
+				id: "item-1",
+				catalogId: "catalog-1",
+				name: "Inactive Item",
+				normalizedName: "inactive item",
+				active: false,
+				metadata: null,
+				createdAt: new Date("2024-01-01"),
+				updatedAt: new Date("2024-01-01"),
+			};
+
+			vi.mocked(mockPrisma.catalogItem.findFirst).mockResolvedValue(
+				mockItem as never,
+			);
+
+			await repository.findItemById("catalog-1", "item-1", true);
+
+			expect(mockPrisma.catalogItem.findFirst).toHaveBeenCalledWith(
+				expect.objectContaining({
+					where: expect.not.objectContaining({
+						active: true,
+					}),
+				}),
+			);
+		});
+
+		it("filters by catalogId", async () => {
+			vi.mocked(mockPrisma.catalogItem.findFirst).mockResolvedValue(null);
+
+			await repository.findItemById("catalog-1", "item-1");
+
+			expect(mockPrisma.catalogItem.findFirst).toHaveBeenCalledWith(
+				expect.objectContaining({
+					where: expect.objectContaining({
+						catalogId: "catalog-1",
+					}),
+				}),
+			);
+		});
+	});
 });

@@ -729,6 +729,65 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/catalogs/{catalogKey}/items/{itemId}": {
+			get: {
+				tags: ["Catalogs"],
+				summary: "Get a catalog item by ID",
+				description:
+					"Retrieve a specific catalog item by its ID within a catalog. Returns 404 if the catalog or item is not found.",
+				parameters: [
+					{
+						name: "catalogKey",
+						in: "path",
+						required: true,
+						schema: {
+							type: "string",
+							minLength: 3,
+							maxLength: 64,
+							pattern: "^[a-zA-Z0-9-]+$",
+						},
+						description:
+							"Identifier of the catalog (e.g., `car-brands`, `states`).",
+					},
+					{
+						name: "itemId",
+						in: "path",
+						required: true,
+						schema: {
+							type: "string",
+							minLength: 1,
+						},
+						description: "ID of the catalog item to retrieve.",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Catalog item retrieved successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/CatalogItem" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "Catalog or catalog item not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
 		"/api/v1/catalogs/{catalogKey}/items": {
 			post: {
 				tags: ["Catalogs"],
@@ -1146,6 +1205,27 @@ export const openAPISpec = {
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/alert-rules/active": {
+			get: {
+				tags: ["Alert Rules"],
+				summary: "Get active alert rules for seekers",
+				description:
+					"Retrieve all active alert rules that can be triggered by seekers (excludes manual-only rules).",
+				responses: {
+					"200": {
+						description: "List of active alert rules for seekers",
+						content: {
+							"application/json": {
+								schema: {
+									type: "array",
+									items: { $ref: "#/components/schemas/AlertRule" },
+								},
 							},
 						},
 					},

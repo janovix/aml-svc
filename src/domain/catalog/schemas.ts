@@ -27,6 +27,11 @@ export const CatalogKeyParamSchema = z.object({
 	catalogKey: CatalogKeySchema,
 });
 
+export const CatalogItemIdParamSchema = z.object({
+	catalogKey: CatalogKeySchema,
+	itemId: z.string().trim().min(1, "itemId is required"),
+});
+
 export const CatalogListQuerySchema = z.object({
 	search: z
 		.string()

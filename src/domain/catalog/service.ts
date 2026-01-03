@@ -61,4 +61,28 @@ export class CatalogQueryService {
 
 		return this.repository.createItem(catalog.id, name);
 	}
+
+	async getItemById(
+		catalogKey: string,
+		itemId: string,
+		includeInactive = false,
+	): Promise<CatalogItemEntity> {
+		const catalog = await this.repository.findByKey(catalogKey);
+
+		if (!catalog || !catalog.active) {
+			throw new Error("CATALOG_NOT_FOUND");
+		}
+
+		const item = await this.repository.findItemById(
+			catalog.id,
+			itemId,
+			includeInactive,
+		);
+
+		if (!item) {
+			throw new Error("CATALOG_ITEM_NOT_FOUND");
+		}
+
+		return item;
+	}
 }

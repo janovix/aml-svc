@@ -52,6 +52,7 @@ function createMockRepository(): CatalogRepository {
 		listItems: vi.fn(),
 		findItemByNormalizedName: vi.fn(),
 		createItem: vi.fn(),
+		findItemById: vi.fn(),
 		findItemsByIds: vi.fn().mockResolvedValue(new Map()),
 		findItemsByCodes: vi.fn().mockResolvedValue(new Map()),
 		findItemsByCodesMultipleCatalogs: vi.fn().mockResolvedValue(new Map()),

@@ -194,6 +194,27 @@ export class CatalogRepository {
 		return item ? mapCatalogItem(item) : null;
 	}
 
+	async findItemById(
+		catalogId: string,
+		itemId: string,
+		includeInactive = false,
+	): Promise<CatalogItemEntity | null> {
+		const where: Prisma.CatalogItemWhereInput = {
+			id: itemId,
+			catalogId,
+		};
+
+		if (!includeInactive) {
+			where.active = true;
+		}
+
+		const item = await this.prisma.catalogItem.findFirst({
+			where,
+		});
+
+		return item ? mapCatalogItem(item) : null;
+	}
+
 	async createItem(
 		catalogId: string,
 		name: string,

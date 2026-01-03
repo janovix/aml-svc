@@ -284,23 +284,37 @@ export async function handleServiceBindingRequest(
 	env: Bindings,
 ): Promise<Response> {
 	const url = new URL(request.url);
-	const path = url.pathname;
+	let path = url.pathname;
+
+	// When using service bindings with https://internal/..., Cloudflare strips the /internal prefix
+	// So /internal/alert-rules/active becomes /alert-rules/active
+	// But Hono route /internal/* matches and passes the full path, so we need to handle both cases
+	// Remove /internal prefix if present for consistent matching
+	if (path.startsWith("/internal/")) {
+		path = path.slice("/internal".length);
+	}
+
+	// Debug logging for service binding requests
+	console.log(
+		`[ServiceBinding] ${request.method} ${path} (original pathname: ${url.pathname}, full URL: ${request.url})`,
+	);
 
 	try {
-		// Route: /internal/alert-rules/active (global - no organizationId required)
-		if (path === "/internal/alert-rules/active" && request.method === "GET") {
+		// Route: /alert-rules/active (global - no organizationId required)
+		if (path === "/alert-rules/active" && request.method === "GET") {
+			console.log("[ServiceBinding] Fetching active alert rules for seekers");
 			const service = new AlertServiceBinding(env);
 			const rules = await service.getActiveAlertRules();
+			console.log(
+				`[ServiceBinding] Found ${rules.length} active alert rules for seekers`,
+			);
 			return new Response(JSON.stringify(rules), {
 				headers: { "Content-Type": "application/json" },
 			});
 		}
 
-		// Route: /internal/alert-rules/all-active (includes manual-only rules)
-		if (
-			path === "/internal/alert-rules/all-active" &&
-			request.method === "GET"
-		) {
+		// Route: /alert-rules/all-active (includes manual-only rules)
+		if (path === "/alert-rules/all-active" && request.method === "GET") {
 			const service = new AlertServiceBinding(env);
 			const rules = await service.getAllActiveAlertRules();
 			return new Response(JSON.stringify(rules), {
@@ -308,10 +322,8 @@ export async function handleServiceBindingRequest(
 			});
 		}
 
-		// Route: /internal/alert-rules/{id}/config/{key}
-		const configMatch = path.match(
-			/^\/internal\/alert-rules\/([^/]+)\/config\/([^/]+)$/,
-		);
+		// Route: /alert-rules/{id}/config/{key}
+		const configMatch = path.match(/^\/alert-rules\/([^/]+)\/config\/([^/]+)$/);
 		if (configMatch && request.method === "GET") {
 			const [, alertRuleId, key] = configMatch;
 			const service = new AlertServiceBinding(env);
@@ -327,8 +339,8 @@ export async function handleServiceBindingRequest(
 			});
 		}
 
-		// Route: /internal/alerts (POST)
-		if (path === "/internal/alerts" && request.method === "POST") {
+		// Route: /alerts (POST)
+		if (path === "/alerts" && request.method === "POST") {
 			const service = new AlertServiceBinding(env);
 			const alertData = (await request.json()) as Parameters<
 				AlertServiceBinding["createAlert"]
@@ -340,8 +352,8 @@ export async function handleServiceBindingRequest(
 			});
 		}
 
-		// Route: /internal/uma-values/active
-		if (path === "/internal/uma-values/active" && request.method === "GET") {
+		// Route: /uma-values/active
+		if (path === "/uma-values/active" && request.method === "GET") {
 			const service = new AlertServiceBinding(env);
 			const umaValue = await service.getActiveUmaValue();
 			if (!umaValue) {
@@ -355,9 +367,9 @@ export async function handleServiceBindingRequest(
 			});
 		}
 
-		// Route: /internal/clients/{clientId}
-		if (path.startsWith("/internal/clients/") && request.method === "GET") {
-			// const clientId = path.split("/internal/clients/")[1];
+		// Route: /clients/{clientId}
+		if (path.startsWith("/clients/") && request.method === "GET") {
+			// const clientId = path.split("/clients/")[1];
 			// This would need ClientService - for now return 501
 			return new Response(
 				JSON.stringify({ error: "Not implemented via service binding" }),
@@ -365,15 +377,13 @@ export async function handleServiceBindingRequest(
 			);
 		}
 
-		// Route: /internal/clients/{clientId}/transactions
+		// Route: /clients/{clientId}/transactions
 		if (
-			path.startsWith("/internal/clients/") &&
+			path.startsWith("/clients/") &&
 			path.endsWith("/transactions") &&
 			request.method === "GET"
 		) {
-			// const clientId = path
-			// 	.split("/internal/clients/")[1]
-			// 	.split("/transactions")[0];
+			// const clientId = path.split("/clients/")[1].split("/transactions")[0];
 			// This would need TransactionService - for now return 501
 			return new Response(
 				JSON.stringify({ error: "Not implemented via service binding" }),
@@ -381,15 +391,13 @@ export async function handleServiceBindingRequest(
 			);
 		}
 
-		// Route: /internal/alerts/{alertId}/generate-file
+		// Route: /alerts/{alertId}/generate-file
 		if (
-			path.startsWith("/internal/alerts/") &&
+			path.startsWith("/alerts/") &&
 			path.endsWith("/generate-file") &&
 			request.method === "POST"
 		) {
-			const alertId = path
-				.split("/internal/alerts/")[1]
-				.split("/generate-file")[0];
+			const alertId = path.split("/alerts/")[1].split("/generate-file")[0];
 			const service = new AlertServiceBinding(env);
 			try {
 				const result = await service.generateSatFile(alertId);
@@ -411,13 +419,30 @@ export async function handleServiceBindingRequest(
 			}
 		}
 
-		return new Response("Not Found", { status: 404 });
+		// No route matched - return 404 with helpful error message
+		console.warn(
+			`[ServiceBinding] No route matched for ${request.method} ${path}`,
+		);
+		return new Response(
+			JSON.stringify({
+				error: "Not Found",
+				message: `No handler found for ${request.method} ${path}`,
+				path,
+				method: request.method,
+			}),
+			{
+				status: 404,
+				headers: { "Content-Type": "application/json" },
+			},
+		);
 	} catch (error) {
-		console.error("Service binding error:", error);
+		console.error("[ServiceBinding] Error processing request:", error);
 		return new Response(
 			JSON.stringify({
 				error: "Internal Server Error",
 				message: error instanceof Error ? error.message : "Unknown error",
+				path,
+				method: request.method,
 			}),
 			{
 				status: 500,

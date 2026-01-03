@@ -83,6 +83,13 @@ alertRulesRouter.get("/", async (c) => {
 	return c.json(result);
 });
 
+// Convenience endpoint: Get active alert rules for seekers (non-manual-only)
+alertRulesRouter.get("/active", async (c) => {
+	const service = getService(c);
+	const rules = await service.listActiveForSeeker().catch(handleServiceError);
+	return c.json(rules);
+});
+
 alertRulesRouter.get("/:id", async (c) => {
 	const params = parseWithZod(AlertRuleIdParamSchema, c.req.param());
 
