@@ -1,3 +1,10 @@
+# [1.1.0-rc.29](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.28...v1.1.0-rc.29) (2026-01-03)
+
+
+### Features
+
+* implement flexible item retrieval by ID, shortName, or code in CatalogRepository ([d58b913](https://github.com/janovix/aml-svc/commit/d58b913cfb08a23e2848736643d6333cd6126d16))
+
 # [1.1.0-rc.28](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.27...v1.1.0-rc.28) (2026-01-03)
 
 
