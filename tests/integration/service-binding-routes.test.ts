@@ -12,6 +12,8 @@ describe("Service Binding Routes (without /internal prefix)", () => {
 		// Clean up test data before each test
 		const prisma = getPrismaClient(env.DB);
 		await prisma.alert.deleteMany({});
+		await prisma.transaction.deleteMany({});
+		await prisma.client.deleteMany({});
 		await prisma.alertRuleConfig.deleteMany({});
 		await prisma.alertRule.deleteMany({});
 		await prisma.umaValue.deleteMany({});
@@ -21,6 +23,8 @@ describe("Service Binding Routes (without /internal prefix)", () => {
 		// Clean up test data after each test
 		const prisma = getPrismaClient(env.DB);
 		await prisma.alert.deleteMany({});
+		await prisma.transaction.deleteMany({});
+		await prisma.client.deleteMany({});
 		await prisma.alertRuleConfig.deleteMany({});
 		await prisma.alertRule.deleteMany({});
 		await prisma.umaValue.deleteMany({});
@@ -390,6 +394,237 @@ describe("Service Binding Routes (without /internal prefix)", () => {
 			};
 			expect(body.error).toBe("Failed to generate SAT file");
 			expect(body.message).toBe("R2_BUCKET not configured");
+		});
+	});
+
+	describe("GET /clients/:id", () => {
+		it("returns client data via Hono route", async () => {
+			const prisma = getPrismaClient(env.DB);
+			const client = await prisma.client.create({
+				data: {
+					id: "test-client",
+					organizationId: "test-org",
+					rfc: "TEST123456",
+					personType: "PHYSICAL",
+					email: "test@example.com",
+					phone: "1234567890",
+					country: "MEX",
+					stateCode: "CDMX",
+					city: "Mexico City",
+					municipality: "Benito Juarez",
+					neighborhood: "Test",
+					street: "Test Street",
+					externalNumber: "123",
+					postalCode: "01234",
+				},
+			});
+
+			const res = await SELF.fetch(`http://local.test/clients/${client.id}`, {
+				method: "GET",
+			});
+
+			expect(res.status).toBe(200);
+			const body = (await res.json()) as { id: string; rfc: string };
+			expect(body.id).toBe("test-client");
+			expect(body.rfc).toBe("TEST123456");
+		});
+
+		it("returns 404 when client not found", async () => {
+			const res = await SELF.fetch("http://local.test/clients/non-existent", {
+				method: "GET",
+			});
+
+			expect(res.status).toBe(404);
+			const body = await res.json();
+			expect(body).toEqual({ error: "Client not found" });
+		});
+	});
+
+	describe("GET /clients/:id/transactions", () => {
+		it("returns client transactions via Hono route", async () => {
+			const prisma = getPrismaClient(env.DB);
+			const client = await prisma.client.create({
+				data: {
+					id: "test-client",
+					organizationId: "test-org",
+					rfc: "TEST123456",
+					personType: "PHYSICAL",
+					email: "test@example.com",
+					phone: "1234567890",
+					country: "MEX",
+					stateCode: "CDMX",
+					city: "Mexico City",
+					municipality: "Benito Juarez",
+					neighborhood: "Test",
+					street: "Test Street",
+					externalNumber: "123",
+					postalCode: "01234",
+				},
+			});
+
+			// Create transactions
+			await prisma.transaction.createMany({
+				data: [
+					{
+						id: "tx1",
+						organizationId: "test-org",
+						clientId: client.id,
+						operationDate: new Date("2025-01-15"),
+						operationType: "SALE",
+						vehicleType: "LAND",
+						brandId: "brand1",
+						model: "Model1",
+						year: 2024,
+						amount: 100000,
+						currency: "MXN",
+						branchPostalCode: "01234",
+					},
+					{
+						id: "tx2",
+						organizationId: "test-org",
+						clientId: client.id,
+						operationDate: new Date("2025-01-16"),
+						operationType: "PURCHASE",
+						vehicleType: "LAND",
+						brandId: "brand2",
+						model: "Model2",
+						year: 2023,
+						amount: 50000,
+						currency: "MXN",
+						branchPostalCode: "01234",
+					},
+				],
+			});
+
+			const res = await SELF.fetch(
+				`http://local.test/clients/${client.id}/transactions`,
+				{ method: "GET" },
+			);
+
+			expect(res.status).toBe(200);
+			const body = (await res.json()) as Array<{ id: string }>;
+			expect(body).toHaveLength(2);
+			expect(body.map((t) => t.id)).toContain("tx1");
+			expect(body.map((t) => t.id)).toContain("tx2");
+		});
+
+		it("returns empty array when client has no transactions", async () => {
+			const prisma = getPrismaClient(env.DB);
+			const client = await prisma.client.create({
+				data: {
+					id: "test-client",
+					organizationId: "test-org",
+					rfc: "TEST123456",
+					personType: "PHYSICAL",
+					email: "test@example.com",
+					phone: "1234567890",
+					country: "MEX",
+					stateCode: "CDMX",
+					city: "Mexico City",
+					municipality: "Benito Juarez",
+					neighborhood: "Test",
+					street: "Test Street",
+					externalNumber: "123",
+					postalCode: "01234",
+				},
+			});
+
+			const res = await SELF.fetch(
+				`http://local.test/clients/${client.id}/transactions`,
+				{ method: "GET" },
+			);
+
+			expect(res.status).toBe(200);
+			const body = await res.json();
+			expect(body).toEqual([]);
+		});
+
+		it("returns 404 when client not found", async () => {
+			const res = await SELF.fetch(
+				"http://local.test/clients/non-existent/transactions",
+				{ method: "GET" },
+			);
+
+			expect(res.status).toBe(404);
+			const body = await res.json();
+			expect(body).toEqual({ error: "Client not found" });
+		});
+	});
+
+	describe("GET /transactions?clientId=:id", () => {
+		it("returns client transactions via query parameter", async () => {
+			const prisma = getPrismaClient(env.DB);
+			const client = await prisma.client.create({
+				data: {
+					id: "test-client",
+					organizationId: "test-org",
+					rfc: "TEST123456",
+					personType: "PHYSICAL",
+					email: "test@example.com",
+					phone: "1234567890",
+					country: "MEX",
+					stateCode: "CDMX",
+					city: "Mexico City",
+					municipality: "Benito Juarez",
+					neighborhood: "Test",
+					street: "Test Street",
+					externalNumber: "123",
+					postalCode: "01234",
+				},
+			});
+
+			// Create transactions
+			await prisma.transaction.createMany({
+				data: [
+					{
+						id: "tx1",
+						organizationId: "test-org",
+						clientId: client.id,
+						operationDate: new Date("2025-01-15"),
+						operationType: "SALE",
+						vehicleType: "LAND",
+						brandId: "brand1",
+						model: "Model1",
+						year: 2024,
+						amount: 100000,
+						currency: "MXN",
+						branchPostalCode: "01234",
+					},
+				],
+			});
+
+			const res = await SELF.fetch(
+				`http://local.test/transactions?clientId=${client.id}`,
+				{ method: "GET" },
+			);
+
+			expect(res.status).toBe(200);
+			const body = (await res.json()) as Array<{ id: string }>;
+			expect(body).toHaveLength(1);
+			expect(body[0].id).toBe("tx1");
+		});
+
+		it("returns 400 when clientId query parameter is missing", async () => {
+			const res = await SELF.fetch("http://local.test/transactions", {
+				method: "GET",
+			});
+
+			expect(res.status).toBe(400);
+			const body = await res.json();
+			expect(body).toEqual({
+				error: "clientId query parameter is required",
+			});
+		});
+
+		it("returns 404 when client not found", async () => {
+			const res = await SELF.fetch(
+				"http://local.test/transactions?clientId=non-existent",
+				{ method: "GET" },
+			);
+
+			expect(res.status).toBe(404);
+			const body = await res.json();
+			expect(body).toEqual({ error: "Client not found" });
 		});
 	});
 

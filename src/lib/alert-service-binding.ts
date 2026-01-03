@@ -112,20 +112,67 @@ export class AlertServiceBinding {
 	 * Get client data
 	 * Called via: env.AML_SERVICE.fetch(new Request(`https://internal/clients/${clientId}`))
 	 */
-	async getClient(_clientId: string) {
-		// This would need to import ClientService
-		// For now, return a placeholder - the actual implementation would use ClientService
-		throw new Error("Not implemented - use ClientService directly");
+	async getClient(clientId: string) {
+		const prisma = getPrismaClient(this.env.DB);
+
+		// First, fetch the client to get its organizationId
+		const clientRecord = await prisma.client.findUnique({
+			where: { id: clientId },
+			select: { organizationId: true },
+		});
+
+		if (!clientRecord) {
+			throw new Error(`Client not found: ${clientId}`);
+		}
+
+		// Now use ClientService to get the full client entity
+		const repository = new ClientRepository(prisma);
+		const service = new ClientService(repository);
+		return service.get(clientRecord.organizationId, clientId);
 	}
 
 	/**
 	 * Get client transactions
 	 * Called via: env.AML_SERVICE.fetch(new Request(`https://internal/clients/${clientId}/transactions`))
 	 */
-	async getClientTransactions(_clientId: string) {
-		// This would need to import TransactionService
-		// For now, return a placeholder - the actual implementation would use TransactionService
-		throw new Error("Not implemented - use TransactionService directly");
+	async getClientTransactions(clientId: string) {
+		const prisma = getPrismaClient(this.env.DB);
+
+		// First, fetch the client to get its organizationId
+		const clientRecord = await prisma.client.findUnique({
+			where: { id: clientId },
+			select: { organizationId: true },
+		});
+
+		if (!clientRecord) {
+			throw new Error(`Client not found: ${clientId}`);
+		}
+
+		// Now use TransactionService to list transactions for this client
+		const umaRepository = new UmaValueRepository(prisma);
+		const catalogRepository = new CatalogRepository(prisma);
+		const catalogEnrichmentService = new CatalogEnrichmentService(
+			catalogRepository,
+		);
+		const transactionRepository = new TransactionRepository(
+			prisma,
+			umaRepository,
+			catalogEnrichmentService,
+		);
+		const clientRepository = new ClientRepository(prisma);
+		const service = new TransactionService(
+			transactionRepository,
+			clientRepository,
+			umaRepository,
+		);
+
+		const result = await service.list(clientRecord.organizationId, {
+			clientId,
+			page: 1,
+			limit: 1000, // Get all transactions for the client
+		});
+
+		return result.data;
 	}
 
 	/**
@@ -367,28 +414,137 @@ export async function handleServiceBindingRequest(
 			});
 		}
 
-		// Route: /clients/{clientId}
-		if (path.startsWith("/clients/") && request.method === "GET") {
-			// const clientId = path.split("/clients/")[1];
-			// This would need ClientService - for now return 501
-			return new Response(
-				JSON.stringify({ error: "Not implemented via service binding" }),
-				{ status: 501, headers: { "Content-Type": "application/json" } },
-			);
-		}
-
-		// Route: /clients/{clientId}/transactions
+		// Route: /clients/{clientId}/transactions (must be checked before /clients/{clientId})
 		if (
 			path.startsWith("/clients/") &&
 			path.endsWith("/transactions") &&
 			request.method === "GET"
 		) {
-			// const clientId = path.split("/clients/")[1].split("/transactions")[0];
-			// This would need TransactionService - for now return 501
-			return new Response(
-				JSON.stringify({ error: "Not implemented via service binding" }),
-				{ status: 501, headers: { "Content-Type": "application/json" } },
-			);
+			const clientId = path.split("/clients/")[1].split("/transactions")[0];
+
+			if (!clientId) {
+				return new Response(
+					JSON.stringify({ error: "Client ID is required" }),
+					{ status: 400, headers: { "Content-Type": "application/json" } },
+				);
+			}
+
+			try {
+				const service = new AlertServiceBinding(env);
+				const transactions = await service.getClientTransactions(clientId);
+				return new Response(JSON.stringify(transactions), {
+					headers: { "Content-Type": "application/json" },
+				});
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : "Unknown error";
+				if (
+					errorMessage.includes("not found") ||
+					errorMessage.includes("NOT_FOUND")
+				) {
+					return new Response(JSON.stringify({ error: "Client not found" }), {
+						status: 404,
+						headers: { "Content-Type": "application/json" },
+					});
+				}
+				return new Response(
+					JSON.stringify({
+						error: "Failed to fetch transactions",
+						message: errorMessage,
+					}),
+					{
+						status: 500,
+						headers: { "Content-Type": "application/json" },
+					},
+				);
+			}
+		}
+
+		// Route: /clients/{clientId}
+		if (path.startsWith("/clients/") && request.method === "GET") {
+			const clientId = path.split("/clients/")[1];
+			// Remove any trailing path segments (e.g., "/transactions")
+			const cleanClientId = clientId.split("/")[0];
+
+			if (!cleanClientId) {
+				return new Response(
+					JSON.stringify({ error: "Client ID is required" }),
+					{ status: 400, headers: { "Content-Type": "application/json" } },
+				);
+			}
+
+			try {
+				const service = new AlertServiceBinding(env);
+				const client = await service.getClient(cleanClientId);
+				return new Response(JSON.stringify(client), {
+					headers: { "Content-Type": "application/json" },
+				});
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : "Unknown error";
+				if (
+					errorMessage.includes("not found") ||
+					errorMessage.includes("NOT_FOUND")
+				) {
+					return new Response(JSON.stringify({ error: "Client not found" }), {
+						status: 404,
+						headers: { "Content-Type": "application/json" },
+					});
+				}
+				return new Response(
+					JSON.stringify({
+						error: "Failed to fetch client",
+						message: errorMessage,
+					}),
+					{
+						status: 500,
+						headers: { "Content-Type": "application/json" },
+					},
+				);
+			}
+		}
+
+		// Route: /transactions?clientId={clientId} (alternative format)
+		if (path === "/transactions" && request.method === "GET") {
+			const url = new URL(request.url);
+			const clientId = url.searchParams.get("clientId");
+
+			if (!clientId) {
+				return new Response(
+					JSON.stringify({ error: "clientId query parameter is required" }),
+					{ status: 400, headers: { "Content-Type": "application/json" } },
+				);
+			}
+
+			try {
+				const service = new AlertServiceBinding(env);
+				const transactions = await service.getClientTransactions(clientId);
+				return new Response(JSON.stringify(transactions), {
+					headers: { "Content-Type": "application/json" },
+				});
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : "Unknown error";
+				if (
+					errorMessage.includes("not found") ||
+					errorMessage.includes("NOT_FOUND")
+				) {
+					return new Response(JSON.stringify({ error: "Client not found" }), {
+						status: 404,
+						headers: { "Content-Type": "application/json" },
+					});
+				}
+				return new Response(
+					JSON.stringify({
+						error: "Failed to fetch transactions",
+						message: errorMessage,
+					}),
+					{
+						status: 500,
+						headers: { "Content-Type": "application/json" },
+					},
+				);
+			}
 		}
 
 		// Route: /alerts/{alertId}/generate-file

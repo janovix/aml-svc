@@ -107,10 +107,20 @@ app.all("/uma-values/active", async (c) => {
 
 // Parameterized service binding routes using wildcard patterns
 // Hono will match these patterns and pass them to the handler
+// IMPORTANT: More specific routes must be registered before less specific ones
 app.all("/alert-rules/:id/config/:key", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 app.all("/alerts/:id/generate-file", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/clients/:id/transactions", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/clients/:id", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/transactions", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 
