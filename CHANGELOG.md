@@ -1,3 +1,10 @@
+# [1.1.0-rc.31](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.30...v1.1.0-rc.31) (2026-01-03)
+
+
+### Features
+
+* add service binding routes for alert rules and UMA values with support for parameterized paths ([8e4aac2](https://github.com/janovix/aml-svc/commit/8e4aac2e90e689de35b6e89f68ce307f8d646c64))
+
 # [1.1.0-rc.30](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.29...v1.1.0-rc.30) (2026-01-03)
 
 
