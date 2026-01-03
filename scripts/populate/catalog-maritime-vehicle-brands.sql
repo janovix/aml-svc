@@ -3,6 +3,20 @@
 -- Data source: Comprehensive manufacturer database with country of origin
 
 -- =====================================================
+-- CREATE CATALOG ENTRY (if not exists)
+-- =====================================================
+INSERT OR IGNORE INTO catalogs (id, key, name, active, allowNewItems, createdAt, updatedAt)
+VALUES (
+    lower(hex(randomblob(16))),
+    'maritime-vehicle-brands',
+    'Marcas de Vehículos Marítimos',
+    1,
+    1,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);
+
+-- =====================================================
 -- MAJOR SHIPYARDS & COMMERCIAL SHIPBUILDERS
 -- =====================================================
 

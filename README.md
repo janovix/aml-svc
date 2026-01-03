@@ -112,6 +112,28 @@ This will:
 - Seed initial data
 - Start the Wrangler dev server
 
+### Local Development with Deployed Auth
+
+For local development using the **deployed** auth service (no local auth-svc needed):
+
+```bash
+pnpm run dev:local
+```
+
+This uses `wrangler.local.jsonc` which:
+
+- Uses deployed `auth-svc.janovix.workers.dev` for JWT verification
+- Runs on port 8789 for use with Caddy reverse proxy
+- Uses local D1 database
+
+To use with the local frontend:
+
+1. Start Caddy: `caddy run --config ../Caddyfile`
+2. Start this service: `pnpm run dev:local`
+3. Access via `https://aml-svc-local.janovix.workers.dev`
+
+See `../aml/LOCAL_DEV_SETUP.md` for complete instructions.
+
 ### Deployment
 
 Deploy to Cloudflare Workers:
@@ -267,7 +289,8 @@ Catalogs can be:
 
 ## Scripts
 
-- `pnpm run dev` - Start development server
+- `pnpm run dev` - Start development server (with seeding)
+- `pnpm run dev:local` - Start local dev with deployed auth (port 8789)
 - `pnpm run seedLocalDb` - Apply migrations to local DB
 - `pnpm run populate` - Populate catalogs
 - `pnpm run seed` - Seed initial data

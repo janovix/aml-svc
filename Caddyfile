@@ -1,0 +1,9 @@
+aml-svc-local.janovix.workers.dev {
+	tls internal
+	reverse_proxy localhost:8789 {
+		header_up Host {host}
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
+

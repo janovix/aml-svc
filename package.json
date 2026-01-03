@@ -59,6 +59,8 @@
 		"deploy:dev": "wrangler deploy --config wrangler.jsonc",
 		"predeploy:dev": "wrangler d1 migrations apply DB --remote --config wrangler.jsonc && REMOTE=true WRANGLER_CONFIG=wrangler.jsonc pnpm run populate && REMOTE=true WRANGLER_CONFIG=wrangler.jsonc pnpm run seed",
 		"dev": "npm run seedLocalDb && pnpm run populate && pnpm run seed && wrangler dev",
+		"dev:local": "npm run seedLocalDb && wrangler dev --config wrangler.local.jsonc --port 8789",
+		"caddy:dev": "caddy run --config Caddyfile",
 		"format": "prettier . --write",
 		"format:check": "prettier . --check",
 		"lint": "eslint .",
