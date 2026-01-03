@@ -84,7 +84,33 @@ app.get("/docsz", (c) => {
 });
 
 // Service binding routes (internal worker-to-worker communication)
+// Note: When using service bindings with https://internal/..., Cloudflare strips the /internal prefix
+// So we need to handle both /internal/* routes (for direct HTTP calls) and direct paths (for service bindings)
 app.all("/internal/*", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+
+// Service binding routes without /internal prefix (for Cloudflare service bindings)
+// These routes handle requests that come through service bindings where /internal is stripped
+app.all("/alert-rules/active", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/alert-rules/all-active", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/alerts", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/uma-values/active", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+
+// Parameterized service binding routes using wildcard patterns
+// Hono will match these patterns and pass them to the handler
+app.all("/alert-rules/:id/config/:key", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/alerts/:id/generate-file", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 
