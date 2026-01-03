@@ -15,6 +15,7 @@ function createMockPrisma(): PrismaClient {
 			create: vi.fn(),
 			count: vi.fn(),
 		},
+		$queryRawUnsafe: vi.fn(),
 	} as unknown as PrismaClient;
 }
 
@@ -457,6 +458,127 @@ describe("CatalogRepository", () => {
 						catalogId: "catalog-1",
 					}),
 				}),
+			);
+		});
+	});
+
+	describe("findItemByIdOrCode", () => {
+		it("returns item when found by ID", async () => {
+			const mockItem = {
+				id: "item-1",
+				catalogId: "catalog-1",
+				name: "Toyota",
+				normalizedName: "toyota",
+				active: true,
+				metadata: '{"shortName": "TOY", "code": "1"}',
+				createdAt: new Date("2024-01-01"),
+				updatedAt: new Date("2024-01-01"),
+			};
+
+			vi.mocked(mockPrisma.catalogItem.findFirst).mockResolvedValue(
+				mockItem as never,
+			);
+
+			const result = await repository.findItemByIdOrCode("catalog-1", "item-1");
+
+			expect(result).toMatchObject({
+				id: "item-1",
+				catalogId: "catalog-1",
+				name: "Toyota",
+			});
+		});
+
+		it("returns item when found by shortName", async () => {
+			const mockItem = {
+				id: "item-1",
+				catalogId: "catalog-1",
+				name: "Mexican Peso",
+				normalizedName: "mexican peso",
+				active: 1, // SQLite returns 1/0 for booleans
+				metadata: '{"shortName": "MXN", "code": "3"}',
+				createdAt: new Date("2024-01-01"),
+				updatedAt: new Date("2024-01-01"),
+			};
+
+			// First call (by ID) returns null
+			vi.mocked(mockPrisma.catalogItem.findFirst).mockResolvedValueOnce(null);
+			// Raw SQL query returns the item
+			vi.mocked(mockPrisma.$queryRawUnsafe).mockResolvedValue([mockItem]);
+
+			const result = await repository.findItemByIdOrCode("catalog-1", "MXN");
+
+			expect(result).toMatchObject({
+				id: "item-1",
+				catalogId: "catalog-1",
+				name: "Mexican Peso",
+				metadata: { shortName: "MXN", code: "3" },
+			});
+		});
+
+		it("returns item when found by code", async () => {
+			const mockItem = {
+				id: "item-1",
+				catalogId: "catalog-1",
+				name: "Mexican Peso",
+				normalizedName: "mexican peso",
+				active: 1, // SQLite returns 1/0 for booleans
+				metadata: '{"shortName": "MXN", "code": "3"}',
+				createdAt: new Date("2024-01-01"),
+				updatedAt: new Date("2024-01-01"),
+			};
+
+			// First call (by ID) returns null
+			vi.mocked(mockPrisma.catalogItem.findFirst).mockResolvedValueOnce(null);
+			// Raw SQL query returns the item
+			vi.mocked(mockPrisma.$queryRawUnsafe).mockResolvedValue([mockItem]);
+
+			const result = await repository.findItemByIdOrCode("catalog-1", "3");
+
+			expect(result).toMatchObject({
+				id: "item-1",
+				catalogId: "catalog-1",
+				name: "Mexican Peso",
+				metadata: { shortName: "MXN", code: "3" },
+			});
+		});
+
+		it("returns null when item not found by any identifier", async () => {
+			vi.mocked(mockPrisma.catalogItem.findFirst).mockResolvedValue(null);
+			vi.mocked(mockPrisma.$queryRawUnsafe).mockResolvedValue([]);
+
+			const result = await repository.findItemByIdOrCode(
+				"catalog-1",
+				"nonexistent",
+			);
+
+			expect(result).toBeNull();
+		});
+
+		it("filters active items by default", async () => {
+			vi.mocked(mockPrisma.catalogItem.findFirst).mockResolvedValue(null);
+			vi.mocked(mockPrisma.$queryRawUnsafe).mockResolvedValue([]);
+
+			await repository.findItemByIdOrCode("catalog-1", "MXN");
+
+			expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
+				expect.stringContaining("AND active = 1"),
+				"catalog-1",
+				"MXN",
+				"MXN",
+			);
+		});
+
+		it("includes inactive items when includeInactive is true", async () => {
+			vi.mocked(mockPrisma.catalogItem.findFirst).mockResolvedValue(null);
+			vi.mocked(mockPrisma.$queryRawUnsafe).mockResolvedValue([]);
+
+			await repository.findItemByIdOrCode("catalog-1", "MXN", true);
+
+			expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
+				expect.not.stringContaining("AND active = 1"),
+				"catalog-1",
+				"MXN",
+				"MXN",
 			);
 		});
 	});

@@ -10,6 +10,7 @@ function createMockRepository(): CatalogRepository {
 		findItemByNormalizedName: vi.fn(),
 		createItem: vi.fn(),
 		findItemById: vi.fn(),
+		findItemByIdOrCode: vi.fn(),
 		findItemsByIds: vi.fn(),
 		findItemsByCodes: vi.fn(),
 		findItemsByCodesMultipleCatalogs: vi.fn(),
@@ -49,13 +50,13 @@ describe("CatalogQueryService", () => {
 
 		it("returns catalog item when found", async () => {
 			vi.mocked(mockRepository.findByKey).mockResolvedValue(mockCatalog);
-			vi.mocked(mockRepository.findItemById).mockResolvedValue(mockItem);
+			vi.mocked(mockRepository.findItemByIdOrCode).mockResolvedValue(mockItem);
 
 			const result = await service.getItemById("test-catalog", "item-1");
 
 			expect(result).toEqual(mockItem);
 			expect(mockRepository.findByKey).toHaveBeenCalledWith("test-catalog");
-			expect(mockRepository.findItemById).toHaveBeenCalledWith(
+			expect(mockRepository.findItemByIdOrCode).toHaveBeenCalledWith(
 				"catalog-1",
 				"item-1",
 				false,
@@ -69,7 +70,7 @@ describe("CatalogQueryService", () => {
 				service.getItemById("nonexistent-catalog", "item-1"),
 			).rejects.toThrow("CATALOG_NOT_FOUND");
 
-			expect(mockRepository.findItemById).not.toHaveBeenCalled();
+			expect(mockRepository.findItemByIdOrCode).not.toHaveBeenCalled();
 		});
 
 		it("throws CATALOG_NOT_FOUND when catalog is inactive", async () => {
@@ -83,19 +84,19 @@ describe("CatalogQueryService", () => {
 				service.getItemById("test-catalog", "item-1"),
 			).rejects.toThrow("CATALOG_NOT_FOUND");
 
-			expect(mockRepository.findItemById).not.toHaveBeenCalled();
+			expect(mockRepository.findItemByIdOrCode).not.toHaveBeenCalled();
 		});
 
 		it("throws CATALOG_ITEM_NOT_FOUND when item does not exist", async () => {
 			vi.mocked(mockRepository.findByKey).mockResolvedValue(mockCatalog);
-			vi.mocked(mockRepository.findItemById).mockResolvedValue(null);
+			vi.mocked(mockRepository.findItemByIdOrCode).mockResolvedValue(null);
 
 			await expect(
 				service.getItemById("test-catalog", "nonexistent-item"),
 			).rejects.toThrow("CATALOG_ITEM_NOT_FOUND");
 
 			expect(mockRepository.findByKey).toHaveBeenCalledWith("test-catalog");
-			expect(mockRepository.findItemById).toHaveBeenCalledWith(
+			expect(mockRepository.findItemByIdOrCode).toHaveBeenCalledWith(
 				"catalog-1",
 				"nonexistent-item",
 				false,
@@ -108,15 +109,69 @@ describe("CatalogQueryService", () => {
 				active: false,
 			};
 			vi.mocked(mockRepository.findByKey).mockResolvedValue(mockCatalog);
-			vi.mocked(mockRepository.findItemById).mockResolvedValue(inactiveItem);
+			vi.mocked(mockRepository.findItemByIdOrCode).mockResolvedValue(
+				inactiveItem,
+			);
 
 			const result = await service.getItemById("test-catalog", "item-1", true);
 
 			expect(result).toEqual(inactiveItem);
-			expect(mockRepository.findItemById).toHaveBeenCalledWith(
+			expect(mockRepository.findItemByIdOrCode).toHaveBeenCalledWith(
 				"catalog-1",
 				"item-1",
 				true,
+			);
+		});
+
+		it("returns item when found by shortName (e.g., MXN)", async () => {
+			const currencyItem: CatalogItemEntity = {
+				id: "currency-mxn-id",
+				catalogId: "catalog-1",
+				name: "Mexican Peso",
+				normalizedName: "mexican peso",
+				active: true,
+				metadata: { shortName: "MXN", code: "3" },
+				createdAt: "2024-01-01T00:00:00Z",
+				updatedAt: "2024-01-01T00:00:00Z",
+			};
+			vi.mocked(mockRepository.findByKey).mockResolvedValue(mockCatalog);
+			vi.mocked(mockRepository.findItemByIdOrCode).mockResolvedValue(
+				currencyItem,
+			);
+
+			const result = await service.getItemById("currencies", "MXN");
+
+			expect(result).toEqual(currencyItem);
+			expect(mockRepository.findItemByIdOrCode).toHaveBeenCalledWith(
+				"catalog-1",
+				"MXN",
+				false,
+			);
+		});
+
+		it("returns item when found by code (e.g., '3' for MXN)", async () => {
+			const currencyItem: CatalogItemEntity = {
+				id: "currency-mxn-id",
+				catalogId: "catalog-1",
+				name: "Mexican Peso",
+				normalizedName: "mexican peso",
+				active: true,
+				metadata: { shortName: "MXN", code: "3" },
+				createdAt: "2024-01-01T00:00:00Z",
+				updatedAt: "2024-01-01T00:00:00Z",
+			};
+			vi.mocked(mockRepository.findByKey).mockResolvedValue(mockCatalog);
+			vi.mocked(mockRepository.findItemByIdOrCode).mockResolvedValue(
+				currencyItem,
+			);
+
+			const result = await service.getItemById("currencies", "3");
+
+			expect(result).toEqual(currencyItem);
+			expect(mockRepository.findItemByIdOrCode).toHaveBeenCalledWith(
+				"catalog-1",
+				"3",
+				false,
 			);
 		});
 	});

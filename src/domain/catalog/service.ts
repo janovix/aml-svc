@@ -73,7 +73,8 @@ export class CatalogQueryService {
 			throw new Error("CATALOG_NOT_FOUND");
 		}
 
-		const item = await this.repository.findItemById(
+		// Try flexible lookup: by ID, shortName, or code
+		const item = await this.repository.findItemByIdOrCode(
 			catalog.id,
 			itemId,
 			includeInactive,

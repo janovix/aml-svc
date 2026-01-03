@@ -215,6 +215,73 @@ export class CatalogRepository {
 		return item ? mapCatalogItem(item) : null;
 	}
 
+	/**
+	 * Find a catalog item by ID, shortName (metadata.shortName), or code (metadata.code)
+	 * Uses efficient database queries with JSON extraction for metadata lookups
+	 */
+	async findItemByIdOrCode(
+		catalogId: string,
+		identifier: string,
+		includeInactive = false,
+	): Promise<CatalogItemEntity | null> {
+		// First try by ID (most common case)
+		const itemById = await this.findItemById(
+			catalogId,
+			identifier,
+			includeInactive,
+		);
+		if (itemById) {
+			return itemById;
+		}
+
+		// If not found by ID, try by metadata.shortName or metadata.code using SQLite JSON functions
+		const activeFilter = includeInactive ? "" : "AND active = 1";
+
+		// Use raw SQL with json_extract for efficient filtering at database level
+		const result = await this.prisma.$queryRawUnsafe<
+			Array<{
+				id: string;
+				catalogId: string;
+				name: string;
+				normalizedName: string;
+				active: number;
+				metadata: string | null;
+				createdAt: Date;
+				updatedAt: Date;
+			}>
+		>(
+			`
+				SELECT * FROM catalog_items
+				WHERE catalogId = ?
+					${activeFilter}
+					AND (
+						json_extract(metadata, '$.shortName') = ?
+						OR json_extract(metadata, '$.code') = ?
+					)
+				LIMIT 1
+			`,
+			catalogId,
+			identifier,
+			identifier,
+		);
+
+		if (result.length === 0) {
+			return null;
+		}
+
+		const item = result[0];
+		return mapCatalogItem({
+			id: item.id,
+			catalogId: item.catalogId,
+			name: item.name,
+			normalizedName: item.normalizedName,
+			active: Boolean(item.active),
+			metadata: item.metadata,
+			createdAt: item.createdAt,
+			updatedAt: item.updatedAt,
+		} as PrismaCatalogItem);
+	}
+
 	async createItem(
 		catalogId: string,
 		name: string,

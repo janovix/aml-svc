@@ -732,9 +732,9 @@ export const openAPISpec = {
 		"/api/v1/catalogs/{catalogKey}/items/{itemId}": {
 			get: {
 				tags: ["Catalogs"],
-				summary: "Get a catalog item by ID",
+				summary: "Get a catalog item by ID, shortName, or code",
 				description:
-					"Retrieve a specific catalog item by its ID within a catalog. Returns 404 if the catalog or item is not found.",
+					"Retrieve a specific catalog item by its ID, metadata.shortName (e.g., 'MXN' for currencies), or metadata.code within a catalog. The endpoint will first try to match by ID, then by shortName, then by code. Returns 404 if the catalog or item is not found.",
 				parameters: [
 					{
 						name: "catalogKey",
@@ -747,7 +747,7 @@ export const openAPISpec = {
 							pattern: "^[a-zA-Z0-9-]+$",
 						},
 						description:
-							"Identifier of the catalog (e.g., `car-brands`, `states`).",
+							"Identifier of the catalog (e.g., `car-brands`, `states`, `currencies`).",
 					},
 					{
 						name: "itemId",
@@ -757,7 +757,8 @@ export const openAPISpec = {
 							type: "string",
 							minLength: 1,
 						},
-						description: "ID of the catalog item to retrieve.",
+						description:
+							"ID, shortName (metadata.shortName), or code (metadata.code) of the catalog item to retrieve. For example, for currencies catalog, you can use the database ID, 'MXN' (shortName), or '3' (code).",
 					},
 				],
 				responses: {
