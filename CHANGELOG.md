@@ -1,3 +1,10 @@
+# [1.1.0-rc.32](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.31...v1.1.0-rc.32) (2026-01-03)
+
+
+### Features
+
+* implement client data and transaction retrieval endpoints in service binding ([03d16e0](https://github.com/janovix/aml-svc/commit/03d16e0f1eba01adaea7aba38db0fadc6e6281ef))
+
 # [1.1.0-rc.31](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.30...v1.1.0-rc.31) (2026-01-03)
 
 
