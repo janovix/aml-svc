@@ -1,3 +1,10 @@
+# [1.1.0-rc.30](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.29...v1.1.0-rc.30) (2026-01-03)
+
+
+### Features
+
+* add Caddyfile for local development and update README with local dev instructions ([8f95e28](https://github.com/janovix/aml-svc/commit/8f95e281de5e5fc0ac087c5fee3719bd0047bdf7))
+
 # [1.1.0-rc.29](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.28...v1.1.0-rc.29) (2026-01-03)
 
 
