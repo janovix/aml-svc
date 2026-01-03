@@ -1,3 +1,10 @@
+# [1.1.0-rc.28](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.27...v1.1.0-rc.28) (2026-01-03)
+
+
+### Features
+
+* add endpoints for retrieving catalog items by ID and active alert rules for seekers ([ab78f97](https://github.com/janovix/aml-svc/commit/ab78f973f3e0a6c8efc3d632bf3e3f97a7e94a13))
+
 # [1.1.0-rc.27](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.26...v1.1.0-rc.27) (2026-01-02)
 
 
