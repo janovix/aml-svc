@@ -265,6 +265,7 @@ export function mapAlertCreateInputToPrisma(
 		metadata: serializeJson(input.metadata) ?? "{}",
 		transactionId: input.transactionId ?? null,
 		isManual: input.isManual ?? false,
+		reportId: null, // Reports are assigned later
 		submissionDeadline: input.submissionDeadline
 			? new Date(input.submissionDeadline)
 			: null,

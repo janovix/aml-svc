@@ -93,6 +93,16 @@ export interface SatVehicleNoticeData {
 }
 
 /**
+ * Data for a monthly report containing multiple avisos
+ */
+export interface SatMonthlyReportData {
+	reportedMonth: string; // YYYYMM format
+	obligatedSubjectKey: string; // 12 chars (RFC)
+	activityKey: string; // Activity code (e.g., "VEH")
+	avisos: SatVehicleNoticeData[]; // Array of notices
+}
+
+/**
  * Escapes XML special characters
  */
 function escapeXml(text: string | null | undefined): string {
@@ -549,4 +559,319 @@ export function mapToSatVehicleNoticeData(
 			},
 		},
 	};
+}
+
+/**
+ * Generates just the <aviso> XML portion for a single notice
+ * This is used by the monthly report generator to combine multiple avisos
+ */
+export function generateAvisoXml(data: SatVehicleNoticeData): string {
+	const xml: string[] = [];
+
+	xml.push("<aviso>");
+	xml.push(
+		`<referencia_aviso>${escapeXml(data.noticeReference)}</referencia_aviso>`,
+	);
+	xml.push(`<prioridad>${escapeXml(data.priority)}</prioridad>`);
+	xml.push("<alerta>");
+	xml.push(`<tipo_alerta>${escapeXml(data.alertType)}</tipo_alerta>`);
+	xml.push("</alerta>");
+
+	// Persona Aviso
+	xml.push("<persona_aviso>");
+	xml.push("<tipo_persona>");
+	if (data.noticePerson.personType === "fisica") {
+		xml.push("<persona_fisica>");
+		if (data.noticePerson.name) {
+			xml.push(`<nombre>${escapeXml(data.noticePerson.name)}</nombre>`);
+		}
+		if (data.noticePerson.paternalLastName) {
+			xml.push(
+				`<apellido_paterno>${escapeXml(data.noticePerson.paternalLastName)}</apellido_paterno>`,
+			);
+		}
+		if (data.noticePerson.maternalLastName) {
+			xml.push(
+				`<apellido_materno>${escapeXml(data.noticePerson.maternalLastName)}</apellido_materno>`,
+			);
+		}
+		if (data.noticePerson.birthDate) {
+			xml.push(
+				`<fecha_nacimiento>${escapeXml(data.noticePerson.birthDate)}</fecha_nacimiento>`,
+			);
+		}
+		if (data.noticePerson.nationalityCountry) {
+			xml.push(
+				`<pais_nacionalidad>${escapeXml(data.noticePerson.nationalityCountry)}</pais_nacionalidad>`,
+			);
+		}
+		if (data.noticePerson.economicActivity) {
+			xml.push(
+				`<actividad_economica>${escapeXml(data.noticePerson.economicActivity)}</actividad_economica>`,
+			);
+		}
+		xml.push("</persona_fisica>");
+	} else if (data.noticePerson.personType === "moral") {
+		xml.push("<persona_moral>");
+		if (data.noticePerson.businessName) {
+			xml.push(
+				`<denominacion_razon>${escapeXml(data.noticePerson.businessName)}</denominacion_razon>`,
+			);
+		}
+		if (data.noticePerson.rfc) {
+			xml.push(`<rfc>${escapeXml(data.noticePerson.rfc)}</rfc>`);
+		}
+		xml.push("</persona_moral>");
+	} else if (data.noticePerson.personType === "fideicomiso") {
+		xml.push("<fideicomiso>");
+		if (data.noticePerson.businessName) {
+			xml.push(
+				`<denominacion_razon>${escapeXml(data.noticePerson.businessName)}</denominacion_razon>`,
+			);
+		}
+		if (data.noticePerson.trustIdentifier) {
+			xml.push(
+				`<identificador_fideicomiso>${escapeXml(data.noticePerson.trustIdentifier)}</identificador_fideicomiso>`,
+			);
+		}
+		if (data.noticePerson.attorneyDelegate) {
+			xml.push("<apoderado_delegado>");
+			if (data.noticePerson.attorneyDelegate.name) {
+				xml.push(
+					`<nombre>${escapeXml(data.noticePerson.attorneyDelegate.name)}</nombre>`,
+				);
+			}
+			if (data.noticePerson.attorneyDelegate.paternalLastName) {
+				xml.push(
+					`<apellido_paterno>${escapeXml(data.noticePerson.attorneyDelegate.paternalLastName)}</apellido_paterno>`,
+				);
+			}
+			if (data.noticePerson.attorneyDelegate.maternalLastName) {
+				xml.push(
+					`<apellido_materno>${escapeXml(data.noticePerson.attorneyDelegate.maternalLastName)}</apellido_materno>`,
+				);
+			}
+			if (data.noticePerson.attorneyDelegate.birthDate) {
+				xml.push(
+					`<fecha_nacimiento>${escapeXml(data.noticePerson.attorneyDelegate.birthDate)}</fecha_nacimiento>`,
+				);
+			}
+			xml.push("</apoderado_delegado>");
+		}
+		xml.push("</fideicomiso>");
+	}
+	xml.push("</tipo_persona>");
+
+	// Address
+	xml.push("<tipo_domicilio>");
+	if (data.noticePerson.addressType === "nacional") {
+		xml.push("<nacional>");
+		if (data.noticePerson.neighborhood) {
+			xml.push(
+				`<colonia>${escapeXml(data.noticePerson.neighborhood)}</colonia>`,
+			);
+		}
+		if (data.noticePerson.street) {
+			xml.push(`<calle>${escapeXml(data.noticePerson.street)}</calle>`);
+		}
+		if (data.noticePerson.externalNumber) {
+			xml.push(
+				`<numero_exterior>${escapeXml(data.noticePerson.externalNumber)}</numero_exterior>`,
+			);
+		}
+		if (data.noticePerson.postalCode) {
+			xml.push(
+				`<codigo_postal>${escapeXml(data.noticePerson.postalCode)}</codigo_postal>`,
+			);
+		}
+		xml.push("</nacional>");
+	} else {
+		xml.push("<extranjero>");
+		xml.push("</extranjero>");
+	}
+	xml.push("</tipo_domicilio>");
+	xml.push("</persona_aviso>");
+
+	// Dueno Beneficiario (optional)
+	if (data.ownerBeneficiary) {
+		xml.push("<dueno_beneficiario>");
+		xml.push("<tipo_persona>");
+		if (data.ownerBeneficiary.personType === "fisica") {
+			xml.push("<persona_fisica>");
+			if (data.ownerBeneficiary.name) {
+				xml.push(`<nombre>${escapeXml(data.ownerBeneficiary.name)}</nombre>`);
+			}
+			if (data.ownerBeneficiary.paternalLastName) {
+				xml.push(
+					`<apellido_paterno>${escapeXml(data.ownerBeneficiary.paternalLastName)}</apellido_paterno>`,
+				);
+			}
+			if (data.ownerBeneficiary.maternalLastName) {
+				xml.push(
+					`<apellido_materno>${escapeXml(data.ownerBeneficiary.maternalLastName)}</apellido_materno>`,
+				);
+			}
+			if (data.ownerBeneficiary.birthDate) {
+				xml.push(
+					`<fecha_nacimiento>${escapeXml(data.ownerBeneficiary.birthDate)}</fecha_nacimiento>`,
+				);
+			}
+			if (data.ownerBeneficiary.nationalityCountry) {
+				xml.push(
+					`<pais_nacionalidad>${escapeXml(data.ownerBeneficiary.nationalityCountry)}</pais_nacionalidad>`,
+				);
+			}
+			xml.push("</persona_fisica>");
+		}
+		xml.push("</tipo_persona>");
+		xml.push("</dueno_beneficiario>");
+	}
+
+	// Detalle Operaciones
+	xml.push("<detalle_operaciones>");
+	xml.push("<datos_operacion>");
+	xml.push(
+		`<fecha_operacion>${escapeXml(data.operationDetails.operationDate)}</fecha_operacion>`,
+	);
+	xml.push(
+		`<codigo_postal>${escapeXml(data.operationDetails.postalCode)}</codigo_postal>`,
+	);
+	xml.push(
+		`<tipo_operacion>${escapeXml(data.operationDetails.operationType)}</tipo_operacion>`,
+	);
+
+	// Vehicles
+	for (const vehicle of data.operationDetails.vehicles) {
+		xml.push("<tipo_vehiculo>");
+		if (vehicle.type === "terrestre") {
+			xml.push("<datos_vehiculo_terrestre>");
+			xml.push(
+				`<marca_fabricante>${escapeXml(vehicle.manufacturerBrand)}</marca_fabricante>`,
+			);
+			xml.push(`<modelo>${escapeXml(vehicle.model)}</modelo>`);
+			xml.push(`<anio>${vehicle.year}</anio>`);
+			if (vehicle.vin) {
+				xml.push(`<vin>${escapeXml(vehicle.vin)}</vin>`);
+			}
+			if (vehicle.repuve) {
+				xml.push(`<repuve>${escapeXml(vehicle.repuve)}</repuve>`);
+			}
+			if (vehicle.plates) {
+				xml.push(`<placas>${escapeXml(vehicle.plates)}</placas>`);
+			}
+			if (vehicle.armorLevel) {
+				xml.push(
+					`<nivel_blindaje>${escapeXml(vehicle.armorLevel)}</nivel_blindaje>`,
+				);
+			}
+			xml.push("</datos_vehiculo_terrestre>");
+		} else if (vehicle.type === "maritimo") {
+			xml.push("<datos_vehiculo_maritimo>");
+			xml.push(
+				`<marca_fabricante>${escapeXml(vehicle.manufacturerBrand)}</marca_fabricante>`,
+			);
+			xml.push(`<modelo>${escapeXml(vehicle.model)}</modelo>`);
+			xml.push(`<anio>${vehicle.year}</anio>`);
+			if (vehicle.serialNumber) {
+				xml.push(
+					`<numero_serie>${escapeXml(vehicle.serialNumber)}</numero_serie>`,
+				);
+			}
+			if (vehicle.flag) {
+				xml.push(`<bandera>${escapeXml(vehicle.flag)}</bandera>`);
+			}
+			if (vehicle.registration) {
+				xml.push(`<matricula>${escapeXml(vehicle.registration)}</matricula>`);
+			}
+			if (vehicle.armorLevel) {
+				xml.push(
+					`<nivel_blindaje>${escapeXml(vehicle.armorLevel)}</nivel_blindaje>`,
+				);
+			}
+			xml.push("</datos_vehiculo_maritimo>");
+		} else if (vehicle.type === "aereo") {
+			xml.push("<datos_vehiculo_aereo>");
+			xml.push(
+				`<marca_fabricante>${escapeXml(vehicle.manufacturerBrand)}</marca_fabricante>`,
+			);
+			xml.push(`<modelo>${escapeXml(vehicle.model)}</modelo>`);
+			xml.push(`<anio>${vehicle.year}</anio>`);
+			if (vehicle.serialNumber) {
+				xml.push(
+					`<numero_serie>${escapeXml(vehicle.serialNumber)}</numero_serie>`,
+				);
+			}
+			if (vehicle.flag) {
+				xml.push(`<bandera>${escapeXml(vehicle.flag)}</bandera>`);
+			}
+			if (vehicle.registration) {
+				xml.push(`<matricula>${escapeXml(vehicle.registration)}</matricula>`);
+			}
+			if (vehicle.armorLevel) {
+				xml.push(
+					`<nivel_blindaje>${escapeXml(vehicle.armorLevel)}</nivel_blindaje>`,
+				);
+			}
+			xml.push("</datos_vehiculo_aereo>");
+		}
+		xml.push("</tipo_vehiculo>");
+	}
+
+	// Datos Liquidacion
+	xml.push("<datos_liquidacion>");
+	xml.push(
+		`<fecha_pago>${escapeXml(data.operationDetails.liquidationData.paymentDate)}</fecha_pago>`,
+	);
+	xml.push(
+		`<forma_pago>${escapeXml(data.operationDetails.liquidationData.paymentForm)}</forma_pago>`,
+	);
+	xml.push(
+		`<instrumento_monetario>${escapeXml(data.operationDetails.liquidationData.monetaryInstrument)}</instrumento_monetario>`,
+	);
+	xml.push(
+		`<moneda>${escapeXml(data.operationDetails.liquidationData.currency)}</moneda>`,
+	);
+	xml.push(
+		`<monto_operacion>${escapeXml(data.operationDetails.liquidationData.operationAmount)}</monto_operacion>`,
+	);
+	xml.push("</datos_liquidacion>");
+	xml.push("</datos_operacion>");
+	xml.push("</detalle_operaciones>");
+	xml.push("</aviso>");
+
+	return xml.join("\n");
+}
+
+/**
+ * Generates a monthly SAT report XML containing multiple avisos
+ * Used for MONTHLY report type to bundle all alerts in a period
+ *
+ * @param data Monthly report data with array of avisos
+ * @returns Complete XML string for SAT submission
+ */
+export function generateMonthlyReportXml(data: SatMonthlyReportData): string {
+	const xml: string[] = [];
+
+	xml.push('<?xml version="1.0" encoding="UTF-8"?>');
+	xml.push(
+		'<archivo xsi:schemaLocation="http://www.uif.shcp.gob.mx/recepcion/veh veh.xsd" xmlns="http://www.uif.shcp.gob.mx/recepcion/veh" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">',
+	);
+	xml.push("<informe>");
+	xml.push(`<mes_reportado>${escapeXml(data.reportedMonth)}</mes_reportado>`);
+	xml.push("<sujeto_obligado>");
+	xml.push(
+		`<clave_sujeto_obligado>${escapeXml(data.obligatedSubjectKey)}</clave_sujeto_obligado>`,
+	);
+	xml.push(`<clave_actividad>${escapeXml(data.activityKey)}</clave_actividad>`);
+	xml.push("</sujeto_obligado>");
+
+	// Add each aviso
+	for (const aviso of data.avisos) {
+		xml.push(generateAvisoXml(aviso));
+	}
+
+	xml.push("</informe>");
+	xml.push("</archivo>");
+
+	return xml.join("\n");
 }
