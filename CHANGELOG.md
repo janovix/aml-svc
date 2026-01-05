@@ -1,3 +1,10 @@
+# [1.1.0-rc.33](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.32...v1.1.0-rc.33) (2026-01-05)
+
+
+### Features
+
+* add report management functionality ([b22edff](https://github.com/janovix/aml-svc/commit/b22edff5e93c5b55996504735571db477f51b64b))
+
 # [1.1.0-rc.32](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.31...v1.1.0-rc.32) (2026-01-03)
 
 
