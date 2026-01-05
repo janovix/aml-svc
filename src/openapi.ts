@@ -52,6 +52,11 @@ export const openAPISpec = {
 			description:
 				"Organization settings management endpoints (RFC and vulnerable activity for compliance officer)",
 		},
+		{
+			name: "Reports",
+			description:
+				"Report management endpoints for generating monthly SAT XML reports and internal PDF reports",
+		},
 	],
 	paths: {
 		"/healthz": {
@@ -2038,6 +2043,354 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/reports": {
+			get: {
+				tags: ["Reports"],
+				summary: "List reports",
+				description:
+					"Retrieve a paginated list of reports with optional filters",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+					},
+					{
+						name: "type",
+						in: "query",
+						schema: { $ref: "#/components/schemas/ReportType" },
+					},
+					{
+						name: "status",
+						in: "query",
+						schema: { $ref: "#/components/schemas/ReportStatus" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Paginated list of reports",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/Report" },
+										},
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Reports"],
+				summary: "Create a new report",
+				description:
+					"Create a new report for a specified period. Alerts in the period will be assigned to the report.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/ReportCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Report created successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Report" },
+							},
+						},
+					},
+					"409": {
+						description: "Report already exists for this period and type",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/preview": {
+			get: {
+				tags: ["Reports"],
+				summary: "Preview report alerts",
+				description:
+					"Get a preview of alerts that would be included in a report for the given period",
+				parameters: [
+					{
+						name: "type",
+						in: "query",
+						required: true,
+						schema: { $ref: "#/components/schemas/ReportType" },
+					},
+					{
+						name: "periodStart",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+					},
+					{
+						name: "periodEnd",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Alert preview for the period",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/ReportPreviewResponse" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/{id}": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get a report",
+				description: "Get a report by ID with alert summary",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Report with alert summary",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/ReportWithAlertSummary" },
+							},
+						},
+					},
+					"404": {
+						description: "Report not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["Reports"],
+				summary: "Update a report",
+				description: "Partially update a report",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/ReportPatchRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Report updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Report" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["Reports"],
+				summary: "Delete a draft report",
+				description:
+					"Delete a report (only DRAFT status reports can be deleted)",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": { description: "Report deleted" },
+					"400": {
+						description: "Only draft reports can be deleted",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/{id}/generate": {
+			post: {
+				tags: ["Reports"],
+				summary: "Generate report file",
+				description:
+					"Generate the XML (MONTHLY) or PDF (others) file for the report",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "File generation result",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										message: { type: "string" },
+										reportId: { type: "string" },
+										alertCount: { type: "integer" },
+										type: { type: "string", enum: ["XML", "PDF"] },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/{id}/download": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get download URL",
+				description: "Get the download URL for a generated report file",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Download URL",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										fileUrl: { type: "string" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/{id}/submit": {
+			post: {
+				tags: ["Reports"],
+				summary: "Submit to SAT",
+				description: "Mark a MONTHLY report as submitted to SAT",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								properties: {
+									satFolioNumber: { type: "string" },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Report marked as submitted",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Report" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/{id}/acknowledge": {
+			post: {
+				tags: ["Reports"],
+				summary: "Record SAT acknowledgment",
+				description: "Mark a MONTHLY report as acknowledged by SAT",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								required: ["satFolioNumber"],
+								properties: {
+									satFolioNumber: { type: "string" },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Report marked as acknowledged",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Report" },
+							},
+						},
+					},
+				},
+			},
+		},
 	},
 	components: {
 		schemas: {
@@ -3695,6 +4048,165 @@ export const openAPISpec = {
 						description:
 							"Vulnerable activity code (e.g., 'VEH') - reference to vulnerable-activities catalog",
 					},
+				},
+			},
+			ReportType: {
+				type: "string",
+				enum: ["MONTHLY", "QUARTERLY", "ANNUAL", "CUSTOM"],
+				description:
+					"Report type: MONTHLY generates SAT XML, others generate PDF",
+			},
+			ReportStatus: {
+				type: "string",
+				enum: ["DRAFT", "GENERATED", "SUBMITTED", "ACKNOWLEDGED"],
+				description: "Report lifecycle status",
+			},
+			Report: {
+				type: "object",
+				required: [
+					"id",
+					"organizationId",
+					"name",
+					"type",
+					"status",
+					"periodStart",
+					"periodEnd",
+					"reportedMonth",
+					"recordCount",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: {
+						type: "string",
+						pattern: "^RPT[A-Za-z0-9]{9}$",
+						description: "Report identifier",
+					},
+					organizationId: { type: "string" },
+					name: { type: "string", maxLength: 200 },
+					type: { $ref: "#/components/schemas/ReportType" },
+					status: { $ref: "#/components/schemas/ReportStatus" },
+					periodStart: { type: "string", format: "date-time" },
+					periodEnd: { type: "string", format: "date-time" },
+					reportedMonth: {
+						type: "string",
+						pattern: "^\\d{4}(0[1-9]|1[0-2]|Q[1-4])?$",
+						description:
+							"YYYYMM for monthly, YYYYQ# for quarterly, YYYY for annual",
+					},
+					recordCount: { type: "integer", minimum: 0 },
+					xmlFileUrl: {
+						type: "string",
+						nullable: true,
+						description: "R2 URL of SAT XML file (MONTHLY only)",
+					},
+					pdfFileUrl: {
+						type: "string",
+						nullable: true,
+						description: "R2 URL of PDF report (QUARTERLY/ANNUAL/CUSTOM)",
+					},
+					fileSize: { type: "integer", nullable: true },
+					generatedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+					},
+					submittedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "SAT submission date (MONTHLY only)",
+					},
+					satFolioNumber: {
+						type: "string",
+						nullable: true,
+						description: "SAT acknowledgment folio (MONTHLY only)",
+					},
+					createdBy: { type: "string", nullable: true },
+					notes: { type: "string", maxLength: 1000, nullable: true },
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			ReportWithAlertSummary: {
+				allOf: [
+					{ $ref: "#/components/schemas/Report" },
+					{
+						type: "object",
+						properties: {
+							alertSummary: {
+								type: "object",
+								properties: {
+									total: { type: "integer" },
+									bySeverity: {
+										type: "object",
+										additionalProperties: { type: "integer" },
+									},
+									byStatus: {
+										type: "object",
+										additionalProperties: { type: "integer" },
+									},
+									byRule: {
+										type: "array",
+										items: {
+											type: "object",
+											properties: {
+												ruleId: { type: "string" },
+												ruleName: { type: "string" },
+												count: { type: "integer" },
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				],
+			},
+			ReportCreateRequest: {
+				type: "object",
+				required: ["name", "periodStart", "periodEnd", "reportedMonth"],
+				properties: {
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					type: { $ref: "#/components/schemas/ReportType" },
+					periodStart: { type: "string", format: "date-time" },
+					periodEnd: { type: "string", format: "date-time" },
+					reportedMonth: {
+						type: "string",
+						pattern: "^\\d{4}(0[1-9]|1[0-2])$",
+						description: "YYYYMM format",
+					},
+					notes: { type: "string", maxLength: 1000, nullable: true },
+				},
+			},
+			ReportPatchRequest: {
+				type: "object",
+				properties: {
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					status: { $ref: "#/components/schemas/ReportStatus" },
+					notes: { type: "string", maxLength: 1000, nullable: true },
+					satFolioNumber: { type: "string", maxLength: 100, nullable: true },
+					submittedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+					},
+				},
+			},
+			ReportPreviewResponse: {
+				type: "object",
+				properties: {
+					total: { type: "integer" },
+					bySeverity: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					byStatus: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					periodStart: { type: "string", format: "date-time" },
+					periodEnd: { type: "string", format: "date-time" },
 				},
 			},
 		},
