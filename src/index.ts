@@ -111,9 +111,6 @@ app.all("/uma-values/active", async (c) => {
 app.all("/alert-rules/:id/config/:key", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
-app.all("/alerts/:id/generate-file", async (c) => {
-	return handleServiceBindingRequest(c.req.raw, c.env);
-});
 app.all("/clients/:id/transactions", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });

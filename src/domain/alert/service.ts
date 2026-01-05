@@ -169,12 +169,4 @@ export class AlertService {
 	): Promise<AlertEntity | null> {
 		return this.repository.findByIdempotencyKey(organizationId, idempotencyKey);
 	}
-
-	async updateSatFileUrl(
-		organizationId: string,
-		id: string,
-		satFileUrl: string,
-	): Promise<AlertEntity> {
-		return this.repository.updateSatFileUrl(organizationId, id, satFileUrl);
-	}
 }

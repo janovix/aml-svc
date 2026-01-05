@@ -355,30 +355,6 @@ describe("handleServiceBindingRequest", () => {
 		});
 	});
 
-	describe("POST /alerts/{alertId}/generate-file", () => {
-		it("returns 500 when R2_BUCKET not configured", async () => {
-			const request = new Request(
-				"https://internal/alerts/alert1/generate-file",
-				{
-					method: "POST",
-				},
-			);
-
-			const response = await handleServiceBindingRequest(
-				request,
-				env as unknown as Bindings,
-			);
-			const body = (await response.json()) as {
-				error: string;
-				message: string;
-			};
-
-			expect(response.status).toBe(500);
-			expect(body.error).toBe("Failed to generate SAT file");
-			expect(body.message).toBe("R2_BUCKET not configured");
-		});
-	});
-
 	describe("404 handling", () => {
 		it("returns 404 for unknown routes", async () => {
 			const request = new Request("https://internal/unknown/route", {

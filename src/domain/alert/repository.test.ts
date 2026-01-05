@@ -85,7 +85,6 @@ const mockAlert = {
 	isManual: false,
 	submissionDeadline: new Date("2024-02-17"),
 	fileGeneratedAt: null,
-	satFileUrl: null,
 	submittedAt: null,
 	satAcknowledgmentReceipt: null,
 	satFolioNumber: null,

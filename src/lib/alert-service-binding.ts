@@ -32,26 +32,8 @@ import { ClientRepository } from "../domain/client";
 import { ClientService } from "../domain/client";
 import { TransactionRepository } from "../domain/transaction";
 import { TransactionService } from "../domain/transaction";
-import { generateAndUploadSatFile } from "./sat-file-generator";
 import { CatalogRepository } from "../domain/catalog/repository";
 import { CatalogEnrichmentService } from "../domain/catalog/enrichment-service";
-
-// R2Bucket type for compatibility
-type R2Bucket = {
-	put(
-		key: string,
-		value: ReadableStream | ArrayBuffer | ArrayBufferView | string | null,
-		options?: {
-			httpMetadata?: {
-				contentType?: string;
-				contentEncoding?: string;
-				cacheControl?: string;
-				cacheExpiry?: Date;
-			};
-			customMetadata?: Record<string, string>;
-		},
-	): Promise<{ key: string; size: number; etag: string }>;
-};
 
 /**
  * Service binding helper functions for alert operations
@@ -205,120 +187,6 @@ export class AlertServiceBinding {
 		}
 
 		return service.create(alertData, client.organizationId);
-	}
-
-	/**
-	 * Generate and upload SAT XML file for an alert
-	 * Called via: env.AML_SERVICE.fetch(new Request(`https://internal/alerts/${alertId}/generate-file`, { method: "POST" }))
-	 */
-	async generateSatFile(alertId: string) {
-		if (!this.env.R2_BUCKET) {
-			throw new Error("R2_BUCKET not configured");
-		}
-
-		const prisma = getPrismaClient(this.env.DB);
-
-		// Get organizationId from alert first (it should have it from Prisma)
-		const alertWithOrg = await prisma.alert.findUnique({
-			where: { id: alertId },
-			select: { organizationId: true },
-		});
-		if (!alertWithOrg) {
-			throw new Error(`Alert not found: ${alertId}`);
-		}
-		const organizationId = alertWithOrg.organizationId;
-
-		const alertRepository = new AlertRepository(prisma);
-		const alertService = new AlertService(alertRepository);
-
-		// Get alert with organization context
-		const alert = await alertService.get(organizationId, alertId);
-		if (!alert.transactionId) {
-			throw new Error("Alert has no trigger transaction");
-		}
-
-		// Get client (RFC is the ID)
-		const clientRepository = new ClientRepository(prisma);
-		const clientService = new ClientService(clientRepository);
-		const client = await clientService.get(organizationId, alert.clientId);
-
-		// Get transaction
-		const umaRepository = new UmaValueRepository(prisma);
-		const catalogRepository = new CatalogRepository(prisma);
-		const catalogEnrichmentService = new CatalogEnrichmentService(
-			catalogRepository,
-		);
-		const transactionRepository = new TransactionRepository(
-			prisma,
-			umaRepository,
-			catalogEnrichmentService,
-		);
-		const transactionService = new TransactionService(
-			transactionRepository,
-			clientRepository, // Reuse clientRepository
-			umaRepository,
-		);
-		const transaction = await transactionService.get(
-			organizationId,
-			alert.transactionId,
-		);
-
-		// Generate and upload file
-		if (!this.env.R2_BUCKET) {
-			throw new Error("R2_BUCKET not configured");
-		}
-
-		// Use the catalogRepository already created above for SAT file generation
-		const result = await generateAndUploadSatFile(alert, client, transaction, {
-			r2Bucket: this.env.R2_BUCKET as unknown as R2Bucket, // Type assertion for compatibility
-			obligatedSubjectKey: this.env.SAT_CLAVE_SUJETO_OBLIGADO || "000000000000",
-			activityKey: this.env.SAT_CLAVE_ACTIVIDAD || "VEH",
-			collegiateEntityKey: this.env.SAT_CLAVE_ENTIDAD_COLEGIADA,
-			getCatalogValue: async (catalogKey: string, code: string) => {
-				try {
-					// Look up catalog by key
-					const catalog = await catalogRepository.findByKey(catalogKey);
-					if (!catalog) {
-						return null;
-					}
-					// Search for catalog item by code (stored in metadata.code)
-					// We need to search all items and find the one with matching code in metadata
-					const result = await catalogRepository.listItems(catalog.id, {
-						page: 1,
-						pageSize: 1000, // Get all items to search metadata
-						active: true,
-					});
-					// Find item where metadata.code matches the requested code
-					const item = result.data.find((item) => {
-						if (!item.metadata || typeof item.metadata !== "object") {
-							return false;
-						}
-						return (item.metadata as { code?: string }).code === code;
-					});
-					// Return the code from metadata if found
-					return item
-						? (item.metadata as { code?: string }).code || code
-						: null;
-				} catch (error) {
-					console.error(`Error looking up catalog ${catalogKey}:`, error);
-					return null;
-				}
-			},
-		});
-
-		// Update alert with file URL
-		const updatedAlert = await alertService.updateSatFileUrl(
-			organizationId,
-			alertId,
-			result.fileUrl,
-		);
-
-		return {
-			alert: updatedAlert,
-			fileUrl: result.fileUrl,
-			fileKey: result.fileKey,
-			fileSize: result.fileSize,
-		};
 	}
 }
 
@@ -538,34 +406,6 @@ export async function handleServiceBindingRequest(
 					JSON.stringify({
 						error: "Failed to fetch transactions",
 						message: errorMessage,
-					}),
-					{
-						status: 500,
-						headers: { "Content-Type": "application/json" },
-					},
-				);
-			}
-		}
-
-		// Route: /alerts/{alertId}/generate-file
-		if (
-			path.startsWith("/alerts/") &&
-			path.endsWith("/generate-file") &&
-			request.method === "POST"
-		) {
-			const alertId = path.split("/alerts/")[1].split("/generate-file")[0];
-			const service = new AlertServiceBinding(env);
-			try {
-				const result = await service.generateSatFile(alertId);
-				return new Response(JSON.stringify(result), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				});
-			} catch (error) {
-				return new Response(
-					JSON.stringify({
-						error: "Failed to generate SAT file",
-						message: error instanceof Error ? error.message : "Unknown error",
 					}),
 					{
 						status: 500,

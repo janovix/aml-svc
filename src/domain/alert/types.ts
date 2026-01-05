@@ -46,8 +46,7 @@ export interface AlertEntity {
 
 	// SAT Submission tracking
 	submissionDeadline?: string | null; // Deadline for SAT submission
-	fileGeneratedAt?: string | null; // When the SAT file was generated
-	satFileUrl?: string | null; // URL of the generated XML file in R2
+	fileGeneratedAt?: string | null; // When the SAT file was generated (via report)
 	submittedAt?: string | null; // When submitted to SAT
 	satAcknowledgmentReceipt?: string | null; // File URL or reference to SAT acknowledgment
 	satFolioNumber?: string | null; // Folio number from SAT acknowledgment

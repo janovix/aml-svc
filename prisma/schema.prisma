@@ -324,8 +324,7 @@ model Alert {
   
   // SAT Submission tracking
   submissionDeadline DateTime?  // Deadline for SAT submission (day 17 of following month for avisos, 24h for suspicion)
-  fileGeneratedAt    DateTime?  // When the SAT file was generated
-  satFileUrl         String?   // URL of the generated XML file in R2
+  fileGeneratedAt    DateTime?  // When the SAT file was generated (via report)
   submittedAt        DateTime?  // When submitted to SAT
   satAcknowledgmentReceipt String? // File URL or reference to SAT acknowledgment (PDF/XML)
   satFolioNumber     String?   // Folio number from SAT acknowledgment

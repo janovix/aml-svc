@@ -443,31 +443,6 @@ export class AlertRepository {
 		};
 	}
 
-	async updateSatFileUrl(
-		organizationId: string,
-		id: string,
-		satFileUrl: string,
-	): Promise<AlertEntity> {
-		await this.ensureExists(organizationId, id);
-
-		const updated = await this.prisma.alert.update({
-			where: { id },
-			data: {
-				satFileUrl,
-				fileGeneratedAt: new Date(),
-				status: "FILE_GENERATED",
-			},
-			include: {
-				alertRule: true,
-			},
-		});
-
-		return {
-			...mapPrismaAlert(updated),
-			alertRule: mapPrismaAlertRule(updated.alertRule),
-		};
-	}
-
 	async update(
 		organizationId: string,
 		id: string,

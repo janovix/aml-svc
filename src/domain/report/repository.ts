@@ -308,6 +308,56 @@ export class ReportRepository {
 	}
 
 	/**
+	 * Mark a report as generated with optional file URLs
+	 * Used when generating files (either uploaded to R2 or stored inline)
+	 * Also updates all alerts in the report to FILE_GENERATED status
+	 */
+	async markAsGenerated(
+		organizationId: string,
+		id: string,
+		options: {
+			xmlFileUrl?: string | null;
+			pdfFileUrl?: string | null;
+			fileSize?: number | null;
+		},
+	): Promise<ReportEntity> {
+		await this.ensureExists(organizationId, id);
+
+		const now = new Date();
+
+		// Update the report status
+		const report = await this.prisma.report.update({
+			where: { id },
+			data: {
+				...(options.xmlFileUrl !== undefined && {
+					xmlFileUrl: options.xmlFileUrl,
+				}),
+				...(options.pdfFileUrl !== undefined && {
+					pdfFileUrl: options.pdfFileUrl,
+				}),
+				...(options.fileSize !== undefined && { fileSize: options.fileSize }),
+				generatedAt: now,
+				status: "GENERATED",
+			},
+		});
+
+		// Update all alerts in this report to FILE_GENERATED status
+		await this.prisma.alert.updateMany({
+			where: {
+				reportId: id,
+				organizationId,
+				status: { notIn: ["CANCELLED", "SUBMITTED"] },
+			},
+			data: {
+				status: "FILE_GENERATED",
+				fileGeneratedAt: now,
+			},
+		});
+
+		return mapPrismaReport(report);
+	}
+
+	/**
 	 * Check if a report exists for the given period and type
 	 */
 	async existsForPeriod(

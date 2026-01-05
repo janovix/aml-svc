@@ -279,6 +279,21 @@ export class ReportService {
 	}
 
 	/**
+	 * Mark a report as generated with optional file URLs
+	 */
+	async markAsGenerated(
+		organizationId: string,
+		id: string,
+		options: {
+			xmlFileUrl?: string | null;
+			pdfFileUrl?: string | null;
+			fileSize?: number | null;
+		},
+	): Promise<ReportEntity> {
+		return this.repository.markAsGenerated(organizationId, id, options);
+	}
+
+	/**
 	 * Mark report as submitted to SAT
 	 */
 	async markAsSubmitted(
