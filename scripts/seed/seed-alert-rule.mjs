@@ -490,9 +490,10 @@ function escapeSqlString(str) {
 function generateSql() {
 	const sql = [];
 
-	// Use INSERT OR REPLACE to update existing rules or insert new ones
-	// This preserves existing alerts that reference these rules (onDelete: Restrict)
-	// Note: createdAt is preserved for existing records, updatedAt is always updated
+	// Use INSERT ... ON CONFLICT DO UPDATE (SQLite upsert) to update existing rules or insert new ones
+	// This properly handles the case where alerts reference these rules (onDelete: Restrict)
+	// Unlike INSERT OR REPLACE, ON CONFLICT DO UPDATE does NOT delete the row first,
+	// so it won't trigger the RESTRICT constraint on alerts.alertRuleId
 	for (const rule of alertRules) {
 		const id = escapeSqlString(rule.id);
 		const name = escapeSqlString(rule.name);
@@ -509,7 +510,7 @@ function generateSql() {
 			: "NULL";
 
 		sql.push(`
-INSERT OR REPLACE INTO alert_rules (id, name, description, active, severity, ruleType, isManualOnly, activityCode, metadata, createdAt, updatedAt)
+INSERT INTO alert_rules (id, name, description, active, severity, ruleType, isManualOnly, activityCode, metadata, createdAt, updatedAt)
 VALUES (
 	${id},
 	${name},
@@ -520,9 +521,19 @@ VALUES (
 	${isManualOnly},
 	${activityCode},
 	${metadata},
-	COALESCE((SELECT createdAt FROM alert_rules WHERE id = ${id}), CURRENT_TIMESTAMP),
+	CURRENT_TIMESTAMP,
 	CURRENT_TIMESTAMP
-);
+)
+ON CONFLICT(id) DO UPDATE SET
+	name = excluded.name,
+	description = excluded.description,
+	active = excluded.active,
+	severity = excluded.severity,
+	ruleType = excluded.ruleType,
+	isManualOnly = excluded.isManualOnly,
+	activityCode = excluded.activityCode,
+	metadata = excluded.metadata,
+	updatedAt = CURRENT_TIMESTAMP;
 `);
 	}
 
