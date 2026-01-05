@@ -1,3 +1,10 @@
+# [1.1.0-rc.34](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.33...v1.1.0-rc.34) (2026-01-05)
+
+
+### Features
+
+* add UMA values population and seeding scripts ([f80008c](https://github.com/janovix/aml-svc/commit/f80008cee92ed297686b10540a75c20ad7ae10ca))
+
 # [1.1.0-rc.33](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.32...v1.1.0-rc.33) (2026-01-05)
 
 
