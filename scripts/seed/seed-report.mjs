@@ -27,7 +27,11 @@ function extractD1Count(json) {
 
 	for (const value of candidates) {
 		if (typeof value === "number") return value;
-		if (typeof value === "string" && value.trim() && !Number.isNaN(Number(value))) {
+		if (
+			typeof value === "string" &&
+			value.trim() &&
+			!Number.isNaN(Number(value))
+		) {
 			return Number(value);
 		}
 	}
