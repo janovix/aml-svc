@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 
 import {
 	ReportFilterSchema,
@@ -20,6 +20,10 @@ export const reportsRouter = new Hono<{
 	Bindings: Bindings;
 	Variables: AuthVariables;
 }>();
+
+const AcknowledgeBodySchema = z.object({
+	satFolioNumber: z.string().min(1).max(100),
+});
 
 function parseWithZod<T>(
 	schema: { parse: (input: unknown) => T },
@@ -277,12 +281,8 @@ reportsRouter.post("/:id/submit", async (c) => {
 reportsRouter.post("/:id/acknowledge", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ReportIdParamSchema, c.req.param());
-	const body = await c.req.json();
-	const satFolioNumber = body.satFolioNumber as string;
-
-	if (!satFolioNumber) {
-		throw new APIError(400, "SAT folio number is required");
-	}
+	const body = await c.req.json().catch(() => ({}));
+	const { satFolioNumber } = parseWithZod(AcknowledgeBodySchema, body);
 
 	const service = getService(c);
 	const updated = await service
