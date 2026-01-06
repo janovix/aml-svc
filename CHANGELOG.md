@@ -1,3 +1,13 @@
+# [1.1.0-rc.35](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.34...v1.1.0-rc.35) (2026-01-06)
+
+
+### Features
+
+* add Notices API endpoints for managing SAT notices and their statuses ([e051bc6](https://github.com/janovix/aml-svc/commit/e051bc6801e48df5b9c01be15623c9ab10e74300))
+* enhance OpenAPI specifications for alerts, transactions, and clients with detailed response schemas ([a4b74de](https://github.com/janovix/aml-svc/commit/a4b74debfa8ba9882514cde7a5e345c85ff98f45))
+* implement Notices & Reports API with migration and service enhancements ([534b005](https://github.com/janovix/aml-svc/commit/534b005a7adba31743c84c696ce7d3dd55820556))
+* remove migration script for MONTHLY reports to Notices ([fd0b3eb](https://github.com/janovix/aml-svc/commit/fd0b3ebbb0fd6502b1f5ce9062f8ebc271e06905))
+
 # [1.1.0-rc.34](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.33...v1.1.0-rc.34) (2026-01-05)
 
 
