@@ -182,12 +182,12 @@ async function migrate() {
 				// Optionally, update the original report to indicate it's been migrated
 				await client.execute({
 					sql: `
-						UPDATE reports
-						SET notes = COALESCE(notes || '\n', '') || '[MIGRATED TO NOTICE: ${noticeId}]',
-							type = 'CUSTOM'
-						WHERE id = ?
-					`,
-					args: [report.id],
+					UPDATE reports
+					SET notes = COALESCE(notes || '\n', '') || '[MIGRATED TO NOTICE: ' || ? || ']',
+						type = 'CUSTOM'
+					WHERE id = ?
+				`,
+					args: [noticeId, report.id],
 				});
 
 				console.log(`  ✓ Marked original report as migrated`);

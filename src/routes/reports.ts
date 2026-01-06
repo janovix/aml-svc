@@ -131,7 +131,7 @@ reportsRouter.get("/aggregate/alerts", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = Object.fromEntries(url.searchParams.entries());
-	const query = ReportAggregationQuerySchema.parse(queryObject);
+	const query = parseWithZod(ReportAggregationQuerySchema, queryObject);
 
 	const aggregator = getAggregator(c);
 	const result = await aggregator.aggregateAlerts(
@@ -150,7 +150,7 @@ reportsRouter.get("/aggregate/transactions", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = Object.fromEntries(url.searchParams.entries());
-	const query = ReportAggregationQuerySchema.parse(queryObject);
+	const query = parseWithZod(ReportAggregationQuerySchema, queryObject);
 
 	const aggregator = getAggregator(c);
 	const result = await aggregator.aggregateTransactions(
@@ -169,7 +169,7 @@ reportsRouter.get("/aggregate/clients", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = Object.fromEntries(url.searchParams.entries());
-	const query = ReportAggregationQuerySchema.parse(queryObject);
+	const query = parseWithZod(ReportAggregationQuerySchema, queryObject);
 
 	const aggregator = getAggregator(c);
 	const result = await aggregator.aggregateClients(

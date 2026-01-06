@@ -171,10 +171,10 @@ export class ReportAggregator {
 			},
 		};
 
+		// clientId parameter takes precedence over filters.clientIds
 		if (clientId) {
 			where.clientId = clientId;
-		}
-		if (filters?.clientIds && filters.clientIds.length > 0) {
+		} else if (filters?.clientIds && filters.clientIds.length > 0) {
 			where.clientId = { in: filters.clientIds };
 		}
 		if (filters?.alertRuleIds && filters.alertRuleIds.length > 0) {
@@ -284,10 +284,10 @@ export class ReportAggregator {
 			deletedAt: null,
 		};
 
+		// clientId parameter takes precedence over filters.clientIds
 		if (clientId) {
 			where.clientId = clientId;
-		}
-		if (filters?.clientIds && filters.clientIds.length > 0) {
+		} else if (filters?.clientIds && filters.clientIds.length > 0) {
 			where.clientId = { in: filters.clientIds };
 		}
 		if (filters?.transactionTypes && filters.transactionTypes.length > 0) {
@@ -466,13 +466,57 @@ export class ReportAggregator {
 		filters?: ReportFilters,
 		clientId?: string,
 	): Promise<ComparisonMetrics> {
+		// Build common filter conditions
+		const alertFilters: Prisma.AlertWhereInput = {};
+		const txnFilters: Prisma.TransactionWhereInput = {};
+		const clientFilters: Prisma.ClientWhereInput = {};
+
+		// clientId parameter takes precedence over filters.clientIds
+		if (clientId) {
+			alertFilters.clientId = clientId;
+			txnFilters.clientId = clientId;
+		} else if (filters?.clientIds && filters.clientIds.length > 0) {
+			alertFilters.clientId = { in: filters.clientIds };
+			txnFilters.clientId = { in: filters.clientIds };
+			clientFilters.id = { in: filters.clientIds };
+		}
+
+		// Apply additional filters
+		if (filters?.alertRuleIds && filters.alertRuleIds.length > 0) {
+			alertFilters.alertRuleId = { in: filters.alertRuleIds };
+		}
+		if (filters?.alertSeverities && filters.alertSeverities.length > 0) {
+			alertFilters.severity = {
+				in: filters.alertSeverities as (
+					| "LOW"
+					| "MEDIUM"
+					| "HIGH"
+					| "CRITICAL"
+				)[],
+			};
+		}
+		if (filters?.transactionTypes && filters.transactionTypes.length > 0) {
+			txnFilters.operationType = {
+				in: filters.transactionTypes as ("PURCHASE" | "SALE")[],
+			};
+		}
+		if (filters?.minAmount !== undefined) {
+			txnFilters.amount = { gte: filters.minAmount };
+		}
+		if (filters?.maxAmount !== undefined) {
+			txnFilters.amount = {
+				...(txnFilters.amount as object),
+				lte: filters.maxAmount,
+			};
+		}
+
 		// Get current period counts
 		const [currentAlerts, currentTxns, currentClients] = await Promise.all([
 			this.prisma.alert.count({
 				where: {
 					organizationId,
 					createdAt: { gte: currentStart, lte: currentEnd },
-					...(clientId && { clientId }),
+					...alertFilters,
 				},
 			}),
 			this.prisma.transaction.aggregate({
@@ -480,7 +524,7 @@ export class ReportAggregator {
 					organizationId,
 					operationDate: { gte: currentStart, lte: currentEnd },
 					deletedAt: null,
-					...(clientId && { clientId }),
+					...txnFilters,
 				},
 				_count: true,
 				_sum: { amount: true },
@@ -490,6 +534,7 @@ export class ReportAggregator {
 					organizationId,
 					createdAt: { gte: currentStart, lte: currentEnd },
 					deletedAt: null,
+					...clientFilters,
 				},
 			}),
 		]);
@@ -500,7 +545,7 @@ export class ReportAggregator {
 				where: {
 					organizationId,
 					createdAt: { gte: comparisonStart, lte: comparisonEnd },
-					...(clientId && { clientId }),
+					...alertFilters,
 				},
 			}),
 			this.prisma.transaction.aggregate({
@@ -508,7 +553,7 @@ export class ReportAggregator {
 					organizationId,
 					operationDate: { gte: comparisonStart, lte: comparisonEnd },
 					deletedAt: null,
-					...(clientId && { clientId }),
+					...txnFilters,
 				},
 				_count: true,
 				_sum: { amount: true },
@@ -518,6 +563,7 @@ export class ReportAggregator {
 					organizationId,
 					createdAt: { gte: comparisonStart, lte: comparisonEnd },
 					deletedAt: null,
+					...clientFilters,
 				},
 			}),
 		]);

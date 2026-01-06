@@ -669,7 +669,50 @@
 					{ "name": "clientId", "in": "query", "schema": { "type": "string" } }
 				],
 				"responses": {
-					"200": { "description": "Alert aggregation data" }
+					"200": {
+						"description": "Alert aggregation data",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"total": { "type": "integer" },
+										"bySeverity": {
+											"type": "object",
+											"additionalProperties": { "type": "integer" }
+										},
+										"byStatus": {
+											"type": "object",
+											"additionalProperties": { "type": "integer" }
+										},
+										"byRule": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"ruleId": { "type": "string" },
+													"ruleName": { "type": "string" },
+													"count": { "type": "integer" }
+												}
+											}
+										},
+										"byMonth": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"month": { "type": "string" },
+													"count": { "type": "integer" }
+												}
+											}
+										},
+										"avgResolutionDays": { "type": "number" },
+										"overdueCount": { "type": "integer" }
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		},
@@ -693,7 +736,74 @@
 					{ "name": "clientId", "in": "query", "schema": { "type": "string" } }
 				],
 				"responses": {
-					"200": { "description": "Transaction aggregation data" }
+					"200": {
+						"description": "Transaction aggregation data",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"total": { "type": "integer" },
+										"totalAmount": { "type": "number" },
+										"avgAmount": { "type": "number" },
+										"byOperationType": {
+											"type": "object",
+											"additionalProperties": {
+												"type": "object",
+												"properties": {
+													"count": { "type": "integer" },
+													"amount": { "type": "number" }
+												}
+											}
+										},
+										"byVehicleType": {
+											"type": "object",
+											"additionalProperties": {
+												"type": "object",
+												"properties": {
+													"count": { "type": "integer" },
+													"amount": { "type": "number" }
+												}
+											}
+										},
+										"byCurrency": {
+											"type": "object",
+											"additionalProperties": {
+												"type": "object",
+												"properties": {
+													"count": { "type": "integer" },
+													"amount": { "type": "number" }
+												}
+											}
+										},
+										"byMonth": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"month": { "type": "string" },
+													"count": { "type": "integer" },
+													"amount": { "type": "number" }
+												}
+											}
+										},
+										"topClients": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"clientId": { "type": "string" },
+													"clientName": { "type": "string" },
+													"count": { "type": "integer" },
+													"amount": { "type": "number" }
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		},
@@ -717,7 +827,29 @@
 					{ "name": "clientId", "in": "query", "schema": { "type": "string" } }
 				],
 				"responses": {
-					"200": { "description": "Client aggregation data" }
+					"200": {
+						"description": "Client aggregation data",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"total": { "type": "integer" },
+										"byPersonType": {
+											"type": "object",
+											"additionalProperties": { "type": "integer" }
+										},
+										"byCountry": {
+											"type": "object",
+											"additionalProperties": { "type": "integer" }
+										},
+										"withAlerts": { "type": "integer" },
+										"newInPeriod": { "type": "integer" }
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		},
