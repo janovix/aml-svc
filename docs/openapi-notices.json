@@ -1,0 +1,749 @@
+{
+	"openapi": "3.0.3",
+	"info": {
+		"title": "AML Service - Notices & Reports API",
+		"description": "API endpoints for SAT Notices and Enhanced Reports",
+		"version": "2.0.0"
+	},
+	"servers": [
+		{
+			"url": "/api/v1",
+			"description": "API v1"
+		}
+	],
+	"components": {
+		"securitySchemes": {
+			"bearerAuth": {
+				"type": "http",
+				"scheme": "bearer",
+				"bearerFormat": "JWT"
+			}
+		},
+		"schemas": {
+			"NoticeStatus": {
+				"type": "string",
+				"enum": ["DRAFT", "GENERATED", "SUBMITTED", "ACKNOWLEDGED"]
+			},
+			"Notice": {
+				"type": "object",
+				"properties": {
+					"id": { "type": "string" },
+					"organizationId": { "type": "string" },
+					"name": { "type": "string" },
+					"status": { "$ref": "#/components/schemas/NoticeStatus" },
+					"periodStart": { "type": "string", "format": "date-time" },
+					"periodEnd": { "type": "string", "format": "date-time" },
+					"reportedMonth": { "type": "string", "pattern": "^\\d{6}$" },
+					"recordCount": { "type": "integer" },
+					"xmlFileUrl": { "type": "string", "nullable": true },
+					"fileSize": { "type": "integer", "nullable": true },
+					"generatedAt": {
+						"type": "string",
+						"format": "date-time",
+						"nullable": true
+					},
+					"submittedAt": {
+						"type": "string",
+						"format": "date-time",
+						"nullable": true
+					},
+					"satFolioNumber": { "type": "string", "nullable": true },
+					"createdBy": { "type": "string", "nullable": true },
+					"notes": { "type": "string", "nullable": true },
+					"createdAt": { "type": "string", "format": "date-time" },
+					"updatedAt": { "type": "string", "format": "date-time" }
+				},
+				"required": [
+					"id",
+					"organizationId",
+					"name",
+					"status",
+					"periodStart",
+					"periodEnd",
+					"reportedMonth",
+					"recordCount",
+					"createdAt",
+					"updatedAt"
+				]
+			},
+			"NoticeWithAlertSummary": {
+				"allOf": [
+					{ "$ref": "#/components/schemas/Notice" },
+					{
+						"type": "object",
+						"properties": {
+							"alertSummary": {
+								"type": "object",
+								"properties": {
+									"total": { "type": "integer" },
+									"bySeverity": {
+										"type": "object",
+										"additionalProperties": { "type": "integer" }
+									},
+									"byStatus": {
+										"type": "object",
+										"additionalProperties": { "type": "integer" }
+									},
+									"byRule": {
+										"type": "array",
+										"items": {
+											"type": "object",
+											"properties": {
+												"ruleId": { "type": "string" },
+												"ruleName": { "type": "string" },
+												"count": { "type": "integer" }
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				]
+			},
+			"NoticeCreateInput": {
+				"type": "object",
+				"properties": {
+					"name": { "type": "string", "minLength": 1, "maxLength": 200 },
+					"periodStart": { "type": "string", "format": "date-time" },
+					"periodEnd": { "type": "string", "format": "date-time" },
+					"reportedMonth": { "type": "string", "pattern": "^\\d{6}$" },
+					"notes": { "type": "string", "maxLength": 1000, "nullable": true }
+				},
+				"required": ["name", "periodStart", "periodEnd", "reportedMonth"]
+			},
+			"NoticePatchInput": {
+				"type": "object",
+				"properties": {
+					"name": { "type": "string", "minLength": 1, "maxLength": 200 },
+					"notes": { "type": "string", "maxLength": 1000, "nullable": true },
+					"satFolioNumber": {
+						"type": "string",
+						"maxLength": 100,
+						"nullable": true
+					}
+				}
+			},
+			"ReportTemplate": {
+				"type": "string",
+				"enum": [
+					"EXECUTIVE_SUMMARY",
+					"COMPLIANCE_STATUS",
+					"TRANSACTION_ANALYSIS",
+					"CLIENT_RISK_PROFILE",
+					"ALERT_BREAKDOWN",
+					"PERIOD_COMPARISON",
+					"CUSTOM"
+				]
+			},
+			"ReportDataSource": {
+				"type": "string",
+				"enum": ["ALERTS", "TRANSACTIONS", "CLIENTS", "ALL"]
+			},
+			"ReportPeriodType": {
+				"type": "string",
+				"enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "CUSTOM"]
+			},
+			"ReportAggregation": {
+				"type": "object",
+				"properties": {
+					"alerts": {
+						"type": "object",
+						"properties": {
+							"total": { "type": "integer" },
+							"bySeverity": {
+								"type": "object",
+								"additionalProperties": { "type": "integer" }
+							},
+							"byStatus": {
+								"type": "object",
+								"additionalProperties": { "type": "integer" }
+							},
+							"byRule": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"ruleId": { "type": "string" },
+										"ruleName": { "type": "string" },
+										"count": { "type": "integer" }
+									}
+								}
+							},
+							"byMonth": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"month": { "type": "string" },
+										"count": { "type": "integer" }
+									}
+								}
+							},
+							"avgResolutionDays": { "type": "number" },
+							"overdueCount": { "type": "integer" }
+						}
+					},
+					"transactions": {
+						"type": "object",
+						"properties": {
+							"total": { "type": "integer" },
+							"totalAmount": { "type": "number" },
+							"avgAmount": { "type": "number" },
+							"byOperationType": { "type": "object" },
+							"byVehicleType": { "type": "object" },
+							"byCurrency": { "type": "object" },
+							"byMonth": { "type": "array" },
+							"topClients": { "type": "array" }
+						}
+					},
+					"clients": {
+						"type": "object",
+						"properties": {
+							"total": { "type": "integer" },
+							"byPersonType": { "type": "object" },
+							"byCountry": { "type": "object" },
+							"withAlerts": { "type": "integer" },
+							"newInPeriod": { "type": "integer" }
+						}
+					},
+					"riskIndicators": {
+						"type": "object",
+						"properties": {
+							"highRiskClients": { "type": "integer" },
+							"criticalAlerts": { "type": "integer" },
+							"overdueSubmissions": { "type": "integer" },
+							"complianceScore": { "type": "integer" }
+						}
+					},
+					"comparison": {
+						"type": "object",
+						"nullable": true,
+						"properties": {
+							"alertsChange": { "type": "number" },
+							"transactionsChange": { "type": "number" },
+							"amountChange": { "type": "number" },
+							"clientsChange": { "type": "number" }
+						}
+					}
+				}
+			},
+			"Pagination": {
+				"type": "object",
+				"properties": {
+					"page": { "type": "integer" },
+					"limit": { "type": "integer" },
+					"total": { "type": "integer" },
+					"totalPages": { "type": "integer" }
+				}
+			},
+			"Error": {
+				"type": "object",
+				"properties": {
+					"error": { "type": "string" },
+					"message": { "type": "string" },
+					"details": { "type": "object" }
+				}
+			}
+		}
+	},
+	"security": [{ "bearerAuth": [] }],
+	"paths": {
+		"/notices": {
+			"get": {
+				"summary": "List notices",
+				"tags": ["Notices"],
+				"parameters": [
+					{
+						"name": "page",
+						"in": "query",
+						"schema": { "type": "integer", "default": 1 }
+					},
+					{
+						"name": "limit",
+						"in": "query",
+						"schema": { "type": "integer", "default": 20, "maximum": 100 }
+					},
+					{
+						"name": "status",
+						"in": "query",
+						"schema": { "$ref": "#/components/schemas/NoticeStatus" }
+					},
+					{ "name": "year", "in": "query", "schema": { "type": "integer" } }
+				],
+				"responses": {
+					"200": {
+						"description": "List of notices",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"data": {
+											"type": "array",
+											"items": { "$ref": "#/components/schemas/Notice" }
+										},
+										"pagination": { "$ref": "#/components/schemas/Pagination" }
+									}
+								}
+							}
+						}
+					}
+				}
+			},
+			"post": {
+				"summary": "Create a notice",
+				"tags": ["Notices"],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": { "$ref": "#/components/schemas/NoticeCreateInput" }
+						}
+					}
+				},
+				"responses": {
+					"201": {
+						"description": "Notice created",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/Notice" }
+							}
+						}
+					},
+					"409": {
+						"description": "Notice already exists for this period"
+					}
+				}
+			}
+		},
+		"/notices/preview": {
+			"get": {
+				"summary": "Preview alerts for a potential notice",
+				"tags": ["Notices"],
+				"parameters": [
+					{
+						"name": "year",
+						"in": "query",
+						"required": true,
+						"schema": { "type": "integer" }
+					},
+					{
+						"name": "month",
+						"in": "query",
+						"required": true,
+						"schema": { "type": "integer", "minimum": 1, "maximum": 12 }
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Preview data",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"total": { "type": "integer" },
+										"bySeverity": { "type": "object" },
+										"byStatus": { "type": "object" },
+										"periodStart": { "type": "string" },
+										"periodEnd": { "type": "string" },
+										"reportedMonth": { "type": "string" },
+										"displayName": { "type": "string" },
+										"submissionDeadline": { "type": "string" }
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/notices/{id}": {
+			"get": {
+				"summary": "Get a notice by ID",
+				"tags": ["Notices"],
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Notice details",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/NoticeWithAlertSummary"
+								}
+							}
+						}
+					},
+					"404": { "description": "Notice not found" }
+				}
+			},
+			"patch": {
+				"summary": "Update a notice",
+				"tags": ["Notices"],
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": { "$ref": "#/components/schemas/NoticePatchInput" }
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Notice updated",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/Notice" }
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"summary": "Delete a draft notice",
+				"tags": ["Notices"],
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"responses": {
+					"204": { "description": "Notice deleted" },
+					"400": { "description": "Cannot delete non-draft notice" }
+				}
+			}
+		},
+		"/notices/{id}/generate": {
+			"post": {
+				"summary": "Generate XML file for a notice",
+				"tags": ["Notices"],
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "XML generated",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"message": { "type": "string" },
+										"noticeId": { "type": "string" },
+										"alertCount": { "type": "integer" }
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/notices/{id}/download": {
+			"get": {
+				"summary": "Get download URL for generated XML",
+				"tags": ["Notices"],
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Download URL",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"fileUrl": { "type": "string" },
+										"fileSize": { "type": "integer", "nullable": true },
+										"format": { "type": "string", "enum": ["xml"] }
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/notices/{id}/submit": {
+			"post": {
+				"summary": "Mark notice as submitted to SAT",
+				"tags": ["Notices"],
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"satFolioNumber": { "type": "string" }
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Notice submitted",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/Notice" }
+							}
+						}
+					}
+				}
+			}
+		},
+		"/notices/{id}/acknowledge": {
+			"post": {
+				"summary": "Record SAT acknowledgment",
+				"tags": ["Notices"],
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"satFolioNumber": { "type": "string" }
+								},
+								"required": ["satFolioNumber"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Acknowledgment recorded",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/Notice" }
+							}
+						}
+					}
+				}
+			}
+		},
+		"/reports/templates": {
+			"get": {
+				"summary": "List available report templates",
+				"tags": ["Reports"],
+				"responses": {
+					"200": {
+						"description": "List of templates",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"templates": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"$ref": "#/components/schemas/ReportTemplate"
+													},
+													"name": { "type": "string" },
+													"description": { "type": "string" },
+													"dataSources": {
+														"type": "array",
+														"items": {
+															"$ref": "#/components/schemas/ReportDataSource"
+														}
+													},
+													"supportsComparison": { "type": "boolean" }
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/reports/aggregate/summary": {
+			"get": {
+				"summary": "Get executive summary aggregation",
+				"tags": ["Reports"],
+				"parameters": [
+					{
+						"name": "periodStart",
+						"in": "query",
+						"required": true,
+						"schema": { "type": "string", "format": "date-time" }
+					},
+					{
+						"name": "periodEnd",
+						"in": "query",
+						"required": true,
+						"schema": { "type": "string", "format": "date-time" }
+					},
+					{
+						"name": "comparisonPeriodStart",
+						"in": "query",
+						"schema": { "type": "string", "format": "date-time" }
+					},
+					{
+						"name": "comparisonPeriodEnd",
+						"in": "query",
+						"schema": { "type": "string", "format": "date-time" }
+					},
+					{ "name": "clientId", "in": "query", "schema": { "type": "string" } }
+				],
+				"responses": {
+					"200": {
+						"description": "Aggregation data",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/ReportAggregation" }
+							}
+						}
+					}
+				}
+			}
+		},
+		"/reports/aggregate/alerts": {
+			"get": {
+				"summary": "Get alert metrics aggregation",
+				"tags": ["Reports"],
+				"parameters": [
+					{
+						"name": "periodStart",
+						"in": "query",
+						"required": true,
+						"schema": { "type": "string", "format": "date-time" }
+					},
+					{
+						"name": "periodEnd",
+						"in": "query",
+						"required": true,
+						"schema": { "type": "string", "format": "date-time" }
+					},
+					{ "name": "clientId", "in": "query", "schema": { "type": "string" } }
+				],
+				"responses": {
+					"200": { "description": "Alert aggregation data" }
+				}
+			}
+		},
+		"/reports/aggregate/transactions": {
+			"get": {
+				"summary": "Get transaction metrics aggregation",
+				"tags": ["Reports"],
+				"parameters": [
+					{
+						"name": "periodStart",
+						"in": "query",
+						"required": true,
+						"schema": { "type": "string", "format": "date-time" }
+					},
+					{
+						"name": "periodEnd",
+						"in": "query",
+						"required": true,
+						"schema": { "type": "string", "format": "date-time" }
+					},
+					{ "name": "clientId", "in": "query", "schema": { "type": "string" } }
+				],
+				"responses": {
+					"200": { "description": "Transaction aggregation data" }
+				}
+			}
+		},
+		"/reports/aggregate/clients": {
+			"get": {
+				"summary": "Get client metrics aggregation",
+				"tags": ["Reports"],
+				"parameters": [
+					{
+						"name": "periodStart",
+						"in": "query",
+						"required": true,
+						"schema": { "type": "string", "format": "date-time" }
+					},
+					{
+						"name": "periodEnd",
+						"in": "query",
+						"required": true,
+						"schema": { "type": "string", "format": "date-time" }
+					},
+					{ "name": "clientId", "in": "query", "schema": { "type": "string" } }
+				],
+				"responses": {
+					"200": { "description": "Client aggregation data" }
+				}
+			}
+		},
+		"/reports/{id}/aggregation": {
+			"get": {
+				"summary": "Get aggregation data for a specific report",
+				"tags": ["Reports"],
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Report aggregation data",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/ReportAggregation" }
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

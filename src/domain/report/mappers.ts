@@ -1,39 +1,74 @@
 import type {
 	Report as PrismaReportModel,
-	ReportType as PrismaReportType,
+	ReportTemplate as PrismaReportTemplate,
+	ReportPeriodType as PrismaReportPeriodType,
 	ReportStatus as PrismaReportStatus,
 } from "@prisma/client";
 
 import { generateId } from "../../lib/id-generator";
 import type { ReportCreateInput, ReportPatchInput } from "./schemas";
-import type { ReportEntity, ReportStatus, ReportType } from "./types";
+import type {
+	ReportEntity,
+	ReportStatus,
+	ReportTemplate,
+	ReportPeriodType,
+	ReportDataSource,
+	ReportFilters,
+	ReportChartConfig as ReportChartConfigType,
+} from "./types";
 
-const REPORT_TYPE_TO_PRISMA: Record<ReportType, PrismaReportType> = {
+const REPORT_TEMPLATE_TO_PRISMA: Record<ReportTemplate, PrismaReportTemplate> =
+	{
+		EXECUTIVE_SUMMARY: "EXECUTIVE_SUMMARY",
+		COMPLIANCE_STATUS: "COMPLIANCE_STATUS",
+		TRANSACTION_ANALYSIS: "TRANSACTION_ANALYSIS",
+		CLIENT_RISK_PROFILE: "CLIENT_RISK_PROFILE",
+		ALERT_BREAKDOWN: "ALERT_BREAKDOWN",
+		PERIOD_COMPARISON: "PERIOD_COMPARISON",
+		CUSTOM: "CUSTOM",
+	};
+
+const REPORT_TEMPLATE_FROM_PRISMA: Record<
+	PrismaReportTemplate,
+	ReportTemplate
+> = {
+	EXECUTIVE_SUMMARY: "EXECUTIVE_SUMMARY",
+	COMPLIANCE_STATUS: "COMPLIANCE_STATUS",
+	TRANSACTION_ANALYSIS: "TRANSACTION_ANALYSIS",
+	CLIENT_RISK_PROFILE: "CLIENT_RISK_PROFILE",
+	ALERT_BREAKDOWN: "ALERT_BREAKDOWN",
+	PERIOD_COMPARISON: "PERIOD_COMPARISON",
+	CUSTOM: "CUSTOM",
+};
+
+const REPORT_PERIOD_TYPE_TO_PRISMA: Record<
+	ReportPeriodType,
+	PrismaReportPeriodType
+> = {
 	MONTHLY: "MONTHLY",
 	QUARTERLY: "QUARTERLY",
 	ANNUAL: "ANNUAL",
 	CUSTOM: "CUSTOM",
 };
 
-const REPORT_TYPE_FROM_PRISMA: Record<PrismaReportType, ReportType> = {
+const REPORT_PERIOD_TYPE_FROM_PRISMA: Record<
+	PrismaReportPeriodType,
+	ReportPeriodType
+> = {
 	MONTHLY: "MONTHLY",
 	QUARTERLY: "QUARTERLY",
 	ANNUAL: "ANNUAL",
 	CUSTOM: "CUSTOM",
 };
 
-const REPORT_STATUS_TO_PRISMA: Record<ReportStatus, PrismaReportStatus> = {
+const _REPORT_STATUS_TO_PRISMA: Record<ReportStatus, PrismaReportStatus> = {
 	DRAFT: "DRAFT",
 	GENERATED: "GENERATED",
-	SUBMITTED: "SUBMITTED",
-	ACKNOWLEDGED: "ACKNOWLEDGED",
 };
 
 const REPORT_STATUS_FROM_PRISMA: Record<PrismaReportStatus, ReportStatus> = {
 	DRAFT: "DRAFT",
 	GENERATED: "GENERATED",
-	SUBMITTED: "SUBMITTED",
-	ACKNOWLEDGED: "ACKNOWLEDGED",
 };
 
 function mapDateTime(value: Date | string | null | undefined): string | null {
@@ -44,6 +79,31 @@ function mapDateTime(value: Date | string | null | undefined): string | null {
 	return value;
 }
 
+function parseJsonArray<T>(
+	json: string | null | undefined,
+	defaultValue: T[],
+): T[] {
+	if (!json) return defaultValue;
+	try {
+		const parsed = JSON.parse(json);
+		return Array.isArray(parsed) ? parsed : defaultValue;
+	} catch {
+		return defaultValue;
+	}
+}
+
+function parseJsonObject<T>(
+	json: string | null | undefined,
+	defaultValue: T,
+): T {
+	if (!json) return defaultValue;
+	try {
+		return JSON.parse(json) as T;
+	} catch {
+		return defaultValue;
+	}
+}
+
 /**
  * Map Prisma Report model to ReportEntity
  */
@@ -52,19 +112,24 @@ export function mapPrismaReport(prisma: PrismaReportModel): ReportEntity {
 		id: prisma.id,
 		organizationId: prisma.organizationId,
 		name: prisma.name,
-		type: REPORT_TYPE_FROM_PRISMA[prisma.type],
-		status: REPORT_STATUS_FROM_PRISMA[prisma.status],
+		template: REPORT_TEMPLATE_FROM_PRISMA[prisma.template],
+		periodType: REPORT_PERIOD_TYPE_FROM_PRISMA[prisma.periodType],
 		periodStart: mapDateTime(prisma.periodStart) ?? "",
 		periodEnd: mapDateTime(prisma.periodEnd) ?? "",
-		reportedMonth: prisma.reportedMonth,
-		recordCount: prisma.recordCount,
-		xmlFileUrl: prisma.xmlFileUrl,
+		comparisonPeriodStart: mapDateTime(prisma.comparisonPeriodStart),
+		comparisonPeriodEnd: mapDateTime(prisma.comparisonPeriodEnd),
+		dataSources: parseJsonArray<ReportDataSource>(prisma.dataSources, [
+			"ALERTS",
+		]),
+		filters: parseJsonObject<ReportFilters>(prisma.filters, {}),
+		clientId: prisma.clientId,
+		charts: parseJsonArray<ReportChartConfigType>(prisma.charts, []),
+		includeSummaryCards: prisma.includeSummaryCards,
+		includeDetailTables: prisma.includeDetailTables,
+		status: REPORT_STATUS_FROM_PRISMA[prisma.status],
 		pdfFileUrl: prisma.pdfFileUrl,
 		fileSize: prisma.fileSize,
-		pdfFileSize: prisma.pdfFileSize,
 		generatedAt: mapDateTime(prisma.generatedAt),
-		submittedAt: mapDateTime(prisma.submittedAt),
-		satFolioNumber: prisma.satFolioNumber,
 		createdBy: prisma.createdBy,
 		notes: prisma.notes,
 		createdAt: mapDateTime(prisma.createdAt) ?? "",
@@ -83,12 +148,19 @@ export function mapReportCreateInputToPrisma(
 	id: string;
 	organizationId: string;
 	name: string;
-	type: PrismaReportType;
-	status: PrismaReportStatus;
+	template: PrismaReportTemplate;
+	periodType: PrismaReportPeriodType;
 	periodStart: Date;
 	periodEnd: Date;
-	reportedMonth: string;
-	recordCount: number;
+	comparisonPeriodStart: Date | null;
+	comparisonPeriodEnd: Date | null;
+	dataSources: string;
+	filters: string;
+	clientId: string | null;
+	charts: string;
+	includeSummaryCards: boolean;
+	includeDetailTables: boolean;
+	status: PrismaReportStatus;
 	createdBy: string | null;
 	notes: string | null;
 } {
@@ -96,12 +168,23 @@ export function mapReportCreateInputToPrisma(
 		id: generateId("REPORT"),
 		organizationId,
 		name: input.name,
-		type: REPORT_TYPE_TO_PRISMA[input.type ?? "MONTHLY"],
-		status: "DRAFT",
+		template: REPORT_TEMPLATE_TO_PRISMA[input.template ?? "CUSTOM"],
+		periodType: REPORT_PERIOD_TYPE_TO_PRISMA[input.periodType ?? "CUSTOM"],
 		periodStart: new Date(input.periodStart),
 		periodEnd: new Date(input.periodEnd),
-		reportedMonth: input.reportedMonth,
-		recordCount: 0,
+		comparisonPeriodStart: input.comparisonPeriodStart
+			? new Date(input.comparisonPeriodStart)
+			: null,
+		comparisonPeriodEnd: input.comparisonPeriodEnd
+			? new Date(input.comparisonPeriodEnd)
+			: null,
+		dataSources: JSON.stringify(input.dataSources ?? ["ALERTS"]),
+		filters: JSON.stringify(input.filters ?? {}),
+		clientId: input.clientId ?? null,
+		charts: JSON.stringify(input.charts ?? []),
+		includeSummaryCards: input.includeSummaryCards ?? true,
+		includeDetailTables: input.includeDetailTables ?? true,
+		status: "DRAFT",
 		createdBy: createdBy ?? null,
 		notes: input.notes ?? null,
 	};
@@ -112,33 +195,33 @@ export function mapReportCreateInputToPrisma(
  */
 export function mapReportPatchInputToPrisma(input: ReportPatchInput): Partial<{
 	name: string;
-	status: PrismaReportStatus;
+	charts: string;
+	includeSummaryCards: boolean;
+	includeDetailTables: boolean;
 	notes: string | null;
-	satFolioNumber: string | null;
-	submittedAt: Date | null;
 }> {
 	const result: Partial<{
 		name: string;
-		status: PrismaReportStatus;
+		charts: string;
+		includeSummaryCards: boolean;
+		includeDetailTables: boolean;
 		notes: string | null;
-		satFolioNumber: string | null;
-		submittedAt: Date | null;
 	}> = {};
 
 	if (input.name !== undefined) {
 		result.name = input.name;
 	}
-	if (input.status !== undefined) {
-		result.status = REPORT_STATUS_TO_PRISMA[input.status];
+	if (input.charts !== undefined) {
+		result.charts = JSON.stringify(input.charts);
+	}
+	if (input.includeSummaryCards !== undefined) {
+		result.includeSummaryCards = input.includeSummaryCards;
+	}
+	if (input.includeDetailTables !== undefined) {
+		result.includeDetailTables = input.includeDetailTables;
 	}
 	if (input.notes !== undefined) {
 		result.notes = input.notes;
-	}
-	if (input.satFolioNumber !== undefined) {
-		result.satFolioNumber = input.satFolioNumber;
-	}
-	if (input.submittedAt !== undefined) {
-		result.submittedAt = input.submittedAt ? new Date(input.submittedAt) : null;
 	}
 
 	return result;

@@ -10,11 +10,14 @@ import {
 	ReportRepository,
 	ReportCreateSchema,
 	ReportPreviewSchema,
+	ReportAggregationQuerySchema,
+	getTemplateConfigs,
 } from "../domain/report";
 import type { Bindings } from "../index";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import { ReportAggregator } from "../lib/report-aggregator";
 
 export const reportsRouter = new Hono<{
 	Bindings: Bindings;
@@ -43,38 +46,30 @@ function getService(
 	return new ReportService(repository);
 }
 
+function getAggregator(
+	c: Context<{ Bindings: Bindings; Variables: AuthVariables }>,
+) {
+	const prisma = getPrismaClient(c.env.DB);
+	return new ReportAggregator(prisma);
+}
+
 function handleServiceError(error: unknown): never {
 	if (error instanceof Error) {
 		if (error.message === "REPORT_NOT_FOUND") {
 			throw new APIError(404, "Report not found");
 		}
-		if (error.message === "REPORT_ALREADY_EXISTS_FOR_PERIOD") {
-			throw new APIError(
-				409,
-				"A report already exists for this period and type",
-			);
-		}
 		if (error.message === "CANNOT_DELETE_NON_DRAFT_REPORT") {
 			throw new APIError(400, "Only draft reports can be deleted");
-		}
-		if (error.message === "ONLY_MONTHLY_REPORTS_CAN_BE_SUBMITTED") {
-			throw new APIError(400, "Only monthly reports can be submitted to SAT");
-		}
-		if (error.message === "REPORT_MUST_BE_GENERATED_BEFORE_SUBMISSION") {
-			throw new APIError(400, "Report must be generated before submission");
-		}
-		if (error.message === "ONLY_MONTHLY_REPORTS_CAN_BE_ACKNOWLEDGED") {
-			throw new APIError(
-				400,
-				"Only monthly reports can be acknowledged by SAT",
-			);
-		}
-		if (error.message === "REPORT_MUST_BE_SUBMITTED_BEFORE_ACKNOWLEDGMENT") {
-			throw new APIError(400, "Report must be submitted before acknowledgment");
 		}
 	}
 	throw error;
 }
+
+// GET /reports/templates - List available report templates
+reportsRouter.get("/templates", async (c) => {
+	const templates = getTemplateConfigs();
+	return c.json({ templates });
+});
 
 // GET /reports - List reports
 reportsRouter.get("/", async (c) => {
@@ -91,7 +86,7 @@ reportsRouter.get("/", async (c) => {
 	return c.json(result);
 });
 
-// GET /reports/preview - Preview alerts for a potential report
+// GET /reports/preview - Preview data for a potential report
 reportsRouter.get("/preview", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
@@ -102,6 +97,87 @@ reportsRouter.get("/preview", async (c) => {
 	const result = await service
 		.preview(organizationId, input)
 		.catch(handleServiceError);
+
+	return c.json(result);
+});
+
+// GET /reports/aggregate/summary - Get executive summary aggregation
+reportsRouter.get("/aggregate/summary", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const url = new URL(c.req.url);
+	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const query = parseWithZod(ReportAggregationQuerySchema, queryObject);
+
+	const aggregator = getAggregator(c);
+	const result = await aggregator.aggregate({
+		organizationId,
+		periodStart: new Date(query.periodStart),
+		periodEnd: new Date(query.periodEnd),
+		comparisonPeriodStart: query.comparisonPeriodStart
+			? new Date(query.comparisonPeriodStart)
+			: undefined,
+		comparisonPeriodEnd: query.comparisonPeriodEnd
+			? new Date(query.comparisonPeriodEnd)
+			: undefined,
+		dataSources: ["ALERTS", "TRANSACTIONS", "CLIENTS"],
+		clientId: query.clientId,
+	});
+
+	return c.json(result);
+});
+
+// GET /reports/aggregate/alerts - Get alert metrics aggregation
+reportsRouter.get("/aggregate/alerts", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const url = new URL(c.req.url);
+	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const query = ReportAggregationQuerySchema.parse(queryObject);
+
+	const aggregator = getAggregator(c);
+	const result = await aggregator.aggregateAlerts(
+		organizationId,
+		new Date(query.periodStart),
+		new Date(query.periodEnd),
+		undefined,
+		query.clientId,
+	);
+
+	return c.json(result);
+});
+
+// GET /reports/aggregate/transactions - Get transaction metrics aggregation
+reportsRouter.get("/aggregate/transactions", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const url = new URL(c.req.url);
+	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const query = ReportAggregationQuerySchema.parse(queryObject);
+
+	const aggregator = getAggregator(c);
+	const result = await aggregator.aggregateTransactions(
+		organizationId,
+		new Date(query.periodStart),
+		new Date(query.periodEnd),
+		undefined,
+		query.clientId,
+	);
+
+	return c.json(result);
+});
+
+// GET /reports/aggregate/clients - Get client metrics aggregation
+reportsRouter.get("/aggregate/clients", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const url = new URL(c.req.url);
+	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const query = ReportAggregationQuerySchema.parse(queryObject);
+
+	const aggregator = getAggregator(c);
+	const result = await aggregator.aggregateClients(
+		organizationId,
+		new Date(query.periodStart),
+		new Date(query.periodEnd),
+		query.clientId,
+	);
 
 	return c.json(result);
 });
@@ -165,59 +241,41 @@ reportsRouter.delete("/:id", async (c) => {
 	return c.body(null, 204);
 });
 
-// POST /reports/:id/generate - Generate file for a report
+// POST /reports/:id/generate - Generate PDF for a report
 reportsRouter.post("/:id/generate", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ReportIdParamSchema, c.req.param());
 
 	const service = getService(c);
 	const report = await service
-		.get(organizationId, params.id)
+		.getWithSummary(organizationId, params.id)
 		.catch(handleServiceError);
 
 	if (report.status !== "DRAFT") {
 		throw new APIError(400, "Report has already been generated");
 	}
 
-	// Get alerts for the report
-	const alerts = await service.getAlertsForReport(organizationId, params.id);
-
-	if (alerts.length === 0) {
-		throw new APIError(400, "Report has no alerts to include");
-	}
-
-	// Determine file types based on report type
-	const types: ("XML" | "PDF")[] =
-		report.type === "MONTHLY" ? ["XML", "PDF"] : ["PDF"];
+	// Get the alert count from the summary
+	const alertCount = report.alertSummary?.total ?? 0;
 
 	// Mark the report as generated
-	// Note: R2 file upload can be implemented later when needed
-	// For now, we mark the status as GENERATED so the workflow can continue
 	await service.markAsGenerated(organizationId, params.id, {
-		// File URLs can be added later when R2 upload is implemented
-		xmlFileUrl: report.type === "MONTHLY" ? null : undefined,
 		pdfFileUrl: null,
 		fileSize: null,
 	});
 
 	return c.json({
-		message:
-			types.length > 1
-				? "XML and PDF generation complete"
-				: "PDF generation complete",
+		message: "PDF generation complete",
 		reportId: report.id,
-		alertCount: alerts.length,
-		types,
+		alertCount,
+		types: ["PDF"],
 	});
 });
 
-// GET /reports/:id/download - Get download URL for generated file
-// For MONTHLY reports, use ?format=xml or ?format=pdf (defaults to xml)
+// GET /reports/:id/download - Get download URL for generated PDF
 reportsRouter.get("/:id/download", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ReportIdParamSchema, c.req.param());
-	const url = new URL(c.req.url);
-	const format = url.searchParams.get("format") ?? "xml";
 
 	const service = getService(c);
 	const report = await service
@@ -228,68 +286,42 @@ reportsRouter.get("/:id/download", async (c) => {
 		throw new APIError(400, "Report has not been generated yet");
 	}
 
-	let fileUrl: string | null | undefined;
-	let fileSize: number | null | undefined;
-	let fileFormat: "xml" | "pdf";
-
-	if (report.type === "MONTHLY") {
-		// MONTHLY reports have both XML and PDF
-		if (format === "pdf") {
-			fileUrl = report.pdfFileUrl;
-			fileSize = report.pdfFileSize;
-			fileFormat = "pdf";
-		} else {
-			fileUrl = report.xmlFileUrl;
-			fileSize = report.fileSize;
-			fileFormat = "xml";
-		}
-	} else {
-		// Other report types only have PDF
-		fileUrl = report.pdfFileUrl;
-		fileSize = report.pdfFileSize ?? report.fileSize;
-		fileFormat = "pdf";
+	if (!report.pdfFileUrl) {
+		throw new APIError(404, "Report PDF file not found");
 	}
 
-	if (!fileUrl) {
-		throw new APIError(
-			404,
-			`Report ${fileFormat.toUpperCase()} file not found`,
-		);
-	}
-
-	return c.json({ fileUrl, fileSize, format: fileFormat });
+	return c.json({
+		fileUrl: report.pdfFileUrl,
+		fileSize: report.fileSize,
+		format: "pdf",
+	});
 });
 
-// POST /reports/:id/submit - Mark monthly report as submitted to SAT
-reportsRouter.post("/:id/submit", async (c) => {
+// GET /reports/:id/aggregation - Get aggregation data for a report
+reportsRouter.get("/:id/aggregation", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ReportIdParamSchema, c.req.param());
-	const body = await c.req.json().catch(() => ({}));
-	const satFolioNumber = body.satFolioNumber as string | undefined;
 
 	const service = getService(c);
-	const updated = await service
-		.markAsSubmitted(organizationId, params.id, satFolioNumber)
+	const report = await service
+		.get(organizationId, params.id)
 		.catch(handleServiceError);
 
-	return c.json(updated);
-});
+	const aggregator = getAggregator(c);
+	const result = await aggregator.aggregate({
+		organizationId,
+		periodStart: new Date(report.periodStart),
+		periodEnd: new Date(report.periodEnd),
+		comparisonPeriodStart: report.comparisonPeriodStart
+			? new Date(report.comparisonPeriodStart)
+			: undefined,
+		comparisonPeriodEnd: report.comparisonPeriodEnd
+			? new Date(report.comparisonPeriodEnd)
+			: undefined,
+		dataSources: report.dataSources,
+		filters: report.filters,
+		clientId: report.clientId ?? undefined,
+	});
 
-// POST /reports/:id/acknowledge - Mark monthly report as acknowledged by SAT
-reportsRouter.post("/:id/acknowledge", async (c) => {
-	const organizationId = getOrganizationId(c);
-	const params = parseWithZod(ReportIdParamSchema, c.req.param());
-	const body = await c.req.json();
-	const satFolioNumber = body.satFolioNumber as string;
-
-	if (!satFolioNumber) {
-		throw new APIError(400, "SAT folio number is required");
-	}
-
-	const service = getService(c);
-	const updated = await service
-		.markAsAcknowledged(organizationId, params.id, satFolioNumber)
-		.catch(handleServiceError);
-
-	return c.json(updated);
+	return c.json(result);
 });

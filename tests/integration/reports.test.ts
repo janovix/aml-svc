@@ -89,7 +89,7 @@ describe("Reports API", () => {
 	});
 
 	describe("POST /api/v1/reports/:id/generate", () => {
-		it("generates report and updates status to GENERATED", async () => {
+		it("generates PDF report and updates status to GENERATED", async () => {
 			const prisma = getPrismaClient(env.DB);
 
 			// Create a test client with all required fields
@@ -139,12 +139,11 @@ describe("Reports API", () => {
 					id: "RPT001",
 					organizationId: testOrgId,
 					name: "Test Monthly Report",
-					type: "MONTHLY",
+					template: "CUSTOM",
+					periodType: "MONTHLY",
 					status: "DRAFT",
 					periodStart,
 					periodEnd,
-					reportedMonth: "202401",
-					recordCount: 1,
 				},
 			});
 
@@ -189,9 +188,9 @@ describe("Reports API", () => {
 
 			expect(body.reportId).toBe(report.id);
 			expect(body.alertCount).toBe(1);
-			expect(body.types).toContain("XML");
-			expect(body.types).toContain("PDF");
-			expect(body.message).toContain("complete");
+			// Reports now only generate PDF (XML is for SAT Notices)
+			expect(body.types).toEqual(["PDF"]);
+			expect(body.message).toContain("PDF generation complete");
 
 			// Verify the report status was updated to GENERATED
 			const updatedReport = await prisma.report.findUnique({
@@ -212,12 +211,11 @@ describe("Reports API", () => {
 					id: "RPT002",
 					organizationId: testOrgId,
 					name: "Already Generated Report",
-					type: "MONTHLY",
+					template: "CUSTOM",
+					periodType: "MONTHLY",
 					status: "GENERATED",
 					periodStart: new Date("2024-02-01T00:00:00Z"),
 					periodEnd: new Date("2024-02-29T23:59:59Z"),
-					reportedMonth: "202402",
-					recordCount: 0,
 					generatedAt: new Date(),
 				},
 			});
@@ -240,42 +238,6 @@ describe("Reports API", () => {
 			expect(body.message).toBe("Report has already been generated");
 		});
 
-		it("returns 400 if report has no alerts", async () => {
-			const prisma = getPrismaClient(env.DB);
-
-			// Create a report with no alerts
-			const report = await prisma.report.create({
-				data: {
-					id: "RPT003",
-					organizationId: testOrgId,
-					name: "Empty Report",
-					type: "MONTHLY",
-					status: "DRAFT",
-					periodStart: new Date("2024-03-01T00:00:00Z"),
-					periodEnd: new Date("2024-03-31T23:59:59Z"),
-					reportedMonth: "202403",
-					recordCount: 0,
-				},
-			});
-
-			const res = await SELF.fetch(
-				`http://local.test/api/v1/reports/${report.id}/generate`,
-				{
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${testToken}`,
-						"x-organization-id": testOrgId,
-						"Content-Type": "application/json",
-					},
-				},
-			);
-
-			expect(res.status).toBe(400);
-
-			const body = (await res.json()) as { error: string; message: string };
-			expect(body.message).toBe("Report has no alerts to include");
-		});
-
 		it("returns 404 if report does not exist", async () => {
 			const res = await SELF.fetch(
 				"http://local.test/api/v1/reports/nonexistent/generate",
@@ -295,7 +257,7 @@ describe("Reports API", () => {
 			expect(body.message).toBe("Report not found");
 		});
 
-		it("generates PDF only for non-MONTHLY report types", async () => {
+		it("generates PDF only for QUARTERLY report types", async () => {
 			const prisma = getPrismaClient(env.DB);
 
 			// Create a test client with all required fields
@@ -345,12 +307,11 @@ describe("Reports API", () => {
 					id: "RPT004",
 					organizationId: testOrgId,
 					name: "Test Quarterly Report",
-					type: "QUARTERLY",
+					template: "CUSTOM",
+					periodType: "QUARTERLY",
 					status: "DRAFT",
 					periodStart,
 					periodEnd,
-					reportedMonth: "2024Q1",
-					recordCount: 1,
 				},
 			});
 

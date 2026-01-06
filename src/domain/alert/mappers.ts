@@ -265,6 +265,7 @@ export function mapAlertCreateInputToPrisma(
 		transactionId: input.transactionId ?? null,
 		isManual: input.isManual ?? false,
 		reportId: null, // Reports are assigned later
+		noticeId: null, // Notices are assigned later
 		submissionDeadline: input.submissionDeadline
 			? new Date(input.submissionDeadline)
 			: null,
