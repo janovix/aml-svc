@@ -1,3 +1,10 @@
+# [1.1.0-rc.36](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.35...v1.1.0-rc.36) (2026-01-06)
+
+
+### Features
+
+* enhance Notices API to include transaction data for alerts and improve XML generation process ([a252258](https://github.com/janovix/aml-svc/commit/a2522580f27491121096b115b2b8968e02499a46))
+
 # [1.1.0-rc.35](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.34...v1.1.0-rc.35) (2026-01-06)
 
 
