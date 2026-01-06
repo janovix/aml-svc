@@ -6,6 +6,7 @@ import { alertRulesRouter } from "./alert-rules";
 import { alertsRouter } from "./alerts";
 import { catalogsRouter } from "./catalogs";
 import { clientsRouter } from "./clients";
+import { noticesRouter } from "./notices";
 import { organizationSettingsRouter } from "./organization-settings";
 import { reportsRouter } from "./reports";
 import { transactionsRouter } from "./transactions";
@@ -20,6 +21,7 @@ export function createRouter() {
 	router.use("/transactions/*", authMiddleware({ requireOrganization: true }));
 	router.use("/alert-rules/*", authMiddleware({ requireOrganization: true }));
 	router.use("/alerts/*", authMiddleware({ requireOrganization: true }));
+	router.use("/notices/*", authMiddleware({ requireOrganization: true }));
 	router.use("/reports/*", authMiddleware({ requireOrganization: true }));
 
 	// Organization settings requires auth and organization context
@@ -37,6 +39,7 @@ export function createRouter() {
 	router.route("/transactions", transactionsRouter);
 	router.route("/alert-rules", alertRulesRouter);
 	router.route("/alerts", alertsRouter);
+	router.route("/notices", noticesRouter);
 	router.route("/reports", reportsRouter);
 	router.route("/uma-values", umaValuesRouter);
 	router.route("/organization-settings", organizationSettingsRouter);

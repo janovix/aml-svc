@@ -21,15 +21,27 @@ export class ReportRepository {
 		organizationId: string,
 		filters: ReportFilterInput,
 	): Promise<ListResult<ReportEntity>> {
-		const { page, limit, type, status, periodStart, periodEnd } = filters;
+		const {
+			page,
+			limit,
+			template,
+			periodType,
+			status,
+			periodStart,
+			periodEnd,
+			clientId,
+		} = filters;
 		const skip = (page - 1) * limit;
 
 		const where: Prisma.ReportWhereInput = {
 			organizationId,
 		};
 
-		if (type) {
-			where.type = type;
+		if (template) {
+			where.template = template;
+		}
+		if (periodType) {
+			where.periodType = periodType;
 		}
 		if (status) {
 			where.status = status;
@@ -39,6 +51,9 @@ export class ReportRepository {
 		}
 		if (periodEnd) {
 			where.periodEnd = { lte: new Date(periodEnd) };
+		}
+		if (clientId) {
+			where.clientId = clientId;
 		}
 
 		const [reports, total] = await Promise.all([
@@ -190,30 +205,49 @@ export class ReportRepository {
 	}
 
 	/**
-	 * Count alerts in a period that can be included in a report
-	 * (not cancelled, not already submitted)
+	 * Count alerts in a period (for analytics reports)
 	 */
 	async countAlertsForPeriod(
 		organizationId: string,
 		periodStart: Date,
 		periodEnd: Date,
+		filters?: {
+			clientId?: string;
+			alertRuleIds?: string[];
+			alertSeverities?: string[];
+		},
 	): Promise<{
 		total: number;
 		bySeverity: Record<string, number>;
 		byStatus: Record<string, number>;
 	}> {
-		const alerts = await this.prisma.alert.findMany({
-			where: {
-				organizationId,
-				createdAt: {
-					gte: periodStart,
-					lte: periodEnd,
-				},
-				status: {
-					notIn: ["CANCELLED", "SUBMITTED"],
-				},
-				reportId: null, // Not already in a report
+		const where: Prisma.AlertWhereInput = {
+			organizationId,
+			createdAt: {
+				gte: periodStart,
+				lte: periodEnd,
 			},
+		};
+
+		if (filters?.clientId) {
+			where.clientId = filters.clientId;
+		}
+		if (filters?.alertRuleIds && filters.alertRuleIds.length > 0) {
+			where.alertRuleId = { in: filters.alertRuleIds };
+		}
+		if (filters?.alertSeverities && filters.alertSeverities.length > 0) {
+			where.severity = {
+				in: filters.alertSeverities as (
+					| "LOW"
+					| "MEDIUM"
+					| "HIGH"
+					| "CRITICAL"
+				)[],
+			};
+		}
+
+		const alerts = await this.prisma.alert.findMany({
+			where,
 			select: {
 				severity: true,
 				status: true,
@@ -236,87 +270,12 @@ export class ReportRepository {
 	}
 
 	/**
-	 * Assign alerts to a report
-	 */
-	async assignAlertsToReport(
-		organizationId: string,
-		reportId: string,
-		periodStart: Date,
-		periodEnd: Date,
-	): Promise<number> {
-		const result = await this.prisma.alert.updateMany({
-			where: {
-				organizationId,
-				createdAt: {
-					gte: periodStart,
-					lte: periodEnd,
-				},
-				status: {
-					notIn: ["CANCELLED", "SUBMITTED"],
-				},
-				reportId: null,
-			},
-			data: { reportId },
-		});
-
-		// Update report record count
-		await this.prisma.report.update({
-			where: { id: reportId },
-			data: { recordCount: result.count },
-		});
-
-		return result.count;
-	}
-
-	/**
-	 * Get all alerts for a report (for XML/PDF generation)
-	 */
-	async getAlertsForReport(organizationId: string, reportId: string) {
-		return this.prisma.alert.findMany({
-			where: { reportId, organizationId },
-			include: {
-				alertRule: true,
-				client: true,
-			},
-			orderBy: { createdAt: "asc" },
-		});
-	}
-
-	/**
-	 * Update report file URL after generation
-	 */
-	async updateFileUrl(
-		organizationId: string,
-		id: string,
-		fileUrl: string,
-		fileSize: number,
-		isXml: boolean,
-	): Promise<ReportEntity> {
-		await this.ensureExists(organizationId, id);
-
-		const report = await this.prisma.report.update({
-			where: { id },
-			data: {
-				...(isXml ? { xmlFileUrl: fileUrl } : { pdfFileUrl: fileUrl }),
-				fileSize,
-				generatedAt: new Date(),
-				status: "GENERATED",
-			},
-		});
-
-		return mapPrismaReport(report);
-	}
-
-	/**
-	 * Mark a report as generated with optional file URLs
-	 * Used when generating files (either uploaded to R2 or stored inline)
-	 * Also updates all alerts in the report to FILE_GENERATED status
+	 * Mark a report as generated with PDF file URL
 	 */
 	async markAsGenerated(
 		organizationId: string,
 		id: string,
 		options: {
-			xmlFileUrl?: string | null;
 			pdfFileUrl?: string | null;
 			fileSize?: number | null;
 		},
@@ -325,13 +284,9 @@ export class ReportRepository {
 
 		const now = new Date();
 
-		// Update the report status
 		const report = await this.prisma.report.update({
 			where: { id },
 			data: {
-				...(options.xmlFileUrl !== undefined && {
-					xmlFileUrl: options.xmlFileUrl,
-				}),
 				...(options.pdfFileUrl !== undefined && {
 					pdfFileUrl: options.pdfFileUrl,
 				}),
@@ -341,40 +296,7 @@ export class ReportRepository {
 			},
 		});
 
-		// Update all alerts in this report to FILE_GENERATED status
-		await this.prisma.alert.updateMany({
-			where: {
-				reportId: id,
-				organizationId,
-				status: { notIn: ["CANCELLED", "SUBMITTED"] },
-			},
-			data: {
-				status: "FILE_GENERATED",
-				fileGeneratedAt: now,
-			},
-		});
-
 		return mapPrismaReport(report);
-	}
-
-	/**
-	 * Check if a report exists for the given period and type
-	 */
-	async existsForPeriod(
-		organizationId: string,
-		type: string,
-		periodStart: Date,
-		periodEnd: Date,
-	): Promise<boolean> {
-		const count = await this.prisma.report.count({
-			where: {
-				organizationId,
-				type: type as "MONTHLY" | "QUARTERLY" | "ANNUAL" | "CUSTOM",
-				periodStart,
-				periodEnd,
-			},
-		});
-		return count > 0;
 	}
 
 	private async ensureExists(

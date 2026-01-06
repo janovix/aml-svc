@@ -55,7 +55,12 @@ export const openAPISpec = {
 		{
 			name: "Reports",
 			description:
-				"Report management endpoints for generating monthly SAT XML reports and internal PDF reports",
+				"Report management endpoints for generating PDF analytics reports",
+		},
+		{
+			name: "Notices",
+			description:
+				"SAT notice management endpoints for generating and submitting XML reports to SAT (17-17 monthly cycle)",
 		},
 	],
 	paths: {
@@ -2391,6 +2396,384 @@ export const openAPISpec = {
 				},
 			},
 		},
+		// Notices endpoints
+		"/api/v1/notices": {
+			get: {
+				tags: ["Notices"],
+				summary: "List notices",
+				description:
+					"Retrieve a paginated list of SAT notices with optional filters.",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+					},
+					{
+						name: "status",
+						in: "query",
+						schema: {
+							type: "string",
+							enum: ["DRAFT", "GENERATED", "SUBMITTED", "ACKNOWLEDGED"],
+						},
+					},
+					{
+						name: "year",
+						in: "query",
+						schema: { type: "integer", minimum: 2020, maximum: 2100 },
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of notices",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/Notice" },
+										},
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Notices"],
+				summary: "Create a notice",
+				description:
+					"Create a new SAT notice for a specific month using the 17-17 cycle.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/NoticeCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Notice created",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Notice" },
+							},
+						},
+					},
+					"409": {
+						description: "A notice already exists for this period",
+					},
+				},
+			},
+		},
+		"/api/v1/notices/preview": {
+			get: {
+				tags: ["Notices"],
+				summary: "Preview alerts for a potential notice",
+				description:
+					"Get a preview of alerts that would be included in a notice for a given month.",
+				parameters: [
+					{
+						name: "year",
+						in: "query",
+						required: true,
+						schema: { type: "integer", minimum: 2020, maximum: 2100 },
+					},
+					{
+						name: "month",
+						in: "query",
+						required: true,
+						schema: { type: "integer", minimum: 1, maximum: 12 },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Preview data",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/NoticePreviewResponse" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/notices/available-months": {
+			get: {
+				tags: ["Notices"],
+				summary: "Get available months for notice creation",
+				description:
+					"Returns a list of months for which notices can be created (no existing notice).",
+				responses: {
+					"200": {
+						description: "Available months",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										months: {
+											type: "array",
+											items: {
+												type: "object",
+												properties: {
+													year: { type: "integer" },
+													month: { type: "integer" },
+													displayName: { type: "string" },
+													hasNotice: { type: "boolean" },
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/notices/{id}": {
+			get: {
+				tags: ["Notices"],
+				summary: "Get a notice by ID",
+				description: "Retrieve a single notice with alert summary.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Notice details",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/NoticeWithAlertSummary" },
+							},
+						},
+					},
+					"404": { description: "Notice not found" },
+				},
+			},
+			patch: {
+				tags: ["Notices"],
+				summary: "Update a notice",
+				description: "Update a notice's name, notes, or SAT folio number.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/NoticePatchRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Notice updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Notice" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["Notices"],
+				summary: "Delete a draft notice",
+				description: "Delete a notice (only allowed for DRAFT status).",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": { description: "Notice deleted" },
+					"400": { description: "Cannot delete non-draft notice" },
+				},
+			},
+		},
+		"/api/v1/notices/{id}/generate": {
+			post: {
+				tags: ["Notices"],
+				summary: "Generate XML file for a notice",
+				description:
+					"Generate the SAT XML file for a notice and mark it as GENERATED.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "XML generated",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										message: { type: "string" },
+										noticeId: { type: "string" },
+										alertCount: { type: "integer" },
+									},
+								},
+							},
+						},
+					},
+					"400": {
+						description: "Notice has already been generated or has no alerts",
+					},
+				},
+			},
+		},
+		"/api/v1/notices/{id}/download": {
+			get: {
+				tags: ["Notices"],
+				summary: "Get download URL for generated XML",
+				description: "Get the download URL for the generated SAT XML file.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Download URL",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										fileUrl: { type: "string" },
+										fileSize: { type: "integer", nullable: true },
+										format: { type: "string", enum: ["xml"] },
+									},
+								},
+							},
+						},
+					},
+					"400": { description: "Notice has not been generated yet" },
+					"404": { description: "Notice XML file not found" },
+				},
+			},
+		},
+		"/api/v1/notices/{id}/submit": {
+			post: {
+				tags: ["Notices"],
+				summary: "Mark notice as submitted to SAT",
+				description:
+					"Mark a GENERATED notice as submitted to SAT, optionally with a folio number.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								properties: {
+									satFolioNumber: { type: "string", maxLength: 100 },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Notice marked as submitted",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Notice" },
+							},
+						},
+					},
+					"400": {
+						description: "Notice must be generated before submission",
+					},
+				},
+			},
+		},
+		"/api/v1/notices/{id}/acknowledge": {
+			post: {
+				tags: ["Notices"],
+				summary: "Record SAT acknowledgment",
+				description:
+					"Mark a SUBMITTED notice as acknowledged by SAT with the folio number.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								required: ["satFolioNumber"],
+								properties: {
+									satFolioNumber: {
+										type: "string",
+										minLength: 1,
+										maxLength: 100,
+									},
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Acknowledgment recorded",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Notice" },
+							},
+						},
+					},
+					"400": {
+						description: "Notice must be submitted before acknowledgment",
+					},
+				},
+			},
+		},
 	},
 	components: {
 		schemas: {
@@ -4207,6 +4590,122 @@ export const openAPISpec = {
 					},
 					periodStart: { type: "string", format: "date-time" },
 					periodEnd: { type: "string", format: "date-time" },
+				},
+			},
+			// Notice schemas
+			NoticeStatus: {
+				type: "string",
+				enum: ["DRAFT", "GENERATED", "SUBMITTED", "ACKNOWLEDGED"],
+				description: "Status of a SAT notice",
+			},
+			Notice: {
+				type: "object",
+				required: [
+					"id",
+					"organizationId",
+					"name",
+					"status",
+					"periodStart",
+					"periodEnd",
+					"reportedMonth",
+					"recordCount",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: { type: "string" },
+					organizationId: { type: "string" },
+					name: { type: "string" },
+					status: { $ref: "#/components/schemas/NoticeStatus" },
+					periodStart: { type: "string", format: "date-time" },
+					periodEnd: { type: "string", format: "date-time" },
+					reportedMonth: {
+						type: "string",
+						pattern: "^\\d{6}$",
+						description: "YYYYMM format for the SAT reporting month",
+					},
+					recordCount: { type: "integer" },
+					xmlFileUrl: { type: "string", nullable: true },
+					fileSize: { type: "integer", nullable: true },
+					generatedAt: { type: "string", format: "date-time", nullable: true },
+					submittedAt: { type: "string", format: "date-time", nullable: true },
+					satFolioNumber: { type: "string", nullable: true },
+					createdBy: { type: "string", nullable: true },
+					notes: { type: "string", nullable: true },
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			NoticeWithAlertSummary: {
+				allOf: [
+					{ $ref: "#/components/schemas/Notice" },
+					{
+						type: "object",
+						properties: {
+							alertSummary: {
+								type: "object",
+								properties: {
+									total: { type: "integer" },
+									bySeverity: {
+										type: "object",
+										additionalProperties: { type: "integer" },
+									},
+									byStatus: {
+										type: "object",
+										additionalProperties: { type: "integer" },
+									},
+									byRule: {
+										type: "array",
+										items: {
+											type: "object",
+											properties: {
+												ruleId: { type: "string" },
+												ruleName: { type: "string" },
+												count: { type: "integer" },
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				],
+			},
+			NoticeCreateRequest: {
+				type: "object",
+				required: ["name", "year", "month"],
+				properties: {
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					year: { type: "integer", minimum: 2020, maximum: 2100 },
+					month: { type: "integer", minimum: 1, maximum: 12 },
+					notes: { type: "string", maxLength: 1000, nullable: true },
+				},
+			},
+			NoticePatchRequest: {
+				type: "object",
+				properties: {
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					notes: { type: "string", maxLength: 1000, nullable: true },
+					satFolioNumber: { type: "string", maxLength: 100, nullable: true },
+				},
+			},
+			NoticePreviewResponse: {
+				type: "object",
+				properties: {
+					total: { type: "integer" },
+					bySeverity: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					byStatus: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					periodStart: { type: "string", format: "date-time" },
+					periodEnd: { type: "string", format: "date-time" },
+					reportedMonth: { type: "string" },
+					displayName: { type: "string" },
+					submissionDeadline: { type: "string", format: "date-time" },
 				},
 			},
 		},

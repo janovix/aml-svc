@@ -32,6 +32,7 @@ export const ID_PREFIXES = {
 	UMA_VALUE: "UMA",
 	ORGANIZATION_SETTINGS: "ORG",
 	REPORT: "RPT",
+	NOTICE: "NTC",
 } as const;
 
 export type EntityType = keyof typeof ID_PREFIXES;

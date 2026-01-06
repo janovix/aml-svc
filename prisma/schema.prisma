@@ -87,6 +87,7 @@ model Client {
   addresses ClientAddress[]
   transactions Transaction[]
   alerts Alert[]
+  reports Report[]  // Reports targeting this specific client
 
   @@map("clients")
   @@index([organizationId])
@@ -245,18 +246,37 @@ enum AlertSeverity {
   CRITICAL
 }
 
-enum ReportType {
-  MONTHLY     // SAT regulatory compliance (XML output)
-  QUARTERLY   // Internal audit/review (PDF output)
-  ANNUAL      // Year-end compliance summary (PDF output)
-  CUSTOM      // Ad-hoc analysis (PDF output)
+// Notice status for SAT regulatory submissions
+enum NoticeStatus {
+  DRAFT        // Created, not yet generated
+  GENERATED    // XML file generated
+  SUBMITTED    // Sent to SAT
+  ACKNOWLEDGED // SAT acknowledged receipt
 }
 
+// Report types for analytics/business intelligence (all use calendar periods)
+enum ReportPeriodType {
+  MONTHLY     // Calendar month (1st-last day)
+  QUARTERLY   // Calendar quarter
+  ANNUAL      // Calendar year
+  CUSTOM      // Custom date range
+}
+
+// Report templates for common use cases
+enum ReportTemplate {
+  EXECUTIVE_SUMMARY      // High-level compliance overview
+  COMPLIANCE_STATUS      // Audit-ready compliance report
+  TRANSACTION_ANALYSIS   // Transaction volume & patterns
+  CLIENT_RISK_PROFILE    // Deep-dive on specific client
+  ALERT_BREAKDOWN        // Alert management metrics
+  PERIOD_COMPARISON      // Trend analysis
+  CUSTOM                 // User-defined report
+}
+
+// Report status (simplified - no SAT workflow)
 enum ReportStatus {
   DRAFT        // Created, not yet generated
-  GENERATED    // File (XML/PDF) generated
-  SUBMITTED    // Sent to SAT (MONTHLY only)
-  ACKNOWLEDGED // SAT acknowledged receipt (MONTHLY only)
+  GENERATED    // PDF generated
 }
 
 model AlertRule {
@@ -307,7 +327,8 @@ model Alert {
   organizationId    String      // Organization this alert belongs to (from auth-svc)
   alertRuleId       String
   clientId          String
-  reportId          String?     // Optional reference to the report this alert is included in
+  reportId          String?     // Optional reference to analytics report (PDF)
+  noticeId          String?     // Optional reference to SAT notice (XML)
   status            AlertStatus @default(DETECTED)
   severity          AlertSeverity
   // Idempotency key: hash of (clientId + alertRuleId + contextHash)
@@ -322,9 +343,9 @@ model Alert {
   transactionId     String?     // Renamed from triggerTransactionId
   isManual          Boolean     @default(false) // True if manually created
   
-  // SAT Submission tracking
+  // SAT Submission tracking (managed via Notice)
   submissionDeadline DateTime?  // Deadline for SAT submission (day 17 of following month for avisos, 24h for suspicion)
-  fileGeneratedAt    DateTime?  // When the SAT file was generated (via report)
+  fileGeneratedAt    DateTime?  // When the SAT file was generated (via notice)
   submittedAt        DateTime?  // When submitted to SAT
   satAcknowledgmentReceipt String? // File URL or reference to SAT acknowledgment (PDF/XML)
   satFolioNumber     String?   // Folio number from SAT acknowledgment
@@ -344,12 +365,14 @@ model Alert {
   alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Restrict)
   client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   report    Report?   @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  notice    Notice?   @relation(fields: [noticeId], references: [id], onDelete: SetNull)
 
   @@map("alerts")
   @@index([organizationId])
   @@index([alertRuleId])
   @@index([clientId])
   @@index([reportId])
+  @@index([noticeId])
   @@index([status])
   @@index([severity])
   @@index([createdAt])
@@ -395,41 +418,87 @@ model OrganizationSettings {
   @@index([activityKey])
 }
 
-// Report - Monthly SAT reports (XML) and internal reports (PDF)
-model Report {
+// Notice - SAT regulatory submissions (avisos) with 17-17 period handling
+model Notice {
   id              String       @id
-  organizationId  String       // Organization this report belongs to
-  name            String       // Display name (e.g., "Reporte Mensual Diciembre 2024")
-  type            ReportType   @default(MONTHLY)
-  status          ReportStatus @default(DRAFT)
-  periodStart     DateTime     // Start of reporting period
-  periodEnd       DateTime     // End of reporting period
-  reportedMonth   String       // YYYYMM format for SAT (MONTHLY) or period identifier
+  organizationId  String       // Organization this notice belongs to
+  name            String       // Display name (e.g., "Aviso Diciembre 2024")
+  status          NoticeStatus @default(DRAFT)
+  periodStart     DateTime     // Day 17 of previous month
+  periodEnd       DateTime     // Day 16 of current month
+  reportedMonth   String       // YYYYMM format for SAT
   recordCount     Int          @default(0) // Number of alerts included
   
-  // File outputs
-  // MONTHLY reports have both XML (for SAT) and PDF (for internal use)
-  // QUARTERLY/ANNUAL/CUSTOM reports have PDF only
-  xmlFileUrl      String?      // R2 URL of SAT XML (MONTHLY only)
-  pdfFileUrl      String?      // R2 URL of PDF report (all report types)
-  fileSize        Int?         // XML file size in bytes (MONTHLY)
-  pdfFileSize     Int?         // PDF file size in bytes
+  // XML file output
+  xmlFileUrl      String?      // R2 URL of SAT XML
+  fileSize        Int?         // XML file size in bytes
   
-  generatedAt     DateTime?    // When the file was generated
-  submittedAt     DateTime?    // Only for MONTHLY (SAT submission date)
-  satFolioNumber  String?      // Only for MONTHLY (SAT acknowledgment folio)
-  createdBy       String?      // User ID who created the report
+  generatedAt     DateTime?    // When the XML was generated
+  submittedAt     DateTime?    // When submitted to SAT
+  satFolioNumber  String?      // SAT acknowledgment folio number
+  createdBy       String?      // User ID who created the notice
   notes           String?      // Optional notes
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  alerts          Alert[]      // Alerts included in this report
+  alerts          Alert[]      // Alerts included in this notice
 
-  @@map("reports")
+  @@map("notices")
   @@index([organizationId])
-  @@index([type])
   @@index([status])
   @@index([periodStart])
   @@index([periodEnd])
   @@index([reportedMonth])
+}
+
+// Report - Analytics and business intelligence reports (PDF)
+model Report {
+  id              String           @id
+  organizationId  String           // Organization this report belongs to
+  name            String           // Display name (e.g., "Monthly Report December 2024")
+  
+  // Report configuration
+  template        ReportTemplate   @default(CUSTOM)
+  periodType      ReportPeriodType @default(CUSTOM)
+  periodStart     DateTime         // Start of reporting period
+  periodEnd       DateTime         // End of reporting period
+  
+  // Optional comparison period for trend analysis
+  comparisonPeriodStart DateTime?
+  comparisonPeriodEnd   DateTime?
+  
+  // Data sources and filtering (stored as JSON)
+  dataSources     String           @default("[\"ALERTS\"]") // JSON array: ["ALERTS", "TRANSACTIONS", "CLIENTS"]
+  filters         String           @default("{}") // JSON object with filter configuration
+  clientId        String?          // For CLIENT_RISK_PROFILE template
+  
+  // Visualization settings (stored as JSON)
+  charts          String           @default("[]") // JSON array of chart configurations
+  includeSummaryCards  Boolean     @default(true)
+  includeDetailTables  Boolean     @default(true)
+  
+  // Report state
+  status          ReportStatus     @default(DRAFT)
+  
+  // PDF output
+  pdfFileUrl      String?          // R2 URL of PDF report
+  fileSize        Int?             // PDF file size in bytes
+  
+  generatedAt     DateTime?        // When the PDF was generated
+  createdBy       String?          // User ID who created the report
+  notes           String?          // Optional notes
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  alerts          Alert[]          // Alerts included in this report (for filtering/aggregation)
+  client          Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@map("reports")
+  @@index([organizationId])
+  @@index([template])
+  @@index([periodType])
+  @@index([status])
+  @@index([periodStart])
+  @@index([periodEnd])
+  @@index([clientId])
 }
