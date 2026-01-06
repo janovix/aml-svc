@@ -2621,7 +2621,7 @@ export const openAPISpec = {
 				tags: ["Notices"],
 				summary: "Generate XML file for a notice",
 				description:
-					"Generate the SAT XML file for a notice and mark it as GENERATED.",
+					"Generate the SAT XML file for a notice, upload it to R2 storage, and mark it as GENERATED. Requires organization settings (RFC and activity code) to be configured.",
 				parameters: [
 					{
 						name: "id",
@@ -2632,7 +2632,7 @@ export const openAPISpec = {
 				],
 				responses: {
 					"200": {
-						description: "XML generated",
+						description: "XML generated and uploaded successfully",
 						content: {
 							"application/json": {
 								schema: {
@@ -2641,13 +2641,23 @@ export const openAPISpec = {
 										message: { type: "string" },
 										noticeId: { type: "string" },
 										alertCount: { type: "integer" },
+										fileSize: {
+											type: "integer",
+											description: "Size of the generated XML file in bytes",
+										},
+										xmlFileUrl: {
+											type: "string",
+											nullable: true,
+											description: "R2 storage path of the XML file",
+										},
 									},
 								},
 							},
 						},
 					},
 					"400": {
-						description: "Notice has already been generated or has no alerts",
+						description:
+							"Notice has already been generated, has no alerts, has no valid alerts with transactions, or organization settings not configured",
 					},
 				},
 			},
@@ -2655,8 +2665,9 @@ export const openAPISpec = {
 		"/api/v1/notices/{id}/download": {
 			get: {
 				tags: ["Notices"],
-				summary: "Get download URL for generated XML",
-				description: "Get the download URL for the generated SAT XML file.",
+				summary: "Download the generated SAT XML file",
+				description:
+					"Download the generated SAT XML file directly from R2 storage. Returns the XML file as a downloadable attachment.",
 				parameters: [
 					{
 						name: "id",
@@ -2667,11 +2678,19 @@ export const openAPISpec = {
 				],
 				responses: {
 					"200": {
-						description: "Download URL",
+						description: "XML file download",
 						content: {
+							"application/xml": {
+								schema: {
+									type: "string",
+									format: "binary",
+									description: "The SAT XML file content",
+								},
+							},
 							"application/json": {
 								schema: {
 									type: "object",
+									description: "Fallback response when R2 is not available",
 									properties: {
 										fileUrl: { type: "string" },
 										fileSize: { type: "integer", nullable: true },

@@ -275,6 +275,7 @@ export class NoticeRepository {
 
 	/**
 	 * Get all alerts for a notice (for XML generation)
+	 * Returns alerts with their associated client and alertRule
 	 */
 	async getAlertsForNotice(organizationId: string, noticeId: string) {
 		return this.prisma.alert.findMany({
@@ -285,6 +286,52 @@ export class NoticeRepository {
 			},
 			orderBy: { createdAt: "asc" },
 		});
+	}
+
+	/**
+	 * Get all alerts for a notice with their transactions (for XML generation)
+	 * Fetches alerts with client, alertRule, and their linked transactions
+	 */
+	async getAlertsWithTransactionsForNotice(
+		organizationId: string,
+		noticeId: string,
+	) {
+		// Get alerts with client and alertRule
+		const alerts = await this.prisma.alert.findMany({
+			where: { noticeId, organizationId },
+			include: {
+				alertRule: true,
+				client: true,
+			},
+			orderBy: { createdAt: "asc" },
+		});
+
+		// Get transaction IDs from alerts (filter out null/undefined)
+		const transactionIds = alerts
+			.map((a) => a.transactionId)
+			.filter((id): id is string => id != null);
+
+		// Fetch transactions in batch
+		const transactions = await this.prisma.transaction.findMany({
+			where: {
+				id: { in: transactionIds },
+				organizationId,
+			},
+			include: {
+				paymentMethods: true,
+			},
+		});
+
+		// Create a map for quick lookup
+		const transactionMap = new Map(transactions.map((t) => [t.id, t]));
+
+		// Attach transactions to alerts
+		return alerts.map((alert) => ({
+			...alert,
+			transaction: alert.transactionId
+				? (transactionMap.get(alert.transactionId) ?? null)
+				: null,
+		}));
 	}
 
 	/**

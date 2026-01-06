@@ -13,10 +13,22 @@ import {
 	NoticeSubmitSchema,
 	NoticeAcknowledgeSchema,
 } from "../domain/notice";
+import { mapPrismaClient } from "../domain/client/mappers";
+import { mapPrismaTransaction } from "../domain/transaction/mappers";
+import { mapPrismaAlert, mapPrismaAlertRule } from "../domain/alert/mappers";
+import {
+	OrganizationSettingsRepository,
+	OrganizationSettingsService,
+} from "../domain/organization-settings";
 import type { Bindings } from "../index";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import {
+	generateMonthlyReportXml,
+	mapToSatVehicleNoticeData,
+	type SatMonthlyReportData,
+} from "../lib/sat-xml-generator";
 
 export const noticesRouter = new Hono<{
 	Bindings: Bindings;
@@ -181,28 +193,122 @@ noticesRouter.post("/:id/generate", async (c) => {
 		throw new APIError(400, "Notice has already been generated");
 	}
 
-	// Get alerts for the notice
-	const alerts = await service.getAlertsForNotice(organizationId, params.id);
+	// Get alerts with transactions for XML generation
+	const alertsWithTransactions =
+		await service.getAlertsWithTransactionsForNotice(organizationId, params.id);
 
-	if (alerts.length === 0) {
+	if (alertsWithTransactions.length === 0) {
 		throw new APIError(400, "Notice has no alerts to include");
 	}
 
-	// Mark the notice as generated
-	// Note: R2 file upload can be implemented later when needed
+	// Get organization settings (RFC and activity code)
+	const prisma = getPrismaClient(c.env.DB);
+	const orgSettingsRepo = new OrganizationSettingsRepository(prisma);
+	const orgSettingsService = new OrganizationSettingsService(orgSettingsRepo);
+	const orgSettings =
+		await orgSettingsService.getByOrganizationId(organizationId);
+
+	if (!orgSettings) {
+		throw new APIError(
+			400,
+			"Organization settings not configured. Please configure RFC and activity code first.",
+		);
+	}
+
+	// Build SAT monthly report data
+	const avisos = alertsWithTransactions
+		.filter((alert) => alert.transaction && alert.client)
+		.map((alert) => {
+			const clientEntity = mapPrismaClient(alert.client);
+			const transactionEntity = mapPrismaTransaction(alert.transaction!);
+			const alertEntity = {
+				...mapPrismaAlert(alert),
+				alertRule: alert.alertRule
+					? mapPrismaAlertRule(alert.alertRule)
+					: undefined,
+			};
+
+			return mapToSatVehicleNoticeData(
+				alertEntity,
+				clientEntity,
+				transactionEntity,
+				{
+					obligatedSubjectKey: orgSettings.obligatedSubjectKey,
+					activityKey: orgSettings.activityKey,
+					noticeReference: alert.id,
+					priority: "1",
+					alertType: alert.alertRule?.id ?? "803",
+					operationType: transactionEntity.operationTypeCode ?? "802",
+					currency: transactionEntity.currencyCode ?? "3",
+					vehicleType:
+						transactionEntity.vehicleType === "land"
+							? "terrestre"
+							: transactionEntity.vehicleType === "marine"
+								? "maritimo"
+								: "aereo",
+					brand: transactionEntity.brand,
+					nationalityCountry:
+						clientEntity.countryCode ?? clientEntity.nationality ?? undefined,
+					economicActivity: clientEntity.economicActivityCode ?? undefined,
+				},
+			);
+		});
+
+	if (avisos.length === 0) {
+		throw new APIError(
+			400,
+			"No valid alerts with transactions found for XML generation",
+		);
+	}
+
+	// Generate the XML
+	const reportData: SatMonthlyReportData = {
+		reportedMonth: notice.reportedMonth,
+		obligatedSubjectKey: orgSettings.obligatedSubjectKey,
+		activityKey: orgSettings.activityKey,
+		avisos,
+	};
+
+	const xmlContent = generateMonthlyReportXml(reportData);
+	const xmlBytes = new TextEncoder().encode(xmlContent);
+	const fileSize = xmlBytes.length;
+
+	// Upload to R2 if bucket is available
+	let xmlFileUrl: string | null = null;
+
+	if (c.env.R2_BUCKET) {
+		const fileName = `notices/${organizationId}/${notice.id}_${notice.reportedMonth}.xml`;
+		await c.env.R2_BUCKET.put(fileName, xmlBytes, {
+			httpMetadata: {
+				contentType: "application/xml",
+			},
+			customMetadata: {
+				noticeId: notice.id,
+				organizationId,
+				reportedMonth: notice.reportedMonth,
+				generatedAt: new Date().toISOString(),
+			},
+		});
+		// Construct the R2 public URL or use a signed URL in production
+		xmlFileUrl = fileName;
+	}
+
+	// Mark the notice as generated with file info
 	await service.markAsGenerated(organizationId, params.id, {
-		xmlFileUrl: null,
-		fileSize: null,
+		xmlFileUrl,
+		fileSize,
 	});
 
 	return c.json({
 		message: "XML generation complete",
 		noticeId: notice.id,
-		alertCount: alerts.length,
+		alertCount: avisos.length,
+		fileSize,
+		xmlFileUrl,
 	});
 });
 
-// GET /notices/:id/download - Get download URL for generated XML file
+// GET /notices/:id/download - Download the generated XML file
 noticesRouter.get("/:id/download", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
@@ -220,6 +326,26 @@ noticesRouter.get("/:id/download", async (c) => {
 		throw new APIError(404, "Notice XML file not found");
 	}
 
+	// Fetch from R2 if available
+	if (c.env.R2_BUCKET) {
+		const file = await c.env.R2_BUCKET.get(notice.xmlFileUrl);
+
+		if (!file) {
+			throw new APIError(404, "Notice XML file not found in storage");
+		}
+
+		const fileName = `aviso_${notice.reportedMonth}_${notice.id}.xml`;
+
+		return new Response(file.body, {
+			headers: {
+				"Content-Type": "application/xml",
+				"Content-Disposition": `attachment; filename="${fileName}"`,
+				"Content-Length": String(file.size),
+			},
+		});
+	}
+
+	// Fallback: return file URL for external download
 	return c.json({
 		fileUrl: notice.xmlFileUrl,
 		fileSize: notice.fileSize,

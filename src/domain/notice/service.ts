@@ -166,6 +166,20 @@ export class NoticeService {
 	}
 
 	/**
+	 * Get alerts with transactions for a notice (for XML generation)
+	 * Includes client, alertRule, and transaction data needed for SAT XML
+	 */
+	async getAlertsWithTransactionsForNotice(
+		organizationId: string,
+		noticeId: string,
+	) {
+		return this.repository.getAlertsWithTransactionsForNotice(
+			organizationId,
+			noticeId,
+		);
+	}
+
+	/**
 	 * Mark a notice as generated with XML file URL
 	 */
 	async markAsGenerated(
