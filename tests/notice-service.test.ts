@@ -25,7 +25,8 @@ describe("NoticeService", () => {
 		markAsGenerated: vi.fn(),
 		markAsSubmitted: vi.fn(),
 		markAsAcknowledged: vi.fn(),
-		existsForPeriod: vi.fn(),
+		hasPendingNoticeForPeriod: vi.fn(),
+		getNoticeStatsForPeriod: vi.fn(),
 		getAlertsForNotice: vi.fn(),
 	} as unknown as NoticeRepository;
 
@@ -115,7 +116,9 @@ describe("NoticeService", () => {
 		};
 
 		it("should create a notice and assign alerts", async () => {
-			vi.mocked(mockRepository.existsForPeriod).mockResolvedValue(false);
+			vi.mocked(mockRepository.hasPendingNoticeForPeriod).mockResolvedValue(
+				false,
+			);
 			vi.mocked(mockRepository.create).mockResolvedValue(mockNotice);
 			vi.mocked(mockRepository.assignAlertsToNotice).mockResolvedValue(5);
 
@@ -123,7 +126,7 @@ describe("NoticeService", () => {
 			const result = await service.create(createInput, organizationId, userId);
 
 			expect(result).toEqual({ ...mockNotice, recordCount: 5 });
-			expect(mockRepository.existsForPeriod).toHaveBeenCalledWith(
+			expect(mockRepository.hasPendingNoticeForPeriod).toHaveBeenCalledWith(
 				organizationId,
 				"202401", // calculated from year/month
 			);
@@ -131,14 +134,31 @@ describe("NoticeService", () => {
 			expect(mockRepository.assignAlertsToNotice).toHaveBeenCalled();
 		});
 
-		it("should throw error if notice already exists for period", async () => {
-			vi.mocked(mockRepository.existsForPeriod).mockResolvedValue(true);
+		it("should throw error if pending notice exists for period", async () => {
+			vi.mocked(mockRepository.hasPendingNoticeForPeriod).mockResolvedValue(
+				true,
+			);
 
 			const service = new NoticeService(mockRepository);
 
 			await expect(
 				service.create(createInput, organizationId, userId),
 			).rejects.toThrow("NOTICE_ALREADY_EXISTS_FOR_PERIOD");
+		});
+
+		it("should allow creating notice when only submitted notices exist", async () => {
+			// This is the new behavior - allow new notices if existing ones are already submitted
+			vi.mocked(mockRepository.hasPendingNoticeForPeriod).mockResolvedValue(
+				false,
+			);
+			vi.mocked(mockRepository.create).mockResolvedValue(mockNotice);
+			vi.mocked(mockRepository.assignAlertsToNotice).mockResolvedValue(3);
+
+			const service = new NoticeService(mockRepository);
+			const result = await service.create(createInput, organizationId, userId);
+
+			expect(result.recordCount).toBe(3);
+			expect(mockRepository.hasPendingNoticeForPeriod).toHaveBeenCalled();
 		});
 	});
 

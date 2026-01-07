@@ -100,6 +100,8 @@ export class NoticeService {
 	/**
 	 * Create a new notice
 	 * Automatically calculates the 17-17 period from year/month
+	 * Allows creating multiple notices for the same period as long as
+	 * there is no pending (DRAFT/GENERATED) notice
 	 */
 	async create(
 		input: NoticeCreateInput,
@@ -108,13 +110,14 @@ export class NoticeService {
 	): Promise<NoticeEntity> {
 		const period = calculateNoticePeriod(input.year, input.month);
 
-		// Check if a notice already exists for this period
-		const exists = await this.repository.existsForPeriod(
+		// Check if a pending notice exists for this period
+		// Only block if there's a DRAFT or GENERATED notice in progress
+		const hasPending = await this.repository.hasPendingNoticeForPeriod(
 			organizationId,
 			period.reportedMonth,
 		);
 
-		if (exists) {
+		if (hasPending) {
 			throw new Error("NOTICE_ALREADY_EXISTS_FOR_PERIOD");
 		}
 
@@ -237,7 +240,11 @@ export class NoticeService {
 
 	/**
 	 * Get available months for creating notices
-	 * Returns the past 12 months that don't already have a notice
+	 * Returns the past 12 months with status information:
+	 * - hasPendingNotice: true if there's a DRAFT/GENERATED notice (blocks creation)
+	 * - hasSubmittedNotice: true if there's a SUBMITTED/ACKNOWLEDGED notice
+	 * - noticeCount: total number of notices for this period
+	 * - hasNotice: kept for backward compatibility (true if hasPendingNotice)
 	 */
 	async getAvailableMonths(organizationId: string): Promise<
 		Array<{
@@ -245,6 +252,9 @@ export class NoticeService {
 			month: number;
 			displayName: string;
 			hasNotice: boolean;
+			hasPendingNotice: boolean;
+			hasSubmittedNotice: boolean;
+			noticeCount: number;
 		}>
 	> {
 		const now = new Date();
@@ -253,6 +263,9 @@ export class NoticeService {
 			month: number;
 			displayName: string;
 			hasNotice: boolean;
+			hasPendingNotice: boolean;
+			hasSubmittedNotice: boolean;
+			noticeCount: number;
 		}> = [];
 
 		for (let i = 0; i < 12; i++) {
@@ -262,7 +275,7 @@ export class NoticeService {
 			const reportedMonth = `${year}${String(month).padStart(2, "0")}`;
 			const displayName = `${MONTH_NAMES_ES[month - 1]} ${year}`;
 
-			const hasNotice = await this.repository.existsForPeriod(
+			const stats = await this.repository.getNoticeStatsForPeriod(
 				organizationId,
 				reportedMonth,
 			);
@@ -271,7 +284,11 @@ export class NoticeService {
 				year,
 				month,
 				displayName,
-				hasNotice,
+				// hasNotice now means "blocks creation" - only pending notices block
+				hasNotice: stats.hasPendingNotice,
+				hasPendingNotice: stats.hasPendingNotice,
+				hasSubmittedNotice: stats.hasSubmittedNotice,
+				noticeCount: stats.noticeCount,
 			});
 		}
 

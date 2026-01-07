@@ -458,9 +458,10 @@ export class NoticeRepository {
 	}
 
 	/**
-	 * Check if a notice exists for the given period
+	 * Check if a pending (DRAFT or GENERATED) notice exists for the given period
+	 * Only pending notices block creation of new notices for the same period
 	 */
-	async existsForPeriod(
+	async hasPendingNoticeForPeriod(
 		organizationId: string,
 		reportedMonth: string,
 	): Promise<boolean> {
@@ -468,9 +469,46 @@ export class NoticeRepository {
 			where: {
 				organizationId,
 				reportedMonth,
+				status: { in: ["DRAFT", "GENERATED"] },
 			},
 		});
 		return count > 0;
+	}
+
+	/**
+	 * Get notice statistics for a given period
+	 * Returns counts of notices by status for UI display
+	 */
+	async getNoticeStatsForPeriod(
+		organizationId: string,
+		reportedMonth: string,
+	): Promise<{
+		hasPendingNotice: boolean;
+		hasSubmittedNotice: boolean;
+		noticeCount: number;
+	}> {
+		const notices = await this.prisma.notice.findMany({
+			where: {
+				organizationId,
+				reportedMonth,
+			},
+			select: {
+				status: true,
+			},
+		});
+
+		const hasPendingNotice = notices.some(
+			(n) => n.status === "DRAFT" || n.status === "GENERATED",
+		);
+		const hasSubmittedNotice = notices.some(
+			(n) => n.status === "SUBMITTED" || n.status === "ACKNOWLEDGED",
+		);
+
+		return {
+			hasPendingNotice,
+			hasSubmittedNotice,
+			noticeCount: notices.length,
+		};
 	}
 
 	private async ensureExists(

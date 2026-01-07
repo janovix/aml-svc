@@ -13,11 +13,19 @@ import {
 	ReportAggregationQuerySchema,
 	getTemplateConfigs,
 } from "../domain/report";
+import {
+	OrganizationSettingsService,
+	OrganizationSettingsRepository,
+} from "../domain/organization-settings";
 import type { Bindings } from "../index";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { ReportAggregator } from "../lib/report-aggregator";
+import {
+	generatePdfReportHtml,
+	type AlertSummaryForPdf,
+} from "../lib/pdf-report-generator";
 
 export const reportsRouter = new Hono<{
 	Bindings: Bindings;
@@ -51,6 +59,14 @@ function getAggregator(
 ) {
 	const prisma = getPrismaClient(c.env.DB);
 	return new ReportAggregator(prisma);
+}
+
+function getOrganizationSettingsService(
+	c: Context<{ Bindings: Bindings; Variables: AuthVariables }>,
+) {
+	const prisma = getPrismaClient(c.env.DB);
+	const repository = new OrganizationSettingsRepository(prisma);
+	return new OrganizationSettingsService(repository);
 }
 
 function handleServiceError(error: unknown): never {
@@ -258,10 +274,93 @@ reportsRouter.post("/:id/generate", async (c) => {
 	// Get the alert count from the summary
 	const alertCount = report.alertSummary?.total ?? 0;
 
-	// Mark the report as generated
+	// Get organization settings for the organization name and RFC
+	const orgSettingsService = getOrganizationSettingsService(c);
+	const orgSettings =
+		await orgSettingsService.getByOrganizationId(organizationId);
+
+	// Get the aggregation data for the report
+	const aggregator = getAggregator(c);
+	const aggregation = await aggregator.aggregate({
+		organizationId,
+		periodStart: new Date(report.periodStart),
+		periodEnd: new Date(report.periodEnd),
+		comparisonPeriodStart: report.comparisonPeriodStart
+			? new Date(report.comparisonPeriodStart)
+			: undefined,
+		comparisonPeriodEnd: report.comparisonPeriodEnd
+			? new Date(report.comparisonPeriodEnd)
+			: undefined,
+		dataSources: report.dataSources,
+		filters: report.filters,
+		clientId: report.clientId ?? undefined,
+	});
+
+	// Get alerts for PDF detail table
+	const prisma = getPrismaClient(c.env.DB);
+	const alerts = await prisma.alert.findMany({
+		where: {
+			organizationId,
+			createdAt: {
+				gte: new Date(report.periodStart),
+				lte: new Date(report.periodEnd),
+			},
+		},
+		include: {
+			alertRule: true,
+			client: true,
+		},
+		orderBy: { createdAt: "desc" },
+		take: 100, // Limit for PDF size
+	});
+
+	// Map alerts to PDF format
+	const alertsForPdf: AlertSummaryForPdf[] = alerts.map((alert) => ({
+		id: alert.id,
+		alertRuleId: alert.alertRuleId,
+		alertRuleName: alert.alertRule?.name || alert.alertRuleId,
+		clientId: alert.clientId || "",
+		clientName: alert.client
+			? alert.client.businessName ||
+				`${alert.client.firstName || ""} ${alert.client.lastName || ""}`.trim()
+			: "Unknown",
+		severity: alert.severity,
+		status: alert.status,
+		createdAt: alert.createdAt.toISOString(),
+		amount: undefined, // Transaction amount not available via relation
+	}));
+
+	// Generate the HTML report - extract report entity without alertSummary
+	const generatedAt = new Date().toISOString();
+	const { alertSummary: _alertSummary, ...reportEntity } = report;
+	const htmlContent = generatePdfReportHtml({
+		report: reportEntity,
+		organizationName:
+			orgSettings?.obligatedSubjectKey || `Organization ${organizationId}`,
+		organizationRfc: orgSettings?.activityKey || "N/A",
+		alerts: alertsForPdf,
+		aggregation,
+		generatedAt,
+	});
+
+	// Upload to R2 if bucket is available
+	let pdfFileUrl: string | null = null;
+	const fileSize = new TextEncoder().encode(htmlContent).length;
+
+	if (c.env.R2_BUCKET) {
+		const filename = `reports/${organizationId}/${report.id}_${report.periodStart.substring(0, 10)}_${report.periodEnd.substring(0, 10)}.html`;
+		await c.env.R2_BUCKET.put(filename, htmlContent, {
+			httpMetadata: {
+				contentType: "text/html; charset=utf-8",
+			},
+		});
+		pdfFileUrl = filename;
+	}
+
+	// Mark the report as generated with the file URL
 	await service.markAsGenerated(organizationId, params.id, {
-		pdfFileUrl: null,
-		fileSize: null,
+		pdfFileUrl,
+		fileSize,
 	});
 
 	return c.json({
@@ -269,10 +368,11 @@ reportsRouter.post("/:id/generate", async (c) => {
 		reportId: report.id,
 		alertCount,
 		types: ["PDF"],
+		...(pdfFileUrl && { fileUrl: pdfFileUrl }),
 	});
 });
 
-// GET /reports/:id/download - Get download URL for generated PDF
+// GET /reports/:id/download - Download the generated report file
 reportsRouter.get("/:id/download", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ReportIdParamSchema, c.req.param());
@@ -287,14 +387,38 @@ reportsRouter.get("/:id/download", async (c) => {
 	}
 
 	if (!report.pdfFileUrl) {
-		throw new APIError(404, "Report PDF file not found");
+		throw new APIError(404, "Report file not found");
 	}
 
-	return c.json({
-		fileUrl: report.pdfFileUrl,
-		fileSize: report.fileSize,
-		format: "pdf",
-	});
+	// Check if R2 bucket is available
+	if (!c.env.R2_BUCKET) {
+		// Fallback: return file info for external download
+		return c.json({
+			fileUrl: report.pdfFileUrl,
+			fileSize: report.fileSize,
+			format: "html",
+		});
+	}
+
+	// Try to fetch from R2
+	const file = await c.env.R2_BUCKET.get(report.pdfFileUrl);
+
+	if (file) {
+		// Extract filename for Content-Disposition
+		const urlParts = report.pdfFileUrl.split("/");
+		const filename = urlParts[urlParts.length - 1];
+
+		return new Response(file.body, {
+			headers: {
+				"Content-Type": "text/html; charset=utf-8",
+				"Content-Disposition": `attachment; filename="${filename}"`,
+				"Content-Length": String(file.size),
+			},
+		});
+	}
+
+	// File not found in R2
+	throw new APIError(404, "Report file not found in storage");
 });
 
 // GET /reports/:id/aggregation - Get aggregation data for a report

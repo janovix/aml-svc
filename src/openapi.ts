@@ -2530,7 +2530,26 @@ export const openAPISpec = {
 													year: { type: "integer" },
 													month: { type: "integer" },
 													displayName: { type: "string" },
-													hasNotice: { type: "boolean" },
+													hasNotice: {
+														type: "boolean",
+														description:
+															"True if a pending notice exists (blocks creation)",
+													},
+													hasPendingNotice: {
+														type: "boolean",
+														description:
+															"True if there is a DRAFT or GENERATED notice for this period",
+													},
+													hasSubmittedNotice: {
+														type: "boolean",
+														description:
+															"True if there is a SUBMITTED or ACKNOWLEDGED notice for this period",
+													},
+													noticeCount: {
+														type: "integer",
+														description:
+															"Total number of notices for this period",
+													},
 												},
 											},
 										},

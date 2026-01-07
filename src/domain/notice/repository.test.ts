@@ -626,24 +626,166 @@ describe("NoticeRepository", () => {
 		});
 	});
 
-	describe("existsForPeriod", () => {
-		it("returns true if notice exists for period", async () => {
+	describe("hasPendingNoticeForPeriod", () => {
+		it("returns true if a DRAFT notice exists for period", async () => {
 			vi.mocked(prisma.notice.count).mockResolvedValue(1);
 
-			const result = await repository.existsForPeriod("org_123", "202401");
+			const result = await repository.hasPendingNoticeForPeriod(
+				"org_123",
+				"202401",
+			);
 
 			expect(result).toBe(true);
 			expect(prisma.notice.count).toHaveBeenCalledWith({
-				where: { organizationId: "org_123", reportedMonth: "202401" },
+				where: {
+					organizationId: "org_123",
+					reportedMonth: "202401",
+					status: { in: ["DRAFT", "GENERATED"] },
+				},
 			});
 		});
 
-		it("returns false if no notice exists for period", async () => {
+		it("returns true if a GENERATED notice exists for period", async () => {
+			vi.mocked(prisma.notice.count).mockResolvedValue(1);
+
+			const result = await repository.hasPendingNoticeForPeriod(
+				"org_123",
+				"202401",
+			);
+
+			expect(result).toBe(true);
+		});
+
+		it("returns false if no pending notice exists for period", async () => {
 			vi.mocked(prisma.notice.count).mockResolvedValue(0);
 
-			const result = await repository.existsForPeriod("org_123", "202401");
+			const result = await repository.hasPendingNoticeForPeriod(
+				"org_123",
+				"202401",
+			);
 
 			expect(result).toBe(false);
+		});
+	});
+
+	describe("getNoticeStatsForPeriod", () => {
+		it("returns correct stats when no notices exist", async () => {
+			vi.mocked(prisma.notice.findMany).mockResolvedValue([]);
+
+			const result = await repository.getNoticeStatsForPeriod(
+				"org_123",
+				"202401",
+			);
+
+			expect(result).toEqual({
+				hasPendingNotice: false,
+				hasSubmittedNotice: false,
+				noticeCount: 0,
+			});
+		});
+
+		it("returns hasPendingNotice true for DRAFT notice", async () => {
+			vi.mocked(prisma.notice.findMany).mockResolvedValue([
+				{ status: "DRAFT" as PrismaNoticeStatus },
+			] as Notice[]);
+
+			const result = await repository.getNoticeStatsForPeriod(
+				"org_123",
+				"202401",
+			);
+
+			expect(result).toEqual({
+				hasPendingNotice: true,
+				hasSubmittedNotice: false,
+				noticeCount: 1,
+			});
+		});
+
+		it("returns hasPendingNotice true for GENERATED notice", async () => {
+			vi.mocked(prisma.notice.findMany).mockResolvedValue([
+				{ status: "GENERATED" as PrismaNoticeStatus },
+			] as Notice[]);
+
+			const result = await repository.getNoticeStatsForPeriod(
+				"org_123",
+				"202401",
+			);
+
+			expect(result).toEqual({
+				hasPendingNotice: true,
+				hasSubmittedNotice: false,
+				noticeCount: 1,
+			});
+		});
+
+		it("returns hasSubmittedNotice true for SUBMITTED notice", async () => {
+			vi.mocked(prisma.notice.findMany).mockResolvedValue([
+				{ status: "SUBMITTED" as PrismaNoticeStatus },
+			] as Notice[]);
+
+			const result = await repository.getNoticeStatsForPeriod(
+				"org_123",
+				"202401",
+			);
+
+			expect(result).toEqual({
+				hasPendingNotice: false,
+				hasSubmittedNotice: true,
+				noticeCount: 1,
+			});
+		});
+
+		it("returns hasSubmittedNotice true for ACKNOWLEDGED notice", async () => {
+			vi.mocked(prisma.notice.findMany).mockResolvedValue([
+				{ status: "ACKNOWLEDGED" as PrismaNoticeStatus },
+			] as Notice[]);
+
+			const result = await repository.getNoticeStatsForPeriod(
+				"org_123",
+				"202401",
+			);
+
+			expect(result).toEqual({
+				hasPendingNotice: false,
+				hasSubmittedNotice: true,
+				noticeCount: 1,
+			});
+		});
+
+		it("returns correct stats for mixed notices", async () => {
+			vi.mocked(prisma.notice.findMany).mockResolvedValue([
+				{ status: "SUBMITTED" as PrismaNoticeStatus },
+				{ status: "DRAFT" as PrismaNoticeStatus },
+			] as Notice[]);
+
+			const result = await repository.getNoticeStatsForPeriod(
+				"org_123",
+				"202401",
+			);
+
+			expect(result).toEqual({
+				hasPendingNotice: true,
+				hasSubmittedNotice: true,
+				noticeCount: 2,
+			});
+		});
+
+		it("returns correct stats for multiple submitted notices", async () => {
+			vi.mocked(prisma.notice.findMany).mockResolvedValue([
+				{ status: "SUBMITTED" as PrismaNoticeStatus },
+				{ status: "ACKNOWLEDGED" as PrismaNoticeStatus },
+			] as Notice[]);
+
+			const result = await repository.getNoticeStatsForPeriod(
+				"org_123",
+				"202401",
+			);
+
+			expect(result).toEqual({
+				hasPendingNotice: false,
+				hasSubmittedNotice: true,
+				noticeCount: 2,
+			});
 		});
 	});
 });
