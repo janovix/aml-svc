@@ -1,3 +1,10 @@
+# [1.1.0-rc.37](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.36...v1.1.0-rc.37) (2026-01-07)
+
+
+### Features
+
+* enhance Notice API to manage pending notices and improve statistics retrieval ([5e8a5fc](https://github.com/janovix/aml-svc/commit/5e8a5fc346bb7320998158fd8798117539ea7c29))
+
 # [1.1.0-rc.36](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.35...v1.1.0-rc.36) (2026-01-06)
 
 
