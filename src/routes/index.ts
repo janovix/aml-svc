@@ -4,6 +4,7 @@ import type { Bindings } from "../index";
 import { authMiddleware, type AuthVariables } from "../middleware/auth";
 import { alertRulesRouter } from "./alert-rules";
 import { alertsRouter } from "./alerts";
+import { auditLogsRouter } from "./audit-logs";
 import { catalogsRouter } from "./catalogs";
 import { clientsRouter } from "./clients";
 import { noticesRouter } from "./notices";
@@ -23,6 +24,7 @@ export function createRouter() {
 	router.use("/alerts/*", authMiddleware({ requireOrganization: true }));
 	router.use("/notices/*", authMiddleware({ requireOrganization: true }));
 	router.use("/reports/*", authMiddleware({ requireOrganization: true }));
+	router.use("/audit-logs/*", authMiddleware({ requireOrganization: true }));
 
 	// Organization settings requires auth and organization context
 	router.use(
@@ -43,6 +45,7 @@ export function createRouter() {
 	router.route("/reports", reportsRouter);
 	router.route("/uma-values", umaValuesRouter);
 	router.route("/organization-settings", organizationSettingsRouter);
+	router.route("/audit-logs", auditLogsRouter);
 
 	return router;
 }

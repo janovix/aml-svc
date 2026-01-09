@@ -451,6 +451,74 @@ model Notice {
   @@index([reportedMonth])
 }
 
+// Audit action types for tracking what operation was performed
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  READ
+  EXPORT
+  VERIFY
+  LOGIN
+  LOGOUT
+  SUBMIT
+  GENERATE
+}
+
+// Actor types for identifying who performed the action
+enum AuditActorType {
+  USER
+  SYSTEM
+  API
+  SERVICE_BINDING
+}
+
+// AuditLog - Tamper-evident cryptographic audit trail with hash chaining
+// Each entry is signed and references the previous entry's signature
+model AuditLog {
+  id                String         @id
+  organizationId    String         // Organization this log belongs to
+
+  // What changed
+  entityType        String         // CLIENT, TRANSACTION, ALERT, etc.
+  entityId          String         // ID of the affected entity
+  action            AuditAction    // CREATE, UPDATE, DELETE, etc.
+
+  // Who/when
+  actorId           String?        // User ID who made the change (null for system)
+  actorType         AuditActorType // USER, SYSTEM, API, SERVICE_BINDING
+  timestamp         DateTime       // When the action occurred
+
+  // Change data (immutable snapshot)
+  oldData           String?        // JSON: previous state (null for CREATE/READ)
+  newData           String?        // JSON: new state (null for DELETE/READ)
+
+  // Cryptographic integrity chain
+  sequenceNumber    Int            // Monotonic per organization
+  dataHash          String         // SHA-256 hash of content
+  previousSignature String?        // Signature of previous entry (null for first)
+  signature         String         // HMAC-SHA256(dataHash + previousSignature, SECRET)
+
+  // Context metadata
+  ipAddress         String?        // Client IP address
+  userAgent         String?        // Client user agent
+  metadata          String?        // Additional JSON context
+
+  createdAt         DateTime       @default(now())
+
+  @@unique([organizationId, sequenceNumber])
+  @@map("audit_logs")
+  @@index([organizationId])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([action])
+  @@index([actorId])
+  @@index([actorType])
+  @@index([timestamp])
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, timestamp])
+}
+
 // Report - Analytics and business intelligence reports (PDF)
 model Report {
   id              String           @id

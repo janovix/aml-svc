@@ -27,6 +27,8 @@ export type Bindings = {
 	ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
 	/** Secret token for synthetic data generation HTTP endpoint (local development only) */
 	SYNTHETIC_DATA_SECRET?: string;
+	/** Secret key for HMAC signing of audit log entries (use a strong secret in production) */
+	AUDIT_SECRET_KEY?: string;
 };
 
 // Start a Hono app
