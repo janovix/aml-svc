@@ -32,13 +32,21 @@ export const CatalogItemIdParamSchema = z.object({
 	itemId: z.string().trim().min(1, "itemId is required"),
 });
 
+/**
+ * Preprocessor for optional search strings that treats empty/whitespace-only
+ * strings as undefined, allowing catalog selectors to load initial data without
+ * triggering validation errors.
+ */
+const optionalSearchString = z.preprocess((val) => {
+	if (typeof val === "string") {
+		const trimmed = val.trim();
+		return trimmed === "" ? undefined : trimmed;
+	}
+	return val;
+}, z.string().min(2, "search must be at least 2 characters long").max(100, "search must be at most 100 characters long").optional());
+
 export const CatalogListQuerySchema = z.object({
-	search: z
-		.string()
-		.trim()
-		.min(2, "search must be at least 2 characters long")
-		.max(100, "search must be at most 100 characters long")
-		.optional(),
+	search: optionalSearchString,
 	page: z.coerce.number().int().min(1).default(1),
 	pageSize: z.coerce.number().int().min(1).max(100).default(10),
 	active: booleanFromQuery.optional(),

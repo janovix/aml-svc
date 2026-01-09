@@ -690,7 +690,7 @@ export const openAPISpec = {
 							maxLength: 100,
 						},
 						description:
-							"Optional case-insensitive text search across `name` and `normalizedName`.",
+							"Optional case-insensitive text search across `name` and `normalizedName`. Empty or whitespace-only strings are treated as no filter (returns all items).",
 					},
 					{
 						name: "page",
