@@ -1,3 +1,10 @@
+# [1.2.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.2.0-rc.3...v1.2.0-rc.4) (2026-01-09)
+
+
+### Features
+
+* add endpoint to cancel alerts with reason and implement corresponding schema and tests ([eb0ebe6](https://github.com/janovix/aml-svc/commit/eb0ebe67c4da50e2a98d07a222ad7741faa8943d))
+
 # [1.2.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.2.0-rc.2...v1.2.0-rc.3) (2026-01-09)
 
 
