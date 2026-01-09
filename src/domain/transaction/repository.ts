@@ -15,14 +15,20 @@ import type {
 } from "./schemas";
 import type { TransactionEntity, TransactionListResult } from "./types";
 import type { UmaValueRepository } from "../uma/repository";
+import type { CatalogEnrichmentService } from "../catalog/enrichment-service";
+import { TRANSACTION_ENRICHMENT_CONFIG } from "./enrichment";
 
 export class TransactionRepository {
 	constructor(
 		private readonly prisma: PrismaClient,
 		private readonly umaRepository: UmaValueRepository,
+		private readonly catalogEnrichmentService?: CatalogEnrichmentService,
 	) {}
 
-	async list(filters: TransactionFilters): Promise<TransactionListResult> {
+	async list(
+		organizationId: string,
+		filters: TransactionFilters,
+	): Promise<TransactionListResult> {
 		const {
 			page,
 			limit,
@@ -35,6 +41,7 @@ export class TransactionRepository {
 		} = filters;
 
 		const where: Prisma.TransactionWhereInput = {
+			organizationId,
 			deletedAt: null,
 		};
 
@@ -80,8 +87,19 @@ export class TransactionRepository {
 
 		const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
+		// Map to entity objects
+		let data: TransactionEntity[] = records.map(mapPrismaTransaction);
+
+		// Enrich with catalog items if enrichment service is available
+		if (this.catalogEnrichmentService && data.length > 0) {
+			data = (await this.catalogEnrichmentService.enrichEntities(
+				data as unknown as Record<string, unknown>[],
+				TRANSACTION_ENRICHMENT_CONFIG,
+			)) as unknown as TransactionEntity[];
+		}
+
 		return {
-			data: records.map(mapPrismaTransaction),
+			data,
 			pagination: {
 				page,
 				limit,
@@ -91,34 +109,69 @@ export class TransactionRepository {
 		};
 	}
 
-	async getById(id: string): Promise<TransactionEntity | null> {
+	async getById(
+		organizationId: string,
+		id: string,
+	): Promise<TransactionEntity | null> {
 		const record = await this.prisma.transaction.findFirst({
-			where: { id, deletedAt: null },
+			where: { id, organizationId, deletedAt: null },
 			include: { paymentMethods: true },
 		});
 
-		return record ? mapPrismaTransaction(record) : null;
+		if (!record) {
+			return null;
+		}
+
+		let entity: TransactionEntity = mapPrismaTransaction(record);
+
+		// Enrich with catalog items if enrichment service is available
+		if (this.catalogEnrichmentService) {
+			entity = (await this.catalogEnrichmentService.enrichEntity(
+				entity as unknown as Record<string, unknown>,
+				TRANSACTION_ENRICHMENT_CONFIG,
+			)) as unknown as TransactionEntity;
+		}
+
+		return entity;
 	}
 
-	async create(input: TransactionCreateInput): Promise<TransactionEntity> {
+	async create(
+		input: TransactionCreateInput,
+		organizationId: string,
+	): Promise<TransactionEntity> {
 		// Calculate UMA value for the transaction date
 		const umaValue = await this.calculateUmaValue(
 			input.operationDate,
 			input.amount,
 		);
 
-		const created = await this.prisma.transaction.create({
-			data: mapCreateInputToPrisma(input, umaValue),
-			include: { paymentMethods: true },
-		});
-		return mapPrismaTransaction(created);
+		try {
+			const created = await this.prisma.transaction.create({
+				data: mapCreateInputToPrisma(input, organizationId, umaValue),
+				include: { paymentMethods: true },
+			});
+			return mapPrismaTransaction(created);
+		} catch (error) {
+			// Re-throw Prisma foreign key errors with more context
+			if (
+				error instanceof Prisma.PrismaClientKnownRequestError &&
+				error.code === "P2003"
+			) {
+				const field = error.meta?.field_name as string | undefined;
+				if (field === "clientId" || field?.includes("clientId")) {
+					throw new Error("CLIENT_NOT_FOUND");
+				}
+			}
+			throw error;
+		}
 	}
 
 	async update(
+		organizationId: string,
 		id: string,
 		input: TransactionUpdateInput,
 	): Promise<TransactionEntity> {
-		await this.ensureExists(id);
+		await this.ensureExists(organizationId, id);
 
 		// Calculate UMA value for the transaction date
 		const umaValue = await this.calculateUmaValue(
@@ -136,26 +189,35 @@ export class TransactionRepository {
 
 	/**
 	 * Calculates UMA value for a transaction: amount / umaDailyValue
-	 * Uses the active UMA value for the transaction date's year
+	 * Uses the UMA value effective for the transaction date (checks effectiveDate and endDate)
+	 * This ensures correct UMA is used even when new UMA values don't start on January 1st
 	 */
 	private async calculateUmaValue(
 		operationDate: string,
 		amount: string,
 	): Promise<Prisma.Decimal | null> {
 		try {
-			// Get the year from the operation date
+			// Parse the operation date
 			const date = new Date(operationDate + "T00:00:00.000Z");
-			const year = date.getFullYear();
 
-			// Get UMA value for the transaction year (prefer active, fallback to year-specific)
-			let umaValue = await this.umaRepository.getActive();
-			if (!umaValue || umaValue.year !== year) {
+			// Get UMA value effective for this specific date
+			// This checks effectiveDate <= date and (endDate is null or endDate >= date)
+			let umaValue = await this.umaRepository.getByDate(date);
+
+			// Fallback: if no date-based match, try by year (for backwards compatibility)
+			if (!umaValue) {
+				const year = date.getFullYear();
 				umaValue = await this.umaRepository.getByYear(year);
+			}
+
+			// Final fallback: use active UMA value
+			if (!umaValue) {
+				umaValue = await this.umaRepository.getActive();
 			}
 
 			if (!umaValue) {
 				console.warn(
-					`No UMA value found for year ${year}, skipping UMA calculation`,
+					`No UMA value found for date ${operationDate}, skipping UMA calculation`,
 				);
 				return null;
 			}
@@ -172,17 +234,20 @@ export class TransactionRepository {
 		}
 	}
 
-	async delete(id: string): Promise<void> {
-		await this.ensureExists(id);
+	async delete(organizationId: string, id: string): Promise<void> {
+		await this.ensureExists(organizationId, id);
 		await this.prisma.transaction.update({
 			where: { id },
 			data: { deletedAt: new Date() },
 		});
 	}
 
-	private async ensureExists(id: string): Promise<void> {
+	private async ensureExists(
+		organizationId: string,
+		id: string,
+	): Promise<void> {
 		const exists = await this.prisma.transaction.findFirst({
-			where: { id, deletedAt: null },
+			where: { id, organizationId, deletedAt: null },
 			select: { id: true },
 		});
 
@@ -191,7 +256,7 @@ export class TransactionRepository {
 		}
 	}
 
-	async getStats(): Promise<{
+	async getStats(organizationId: string): Promise<{
 		transactionsToday: number;
 		suspiciousTransactions: number;
 		totalVolume: string;
@@ -210,6 +275,7 @@ export class TransactionRepository {
 		] = await Promise.all([
 			this.prisma.transaction.count({
 				where: {
+					organizationId,
 					deletedAt: null,
 					operationDate: {
 						gte: today,
@@ -219,11 +285,13 @@ export class TransactionRepository {
 			}),
 			this.prisma.alert.count({
 				where: {
+					organizationId,
 					status: { in: ["DETECTED", "FILE_GENERATED"] },
 				},
 			}),
 			this.prisma.transaction.aggregate({
 				where: {
+					organizationId,
 					deletedAt: null,
 				},
 				_sum: {
@@ -232,6 +300,7 @@ export class TransactionRepository {
 			}),
 			this.prisma.transaction.findMany({
 				where: {
+					organizationId,
 					deletedAt: null,
 				},
 				select: {

@@ -1,5 +1,13 @@
 export * from "./schemas";
 export * from "./types";
-export { AlertRepository, AlertRuleRepository } from "./repository";
-export { AlertService, AlertRuleService } from "./service";
+export {
+	AlertRepository,
+	AlertRuleRepository,
+	AlertRuleConfigRepository,
+} from "./repository";
+export {
+	AlertService,
+	AlertRuleService,
+	AlertRuleConfigService,
+} from "./service";
 export * from "./mappers";

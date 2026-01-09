@@ -6,6 +6,7 @@
  */
 
 import type { PrismaClient, DocumentType, AddressType } from "@prisma/client";
+import { generateId } from "./id-generator";
 import type { ClientCreateInput } from "../domain/client/schemas";
 import type { TransactionCreateInput } from "../domain/transaction/schemas";
 
@@ -494,7 +495,14 @@ function generateTransaction(
  * Synthetic Data Generator Service
  */
 export class SyntheticDataGenerator {
-	constructor(private readonly prisma: PrismaClient) {}
+	private readonly organizationId: string;
+
+	constructor(
+		private readonly prisma: PrismaClient,
+		organizationId: string,
+	) {
+		this.organizationId = organizationId;
+	}
 
 	/**
 	 * Generates synthetic data based on the provided options
@@ -564,7 +572,9 @@ export class SyntheticDataGenerator {
 				// Create client using Prisma directly
 				const client = await this.prisma.client.create({
 					data: {
+						id: generateId("CLIENT"),
 						rfc: clientData.rfc,
+						organizationId: this.organizationId,
 						personType: clientData.personType.toUpperCase() as
 							| "PHYSICAL"
 							| "MORAL"
@@ -604,12 +614,12 @@ export class SyntheticDataGenerator {
 
 				// Generate documents if requested
 				if (includeDocuments && isPhysical) {
-					await this.generateClientDocuments(client.rfc);
+					await this.generateClientDocuments(client.id);
 				}
 
 				// Generate addresses if requested
 				if (includeAddresses) {
-					await this.generateClientAddresses(client.rfc);
+					await this.generateClientAddresses(client.id);
 				}
 			} catch (error) {
 				// Skip if RFC already exists (collision)
@@ -641,10 +651,27 @@ export class SyntheticDataGenerator {
 			throw new Error("No clients available for transaction generation");
 		}
 
+		// Look up client IDs from RFCs
+		const clients = await this.prisma.client.findMany({
+			where: {
+				organizationId: this.organizationId,
+				rfc: { in: clientRfcs },
+			},
+			select: { id: true, rfc: true },
+		});
+
+		const clientIdMap = new Map(clients.map((c) => [c.rfc, c.id]));
+
 		const transactionsPerClient =
 			perClient || Math.ceil(count / clientRfcs.length);
 
 		for (const clientRfc of clientRfcs) {
+			const clientId = clientIdMap.get(clientRfc);
+			if (!clientId) {
+				console.warn(`Client with RFC ${clientRfc} not found, skipping`);
+				continue;
+			}
+
 			const clientTransactions = Math.min(
 				transactionsPerClient,
 				count - created,
@@ -652,12 +679,14 @@ export class SyntheticDataGenerator {
 
 			for (let i = 0; i < clientTransactions && created < count; i++) {
 				try {
-					const transactionData = generateTransaction(clientRfc, created);
+					const transactionData = generateTransaction(clientId, created);
 
 					// Create transaction using Prisma directly
 					// Note: UMA value is left null for synthetic data (can be calculated later if needed)
 					const transaction = await this.prisma.transaction.create({
 						data: {
+							id: generateId("TRANSACTION"),
+							organizationId: this.organizationId,
 							clientId: transactionData.clientId,
 							operationDate: new Date(transactionData.operationDate),
 							operationType: transactionData.operationType.toUpperCase() as
@@ -688,6 +717,7 @@ export class SyntheticDataGenerator {
 							umaValue: null, // UMA value can be calculated later if needed
 							paymentMethods: {
 								create: transactionData.paymentMethods.map((pm) => ({
+									id: generateId("TRANSACTION_PAYMENT_METHOD"),
 									method: pm.method,
 									amount: pm.amount,
 								})),
@@ -740,7 +770,7 @@ export class SyntheticDataGenerator {
 	/**
 	 * Generates synthetic documents for a client
 	 */
-	private async generateClientDocuments(clientRfc: string): Promise<void> {
+	private async generateClientDocuments(clientId: string): Promise<void> {
 		const documentTypes = [
 			"NATIONAL_ID",
 			"PASSPORT",
@@ -763,7 +793,8 @@ export class SyntheticDataGenerator {
 
 			await this.prisma.clientDocument.create({
 				data: {
-					clientId: clientRfc,
+					id: generateId("CLIENT_DOCUMENT"),
+					clientId: clientId,
 					documentType: docType as DocumentType,
 					documentNumber: docNumber,
 					issuingCountry: "MX",
@@ -780,7 +811,7 @@ export class SyntheticDataGenerator {
 	/**
 	 * Generates synthetic addresses for a client
 	 */
-	private async generateClientAddresses(clientRfc: string): Promise<void> {
+	private async generateClientAddresses(clientId: string): Promise<void> {
 		const addressCount = Math.floor(Math.random() * 2) + 1; // 1-2 addresses
 		const addressTypes = ["RESIDENTIAL", "BUSINESS", "MAILING"];
 
@@ -791,7 +822,8 @@ export class SyntheticDataGenerator {
 
 			await this.prisma.clientAddress.create({
 				data: {
-					clientId: clientRfc,
+					id: generateId("CLIENT_ADDRESS"),
+					clientId: clientId,
 					addressType: addressTypes[i] as AddressType,
 					street1: `Calle ${Math.floor(Math.random() * 200)}`,
 					street2:

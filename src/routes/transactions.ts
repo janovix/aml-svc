@@ -1,7 +1,10 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 
+import { CatalogRepository } from "../domain/catalog/repository";
+import { CatalogEnrichmentService } from "../domain/catalog/enrichment-service";
 import { ClientRepository } from "../domain/client";
 import {
 	TransactionCreateSchema,
@@ -16,8 +19,12 @@ import type { Bindings } from "../index";
 import { createAlertQueueService } from "../lib/alert-queue";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
+import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 
-export const transactionsRouter = new Hono<{ Bindings: Bindings }>();
+export const transactionsRouter = new Hono<{
+	Bindings: Bindings;
+	Variables: AuthVariables;
+}>();
 
 function parseWithZod<T>(
 	schema: { parse: (input: unknown) => T },
@@ -33,12 +40,19 @@ function parseWithZod<T>(
 	}
 }
 
-function getService(c: Context<{ Bindings: Bindings }>) {
+function getService(
+	c: Context<{ Bindings: Bindings; Variables: AuthVariables }>,
+) {
 	const prisma = getPrismaClient(c.env.DB);
 	const umaRepository = new UmaValueRepository(prisma);
+	const catalogRepository = new CatalogRepository(prisma);
+	const catalogEnrichmentService = new CatalogEnrichmentService(
+		catalogRepository,
+	);
 	const transactionRepository = new TransactionRepository(
 		prisma,
 		umaRepository,
+		catalogEnrichmentService,
 	);
 	const clientRepository = new ClientRepository(prisma);
 	return new TransactionService(
@@ -57,42 +71,75 @@ function handleServiceError(error: unknown): never {
 			throw new APIError(404, "Client not found");
 		}
 	}
+
+	// Handle Prisma foreign key constraint violations
+	if (error instanceof Prisma.PrismaClientKnownRequestError) {
+		if (error.code === "P2003") {
+			// Foreign key constraint failed
+			const field = error.meta?.field_name as string | undefined;
+			if (field === "clientId" || field?.includes("clientId")) {
+				throw new APIError(404, "Client not found", {
+					field: "clientId",
+					message:
+						"The specified client does not exist or belongs to a different organization",
+				});
+			}
+			throw new APIError(400, "Foreign key constraint violation", {
+				field: field || "unknown",
+				message: "A referenced record does not exist",
+				details: error.meta,
+			});
+		}
+	}
+
 	throw error;
 }
 
 transactionsRouter.get("/", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = Object.fromEntries(url.searchParams.entries());
 	const filters = parseWithZod(TransactionFilterSchema, queryObject);
 
 	const service = getService(c);
-	const result = await service.list(filters).catch(handleServiceError);
+	const result = await service
+		.list(organizationId, filters)
+		.catch(handleServiceError);
 
 	return c.json(result);
 });
 
 // IMPORTANT: /stats must be defined BEFORE /:id to avoid "stats" being matched as an id parameter
 transactionsRouter.get("/stats", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const service = getService(c);
-	const stats = await service.getStats().catch(handleServiceError);
+	const stats = await service
+		.getStats(organizationId)
+		.catch(handleServiceError);
 	return c.json(stats);
 });
 
 transactionsRouter.get("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(TransactionIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	const record = await service.get(params.id).catch(handleServiceError);
+	const record = await service
+		.get(organizationId, params.id)
+		.catch(handleServiceError);
 
 	return c.json(record);
 });
 
 transactionsRouter.post("/", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const body = await c.req.json();
 	const payload = parseWithZod(TransactionCreateSchema, body);
 
 	const service = getService(c);
-	const created = await service.create(payload).catch(handleServiceError);
+	const created = await service
+		.create(payload, organizationId)
+		.catch(handleServiceError);
 
 	// Queue alert detection job
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
@@ -102,23 +149,25 @@ transactionsRouter.post("/", async (c) => {
 });
 
 transactionsRouter.put("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(TransactionIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(TransactionUpdateSchema, body);
 
 	const service = getService(c);
 	const updated = await service
-		.update(params.id, payload)
+		.update(organizationId, params.id, payload)
 		.catch(handleServiceError);
 
 	return c.json(updated);
 });
 
 transactionsRouter.delete("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(TransactionIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	await service.delete(params.id).catch(handleServiceError);
+	await service.delete(organizationId, params.id).catch(handleServiceError);
 
 	return c.body(null, 204);
 });

@@ -21,97 +21,153 @@ import type {
 export class ClientService {
 	constructor(private readonly repository: ClientRepository) {}
 
-	list(filters: ClientFilters): Promise<ListResult<ClientEntity>> {
-		return this.repository.list(filters);
+	list(
+		organizationId: string,
+		filters: ClientFilters,
+	): Promise<ListResult<ClientEntity>> {
+		return this.repository.list(organizationId, filters);
 	}
 
-	async get(id: string): Promise<ClientEntity> {
-		const client = await this.repository.getById(id);
+	async get(organizationId: string, id: string): Promise<ClientEntity> {
+		const client = await this.repository.getById(organizationId, id);
 		if (!client) {
 			throw new Error("CLIENT_NOT_FOUND");
 		}
 		return client;
 	}
 
-	create(input: ClientCreateInput): Promise<ClientEntity> {
-		return this.repository.create(input);
+	create(
+		organizationId: string,
+		input: ClientCreateInput,
+	): Promise<ClientEntity> {
+		return this.repository.create(organizationId, input);
 	}
 
-	update(id: string, input: ClientUpdateInput): Promise<ClientEntity> {
-		return this.repository.update(id, input);
+	update(
+		organizationId: string,
+		id: string,
+		input: ClientUpdateInput,
+	): Promise<ClientEntity> {
+		return this.repository.update(organizationId, id, input);
 	}
 
-	patch(id: string, input: ClientPatchInput): Promise<ClientEntity> {
-		return this.repository.patch(id, input);
+	patch(
+		organizationId: string,
+		id: string,
+		input: ClientPatchInput,
+	): Promise<ClientEntity> {
+		return this.repository.patch(organizationId, id, input);
 	}
 
-	delete(id: string): Promise<void> {
-		return this.repository.delete(id);
+	delete(organizationId: string, id: string): Promise<void> {
+		return this.repository.delete(organizationId, id);
 	}
 
-	listDocuments(clientId: string): Promise<ClientDocumentEntity[]> {
-		return this.repository.listDocuments(clientId);
+	listDocuments(
+		organizationId: string,
+		clientId: string,
+	): Promise<ClientDocumentEntity[]> {
+		return this.repository.listDocuments(organizationId, clientId);
 	}
 
 	createDocument(
+		organizationId: string,
 		input: ClientDocumentCreateInput,
 	): Promise<ClientDocumentEntity> {
-		return this.repository.createDocument(input);
+		return this.repository.createDocument(organizationId, input);
 	}
 
 	updateDocument(
+		organizationId: string,
 		clientId: string,
 		documentId: string,
 		input: ClientDocumentUpdateInput,
 	): Promise<ClientDocumentEntity> {
-		return this.repository.updateDocument(clientId, documentId, input);
+		return this.repository.updateDocument(
+			organizationId,
+			clientId,
+			documentId,
+			input,
+		);
 	}
 
 	patchDocument(
+		organizationId: string,
 		clientId: string,
 		documentId: string,
 		input: ClientDocumentPatchInput,
 	): Promise<ClientDocumentEntity> {
-		return this.repository.patchDocument(clientId, documentId, input);
+		return this.repository.patchDocument(
+			organizationId,
+			clientId,
+			documentId,
+			input,
+		);
 	}
 
-	deleteDocument(clientId: string, documentId: string): Promise<void> {
-		return this.repository.deleteDocument(clientId, documentId);
+	deleteDocument(
+		organizationId: string,
+		clientId: string,
+		documentId: string,
+	): Promise<void> {
+		return this.repository.deleteDocument(organizationId, clientId, documentId);
 	}
 
-	listAddresses(clientId: string): Promise<ClientAddressEntity[]> {
-		return this.repository.listAddresses(clientId);
+	listAddresses(
+		organizationId: string,
+		clientId: string,
+	): Promise<ClientAddressEntity[]> {
+		return this.repository.listAddresses(organizationId, clientId);
 	}
 
-	createAddress(input: ClientAddressCreateInput): Promise<ClientAddressEntity> {
-		return this.repository.createAddress(input);
+	createAddress(
+		organizationId: string,
+		input: ClientAddressCreateInput,
+	): Promise<ClientAddressEntity> {
+		return this.repository.createAddress(organizationId, input);
 	}
 
 	updateAddress(
+		organizationId: string,
 		clientId: string,
 		addressId: string,
 		input: ClientAddressUpdateInput,
 	): Promise<ClientAddressEntity> {
-		return this.repository.updateAddress(clientId, addressId, input);
+		return this.repository.updateAddress(
+			organizationId,
+			clientId,
+			addressId,
+			input,
+		);
 	}
 
 	patchAddress(
+		organizationId: string,
 		clientId: string,
 		addressId: string,
 		input: ClientAddressPatchInput,
 	): Promise<ClientAddressEntity> {
-		return this.repository.patchAddress(clientId, addressId, input);
+		return this.repository.patchAddress(
+			organizationId,
+			clientId,
+			addressId,
+			input,
+		);
 	}
 
-	deleteAddress(clientId: string, addressId: string): Promise<void> {
-		return this.repository.deleteAddress(clientId, addressId);
+	deleteAddress(
+		organizationId: string,
+		clientId: string,
+		addressId: string,
+	): Promise<void> {
+		return this.repository.deleteAddress(organizationId, clientId, addressId);
 	}
 
-	getStats(): Promise<{
+	getStats(organizationId: string): Promise<{
 		totalClients: number;
 		openAlerts: number;
 		urgentReviews: number;
 	}> {
-		return this.repository.getStats();
+		return this.repository.getStats(organizationId);
 	}
 }

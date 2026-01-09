@@ -48,9 +48,19 @@ export const openAPISpec = {
 				"UMA (Unidad de Medida y Actualización) value management endpoints",
 		},
 		{
-			name: "Compliance Organization",
+			name: "Organization Settings",
 			description:
-				"Compliance organization management endpoints (RFC and vulnerable activity for compliance officer)",
+				"Organization settings management endpoints (RFC and vulnerable activity for compliance officer)",
+		},
+		{
+			name: "Reports",
+			description:
+				"Report management endpoints for generating PDF analytics reports",
+		},
+		{
+			name: "Notices",
+			description:
+				"SAT notice management endpoints for generating and submitting XML reports to SAT (17-17 monthly cycle)",
 		},
 	],
 	paths: {
@@ -202,8 +212,7 @@ export const openAPISpec = {
 						in: "path",
 						required: true,
 						schema: { type: "string" },
-						description:
-							"Client RFC (Registro Federal de Contribuyentes) - Primary key",
+						description: "Client ID",
 					},
 				],
 				responses: {
@@ -730,6 +739,139 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/catalogs/{catalogKey}/items/{itemId}": {
+			get: {
+				tags: ["Catalogs"],
+				summary: "Get a catalog item by ID, shortName, or code",
+				description:
+					"Retrieve a specific catalog item by its ID, metadata.shortName (e.g., 'MXN' for currencies), or metadata.code within a catalog. The endpoint will first try to match by ID, then by shortName, then by code. Returns 404 if the catalog or item is not found.",
+				parameters: [
+					{
+						name: "catalogKey",
+						in: "path",
+						required: true,
+						schema: {
+							type: "string",
+							minLength: 3,
+							maxLength: 64,
+							pattern: "^[a-zA-Z0-9-]+$",
+						},
+						description:
+							"Identifier of the catalog (e.g., `car-brands`, `states`, `currencies`).",
+					},
+					{
+						name: "itemId",
+						in: "path",
+						required: true,
+						schema: {
+							type: "string",
+							minLength: 1,
+						},
+						description:
+							"ID, shortName (metadata.shortName), or code (metadata.code) of the catalog item to retrieve. For example, for currencies catalog, you can use the database ID, 'MXN' (shortName), or '3' (code).",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Catalog item retrieved successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/CatalogItem" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "Catalog or catalog item not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/catalogs/{catalogKey}/items": {
+			post: {
+				tags: ["Catalogs"],
+				summary: "Create a new catalog item",
+				description:
+					"Add a new item to an open catalog (one that allows new items to be added). Returns 403 if the catalog is closed.",
+				parameters: [
+					{
+						name: "catalogKey",
+						in: "path",
+						required: true,
+						schema: {
+							type: "string",
+							minLength: 3,
+							maxLength: 64,
+							pattern: "^[a-zA-Z0-9-]+$",
+						},
+						description:
+							"Identifier of the catalog to add the item to (e.g., `terrestrial-vehicle-brands`).",
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/CatalogItemCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Catalog item created successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/CatalogItem" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"403": {
+						description: "Catalog does not allow adding new items",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "Catalog not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"409": {
+						description: "An item with this name already exists",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
 		"/api/v1/transactions": {
 			get: {
 				tags: ["Transactions"],
@@ -1080,6 +1222,27 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/alert-rules/active": {
+			get: {
+				tags: ["Alert Rules"],
+				summary: "Get active alert rules for seekers",
+				description:
+					"Retrieve all active alert rules that can be triggered by seekers (excludes manual-only rules).",
+				responses: {
+					"200": {
+						description: "List of active alert rules for seekers",
+						content: {
+							"application/json": {
+								schema: {
+									type: "array",
+									items: { $ref: "#/components/schemas/AlertRule" },
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 		"/api/v1/alert-rules/{id}": {
 			get: {
 				tags: ["Alert Rules"],
@@ -1247,7 +1410,7 @@ export const openAPISpec = {
 						name: "clientId",
 						in: "query",
 						schema: { type: "string" },
-						description: "Filter by client ID (RFC)",
+						description: "Filter by client ID",
 					},
 					{
 						name: "status",
@@ -1785,25 +1948,25 @@ export const openAPISpec = {
 				},
 			},
 		},
-		"/api/v1/compliance-organization": {
+		"/api/v1/organization-settings": {
 			get: {
-				tags: ["Compliance Organization"],
-				summary: "Get compliance organization",
+				tags: ["Organization Settings"],
+				summary: "Get organization settings",
 				description:
-					"Retrieve the compliance organization (RFC and vulnerable activity) for the authenticated user.",
+					"Retrieve the organization settings (RFC and vulnerable activity) for the authenticated user's organization.",
 				responses: {
 					"200": {
-						description: "Compliance organization",
+						description: "Organization settings",
 						content: {
 							"application/json": {
 								schema: {
-									$ref: "#/components/schemas/ComplianceOrganization",
+									$ref: "#/components/schemas/OrganizationSettings",
 								},
 							},
 						},
 					},
 					"404": {
-						description: "Compliance organization not found",
+						description: "Organization settings not found",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
@@ -1813,27 +1976,27 @@ export const openAPISpec = {
 				},
 			},
 			put: {
-				tags: ["Compliance Organization"],
-				summary: "Create or update compliance organization",
+				tags: ["Organization Settings"],
+				summary: "Create or update organization settings",
 				description:
-					"Create or update the compliance organization (RFC and vulnerable activity) for the authenticated user.",
+					"Create or update the organization settings (RFC and vulnerable activity) for the authenticated user's organization.",
 				requestBody: {
 					required: true,
 					content: {
 						"application/json": {
 							schema: {
-								$ref: "#/components/schemas/ComplianceOrganizationCreateRequest",
+								$ref: "#/components/schemas/OrganizationSettingsCreateRequest",
 							},
 						},
 					},
 				},
 				responses: {
 					"200": {
-						description: "Compliance organization created or updated",
+						description: "Organization settings created or updated",
 						content: {
 							"application/json": {
 								schema: {
-									$ref: "#/components/schemas/ComplianceOrganization",
+									$ref: "#/components/schemas/OrganizationSettings",
 								},
 							},
 						},
@@ -1849,38 +2012,802 @@ export const openAPISpec = {
 				},
 			},
 			patch: {
-				tags: ["Compliance Organization"],
-				summary: "Update compliance organization",
+				tags: ["Organization Settings"],
+				summary: "Update organization settings",
 				description:
-					"Partially update the compliance organization for the authenticated user.",
+					"Partially update the organization settings for the authenticated user's organization.",
 				requestBody: {
 					required: true,
 					content: {
 						"application/json": {
 							schema: {
-								$ref: "#/components/schemas/ComplianceOrganizationUpdateRequest",
+								$ref: "#/components/schemas/OrganizationSettingsUpdateRequest",
 							},
 						},
 					},
 				},
 				responses: {
 					"200": {
-						description: "Compliance organization updated",
+						description: "Organization settings updated",
 						content: {
 							"application/json": {
 								schema: {
-									$ref: "#/components/schemas/ComplianceOrganization",
+									$ref: "#/components/schemas/OrganizationSettings",
 								},
 							},
 						},
 					},
 					"404": {
-						description: "Compliance organization not found",
+						description: "Organization settings not found",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
 							},
 						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports": {
+			get: {
+				tags: ["Reports"],
+				summary: "List reports",
+				description:
+					"Retrieve a paginated list of reports with optional filters",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+					},
+					{
+						name: "type",
+						in: "query",
+						schema: { $ref: "#/components/schemas/ReportType" },
+					},
+					{
+						name: "status",
+						in: "query",
+						schema: { $ref: "#/components/schemas/ReportStatus" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Paginated list of reports",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/Report" },
+										},
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Reports"],
+				summary: "Create a new report",
+				description:
+					"Create a new report for a specified period. Alerts in the period will be assigned to the report.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/ReportCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Report created successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Report" },
+							},
+						},
+					},
+					"409": {
+						description: "Report already exists for this period and type",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/preview": {
+			get: {
+				tags: ["Reports"],
+				summary: "Preview report alerts",
+				description:
+					"Get a preview of alerts that would be included in a report for the given period",
+				parameters: [
+					{
+						name: "type",
+						in: "query",
+						required: true,
+						schema: { $ref: "#/components/schemas/ReportType" },
+					},
+					{
+						name: "periodStart",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+					},
+					{
+						name: "periodEnd",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Alert preview for the period",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/ReportPreviewResponse" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/{id}": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get a report",
+				description: "Get a report by ID with alert summary",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Report with alert summary",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/ReportWithAlertSummary" },
+							},
+						},
+					},
+					"404": {
+						description: "Report not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["Reports"],
+				summary: "Update a report",
+				description: "Partially update a report",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/ReportPatchRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Report updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Report" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["Reports"],
+				summary: "Delete a draft report",
+				description:
+					"Delete a report (only DRAFT status reports can be deleted)",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": { description: "Report deleted" },
+					"400": {
+						description: "Only draft reports can be deleted",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/{id}/generate": {
+			post: {
+				tags: ["Reports"],
+				summary: "Generate report file",
+				description:
+					"Generate the XML (MONTHLY) or PDF (others) file for the report",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "File generation result",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										message: { type: "string" },
+										reportId: { type: "string" },
+										alertCount: { type: "integer" },
+										type: { type: "string", enum: ["XML", "PDF"] },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/{id}/download": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get download URL",
+				description: "Get the download URL for a generated report file",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Download URL",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										fileUrl: { type: "string" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/{id}/submit": {
+			post: {
+				tags: ["Reports"],
+				summary: "Submit to SAT",
+				description: "Mark a MONTHLY report as submitted to SAT",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								properties: {
+									satFolioNumber: { type: "string" },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Report marked as submitted",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Report" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/{id}/acknowledge": {
+			post: {
+				tags: ["Reports"],
+				summary: "Record SAT acknowledgment",
+				description: "Mark a MONTHLY report as acknowledged by SAT",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								required: ["satFolioNumber"],
+								properties: {
+									satFolioNumber: { type: "string" },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Report marked as acknowledged",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Report" },
+							},
+						},
+					},
+				},
+			},
+		},
+		// Notices endpoints
+		"/api/v1/notices": {
+			get: {
+				tags: ["Notices"],
+				summary: "List notices",
+				description:
+					"Retrieve a paginated list of SAT notices with optional filters.",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+					},
+					{
+						name: "status",
+						in: "query",
+						schema: {
+							type: "string",
+							enum: ["DRAFT", "GENERATED", "SUBMITTED", "ACKNOWLEDGED"],
+						},
+					},
+					{
+						name: "year",
+						in: "query",
+						schema: { type: "integer", minimum: 2020, maximum: 2100 },
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of notices",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/Notice" },
+										},
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Notices"],
+				summary: "Create a notice",
+				description:
+					"Create a new SAT notice for a specific month using the 17-17 cycle.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/NoticeCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Notice created",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Notice" },
+							},
+						},
+					},
+					"409": {
+						description: "A notice already exists for this period",
+					},
+				},
+			},
+		},
+		"/api/v1/notices/preview": {
+			get: {
+				tags: ["Notices"],
+				summary: "Preview alerts for a potential notice",
+				description:
+					"Get a preview of alerts that would be included in a notice for a given month.",
+				parameters: [
+					{
+						name: "year",
+						in: "query",
+						required: true,
+						schema: { type: "integer", minimum: 2020, maximum: 2100 },
+					},
+					{
+						name: "month",
+						in: "query",
+						required: true,
+						schema: { type: "integer", minimum: 1, maximum: 12 },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Preview data",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/NoticePreviewResponse" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/notices/available-months": {
+			get: {
+				tags: ["Notices"],
+				summary: "Get available months for notice creation",
+				description:
+					"Returns a list of months for which notices can be created (no existing notice).",
+				responses: {
+					"200": {
+						description: "Available months",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										months: {
+											type: "array",
+											items: {
+												type: "object",
+												properties: {
+													year: { type: "integer" },
+													month: { type: "integer" },
+													displayName: { type: "string" },
+													hasNotice: {
+														type: "boolean",
+														description:
+															"True if a pending notice exists (blocks creation)",
+													},
+													hasPendingNotice: {
+														type: "boolean",
+														description:
+															"True if there is a DRAFT or GENERATED notice for this period",
+													},
+													hasSubmittedNotice: {
+														type: "boolean",
+														description:
+															"True if there is a SUBMITTED or ACKNOWLEDGED notice for this period",
+													},
+													noticeCount: {
+														type: "integer",
+														description:
+															"Total number of notices for this period",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/notices/{id}": {
+			get: {
+				tags: ["Notices"],
+				summary: "Get a notice by ID",
+				description: "Retrieve a single notice with alert summary.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Notice details",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/NoticeWithAlertSummary" },
+							},
+						},
+					},
+					"404": { description: "Notice not found" },
+				},
+			},
+			patch: {
+				tags: ["Notices"],
+				summary: "Update a notice",
+				description: "Update a notice's name, notes, or SAT folio number.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/NoticePatchRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Notice updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Notice" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["Notices"],
+				summary: "Delete a draft notice",
+				description: "Delete a notice (only allowed for DRAFT status).",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": { description: "Notice deleted" },
+					"400": { description: "Cannot delete non-draft notice" },
+				},
+			},
+		},
+		"/api/v1/notices/{id}/generate": {
+			post: {
+				tags: ["Notices"],
+				summary: "Generate XML file for a notice",
+				description:
+					"Generate the SAT XML file for a notice, upload it to R2 storage, and mark it as GENERATED. Requires organization settings (RFC and activity code) to be configured.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "XML generated and uploaded successfully",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										message: { type: "string" },
+										noticeId: { type: "string" },
+										alertCount: { type: "integer" },
+										fileSize: {
+											type: "integer",
+											description: "Size of the generated XML file in bytes",
+										},
+										xmlFileUrl: {
+											type: "string",
+											nullable: true,
+											description: "R2 storage path of the XML file",
+										},
+									},
+								},
+							},
+						},
+					},
+					"400": {
+						description:
+							"Notice has already been generated, has no alerts, has no valid alerts with transactions, or organization settings not configured",
+					},
+				},
+			},
+		},
+		"/api/v1/notices/{id}/download": {
+			get: {
+				tags: ["Notices"],
+				summary: "Download the generated SAT XML file",
+				description:
+					"Download the generated SAT XML file directly from R2 storage. Returns the XML file as a downloadable attachment.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "XML file download",
+						content: {
+							"application/xml": {
+								schema: {
+									type: "string",
+									format: "binary",
+									description: "The SAT XML file content",
+								},
+							},
+							"application/json": {
+								schema: {
+									type: "object",
+									description: "Fallback response when R2 is not available",
+									properties: {
+										fileUrl: { type: "string" },
+										fileSize: { type: "integer", nullable: true },
+										format: { type: "string", enum: ["xml"] },
+									},
+								},
+							},
+						},
+					},
+					"400": { description: "Notice has not been generated yet" },
+					"404": { description: "Notice XML file not found" },
+				},
+			},
+		},
+		"/api/v1/notices/{id}/submit": {
+			post: {
+				tags: ["Notices"],
+				summary: "Mark notice as submitted to SAT",
+				description:
+					"Mark a GENERATED notice as submitted to SAT, optionally with a folio number.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								properties: {
+									satFolioNumber: { type: "string", maxLength: 100 },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Notice marked as submitted",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Notice" },
+							},
+						},
+					},
+					"400": {
+						description: "Notice must be generated before submission",
+					},
+				},
+			},
+		},
+		"/api/v1/notices/{id}/acknowledge": {
+			post: {
+				tags: ["Notices"],
+				summary: "Record SAT acknowledgment",
+				description:
+					"Mark a SUBMITTED notice as acknowledged by SAT with the folio number.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								required: ["satFolioNumber"],
+								properties: {
+									satFolioNumber: {
+										type: "string",
+										minLength: 1,
+										maxLength: 100,
+									},
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Acknowledgment recorded",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Notice" },
+							},
+						},
+					},
+					"400": {
+						description: "Notice must be submitted before acknowledgment",
 					},
 				},
 			},
@@ -2201,7 +3128,7 @@ export const openAPISpec = {
 					},
 					clientId: {
 						type: "string",
-						description: "FK to the owning client (RFC - Primary key)",
+						description: "FK to the owning client",
 					},
 					documentType: {
 						type: "string",
@@ -2306,7 +3233,7 @@ export const openAPISpec = {
 					},
 					clientId: {
 						type: "string",
-						description: "FK to the owning client (RFC - Primary key)",
+						description: "FK to the owning client",
 					},
 					addressType: {
 						type: "string",
@@ -2407,6 +3334,61 @@ export const openAPISpec = {
 					updatedAt: { type: "string", format: "date-time" },
 				},
 			},
+			EnrichedCatalogItem: {
+				type: "object",
+				description:
+					"Catalog item with additional catalogKey field, used when enriching entities with catalog data",
+				required: [
+					"id",
+					"catalogId",
+					"name",
+					"normalizedName",
+					"active",
+					"catalogKey",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: {
+						type: "string",
+						pattern: "^[A-Za-z0-9-]{1,64}$",
+						description:
+							"Unique identifier for the catalog item (UUID or deterministic ID)",
+					},
+					catalogId: {
+						type: "string",
+						pattern: "^[A-Za-z0-9-]{1,64}$",
+						description: "Identifier of the owning catalog",
+					},
+					name: {
+						type: "string",
+						description: "Display name shown to end users",
+					},
+					normalizedName: {
+						type: "string",
+						description:
+							"Lowercased and accent-free version used for search and ordering",
+					},
+					active: {
+						type: "boolean",
+						description: "Indicates if the item is available for selection",
+					},
+					metadata: {
+						type: "object",
+						nullable: true,
+						additionalProperties: true,
+						description:
+							"Custom metadata for the catalog item (e.g., code, originCountry, etc.)",
+					},
+					catalogKey: {
+						type: "string",
+						description:
+							"The key of the catalog this item belongs to (e.g., 'terrestrial-vehicle-brands')",
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
 			CatalogPagination: {
 				type: "object",
 				required: ["page", "pageSize", "total", "totalPages"],
@@ -2423,7 +3405,7 @@ export const openAPISpec = {
 				properties: {
 					catalog: {
 						type: "object",
-						required: ["id", "key", "name"],
+						required: ["id", "key", "name", "allowNewItems"],
 						properties: {
 							id: {
 								type: "string",
@@ -2439,6 +3421,11 @@ export const openAPISpec = {
 								type: "string",
 								description: "Human readable catalog name",
 							},
+							allowNewItems: {
+								type: "boolean",
+								description:
+									"When true, users can add new items to this catalog dynamically",
+							},
 						},
 					},
 					data: {
@@ -2446,6 +3433,18 @@ export const openAPISpec = {
 						items: { $ref: "#/components/schemas/CatalogItem" },
 					},
 					pagination: { $ref: "#/components/schemas/CatalogPagination" },
+				},
+			},
+			CatalogItemCreateRequest: {
+				type: "object",
+				required: ["name"],
+				properties: {
+					name: {
+						type: "string",
+						minLength: 1,
+						maxLength: 200,
+						description: "The name of the new catalog item",
+					},
 				},
 			},
 			PaymentMethod: {
@@ -2553,6 +3552,30 @@ export const openAPISpec = {
 					createdAt: { type: "string", format: "date-time" },
 					updatedAt: { type: "string", format: "date-time" },
 					deletedAt: { type: "string", format: "date-time", nullable: true },
+					brandCatalog: {
+						allOf: [{ $ref: "#/components/schemas/EnrichedCatalogItem" }],
+						nullable: true,
+						description:
+							"Enriched catalog item for the vehicle brand, including full metadata",
+					},
+					flagCountryCatalog: {
+						allOf: [{ $ref: "#/components/schemas/EnrichedCatalogItem" }],
+						nullable: true,
+						description:
+							"Enriched catalog item for the flag country (for marine/air vehicles)",
+					},
+					operationTypeCatalog: {
+						allOf: [{ $ref: "#/components/schemas/EnrichedCatalogItem" }],
+						nullable: true,
+						description:
+							"Enriched catalog item for the operation type (looked up by operationTypeCode)",
+					},
+					currencyCatalog: {
+						allOf: [{ $ref: "#/components/schemas/EnrichedCatalogItem" }],
+						nullable: true,
+						description:
+							"Enriched catalog item for the currency (looked up by currencyCode)",
+					},
 				},
 			},
 			PaymentMethodInput: {
@@ -2834,40 +3857,75 @@ export const openAPISpec = {
 					"name",
 					"active",
 					"severity",
-					"ruleConfig",
+					"isManualOnly",
+					"activityCode",
 					"createdAt",
 					"updatedAt",
 				],
 				properties: {
 					id: {
 						type: "string",
-						pattern: "^[A-Za-z0-9-]{1,64}$",
-						description: "Alert rule identifier",
+						pattern: "^[A-Za-z0-9-_]{1,64}$",
+						description:
+							"Alert rule identifier/code (e.g., '2501', 'AUTO_UMA')",
 					},
 					name: { type: "string", minLength: 1, maxLength: 200 },
 					description: { type: "string", maxLength: 1000, nullable: true },
 					active: { type: "boolean" },
 					severity: { $ref: "#/components/schemas/AlertSeverity" },
-					ruleConfig: {
-						type: "object",
+					ruleType: {
+						type: "string",
+						maxLength: 100,
+						nullable: true,
 						description:
-							"Dynamic rule configuration stored as JSON. Structure depends on rule type.",
-						additionalProperties: true,
+							"Matches seeker's ruleType (null for manual-only rules)",
+					},
+					isManualOnly: {
+						type: "boolean",
+						description: "True if this rule can only be triggered manually",
+					},
+					activityCode: {
+						type: "string",
+						maxLength: 10,
+						description: "Vulnerable activity code: VEH, JYS, INM, JOY, ART",
 					},
 					metadata: {
 						type: "object",
 						nullable: true,
-						description: "Additional metadata as JSON",
+						description:
+							"Additional metadata as JSON (legal basis, category, etc.)",
 						additionalProperties: true,
 					},
 					createdAt: { type: "string", format: "date-time" },
 					updatedAt: { type: "string", format: "date-time" },
 				},
 			},
+			AlertRuleConfig: {
+				type: "object",
+				required: ["id", "alertRuleId", "key", "value", "isHardcoded"],
+				properties: {
+					id: { type: "string" },
+					alertRuleId: { type: "string" },
+					key: { type: "string", maxLength: 100 },
+					value: { type: "string", description: "JSON string value" },
+					isHardcoded: {
+						type: "boolean",
+						description: "True if this config cannot be updated via API",
+					},
+					description: { type: "string", maxLength: 500, nullable: true },
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
 			AlertRuleCreateRequest: {
 				type: "object",
-				required: ["name", "severity", "ruleConfig"],
+				required: ["name", "severity"],
 				properties: {
+					id: {
+						type: "string",
+						maxLength: 64,
+						description: "Alert code (e.g., '2501', 'AUTO_UMA')",
+					},
 					name: { type: "string", minLength: 1, maxLength: 200 },
 					description: { type: "string", maxLength: 1000, nullable: true },
 					active: { type: "boolean", default: true },
@@ -2875,12 +3933,9 @@ export const openAPISpec = {
 						$ref: "#/components/schemas/AlertSeverity",
 						default: "MEDIUM",
 					},
-					ruleConfig: {
-						type: "object",
-						description:
-							"Dynamic rule configuration. Examples: transaction_amount, transaction_count, aggregate_amount, custom",
-						additionalProperties: true,
-					},
+					ruleType: { type: "string", maxLength: 100, nullable: true },
+					isManualOnly: { type: "boolean", default: false },
+					activityCode: { type: "string", maxLength: 10, default: "VEH" },
 					metadata: {
 						type: "object",
 						nullable: true,
@@ -2895,15 +3950,31 @@ export const openAPISpec = {
 					description: { type: "string", maxLength: 1000, nullable: true },
 					active: { type: "boolean" },
 					severity: { $ref: "#/components/schemas/AlertSeverity" },
-					ruleConfig: {
-						type: "object",
-						additionalProperties: true,
-					},
+					ruleType: { type: "string", maxLength: 100, nullable: true },
+					isManualOnly: { type: "boolean" },
+					activityCode: { type: "string", maxLength: 10 },
 					metadata: {
 						type: "object",
 						nullable: true,
 						additionalProperties: true,
 					},
+				},
+			},
+			AlertRuleConfigCreateRequest: {
+				type: "object",
+				required: ["key", "value"],
+				properties: {
+					key: { type: "string", minLength: 1, maxLength: 100 },
+					value: { type: "string", description: "JSON string value" },
+					isHardcoded: { type: "boolean", default: false },
+					description: { type: "string", maxLength: 500, nullable: true },
+				},
+			},
+			AlertRuleConfigUpdateRequest: {
+				type: "object",
+				properties: {
+					value: { type: "string" },
+					description: { type: "string", maxLength: 500, nullable: true },
 				},
 			},
 			Alert: {
@@ -2916,7 +3987,8 @@ export const openAPISpec = {
 					"severity",
 					"idempotencyKey",
 					"contextHash",
-					"alertData",
+					"metadata",
+					"isManual",
 					"createdAt",
 					"updatedAt",
 				],
@@ -2933,7 +4005,7 @@ export const openAPISpec = {
 					},
 					clientId: {
 						type: "string",
-						description: "Client ID (RFC) for which this alert was generated",
+						description: "Client ID for which this alert was generated",
 					},
 					status: { $ref: "#/components/schemas/AlertStatus" },
 					severity: { $ref: "#/components/schemas/AlertSeverity" },
@@ -2949,17 +4021,21 @@ export const openAPISpec = {
 						description:
 							"Hash of the specific data that triggered this alert (transaction IDs, amounts, dates, etc.)",
 					},
-					alertData: {
+					metadata: {
 						type: "object",
 						description:
 							"Alert-specific data stored as JSON (transaction IDs, amounts, dates, etc.)",
 						additionalProperties: true,
 					},
-					triggerTransactionId: {
+					transactionId: {
 						type: "string",
 						nullable: true,
 						description:
 							"Optional reference to the transaction that triggered the alert",
+					},
+					isManual: {
+						type: "boolean",
+						description: "True if the alert was manually created",
 					},
 					submissionDeadline: {
 						type: "string",
@@ -3037,7 +4113,7 @@ export const openAPISpec = {
 					"severity",
 					"idempotencyKey",
 					"contextHash",
-					"alertData",
+					"metadata",
 				],
 				properties: {
 					alertRuleId: { type: "string" },
@@ -3057,13 +4133,18 @@ export const openAPISpec = {
 						description:
 							"Hash of the specific data that triggered this alert (transaction IDs, amounts, dates, etc.)",
 					},
-					alertData: {
+					metadata: {
 						type: "object",
 						description:
 							"Alert-specific data stored as JSON (transaction IDs, amounts, dates, etc.)",
 						additionalProperties: true,
 					},
-					triggerTransactionId: { type: "string", nullable: true },
+					transactionId: { type: "string", nullable: true },
+					isManual: {
+						type: "boolean",
+						default: false,
+						description: "True if manually created",
+					},
 					submissionDeadline: {
 						type: "string",
 						format: "date-time",
@@ -3309,11 +4390,11 @@ export const openAPISpec = {
 					},
 				},
 			},
-			ComplianceOrganization: {
+			OrganizationSettings: {
 				type: "object",
 				required: [
 					"id",
-					"userId",
+					"organizationId",
 					"obligatedSubjectKey",
 					"activityKey",
 					"createdAt",
@@ -3323,12 +4404,12 @@ export const openAPISpec = {
 					id: {
 						type: "string",
 						pattern: "^[A-Za-z0-9-]{1,64}$",
-						description: "Compliance organization identifier",
+						description: "Organization settings identifier",
 					},
-					userId: {
+					organizationId: {
 						type: "string",
 						description:
-							"User ID from JWT (compliance officer) - unique, 1:1 relationship",
+							"Organization ID from auth-svc (better-auth organization plugin)",
 					},
 					obligatedSubjectKey: {
 						type: "string",
@@ -3349,7 +4430,7 @@ export const openAPISpec = {
 					updatedAt: { type: "string", format: "date-time" },
 				},
 			},
-			ComplianceOrganizationCreateRequest: {
+			OrganizationSettingsCreateRequest: {
 				type: "object",
 				required: ["obligatedSubjectKey", "activityKey"],
 				properties: {
@@ -3370,7 +4451,7 @@ export const openAPISpec = {
 					},
 				},
 			},
-			ComplianceOrganizationUpdateRequest: {
+			OrganizationSettingsUpdateRequest: {
 				type: "object",
 				properties: {
 					obligatedSubjectKey: {
@@ -3388,6 +4469,281 @@ export const openAPISpec = {
 						description:
 							"Vulnerable activity code (e.g., 'VEH') - reference to vulnerable-activities catalog",
 					},
+				},
+			},
+			ReportType: {
+				type: "string",
+				enum: ["MONTHLY", "QUARTERLY", "ANNUAL", "CUSTOM"],
+				description:
+					"Report type: MONTHLY generates SAT XML, others generate PDF",
+			},
+			ReportStatus: {
+				type: "string",
+				enum: ["DRAFT", "GENERATED", "SUBMITTED", "ACKNOWLEDGED"],
+				description: "Report lifecycle status",
+			},
+			Report: {
+				type: "object",
+				required: [
+					"id",
+					"organizationId",
+					"name",
+					"type",
+					"status",
+					"periodStart",
+					"periodEnd",
+					"reportedMonth",
+					"recordCount",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: {
+						type: "string",
+						pattern: "^RPT[A-Za-z0-9]{9}$",
+						description: "Report identifier",
+					},
+					organizationId: { type: "string" },
+					name: { type: "string", maxLength: 200 },
+					type: { $ref: "#/components/schemas/ReportType" },
+					status: { $ref: "#/components/schemas/ReportStatus" },
+					periodStart: { type: "string", format: "date-time" },
+					periodEnd: { type: "string", format: "date-time" },
+					reportedMonth: {
+						type: "string",
+						pattern: "^\\d{4}(0[1-9]|1[0-2]|Q[1-4])?$",
+						description:
+							"YYYYMM for monthly, YYYYQ# for quarterly, YYYY for annual",
+					},
+					recordCount: { type: "integer", minimum: 0 },
+					xmlFileUrl: {
+						type: "string",
+						nullable: true,
+						description: "R2 URL of SAT XML file (MONTHLY only)",
+					},
+					pdfFileUrl: {
+						type: "string",
+						nullable: true,
+						description: "R2 URL of PDF report (QUARTERLY/ANNUAL/CUSTOM)",
+					},
+					fileSize: { type: "integer", nullable: true },
+					generatedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+					},
+					submittedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "SAT submission date (MONTHLY only)",
+					},
+					satFolioNumber: {
+						type: "string",
+						nullable: true,
+						description: "SAT acknowledgment folio (MONTHLY only)",
+					},
+					createdBy: { type: "string", nullable: true },
+					notes: { type: "string", maxLength: 1000, nullable: true },
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			ReportWithAlertSummary: {
+				allOf: [
+					{ $ref: "#/components/schemas/Report" },
+					{
+						type: "object",
+						properties: {
+							alertSummary: {
+								type: "object",
+								properties: {
+									total: { type: "integer" },
+									bySeverity: {
+										type: "object",
+										additionalProperties: { type: "integer" },
+									},
+									byStatus: {
+										type: "object",
+										additionalProperties: { type: "integer" },
+									},
+									byRule: {
+										type: "array",
+										items: {
+											type: "object",
+											properties: {
+												ruleId: { type: "string" },
+												ruleName: { type: "string" },
+												count: { type: "integer" },
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				],
+			},
+			ReportCreateRequest: {
+				type: "object",
+				required: ["name", "periodStart", "periodEnd", "reportedMonth"],
+				properties: {
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					type: { $ref: "#/components/schemas/ReportType" },
+					periodStart: { type: "string", format: "date-time" },
+					periodEnd: { type: "string", format: "date-time" },
+					reportedMonth: {
+						type: "string",
+						pattern: "^\\d{4}(0[1-9]|1[0-2])$",
+						description: "YYYYMM format",
+					},
+					notes: { type: "string", maxLength: 1000, nullable: true },
+				},
+			},
+			ReportPatchRequest: {
+				type: "object",
+				properties: {
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					status: { $ref: "#/components/schemas/ReportStatus" },
+					notes: { type: "string", maxLength: 1000, nullable: true },
+					satFolioNumber: { type: "string", maxLength: 100, nullable: true },
+					submittedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+					},
+				},
+			},
+			ReportPreviewResponse: {
+				type: "object",
+				properties: {
+					total: { type: "integer" },
+					bySeverity: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					byStatus: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					periodStart: { type: "string", format: "date-time" },
+					periodEnd: { type: "string", format: "date-time" },
+				},
+			},
+			// Notice schemas
+			NoticeStatus: {
+				type: "string",
+				enum: ["DRAFT", "GENERATED", "SUBMITTED", "ACKNOWLEDGED"],
+				description: "Status of a SAT notice",
+			},
+			Notice: {
+				type: "object",
+				required: [
+					"id",
+					"organizationId",
+					"name",
+					"status",
+					"periodStart",
+					"periodEnd",
+					"reportedMonth",
+					"recordCount",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: { type: "string" },
+					organizationId: { type: "string" },
+					name: { type: "string" },
+					status: { $ref: "#/components/schemas/NoticeStatus" },
+					periodStart: { type: "string", format: "date-time" },
+					periodEnd: { type: "string", format: "date-time" },
+					reportedMonth: {
+						type: "string",
+						pattern: "^\\d{6}$",
+						description: "YYYYMM format for the SAT reporting month",
+					},
+					recordCount: { type: "integer" },
+					xmlFileUrl: { type: "string", nullable: true },
+					fileSize: { type: "integer", nullable: true },
+					generatedAt: { type: "string", format: "date-time", nullable: true },
+					submittedAt: { type: "string", format: "date-time", nullable: true },
+					satFolioNumber: { type: "string", nullable: true },
+					createdBy: { type: "string", nullable: true },
+					notes: { type: "string", nullable: true },
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			NoticeWithAlertSummary: {
+				allOf: [
+					{ $ref: "#/components/schemas/Notice" },
+					{
+						type: "object",
+						properties: {
+							alertSummary: {
+								type: "object",
+								properties: {
+									total: { type: "integer" },
+									bySeverity: {
+										type: "object",
+										additionalProperties: { type: "integer" },
+									},
+									byStatus: {
+										type: "object",
+										additionalProperties: { type: "integer" },
+									},
+									byRule: {
+										type: "array",
+										items: {
+											type: "object",
+											properties: {
+												ruleId: { type: "string" },
+												ruleName: { type: "string" },
+												count: { type: "integer" },
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				],
+			},
+			NoticeCreateRequest: {
+				type: "object",
+				required: ["name", "year", "month"],
+				properties: {
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					year: { type: "integer", minimum: 2020, maximum: 2100 },
+					month: { type: "integer", minimum: 1, maximum: 12 },
+					notes: { type: "string", maxLength: 1000, nullable: true },
+				},
+			},
+			NoticePatchRequest: {
+				type: "object",
+				properties: {
+					name: { type: "string", minLength: 1, maxLength: 200 },
+					notes: { type: "string", maxLength: 1000, nullable: true },
+					satFolioNumber: { type: "string", maxLength: 100, nullable: true },
+				},
+			},
+			NoticePreviewResponse: {
+				type: "object",
+				properties: {
+					total: { type: "integer" },
+					bySeverity: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					byStatus: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					periodStart: { type: "string", format: "date-time" },
+					periodEnd: { type: "string", format: "date-time" },
+					reportedMonth: { type: "string" },
+					displayName: { type: "string" },
+					submissionDeadline: { type: "string", format: "date-time" },
 				},
 			},
 		},

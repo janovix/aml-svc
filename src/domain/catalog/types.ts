@@ -3,6 +3,7 @@ export interface CatalogEntity {
 	key: string;
 	name: string;
 	active: boolean;
+	allowNewItems: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -33,7 +34,7 @@ export interface CatalogPagination {
 }
 
 export interface PaginatedCatalogResult {
-	catalog: Pick<CatalogEntity, "id" | "key" | "name">;
+	catalog: Pick<CatalogEntity, "id" | "key" | "name" | "allowNewItems">;
 	data: CatalogItemEntity[];
 	pagination: CatalogPagination;
 }

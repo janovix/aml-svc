@@ -1,10 +1,12 @@
 import type {
 	Alert as PrismaAlertModel,
 	AlertRule as PrismaAlertRuleModel,
+	AlertRuleConfig as PrismaAlertRuleConfigModel,
 	AlertSeverity as PrismaAlertSeverity,
 	AlertStatus as PrismaAlertStatus,
 } from "@prisma/client";
 
+import { generateId } from "../../lib/id-generator";
 import type {
 	AlertCreateInput,
 	AlertPatchInput,
@@ -12,9 +14,12 @@ import type {
 	AlertRulePatchInput,
 	AlertRuleUpdateInput,
 	AlertUpdateInput,
+	AlertRuleConfigCreateInput,
+	AlertRuleConfigUpdateInput,
 } from "./schemas";
 import type {
 	AlertEntity,
+	AlertRuleConfigEntity,
 	AlertRuleEntity,
 	AlertSeverity,
 	AlertStatus,
@@ -85,8 +90,25 @@ export function mapPrismaAlertRule(
 		description: prisma.description,
 		active: Boolean(prisma.active),
 		severity: ALERT_SEVERITY_FROM_PRISMA[prisma.severity],
-		ruleConfig: parseJson(prisma.ruleConfig) ?? {},
+		ruleType: prisma.ruleType,
+		isManualOnly: Boolean(prisma.isManualOnly),
+		activityCode: prisma.activityCode,
 		metadata: parseJson(prisma.metadata ?? null),
+		createdAt: mapDateTime(prisma.createdAt) ?? "",
+		updatedAt: mapDateTime(prisma.updatedAt) ?? "",
+	};
+}
+
+export function mapPrismaAlertRuleConfig(
+	prisma: PrismaAlertRuleConfigModel,
+): AlertRuleConfigEntity {
+	return {
+		id: prisma.id,
+		alertRuleId: prisma.alertRuleId,
+		key: prisma.key,
+		value: prisma.value,
+		isHardcoded: Boolean(prisma.isHardcoded),
+		description: prisma.description,
 		createdAt: mapDateTime(prisma.createdAt) ?? "",
 		updatedAt: mapDateTime(prisma.updatedAt) ?? "",
 	};
@@ -101,11 +123,11 @@ export function mapPrismaAlert(prisma: PrismaAlertModel): AlertEntity {
 		severity: ALERT_SEVERITY_FROM_PRISMA[prisma.severity],
 		idempotencyKey: prisma.idempotencyKey,
 		contextHash: prisma.contextHash,
-		alertData: parseJson(prisma.alertData) ?? {},
-		triggerTransactionId: prisma.triggerTransactionId,
+		metadata: parseJson(prisma.metadata) ?? {},
+		transactionId: prisma.transactionId,
+		isManual: Boolean(prisma.isManual),
 		submissionDeadline: mapDateTime(prisma.submissionDeadline),
 		fileGeneratedAt: mapDateTime(prisma.fileGeneratedAt),
-		satFileUrl: prisma.satFileUrl,
 		submittedAt: mapDateTime(prisma.submittedAt),
 		satAcknowledgmentReceipt: prisma.satAcknowledgmentReceipt,
 		satFolioNumber: prisma.satFolioNumber,
@@ -123,13 +145,16 @@ export function mapPrismaAlert(prisma: PrismaAlertModel): AlertEntity {
 
 export function mapAlertRuleCreateInputToPrisma(
 	input: AlertRuleCreateInput,
-): Omit<PrismaAlertRuleModel, "id" | "createdAt" | "updatedAt"> {
+): Omit<PrismaAlertRuleModel, "createdAt" | "updatedAt"> {
 	return {
+		id: input.id ?? generateId("ALERT_RULE"),
 		name: input.name,
 		description: input.description ?? null,
 		active: input.active,
 		severity: ALERT_SEVERITY_TO_PRISMA[input.severity],
-		ruleConfig: serializeJson(input.ruleConfig) ?? "{}",
+		ruleType: input.ruleType ?? null,
+		isManualOnly: input.isManualOnly ?? false,
+		activityCode: input.activityCode ?? "VEH",
 		metadata: serializeJson(input.metadata ?? null),
 	};
 }
@@ -142,7 +167,9 @@ export function mapAlertRuleUpdateInputToPrisma(
 		description: input.description ?? null,
 		active: input.active,
 		severity: ALERT_SEVERITY_TO_PRISMA[input.severity],
-		ruleConfig: serializeJson(input.ruleConfig) ?? "{}",
+		ruleType: input.ruleType ?? null,
+		isManualOnly: input.isManualOnly ?? false,
+		activityCode: input.activityCode ?? "VEH",
 		metadata: serializeJson(input.metadata ?? null),
 	};
 }
@@ -166,8 +193,14 @@ export function mapAlertRulePatchInputToPrisma(
 	if (input.severity !== undefined) {
 		result.severity = ALERT_SEVERITY_TO_PRISMA[input.severity];
 	}
-	if (input.ruleConfig !== undefined) {
-		result.ruleConfig = serializeJson(input.ruleConfig) ?? "{}";
+	if (input.ruleType !== undefined) {
+		result.ruleType = input.ruleType ?? null;
+	}
+	if (input.isManualOnly !== undefined) {
+		result.isManualOnly = input.isManualOnly;
+	}
+	if (input.activityCode !== undefined) {
+		result.activityCode = input.activityCode;
 	}
 	if (input.metadata !== undefined) {
 		result.metadata = serializeJson(input.metadata ?? null);
@@ -176,23 +209,67 @@ export function mapAlertRulePatchInputToPrisma(
 	return result;
 }
 
+export function mapAlertRuleConfigCreateInputToPrisma(
+	input: AlertRuleConfigCreateInput,
+	alertRuleId: string,
+): Omit<PrismaAlertRuleConfigModel, "createdAt" | "updatedAt"> {
+	return {
+		id: generateId("ALERT_RULE_CONFIG"),
+		alertRuleId,
+		key: input.key,
+		value: input.value,
+		isHardcoded: input.isHardcoded ?? false,
+		description: input.description ?? null,
+	};
+}
+
+export function mapAlertRuleConfigUpdateInputToPrisma(
+	input: AlertRuleConfigUpdateInput,
+): Partial<
+	Omit<
+		PrismaAlertRuleConfigModel,
+		"id" | "alertRuleId" | "createdAt" | "updatedAt"
+	>
+> {
+	const result: Partial<
+		Omit<
+			PrismaAlertRuleConfigModel,
+			"id" | "alertRuleId" | "createdAt" | "updatedAt"
+		>
+	> = {};
+
+	if (input.value !== undefined) {
+		result.value = input.value;
+	}
+	if (input.description !== undefined) {
+		result.description = input.description ?? null;
+	}
+
+	return result;
+}
+
 export function mapAlertCreateInputToPrisma(
 	input: AlertCreateInput,
-): Omit<PrismaAlertModel, "id" | "createdAt" | "updatedAt"> {
+	organizationId: string,
+): Omit<PrismaAlertModel, "createdAt" | "updatedAt"> {
 	return {
+		id: generateId("ALERT"),
+		organizationId,
 		alertRuleId: input.alertRuleId,
 		clientId: input.clientId,
 		status: "DETECTED",
 		severity: ALERT_SEVERITY_TO_PRISMA[input.severity],
 		idempotencyKey: input.idempotencyKey,
 		contextHash: input.contextHash,
-		alertData: serializeJson(input.alertData) ?? "{}",
-		triggerTransactionId: input.triggerTransactionId ?? null,
+		metadata: serializeJson(input.metadata) ?? "{}",
+		transactionId: input.transactionId ?? null,
+		isManual: input.isManual ?? false,
+		reportId: null, // Reports are assigned later
+		noticeId: null, // Notices are assigned later
 		submissionDeadline: input.submissionDeadline
 			? new Date(input.submissionDeadline)
 			: null,
 		fileGeneratedAt: null,
-		satFileUrl: null,
 		submittedAt: null,
 		satAcknowledgmentReceipt: null,
 		satFolioNumber: null,
@@ -218,9 +295,10 @@ export function mapAlertUpdateInputToPrisma(
 		| "clientId"
 		| "idempotencyKey"
 		| "contextHash"
-		| "alertData"
+		| "metadata"
 		| "severity"
-		| "triggerTransactionId"
+		| "transactionId"
+		| "isManual"
 	>
 > {
 	const result: Partial<
@@ -233,9 +311,10 @@ export function mapAlertUpdateInputToPrisma(
 			| "clientId"
 			| "idempotencyKey"
 			| "contextHash"
-			| "alertData"
+			| "metadata"
 			| "severity"
-			| "triggerTransactionId"
+			| "transactionId"
+			| "isManual"
 		>
 	> = {};
 
@@ -315,9 +394,10 @@ export function mapAlertPatchInputToPrisma(
 		| "clientId"
 		| "idempotencyKey"
 		| "contextHash"
-		| "alertData"
+		| "metadata"
 		| "severity"
-		| "triggerTransactionId"
+		| "transactionId"
+		| "isManual"
 	>
 > {
 	const result: Partial<
@@ -330,9 +410,10 @@ export function mapAlertPatchInputToPrisma(
 			| "clientId"
 			| "idempotencyKey"
 			| "contextHash"
-			| "alertData"
+			| "metadata"
 			| "severity"
-			| "triggerTransactionId"
+			| "transactionId"
+			| "isManual"
 		>
 	> = {};
 

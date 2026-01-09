@@ -23,6 +23,8 @@ export interface AuthTokenPayload {
 	email?: string;
 	/** User name (if included in token) */
 	name?: string;
+	/** Active organization ID (from better-auth organization plugin) */
+	organizationId?: string | null;
 }
 
 /**
@@ -32,6 +34,13 @@ export interface AuthUser {
 	id: string;
 	email?: string;
 	name?: string;
+}
+
+/**
+ * Organization context extracted from JWT
+ */
+export interface AuthOrganization {
+	id: string;
 }
 
 /**
@@ -49,6 +58,7 @@ export type AuthBindings = Bindings & {
  */
 export interface AuthVariables {
 	user: AuthUser;
+	organization: AuthOrganization | null;
 	token: string;
 	tokenPayload: AuthTokenPayload;
 }
@@ -167,6 +177,7 @@ function extractBearerToken(authHeader: string | undefined): string | null {
  *
  * @param options - Configuration options
  * @param options.optional - If true, allows unauthenticated requests to pass through
+ * @param options.requireOrganization - If true, requires an active organization in the JWT
  * @returns Hono middleware handler
  *
  * @example
@@ -175,14 +186,18 @@ function extractBearerToken(authHeader: string | undefined): string | null {
  *
  * // Optional authentication (user info available if token present)
  * router.use("*", authMiddleware({ optional: true }));
+ *
+ * // Require authentication AND organization context
+ * router.use("*", authMiddleware({ requireOrganization: true }));
  */
 export function authMiddleware(options?: {
 	optional?: boolean;
+	requireOrganization?: boolean;
 }): MiddlewareHandler<{
 	Bindings: AuthBindings;
 	Variables: AuthVariables;
 }> {
-	const { optional = false } = options ?? {};
+	const { optional = false, requireOrganization = false } = options ?? {};
 
 	return async (c, next) => {
 		const authHeader = c.req.header("Authorization");
@@ -239,9 +254,31 @@ export function authMiddleware(options?: {
 				name: payload.name,
 			};
 
+			// Extract organization context from JWT (set by better-auth organization plugin)
+			const organization: AuthOrganization | null = payload.organizationId
+				? { id: payload.organizationId }
+				: null;
+
 			c.set("user", user);
+			c.set("organization", organization);
 			c.set("token", token);
 			c.set("tokenPayload", payload);
+
+			// Check if organization is required but not present
+			// Return 409 Conflict to distinguish from 403 Forbidden (access denied)
+			// This allows the frontend to detect "no org selected" vs "unauthorized"
+			if (requireOrganization && !organization) {
+				return c.json(
+					{
+						success: false,
+						error: "Organization Required",
+						code: "ORGANIZATION_REQUIRED",
+						message:
+							"An active organization must be selected. Please switch to an organization first.",
+					},
+					409,
+				);
+			}
 
 			return next();
 		} catch (error) {
@@ -334,6 +371,58 @@ export function getAuthUserOrNull(
 	c: Context<{ Variables: Partial<AuthVariables> }>,
 ): AuthUser | null {
 	return c.get("user") ?? null;
+}
+
+/**
+ * Helper to get the organization context from JWT
+ * Throws if organization is not set (user hasn't selected an organization)
+ */
+export function getAuthOrganization(
+	c: Context<{ Variables: Partial<AuthVariables> }>,
+): AuthOrganization {
+	const organization = c.get("organization");
+	if (!organization) {
+		throw new Error(
+			"Organization not set. User must select an active organization.",
+		);
+	}
+	return organization;
+}
+
+/**
+ * Helper to get the organization context from JWT, or null if not set
+ */
+export function getAuthOrganizationOrNull(
+	c: Context<{ Variables: Partial<AuthVariables> }>,
+): AuthOrganization | null {
+	return c.get("organization") ?? null;
+}
+
+/**
+ * Helper to get the organization ID from context
+ * Throws if organization is not set
+ */
+export function getOrganizationId<
+	E extends { Variables?: Partial<AuthVariables> | AuthVariables },
+>(c: Context<E>): string {
+	const organization = (
+		c as unknown as Context<{ Variables: Partial<AuthVariables> }>
+	).get("organization");
+	if (!organization) {
+		throw new Error(
+			"Organization not set. User must select an active organization.",
+		);
+	}
+	return organization.id;
+}
+
+/**
+ * Helper to get the organization ID from context, or null if not set
+ */
+export function getOrganizationIdOrNull(
+	c: Context<{ Variables: Partial<AuthVariables> }>,
+): string | null {
+	return getAuthOrganizationOrNull(c)?.id ?? null;
 }
 
 /**

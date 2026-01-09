@@ -1,5 +1,42 @@
-# [1.1.0](https://github.com/janovix/aml-svc/compare/v1.0.0...v1.1.0) (2025-12-30)
+# [1.2.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.1.0...v1.2.0-rc.1) (2026-01-09)
 
+
+### Bug Fixes
+
+* add validation for GitHub Secrets in synthetic data generation workflow ([ba12a45](https://github.com/janovix/aml-svc/commit/ba12a45e593b644c69715658551a223ee872aa5b))
+* enhance JSONC parsing in synthetic data generation script to handle multi-line comments and trailing commas ([b0ff3f1](https://github.com/janovix/aml-svc/commit/b0ff3f1f2c004e77c162eae909ef46004fd87d0e))
+* ensure correct order of alert rule and config seeding scripts ([0b0e392](https://github.com/janovix/aml-svc/commit/0b0e39263215a829131ce4bcb9316faeed5446dc))
+* implement synthetic data generation for clients and transactions with SQL output ([e3eb469](https://github.com/janovix/aml-svc/commit/e3eb469b4421b2dae969c1cd7aa2c3c374100781))
+* improve JSONC parsing in synthetic data generation script to handle edge cases with comments and trailing commas ([7c87c47](https://github.com/janovix/aml-svc/commit/7c87c4719994044cea7267647c03d355caef16a7))
+* remove working-directory specification for synthetic data generation in GitHub Actions workflow ([58f9cd7](https://github.com/janovix/aml-svc/commit/58f9cd7ae55c43e2defff4b2ec148d15c6d62cd9))
+* update auth middleware to return 409 Conflict for missing organization ([f6f633a](https://github.com/janovix/aml-svc/commit/f6f633abce89e15e400145137279a38b629417e7))
+
+
+### Features
+
+* add Caddyfile for local development and update README with local dev instructions ([8f95e28](https://github.com/janovix/aml-svc/commit/8f95e281de5e5fc0ac087c5fee3719bd0047bdf7))
+* add endpoints for retrieving catalog items by ID and active alert rules for seekers ([ab78f97](https://github.com/janovix/aml-svc/commit/ab78f973f3e0a6c8efc3d632bf3e3f97a7e94a13))
+* add Notices API endpoints for managing SAT notices and their statuses ([e051bc6](https://github.com/janovix/aml-svc/commit/e051bc6801e48df5b9c01be15623c9ab10e74300))
+* add organization ID support in synthetic data generation and update related services ([a5573c0](https://github.com/janovix/aml-svc/commit/a5573c04454d5c77457b116347c969907cf2d962))
+* add report management functionality ([b22edff](https://github.com/janovix/aml-svc/commit/b22edff5e93c5b55996504735571db477f51b64b))
+* add service binding routes for alert rules and UMA values with support for parameterized paths ([8e4aac2](https://github.com/janovix/aml-svc/commit/8e4aac2e90e689de35b6e89f68ce307f8d646c64))
+* add target environment input and dynamic wrangler config selection for synthetic data generation ([066d0cb](https://github.com/janovix/aml-svc/commit/066d0cb7503657bee2867021d88a1614659217be))
+* Add target environment to synthetic data generation ([1ea0117](https://github.com/janovix/aml-svc/commit/1ea0117eb51d34e9b4db852d1fca780c2e8a8097))
+* add UMA values population and seeding scripts ([f80008c](https://github.com/janovix/aml-svc/commit/f80008cee92ed297686b10540a75c20ad7ae10ca))
+* enhance Notice API to manage pending notices and improve statistics retrieval ([5e8a5fc](https://github.com/janovix/aml-svc/commit/5e8a5fc346bb7320998158fd8798117539ea7c29))
+* enhance Notices API to include transaction data for alerts and improve XML generation process ([a252258](https://github.com/janovix/aml-svc/commit/a2522580f27491121096b115b2b8968e02499a46))
+* enhance OpenAPI specifications for alerts, transactions, and clients with detailed response schemas ([a4b74de](https://github.com/janovix/aml-svc/commit/a4b74debfa8ba9882514cde7a5e345c85ff98f45))
+* implement catalog enrichment service for transactions ([9733c34](https://github.com/janovix/aml-svc/commit/9733c348064080618467cb221d964f1755fbd4a7))
+* implement client data and transaction retrieval endpoints in service binding ([03d16e0](https://github.com/janovix/aml-svc/commit/03d16e0f1eba01adaea7aba38db0fadc6e6281ef))
+* implement custom ID generation for clients and related entities ([82aac9d](https://github.com/janovix/aml-svc/commit/82aac9dd5da51c11ae0f8fc4a50ab99be07dacfe))
+* implement flexible item retrieval by ID, shortName, or code in CatalogRepository ([d58b913](https://github.com/janovix/aml-svc/commit/d58b913cfb08a23e2848736643d6333cd6126d16))
+* implement global alert rules architecture and configuration management ([e115073](https://github.com/janovix/aml-svc/commit/e115073466330c27428355b2cacd45829490c080))
+* implement Notices & Reports API with migration and service enhancements ([534b005](https://github.com/janovix/aml-svc/commit/534b005a7adba31743c84c696ce7d3dd55820556))
+* Improve RFC validation and add tests ([1fb6a8f](https://github.com/janovix/aml-svc/commit/1fb6a8f2f2f9fda0858780a2f03d4a4acbb074e6))
+* new vehicle brand catalogs and organization settings ([209b64d](https://github.com/janovix/aml-svc/commit/209b64d7a6e522375a48e6328ec1322906b8a9b7))
+* remove migration script for MONTHLY reports to Notices ([fd0b3eb](https://github.com/janovix/aml-svc/commit/fd0b3ebbb0fd6502b1f5ce9062f8ebc271e06905))
+
+# [1.1.0](https://github.com/janovix/aml-svc/compare/v1.0.0...v1.1.0) (2025-12-30)
 
 ### Bug Fixes
 
@@ -43,6 +80,172 @@
 ### Reverts
 
 * remove cookie-based auth, use JWT Bearer tokens only ([bd40f6c](https://github.com/janovix/aml-svc/commit/bd40f6c71fa62121dc5ec11db3183e3d42931bbe))
+
+
+# [1.1.0-rc.37](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.36...v1.1.0-rc.37) (2026-01-07)
+
+
+### Features
+
+* enhance Notice API to manage pending notices and improve statistics retrieval ([5e8a5fc](https://github.com/janovix/aml-svc/commit/5e8a5fc346bb7320998158fd8798117539ea7c29))
+
+# [1.1.0-rc.36](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.35...v1.1.0-rc.36) (2026-01-06)
+
+
+### Features
+
+* enhance Notices API to include transaction data for alerts and improve XML generation process ([a252258](https://github.com/janovix/aml-svc/commit/a2522580f27491121096b115b2b8968e02499a46))
+
+# [1.1.0-rc.35](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.34...v1.1.0-rc.35) (2026-01-06)
+
+
+### Features
+
+* add Notices API endpoints for managing SAT notices and their statuses ([e051bc6](https://github.com/janovix/aml-svc/commit/e051bc6801e48df5b9c01be15623c9ab10e74300))
+* enhance OpenAPI specifications for alerts, transactions, and clients with detailed response schemas ([a4b74de](https://github.com/janovix/aml-svc/commit/a4b74debfa8ba9882514cde7a5e345c85ff98f45))
+* implement Notices & Reports API with migration and service enhancements ([534b005](https://github.com/janovix/aml-svc/commit/534b005a7adba31743c84c696ce7d3dd55820556))
+* remove migration script for MONTHLY reports to Notices ([fd0b3eb](https://github.com/janovix/aml-svc/commit/fd0b3ebbb0fd6502b1f5ce9062f8ebc271e06905))
+
+# [1.1.0-rc.34](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.33...v1.1.0-rc.34) (2026-01-05)
+
+
+### Features
+
+* add UMA values population and seeding scripts ([f80008c](https://github.com/janovix/aml-svc/commit/f80008cee92ed297686b10540a75c20ad7ae10ca))
+
+# [1.1.0-rc.33](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.32...v1.1.0-rc.33) (2026-01-05)
+
+
+### Features
+
+* add report management functionality ([b22edff](https://github.com/janovix/aml-svc/commit/b22edff5e93c5b55996504735571db477f51b64b))
+
+# [1.1.0-rc.32](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.31...v1.1.0-rc.32) (2026-01-03)
+
+
+### Features
+
+* implement client data and transaction retrieval endpoints in service binding ([03d16e0](https://github.com/janovix/aml-svc/commit/03d16e0f1eba01adaea7aba38db0fadc6e6281ef))
+
+# [1.1.0-rc.31](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.30...v1.1.0-rc.31) (2026-01-03)
+
+
+### Features
+
+* add service binding routes for alert rules and UMA values with support for parameterized paths ([8e4aac2](https://github.com/janovix/aml-svc/commit/8e4aac2e90e689de35b6e89f68ce307f8d646c64))
+
+# [1.1.0-rc.30](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.29...v1.1.0-rc.30) (2026-01-03)
+
+
+### Features
+
+* add Caddyfile for local development and update README with local dev instructions ([8f95e28](https://github.com/janovix/aml-svc/commit/8f95e281de5e5fc0ac087c5fee3719bd0047bdf7))
+
+# [1.1.0-rc.29](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.28...v1.1.0-rc.29) (2026-01-03)
+
+
+### Features
+
+* implement flexible item retrieval by ID, shortName, or code in CatalogRepository ([d58b913](https://github.com/janovix/aml-svc/commit/d58b913cfb08a23e2848736643d6333cd6126d16))
+
+# [1.1.0-rc.28](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.27...v1.1.0-rc.28) (2026-01-03)
+
+
+### Features
+
+* add endpoints for retrieving catalog items by ID and active alert rules for seekers ([ab78f97](https://github.com/janovix/aml-svc/commit/ab78f973f3e0a6c8efc3d632bf3e3f97a7e94a13))
+
+# [1.1.0-rc.27](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.26...v1.1.0-rc.27) (2026-01-02)
+
+
+### Bug Fixes
+
+* ensure correct order of alert rule and config seeding scripts ([0b0e392](https://github.com/janovix/aml-svc/commit/0b0e39263215a829131ce4bcb9316faeed5446dc))
+
+# [1.1.0-rc.26](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.25...v1.1.0-rc.26) (2026-01-02)
+
+
+### Features
+
+* implement global alert rules architecture and configuration management ([e115073](https://github.com/janovix/aml-svc/commit/e115073466330c27428355b2cacd45829490c080))
+
+# [1.1.0-rc.25](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.24...v1.1.0-rc.25) (2025-12-31)
+
+
+### Features
+
+* implement custom ID generation for clients and related entities ([82aac9d](https://github.com/janovix/aml-svc/commit/82aac9dd5da51c11ae0f8fc4a50ab99be07dacfe))
+
+# [1.1.0-rc.24](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.23...v1.1.0-rc.24) (2025-12-31)
+
+
+### Bug Fixes
+
+* update auth middleware to return 409 Conflict for missing organization ([f6f633a](https://github.com/janovix/aml-svc/commit/f6f633abce89e15e400145137279a38b629417e7))
+
+# [1.1.0-rc.23](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.22...v1.1.0-rc.23) (2025-12-31)
+
+
+### Features
+
+* implement catalog enrichment service for transactions ([9733c34](https://github.com/janovix/aml-svc/commit/9733c348064080618467cb221d964f1755fbd4a7))
+
+# [1.1.0-rc.22](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.21...v1.1.0-rc.22) (2025-12-31)
+
+
+### Features
+
+* add organization ID support in synthetic data generation and update related services ([a5573c0](https://github.com/janovix/aml-svc/commit/a5573c04454d5c77457b116347c969907cf2d962))
+* Add target environment to synthetic data generation ([1ea0117](https://github.com/janovix/aml-svc/commit/1ea0117eb51d34e9b4db852d1fca780c2e8a8097))
+* new vehicle brand catalogs and organization settings ([209b64d](https://github.com/janovix/aml-svc/commit/209b64d7a6e522375a48e6328ec1322906b8a9b7))
+
+# [1.1.0-rc.21](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.20...v1.1.0-rc.21) (2025-12-31)
+
+
+### Features
+
+* Improve RFC validation and add tests ([1fb6a8f](https://github.com/janovix/aml-svc/commit/1fb6a8f2f2f9fda0858780a2f03d4a4acbb074e6))
+
+# [1.1.0-rc.20](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.19...v1.1.0-rc.20) (2025-12-30)
+
+
+### Features
+
+* add target environment input and dynamic wrangler config selection for synthetic data generation ([066d0cb](https://github.com/janovix/aml-svc/commit/066d0cb7503657bee2867021d88a1614659217be))
+
+# [1.1.0-rc.19](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.18...v1.1.0-rc.19) (2025-12-30)
+
+
+### Bug Fixes
+
+* implement synthetic data generation for clients and transactions with SQL output ([e3eb469](https://github.com/janovix/aml-svc/commit/e3eb469b4421b2dae969c1cd7aa2c3c374100781))
+
+# [1.1.0-rc.18](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.17...v1.1.0-rc.18) (2025-12-30)
+
+
+### Bug Fixes
+
+* improve JSONC parsing in synthetic data generation script to handle edge cases with comments and trailing commas ([7c87c47](https://github.com/janovix/aml-svc/commit/7c87c4719994044cea7267647c03d355caef16a7))
+
+# [1.1.0-rc.17](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.16...v1.1.0-rc.17) (2025-12-30)
+
+
+### Bug Fixes
+
+* enhance JSONC parsing in synthetic data generation script to handle multi-line comments and trailing commas ([b0ff3f1](https://github.com/janovix/aml-svc/commit/b0ff3f1f2c004e77c162eae909ef46004fd87d0e))
+
+# [1.1.0-rc.16](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.15...v1.1.0-rc.16) (2025-12-30)
+
+
+### Bug Fixes
+
+* add validation for GitHub Secrets in synthetic data generation workflow ([ba12a45](https://github.com/janovix/aml-svc/commit/ba12a45e593b644c69715658551a223ee872aa5b))
+
+# [1.1.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.14...v1.1.0-rc.15) (2025-12-30)
+
+
+### Bug Fixes
+* remove working-directory specification for synthetic data generation in GitHub Actions workflow ([58f9cd7](https://github.com/janovix/aml-svc/commit/58f9cd7ae55c43e2defff4b2ec148d15c6d62cd9))
 
 # [1.1.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.1.0-rc.13...v1.1.0-rc.14) (2025-12-30)
 

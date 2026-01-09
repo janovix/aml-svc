@@ -1,10 +1,12 @@
 # Synthetic Data Generation
 
-This script generates synthetic data (clients, transactions, etc.) for testing and development purposes. It is intended to be run from GitHub Actions via `workflow_dispatch`.
+This script generates synthetic data (clients, transactions, etc.) for testing and development purposes. It can be run from GitHub Actions via `workflow_dispatch` or locally.
 
 ## Usage
 
 ### From GitHub Actions
+
+The script runs entirely within GitHub Actions and connects directly to your D1 database via Cloudflare REST API.
 
 Create a workflow file (e.g., `.github/workflows/generate-synthetic-data.yml`):
 
@@ -52,7 +54,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
-        working-directory: aml-svc
 
       - name: Generate synthetic data
         env:
@@ -60,69 +61,91 @@ jobs:
           MODELS: ${{ inputs.models }}
           CLIENTS_COUNT: ${{ inputs.clients_count }}
           TRANSACTIONS_COUNT: ${{ inputs.transactions_count }}
-          SYNTHETIC_DATA_SECRET: ${{ secrets.SYNTHETIC_DATA_SECRET }}
-          WORKER_URL: ${{ secrets.WORKER_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_CONFIG: wrangler.preview.jsonc
           REMOTE: "true"
         run: node scripts/generate-synthetic-data.mjs
-        working-directory: aml-svc
 ```
+
+**Required GitHub Secrets:**
+
+- `CLOUDFLARE_API_TOKEN` - Cloudflare API token with D1 read/write permissions
+- `CLOUDFLARE_ACCOUNT_ID` - Your Cloudflare account ID
 
 ### From Local Development
 
-1. Start the worker:
+For local development, you can either:
 
-   ```bash
-   cd aml-svc
-   pnpm dev
-   ```
+1. **Run the script directly** (requires wrangler dev to be running):
 
-2. In another terminal, run the script:
    ```bash
    cd aml-svc
    USER_ID=user-123 \
    MODELS=clients,transactions \
    CLIENTS_COUNT=10 \
    TRANSACTIONS_COUNT=50 \
-   SYNTHETIC_DATA_SECRET=your-secret-token \
-   WORKER_URL=http://localhost:8787 \
    node scripts/generate-synthetic-data.mjs
+   ```
+
+2. **Use the HTTP endpoint** (requires wrangler dev to be running with `SYNTHETIC_DATA_SECRET` configured):
+
+   ```bash
+   # Start the worker
+   cd aml-svc
+   pnpm dev
+
+   # In another terminal, call the endpoint
+   curl -X POST http://localhost:8787/internal/synthetic-data \
+     -H "Content-Type: application/json" \
+     -H "X-Synthetic-Data-Secret: your-secret-token" \
+     -d '{
+       "userId": "user-123",
+       "models": ["clients", "transactions"],
+       "options": {
+         "clients": { "count": 10 },
+         "transactions": { "count": 50 }
+       }
+     }'
    ```
 
 ## Environment Variables
 
-| Variable                    | Required     | Description                                            | Default       |
-| --------------------------- | ------------ | ------------------------------------------------------ | ------------- |
-| `USER_ID`                   | Yes          | User ID for which to generate data                     | -             |
-| `MODELS`                    | Yes          | Comma-separated list of models: `clients,transactions` | -             |
-| `CLIENTS_COUNT`             | No           | Number of clients to generate                          | 10            |
-| `CLIENTS_INCLUDE_DOCUMENTS` | No           | Include documents for clients                          | false         |
-| `CLIENTS_INCLUDE_ADDRESSES` | No           | Include addresses for clients                          | false         |
-| `TRANSACTIONS_COUNT`        | No           | Number of transactions to generate                     | 50            |
-| `TRANSACTIONS_PER_CLIENT`   | No           | Number of transactions per client                      | -             |
-| `SYNTHETIC_DATA_SECRET`     | Yes          | Secret token for authentication                        | -             |
-| `WORKER_URL`                | Yes (remote) | URL of the deployed worker                             | -             |
-| `WRANGLER_CONFIG`           | No           | Wrangler config file                                   | Auto-detected |
-| `REMOTE`                    | No           | Use remote database                                    | false         |
+| Variable                    | Required     | Description                                            | Default                |
+| --------------------------- | ------------ | ------------------------------------------------------ | ---------------------- |
+| `USER_ID`                   | Yes          | User ID for which to generate data                     | -                      |
+| `MODELS`                    | Yes          | Comma-separated list of models: `clients,transactions` | -                      |
+| `CLIENTS_COUNT`             | No           | Number of clients to generate                          | 10                     |
+| `CLIENTS_INCLUDE_DOCUMENTS` | No           | Include documents for clients                          | false                  |
+| `CLIENTS_INCLUDE_ADDRESSES` | No           | Include addresses for clients                          | false                  |
+| `TRANSACTIONS_COUNT`        | No           | Number of transactions to generate                     | 50                     |
+| `TRANSACTIONS_PER_CLIENT`   | No           | Number of transactions per client                      | -                      |
+| `CLOUDFLARE_API_TOKEN`      | Yes (remote) | Cloudflare API token for D1 access                     | -                      |
+| `CLOUDFLARE_ACCOUNT_ID`     | Yes (remote) | Cloudflare account ID                                  | -                      |
+| `WRANGLER_CONFIG`           | No           | Wrangler config file                                   | wrangler.preview.jsonc |
+| `REMOTE`                    | No           | Use remote database (set to "true" for GitHub Actions) | false                  |
 
 ## Security
 
-- The endpoint `/internal/synthetic-data` is **not** part of the public API
-- It requires a secret token (`X-Synthetic-Data-Secret` header)
-- It is blocked in production environments
-- The secret should be stored in GitHub Secrets
+- The script connects directly to D1 via Cloudflare REST API when running remotely
+- The `/internal/synthetic-data` HTTP endpoint (for local development) requires a secret token (`X-Synthetic-Data-Secret` header)
+- The HTTP endpoint is blocked in production environments
+- Cloudflare API tokens should be stored in GitHub Secrets with minimal required permissions
 
 ## Configuration
 
-Add the `SYNTHETIC_DATA_SECRET` to your Wrangler configuration:
+For GitHub Actions, add these secrets:
+
+- `CLOUDFLARE_API_TOKEN` - Create at https://dash.cloudflare.com/profile/api-tokens
+- `CLOUDFLARE_ACCOUNT_ID` - Found in your Cloudflare dashboard
+
+For local development using the HTTP endpoint, add `SYNTHETIC_DATA_SECRET` to your Wrangler configuration:
 
 ```jsonc
 // wrangler.preview.jsonc
 {
 	"vars": {
-		"SYNTETIC_DATA_SECRET": "your-secret-token-here",
+		"SYNTHETIC_DATA_SECRET": "your-secret-token-here",
 	},
 }
 ```
-
-And add it to your GitHub Secrets for use in workflows.

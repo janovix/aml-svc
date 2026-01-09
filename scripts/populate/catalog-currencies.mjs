@@ -26,6 +26,14 @@ async function downloadCsv() {
 	return await response.text();
 }
 
+// Keywords to filter out precious metal coins (not actual currencies)
+const EXCLUDED_KEYWORDS = ["LIBERTAD", "HIDALGO", "AZTECA", "CENTENARIO"];
+
+function shouldExcludeEntry(name) {
+	const upperName = name.toUpperCase();
+	return EXCLUDED_KEYWORDS.some((keyword) => upperName.includes(keyword));
+}
+
 function parseCsv(csvText) {
 	const lines = csvText.trim().split("\n");
 	const data = [];
@@ -53,16 +61,33 @@ function parseCsv(csvText) {
 		values.push(current.trim());
 
 		if (values.length >= 3) {
+			const name = values[2];
+			// Skip precious metal coins (LIBERTAD, HIDALGO, AZTECA, CENTENARIO)
+			if (shouldExcludeEntry(name)) {
+				continue;
+			}
 			data.push({
 				key: values[0], // e.g., "1"
 				shortName: values[1], // e.g., "MXN"
-				name: values[2], // e.g., "Peso mexicano"
+				name: name, // e.g., "Peso mexicano"
 				country: values[3] || "", // e.g., "México"
 			});
 		}
 	}
 
 	return data;
+}
+
+// Generate deterministic ID based on catalogId and normalizedName
+function generateDeterministicId(catalogId, normalizedName) {
+	const combined = `${catalogId}-${normalizedName}`;
+	let hash = 0;
+	for (let i = 0; i < combined.length; i++) {
+		const char = combined.charCodeAt(i);
+		hash = (hash << 5) - hash + char;
+		hash = hash & hash;
+	}
+	return Math.abs(hash).toString(16).padStart(32, "0");
 }
 
 function generateSql(catalogId, items) {
@@ -74,10 +99,19 @@ function generateSql(catalogId, items) {
 		VALUES ('${catalogId}', '${CATALOG_KEY}', 'Monedas', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 	`);
 
-	// Delete existing items for this catalog
-	sql.push(`DELETE FROM catalog_items WHERE catalogId = '${catalogId}';`);
+	// Delete precious metal coins that were previously imported
+	sql.push(`
+		DELETE FROM catalog_items 
+		WHERE catalogId = '${catalogId}' 
+		AND (
+			name LIKE '%LIBERTAD%' 
+			OR name LIKE '%HIDALGO%' 
+			OR name LIKE '%AZTECA%' 
+			OR name LIKE '%CENTENARIO%'
+		);
+	`);
 
-	// Insert catalog items
+	// Insert or replace catalog items using deterministic IDs
 	for (const item of items) {
 		// name = human-readable name (e.g., "Peso mexicano", "Dólar estadounidense")
 		const name = item.name.replace(/'/g, "''");
@@ -94,17 +128,18 @@ function generateSql(catalogId, items) {
 			shortName: item.shortName, // e.g., "MXN", "USD"
 			country: item.country,
 		}).replace(/'/g, "''"); // Escape single quotes
+		const itemId = generateDeterministicId(catalogId, normalizedName);
 
 		sql.push(`
-			INSERT INTO catalog_items (id, catalogId, name, normalizedName, active, metadata, createdAt, updatedAt)
+			INSERT OR REPLACE INTO catalog_items (id, catalogId, name, normalizedName, active, metadata, createdAt, updatedAt)
 			VALUES (
-				lower(hex(randomblob(16))),
+				'${itemId}',
 				'${catalogId}',
 				'${name}',
 				'${normalizedName}',
 				1,
 				'${metadata}',
-				CURRENT_TIMESTAMP,
+				COALESCE((SELECT createdAt FROM catalog_items WHERE id = '${itemId}'), CURRENT_TIMESTAMP),
 				CURRENT_TIMESTAMP
 			);
 		`);
@@ -137,8 +172,12 @@ async function populateCurrencyCatalog() {
 
 		// Download and parse CSV
 		const csvText = await downloadCsv();
+		const allLines = csvText.trim().split("\n").length - 1; // Exclude header
 		const items = parseCsv(csvText);
-		console.log(`✅ Parsed ${items.length} currencies from CSV`);
+		const filtered = allLines - items.length;
+		console.log(
+			`✅ Parsed ${items.length} currencies from CSV (filtered out ${filtered} precious metal coins)`,
+		);
 
 		// Generate catalog ID (deterministic based on catalog key)
 		const catalogId = Array.from(CATALOG_KEY)

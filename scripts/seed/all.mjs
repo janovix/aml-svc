@@ -21,6 +21,10 @@ const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
 
 // Determine config file based on environment
 function getConfigFile() {
+	// Check if config is explicitly set (this takes precedence)
+	if (process.env.WRANGLER_CONFIG) {
+		return process.env.WRANGLER_CONFIG;
+	}
 	// Check if we're in preview environment
 	if (
 		process.env.CF_PAGES_BRANCH ||
@@ -29,10 +33,6 @@ function getConfigFile() {
 		process.env.PREVIEW === "true"
 	) {
 		return "wrangler.preview.jsonc";
-	}
-	// Check if config is explicitly set
-	if (process.env.WRANGLER_CONFIG) {
-		return process.env.WRANGLER_CONFIG;
 	}
 	return "";
 }
@@ -50,6 +50,25 @@ async function seedAll() {
 				file.endsWith(".mjs") && file !== "validate.mjs" && file !== "all.mjs",
 		)
 		.sort();
+
+	// Ensure alert rules are seeded before alert rule configs (dependency order)
+	// seed-alert-rule-config.mjs depends on seed-alert-rule.mjs
+	const alertRuleIndex = seedScripts.indexOf("seed-alert-rule.mjs");
+	const alertRuleConfigIndex = seedScripts.indexOf(
+		"seed-alert-rule-config.mjs",
+	);
+
+	if (
+		alertRuleIndex !== -1 &&
+		alertRuleConfigIndex !== -1 &&
+		alertRuleConfigIndex < alertRuleIndex
+	) {
+		// Move alert rule config to after alert rule
+		const configScript = seedScripts.splice(alertRuleConfigIndex, 1)[0];
+		// After removal, alertRuleIndex needs to be adjusted
+		const newAlertRuleIndex = alertRuleIndex - 1;
+		seedScripts.splice(newAlertRuleIndex + 1, 0, configScript);
+	}
 
 	if (seedScripts.length === 0) {
 		console.log("⚠️  No seed scripts found.");

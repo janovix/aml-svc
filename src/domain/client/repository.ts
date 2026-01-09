@@ -37,10 +37,14 @@ import type {
 export class ClientRepository {
 	constructor(private readonly prisma: PrismaClient) {}
 
-	async list(filters: ClientFilters): Promise<ListResult<ClientEntity>> {
+	async list(
+		organizationId: string,
+		filters: ClientFilters,
+	): Promise<ListResult<ClientEntity>> {
 		const { page, limit, search, rfc, personType } = filters;
 
 		const where: Prisma.ClientWhereInput = {
+			organizationId,
 			deletedAt: null,
 		};
 
@@ -85,66 +89,78 @@ export class ClientRepository {
 		};
 	}
 
-	async getById(id: string): Promise<ClientEntity | null> {
-		// id is now RFC (primary key)
+	async getById(
+		organizationId: string,
+		id: string,
+	): Promise<ClientEntity | null> {
 		const record = await this.prisma.client.findFirst({
-			where: { rfc: id.toUpperCase(), deletedAt: null },
+			where: { organizationId, id, deletedAt: null },
 		});
 		return record ? mapPrismaClient(record) : null;
 	}
 
-	async create(input: ClientCreateInput): Promise<ClientEntity> {
+	async create(
+		organizationId: string,
+		input: ClientCreateInput,
+	): Promise<ClientEntity> {
 		const prismaData = mapCreateInputToPrisma(input);
-		// RFC is the primary key, so we use it directly
 		const created = await this.prisma.client.create({
 			data: {
 				...prismaData,
-				rfc: prismaData.rfc, // RFC is the PK
+				organizationId,
 			},
 		});
 		return mapPrismaClient(created);
 	}
 
-	async update(id: string, input: ClientUpdateInput): Promise<ClientEntity> {
-		// id is now RFC (primary key)
-		await this.ensureExists(id);
+	async update(
+		organizationId: string,
+		id: string,
+		input: ClientUpdateInput,
+	): Promise<ClientEntity> {
+		await this.ensureExists(organizationId, id);
 
 		const updated = await this.prisma.client.update({
-			where: { rfc: id.toUpperCase() },
+			where: { id },
 			data: mapUpdateInputToPrisma(input),
 		});
 
 		return mapPrismaClient(updated);
 	}
 
-	async patch(id: string, input: ClientPatchInput): Promise<ClientEntity> {
-		// id is now RFC (primary key)
-		await this.ensureExists(id);
+	async patch(
+		organizationId: string,
+		id: string,
+		input: ClientPatchInput,
+	): Promise<ClientEntity> {
+		await this.ensureExists(organizationId, id);
 
 		const payload = mapPatchInputToPrisma(input) as Prisma.ClientUpdateInput;
 
 		const updated = await this.prisma.client.update({
-			where: { rfc: id.toUpperCase() },
+			where: { id },
 			data: payload,
 		});
 
 		return mapPrismaClient(updated);
 	}
 
-	async delete(id: string): Promise<void> {
-		// id is now RFC (primary key)
-		await this.ensureExists(id);
+	async delete(organizationId: string, id: string): Promise<void> {
+		await this.ensureExists(organizationId, id);
 
 		await this.prisma.client.update({
-			where: { rfc: id.toUpperCase() },
+			where: { id },
 			data: {
 				deletedAt: new Date(),
 			},
 		});
 	}
 
-	async listDocuments(clientId: string): Promise<ClientDocumentEntity[]> {
-		await this.ensureExists(clientId);
+	async listDocuments(
+		organizationId: string,
+		clientId: string,
+	): Promise<ClientDocumentEntity[]> {
+		await this.ensureExists(organizationId, clientId);
 		const documents = await this.prisma.clientDocument.findMany({
 			where: { clientId },
 			orderBy: { createdAt: "desc" },
@@ -153,9 +169,10 @@ export class ClientRepository {
 	}
 
 	async createDocument(
+		organizationId: string,
 		input: ClientDocumentCreateInput,
 	): Promise<ClientDocumentEntity> {
-		await this.ensureExists(input.clientId);
+		await this.ensureExists(organizationId, input.clientId);
 		const created = await this.prisma.clientDocument.create({
 			data: mapDocumentCreateInputToPrisma(input),
 		});
@@ -163,10 +180,12 @@ export class ClientRepository {
 	}
 
 	async updateDocument(
+		organizationId: string,
 		clientId: string,
 		documentId: string,
 		input: ClientDocumentUpdateInput,
 	): Promise<ClientDocumentEntity> {
+		await this.ensureExists(organizationId, clientId);
 		await this.ensureDocumentExists(clientId, documentId);
 		const updated = await this.prisma.clientDocument.update({
 			where: { id: documentId },
@@ -176,10 +195,12 @@ export class ClientRepository {
 	}
 
 	async patchDocument(
+		organizationId: string,
 		clientId: string,
 		documentId: string,
 		input: ClientDocumentPatchInput,
 	): Promise<ClientDocumentEntity> {
+		await this.ensureExists(organizationId, clientId);
 		await this.ensureDocumentExists(clientId, documentId);
 		const updated = await this.prisma.clientDocument.update({
 			where: { id: documentId },
@@ -188,13 +209,21 @@ export class ClientRepository {
 		return mapPrismaDocument(updated);
 	}
 
-	async deleteDocument(clientId: string, documentId: string): Promise<void> {
+	async deleteDocument(
+		organizationId: string,
+		clientId: string,
+		documentId: string,
+	): Promise<void> {
+		await this.ensureExists(organizationId, clientId);
 		await this.ensureDocumentExists(clientId, documentId);
 		await this.prisma.clientDocument.delete({ where: { id: documentId } });
 	}
 
-	async listAddresses(clientId: string): Promise<ClientAddressEntity[]> {
-		await this.ensureExists(clientId);
+	async listAddresses(
+		organizationId: string,
+		clientId: string,
+	): Promise<ClientAddressEntity[]> {
+		await this.ensureExists(organizationId, clientId);
 		const addresses = await this.prisma.clientAddress.findMany({
 			where: { clientId },
 			orderBy: { createdAt: "desc" },
@@ -203,9 +232,10 @@ export class ClientRepository {
 	}
 
 	async createAddress(
+		organizationId: string,
 		input: ClientAddressCreateInput,
 	): Promise<ClientAddressEntity> {
-		await this.ensureExists(input.clientId);
+		await this.ensureExists(organizationId, input.clientId);
 		const created = await this.prisma.clientAddress.create({
 			data: mapAddressCreateInputToPrisma(input),
 		});
@@ -213,10 +243,12 @@ export class ClientRepository {
 	}
 
 	async updateAddress(
+		organizationId: string,
 		clientId: string,
 		addressId: string,
 		input: ClientAddressUpdateInput,
 	): Promise<ClientAddressEntity> {
+		await this.ensureExists(organizationId, clientId);
 		await this.ensureAddressExists(clientId, addressId);
 		const updated = await this.prisma.clientAddress.update({
 			where: { id: addressId },
@@ -226,10 +258,12 @@ export class ClientRepository {
 	}
 
 	async patchAddress(
+		organizationId: string,
 		clientId: string,
 		addressId: string,
 		input: ClientAddressPatchInput,
 	): Promise<ClientAddressEntity> {
+		await this.ensureExists(organizationId, clientId);
 		await this.ensureAddressExists(clientId, addressId);
 		const updated = await this.prisma.clientAddress.update({
 			where: { id: addressId },
@@ -238,16 +272,23 @@ export class ClientRepository {
 		return mapPrismaAddress(updated);
 	}
 
-	async deleteAddress(clientId: string, addressId: string): Promise<void> {
+	async deleteAddress(
+		organizationId: string,
+		clientId: string,
+		addressId: string,
+	): Promise<void> {
+		await this.ensureExists(organizationId, clientId);
 		await this.ensureAddressExists(clientId, addressId);
 		await this.prisma.clientAddress.delete({ where: { id: addressId } });
 	}
 
-	private async ensureExists(id: string): Promise<void> {
-		// id is now RFC (primary key)
+	private async ensureExists(
+		organizationId: string,
+		id: string,
+	): Promise<void> {
 		const exists = await this.prisma.client.findFirst({
-			where: { rfc: id.toUpperCase(), deletedAt: null },
-			select: { rfc: true },
+			where: { organizationId, id, deletedAt: null },
+			select: { id: true },
 		});
 
 		if (!exists) {
@@ -275,22 +316,24 @@ export class ClientRepository {
 		}
 	}
 
-	async getStats(): Promise<{
+	async getStats(organizationId: string): Promise<{
 		totalClients: number;
 		openAlerts: number;
 		urgentReviews: number;
 	}> {
 		const [totalClients, openAlerts, urgentReviews] = await Promise.all([
 			this.prisma.client.count({
-				where: { deletedAt: null },
+				where: { organizationId, deletedAt: null },
 			}),
 			this.prisma.alert.count({
 				where: {
+					organizationId,
 					status: "DETECTED",
 				},
 			}),
 			this.prisma.alert.count({
 				where: {
+					organizationId,
 					severity: "CRITICAL",
 					status: { in: ["DETECTED", "FILE_GENERATED"] },
 				},

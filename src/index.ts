@@ -25,7 +25,7 @@ export type Bindings = {
 	AUTH_SERVICE?: Fetcher;
 	/** Queue for alert detection jobs */
 	ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
-	/** Secret token for synthetic data generation (internal use only) */
+	/** Secret token for synthetic data generation HTTP endpoint (local development only) */
 	SYNTHETIC_DATA_SECRET?: string;
 };
 
@@ -84,12 +84,46 @@ app.get("/docsz", (c) => {
 });
 
 // Service binding routes (internal worker-to-worker communication)
+// Note: When using service bindings with https://internal/..., Cloudflare strips the /internal prefix
+// So we need to handle both /internal/* routes (for direct HTTP calls) and direct paths (for service bindings)
 app.all("/internal/*", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 
-// Internal synthetic data generation endpoint (not in public API)
-// Only accessible with SYNTETIC_DATA_SECRET token
+// Service binding routes without /internal prefix (for Cloudflare service bindings)
+// These routes handle requests that come through service bindings where /internal is stripped
+app.all("/alert-rules/active", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/alert-rules/all-active", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/alerts", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/uma-values/active", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+
+// Parameterized service binding routes using wildcard patterns
+// Hono will match these patterns and pass them to the handler
+// IMPORTANT: More specific routes must be registered before less specific ones
+app.all("/alert-rules/:id/config/:key", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/clients/:id/transactions", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/clients/:id", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/transactions", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+
+// Internal synthetic data generation endpoint (for local development only)
+// Note: GitHub Actions uses the script directly, not this endpoint
+// Only accessible with SYNTHETIC_DATA_SECRET token
 app.post("/internal/synthetic-data", async (c) => {
 	const secret = c.req.header("X-Synthetic-Data-Secret");
 	const expectedSecret = c.env.SYNTHETIC_DATA_SECRET;
@@ -131,14 +165,14 @@ app.post("/internal/synthetic-data", async (c) => {
 
 	try {
 		const body = await c.req.json();
-		const { userId, models, options } = body;
+		const { userId, organizationId, models, options } = body;
 
-		if (!userId || !models || !Array.isArray(models)) {
+		if (!userId || !organizationId || !models || !Array.isArray(models)) {
 			return c.json(
 				{
 					success: false,
 					error: "Validation Error",
-					message: "userId and models are required",
+					message: "userId, organizationId, and models are required",
 				},
 				400,
 			);
@@ -149,7 +183,10 @@ app.post("/internal/synthetic-data", async (c) => {
 		const { getPrismaClient } = await import("./lib/prisma");
 
 		const prisma = getPrismaClient(c.env.DB);
-		const generator = new syntheticDataModule.SyntheticDataGenerator(prisma);
+		const generator = new syntheticDataModule.SyntheticDataGenerator(
+			prisma,
+			organizationId,
+		);
 
 		// Build options based on requested models
 		const syntheticOptions: {

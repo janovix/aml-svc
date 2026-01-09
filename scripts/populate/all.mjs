@@ -53,16 +53,24 @@ async function populateAll() {
 	}
 
 	try {
+		// Populate catalogs first
 		execSync(`node "${join(__dirname, "all-catalogs.mjs")}"`, {
 			stdio: "inherit",
 			env,
 		});
+
+		// Populate UMA values (essential reference data)
+		console.log("\n");
+		execSync(`node "${join(__dirname, "uma-values.mjs")}"`, {
+			stdio: "inherit",
+			env,
+		});
 	} catch (error) {
-		console.error("Failed to populate catalogs:", error);
+		console.error("Failed to populate:", error);
 		process.exit(1);
 	}
 
-	console.log("\n✅ All catalogs populated successfully!");
+	console.log("\n✅ All catalogs and reference data populated successfully!");
 }
 
 populateAll().catch((error) => {

@@ -16,32 +16,24 @@
 
 import type { Bindings } from "../index";
 import { getPrismaClient } from "./prisma";
-import { AlertRuleRepository, AlertRepository } from "../domain/alert";
-import { AlertService, AlertRuleService } from "../domain/alert";
+import {
+	AlertRuleRepository,
+	AlertRepository,
+	AlertRuleConfigRepository,
+} from "../domain/alert";
+import {
+	AlertService,
+	AlertRuleService,
+	AlertRuleConfigService,
+} from "../domain/alert";
 import { UmaValueRepository } from "../domain/uma";
 import { UmaValueService } from "../domain/uma";
 import { ClientRepository } from "../domain/client";
 import { ClientService } from "../domain/client";
 import { TransactionRepository } from "../domain/transaction";
 import { TransactionService } from "../domain/transaction";
-import { generateAndUploadSatFile } from "./sat-file-generator";
-
-// R2Bucket type for compatibility
-type R2Bucket = {
-	put(
-		key: string,
-		value: ReadableStream | ArrayBuffer | ArrayBufferView | string | null,
-		options?: {
-			httpMetadata?: {
-				contentType?: string;
-				contentEncoding?: string;
-				cacheControl?: string;
-				cacheExpiry?: Date;
-			};
-			customMetadata?: Record<string, string>;
-		},
-	): Promise<{ key: string; size: number; etag: string }>;
-};
+import { CatalogRepository } from "../domain/catalog/repository";
+import { CatalogEnrichmentService } from "../domain/catalog/enrichment-service";
 
 /**
  * Service binding helper functions for alert operations
@@ -51,14 +43,40 @@ export class AlertServiceBinding {
 	constructor(private readonly env: Bindings) {}
 
 	/**
-	 * Get all active alert rules
+	 * Get all active alert rules (global - no organizationId required)
 	 * Called via: env.AML_SERVICE.fetch(new Request("https://internal/alert-rules/active"))
 	 */
 	async getActiveAlertRules() {
 		const prisma = getPrismaClient(this.env.DB);
 		const repository = new AlertRuleRepository(prisma);
 		const service = new AlertRuleService(repository);
+		return service.listActiveForSeeker();
+	}
+
+	/**
+	 * Get all active alert rules including manual-only rules
+	 * Called via: env.AML_SERVICE.fetch(new Request("https://internal/alert-rules/all-active"))
+	 */
+	async getAllActiveAlertRules() {
+		const prisma = getPrismaClient(this.env.DB);
+		const repository = new AlertRuleRepository(prisma);
+		const service = new AlertRuleService(repository);
 		return service.listActive();
+	}
+
+	/**
+	 * Get alert rule config by key
+	 * Called via: env.AML_SERVICE.fetch(new Request("https://internal/alert-rules/{id}/config/{key}"))
+	 */
+	async getAlertRuleConfig(alertRuleId: string, key: string) {
+		const prisma = getPrismaClient(this.env.DB);
+		const repository = new AlertRuleConfigRepository(prisma);
+		const service = new AlertRuleConfigService(repository);
+		try {
+			return await service.getByKey(alertRuleId, key);
+		} catch {
+			return null;
+		}
 	}
 
 	/**
@@ -76,20 +94,67 @@ export class AlertServiceBinding {
 	 * Get client data
 	 * Called via: env.AML_SERVICE.fetch(new Request(`https://internal/clients/${clientId}`))
 	 */
-	async getClient(_clientId: string) {
-		// This would need to import ClientService
-		// For now, return a placeholder - the actual implementation would use ClientService
-		throw new Error("Not implemented - use ClientService directly");
+	async getClient(clientId: string) {
+		const prisma = getPrismaClient(this.env.DB);
+
+		// First, fetch the client to get its organizationId
+		const clientRecord = await prisma.client.findUnique({
+			where: { id: clientId },
+			select: { organizationId: true },
+		});
+
+		if (!clientRecord) {
+			throw new Error(`Client not found: ${clientId}`);
+		}
+
+		// Now use ClientService to get the full client entity
+		const repository = new ClientRepository(prisma);
+		const service = new ClientService(repository);
+		return service.get(clientRecord.organizationId, clientId);
 	}
 
 	/**
 	 * Get client transactions
 	 * Called via: env.AML_SERVICE.fetch(new Request(`https://internal/clients/${clientId}/transactions`))
 	 */
-	async getClientTransactions(_clientId: string) {
-		// This would need to import TransactionService
-		// For now, return a placeholder - the actual implementation would use TransactionService
-		throw new Error("Not implemented - use TransactionService directly");
+	async getClientTransactions(clientId: string) {
+		const prisma = getPrismaClient(this.env.DB);
+
+		// First, fetch the client to get its organizationId
+		const clientRecord = await prisma.client.findUnique({
+			where: { id: clientId },
+			select: { organizationId: true },
+		});
+
+		if (!clientRecord) {
+			throw new Error(`Client not found: ${clientId}`);
+		}
+
+		// Now use TransactionService to list transactions for this client
+		const umaRepository = new UmaValueRepository(prisma);
+		const catalogRepository = new CatalogRepository(prisma);
+		const catalogEnrichmentService = new CatalogEnrichmentService(
+			catalogRepository,
+		);
+		const transactionRepository = new TransactionRepository(
+			prisma,
+			umaRepository,
+			catalogEnrichmentService,
+		);
+		const clientRepository = new ClientRepository(prisma);
+		const service = new TransactionService(
+			transactionRepository,
+			clientRepository,
+			umaRepository,
+		);
+
+		const result = await service.list(clientRecord.organizationId, {
+			clientId,
+			page: 1,
+			limit: 1000, // Get all transactions for the client
+		});
+
+		return result.data;
 	}
 
 	/**
@@ -102,113 +167,26 @@ export class AlertServiceBinding {
 		severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 		idempotencyKey: string;
 		contextHash: string;
-		alertData: Record<string, unknown>;
-		triggerTransactionId?: string | null;
+		metadata: Record<string, unknown>; // Renamed from alertData
+		transactionId?: string | null; // Renamed from triggerTransactionId
+		isManual: boolean;
 		notes?: string | null;
 	}) {
 		const prisma = getPrismaClient(this.env.DB);
 		const repository = new AlertRepository(prisma);
 		const service = new AlertService(repository);
-		return service.create(alertData);
-	}
 
-	/**
-	 * Generate and upload SAT XML file for an alert
-	 * Called via: env.AML_SERVICE.fetch(new Request(`https://internal/alerts/${alertId}/generate-file`, { method: "POST" }))
-	 */
-	async generateSatFile(alertId: string) {
-		if (!this.env.R2_BUCKET) {
-			throw new Error("R2_BUCKET not configured");
-		}
-
-		const prisma = getPrismaClient(this.env.DB);
-		const alertRepository = new AlertRepository(prisma);
-		const alertService = new AlertService(alertRepository);
-
-		// Get alert
-		const alert = await alertService.get(alertId);
-		if (!alert.triggerTransactionId) {
-			throw new Error("Alert has no trigger transaction");
-		}
-
-		// Get client (RFC is the ID)
-		const clientRepository = new ClientRepository(prisma);
-		const clientService = new ClientService(clientRepository);
-		const client = await clientService.get(alert.clientId);
-
-		// Get transaction
-		const umaRepository = new UmaValueRepository(prisma);
-		const transactionRepository = new TransactionRepository(
-			prisma,
-			umaRepository,
-		);
-		const transactionService = new TransactionService(
-			transactionRepository,
-			clientRepository, // Reuse clientRepository
-			umaRepository,
-		);
-		const transaction = await transactionService.get(
-			alert.triggerTransactionId,
-		);
-
-		// Generate and upload file
-		if (!this.env.R2_BUCKET) {
-			throw new Error("R2_BUCKET not configured");
-		}
-
-		// Import CatalogRepository for catalog lookups
-		const { CatalogRepository } = await import("../domain/catalog");
-		const catalogRepository = new CatalogRepository(prisma);
-
-		const result = await generateAndUploadSatFile(alert, client, transaction, {
-			r2Bucket: this.env.R2_BUCKET as unknown as R2Bucket, // Type assertion for compatibility
-			obligatedSubjectKey: this.env.SAT_CLAVE_SUJETO_OBLIGADO || "000000000000",
-			activityKey: this.env.SAT_CLAVE_ACTIVIDAD || "VEH",
-			collegiateEntityKey: this.env.SAT_CLAVE_ENTIDAD_COLEGIADA,
-			getCatalogValue: async (catalogKey: string, code: string) => {
-				try {
-					// Look up catalog by key
-					const catalog = await catalogRepository.findByKey(catalogKey);
-					if (!catalog) {
-						return null;
-					}
-					// Search for catalog item by code (stored in metadata.code)
-					// We need to search all items and find the one with matching code in metadata
-					const result = await catalogRepository.listItems(catalog.id, {
-						page: 1,
-						pageSize: 1000, // Get all items to search metadata
-						active: true,
-					});
-					// Find item where metadata.code matches the requested code
-					const item = result.data.find((item) => {
-						if (!item.metadata || typeof item.metadata !== "object") {
-							return false;
-						}
-						return (item.metadata as { code?: string }).code === code;
-					});
-					// Return the code from metadata if found
-					return item
-						? (item.metadata as { code?: string }).code || code
-						: null;
-				} catch (error) {
-					console.error(`Error looking up catalog ${catalogKey}:`, error);
-					return null;
-				}
-			},
+		// Get organizationId from client
+		const client = await prisma.client.findUnique({
+			where: { id: alertData.clientId },
+			select: { organizationId: true },
 		});
 
-		// Update alert with file URL
-		const updatedAlert = await alertService.updateSatFileUrl(
-			alertId,
-			result.fileUrl,
-		);
+		if (!client) {
+			throw new Error(`Client not found: ${alertData.clientId}`);
+		}
 
-		return {
-			alert: updatedAlert,
-			fileUrl: result.fileUrl,
-			fileKey: result.fileKey,
-			fileSize: result.fileSize,
-		};
+		return service.create(alertData, client.organizationId);
 	}
 }
 
@@ -221,20 +199,63 @@ export async function handleServiceBindingRequest(
 	env: Bindings,
 ): Promise<Response> {
 	const url = new URL(request.url);
-	const path = url.pathname;
+	let path = url.pathname;
+
+	// When using service bindings with https://internal/..., Cloudflare strips the /internal prefix
+	// So /internal/alert-rules/active becomes /alert-rules/active
+	// But Hono route /internal/* matches and passes the full path, so we need to handle both cases
+	// Remove /internal prefix if present for consistent matching
+	if (path.startsWith("/internal/")) {
+		path = path.slice("/internal".length);
+	}
+
+	// Debug logging for service binding requests
+	console.log(
+		`[ServiceBinding] ${request.method} ${path} (original pathname: ${url.pathname}, full URL: ${request.url})`,
+	);
 
 	try {
-		// Route: /internal/alert-rules/active
-		if (path === "/internal/alert-rules/active" && request.method === "GET") {
+		// Route: /alert-rules/active (global - no organizationId required)
+		if (path === "/alert-rules/active" && request.method === "GET") {
+			console.log("[ServiceBinding] Fetching active alert rules for seekers");
 			const service = new AlertServiceBinding(env);
 			const rules = await service.getActiveAlertRules();
+			console.log(
+				`[ServiceBinding] Found ${rules.length} active alert rules for seekers`,
+			);
 			return new Response(JSON.stringify(rules), {
 				headers: { "Content-Type": "application/json" },
 			});
 		}
 
-		// Route: /internal/alerts (POST)
-		if (path === "/internal/alerts" && request.method === "POST") {
+		// Route: /alert-rules/all-active (includes manual-only rules)
+		if (path === "/alert-rules/all-active" && request.method === "GET") {
+			const service = new AlertServiceBinding(env);
+			const rules = await service.getAllActiveAlertRules();
+			return new Response(JSON.stringify(rules), {
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+
+		// Route: /alert-rules/{id}/config/{key}
+		const configMatch = path.match(/^\/alert-rules\/([^/]+)\/config\/([^/]+)$/);
+		if (configMatch && request.method === "GET") {
+			const [, alertRuleId, key] = configMatch;
+			const service = new AlertServiceBinding(env);
+			const config = await service.getAlertRuleConfig(alertRuleId, key);
+			if (!config) {
+				return new Response(JSON.stringify({ error: "Config not found" }), {
+					status: 404,
+					headers: { "Content-Type": "application/json" },
+				});
+			}
+			return new Response(JSON.stringify(config), {
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+
+		// Route: /alerts (POST)
+		if (path === "/alerts" && request.method === "POST") {
 			const service = new AlertServiceBinding(env);
 			const alertData = (await request.json()) as Parameters<
 				AlertServiceBinding["createAlert"]
@@ -246,8 +267,8 @@ export async function handleServiceBindingRequest(
 			});
 		}
 
-		// Route: /internal/uma-values/active
-		if (path === "/internal/uma-values/active" && request.method === "GET") {
+		// Route: /uma-values/active
+		if (path === "/uma-values/active" && request.method === "GET") {
 			const service = new AlertServiceBinding(env);
 			const umaValue = await service.getActiveUmaValue();
 			if (!umaValue) {
@@ -261,53 +282,43 @@ export async function handleServiceBindingRequest(
 			});
 		}
 
-		// Route: /internal/clients/{clientId}
-		if (path.startsWith("/internal/clients/") && request.method === "GET") {
-			// const clientId = path.split("/internal/clients/")[1];
-			// This would need ClientService - for now return 501
-			return new Response(
-				JSON.stringify({ error: "Not implemented via service binding" }),
-				{ status: 501, headers: { "Content-Type": "application/json" } },
-			);
-		}
-
-		// Route: /internal/clients/{clientId}/transactions
+		// Route: /clients/{clientId}/transactions (must be checked before /clients/{clientId})
 		if (
-			path.startsWith("/internal/clients/") &&
+			path.startsWith("/clients/") &&
 			path.endsWith("/transactions") &&
 			request.method === "GET"
 		) {
-			// const clientId = path
-			// 	.split("/internal/clients/")[1]
-			// 	.split("/transactions")[0];
-			// This would need TransactionService - for now return 501
-			return new Response(
-				JSON.stringify({ error: "Not implemented via service binding" }),
-				{ status: 501, headers: { "Content-Type": "application/json" } },
-			);
-		}
+			const clientId = path.split("/clients/")[1].split("/transactions")[0];
 
-		// Route: /internal/alerts/{alertId}/generate-file
-		if (
-			path.startsWith("/internal/alerts/") &&
-			path.endsWith("/generate-file") &&
-			request.method === "POST"
-		) {
-			const alertId = path
-				.split("/internal/alerts/")[1]
-				.split("/generate-file")[0];
-			const service = new AlertServiceBinding(env);
+			if (!clientId) {
+				return new Response(
+					JSON.stringify({ error: "Client ID is required" }),
+					{ status: 400, headers: { "Content-Type": "application/json" } },
+				);
+			}
+
 			try {
-				const result = await service.generateSatFile(alertId);
-				return new Response(JSON.stringify(result), {
-					status: 200,
+				const service = new AlertServiceBinding(env);
+				const transactions = await service.getClientTransactions(clientId);
+				return new Response(JSON.stringify(transactions), {
 					headers: { "Content-Type": "application/json" },
 				});
 			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : "Unknown error";
+				if (
+					errorMessage.includes("not found") ||
+					errorMessage.includes("NOT_FOUND")
+				) {
+					return new Response(JSON.stringify({ error: "Client not found" }), {
+						status: 404,
+						headers: { "Content-Type": "application/json" },
+					});
+				}
 				return new Response(
 					JSON.stringify({
-						error: "Failed to generate SAT file",
-						message: error instanceof Error ? error.message : "Unknown error",
+						error: "Failed to fetch transactions",
+						message: errorMessage,
 					}),
 					{
 						status: 500,
@@ -317,13 +328,117 @@ export async function handleServiceBindingRequest(
 			}
 		}
 
-		return new Response("Not Found", { status: 404 });
+		// Route: /clients/{clientId}
+		if (path.startsWith("/clients/") && request.method === "GET") {
+			const clientId = path.split("/clients/")[1];
+			// Remove any trailing path segments (e.g., "/transactions")
+			const cleanClientId = clientId.split("/")[0];
+
+			if (!cleanClientId) {
+				return new Response(
+					JSON.stringify({ error: "Client ID is required" }),
+					{ status: 400, headers: { "Content-Type": "application/json" } },
+				);
+			}
+
+			try {
+				const service = new AlertServiceBinding(env);
+				const client = await service.getClient(cleanClientId);
+				return new Response(JSON.stringify(client), {
+					headers: { "Content-Type": "application/json" },
+				});
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : "Unknown error";
+				if (
+					errorMessage.includes("not found") ||
+					errorMessage.includes("NOT_FOUND")
+				) {
+					return new Response(JSON.stringify({ error: "Client not found" }), {
+						status: 404,
+						headers: { "Content-Type": "application/json" },
+					});
+				}
+				return new Response(
+					JSON.stringify({
+						error: "Failed to fetch client",
+						message: errorMessage,
+					}),
+					{
+						status: 500,
+						headers: { "Content-Type": "application/json" },
+					},
+				);
+			}
+		}
+
+		// Route: /transactions?clientId={clientId} (alternative format)
+		if (path === "/transactions" && request.method === "GET") {
+			const url = new URL(request.url);
+			const clientId = url.searchParams.get("clientId");
+
+			if (!clientId) {
+				return new Response(
+					JSON.stringify({ error: "clientId query parameter is required" }),
+					{ status: 400, headers: { "Content-Type": "application/json" } },
+				);
+			}
+
+			try {
+				const service = new AlertServiceBinding(env);
+				const transactions = await service.getClientTransactions(clientId);
+				return new Response(JSON.stringify(transactions), {
+					headers: { "Content-Type": "application/json" },
+				});
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : "Unknown error";
+				if (
+					errorMessage.includes("not found") ||
+					errorMessage.includes("NOT_FOUND")
+				) {
+					return new Response(JSON.stringify({ error: "Client not found" }), {
+						status: 404,
+						headers: { "Content-Type": "application/json" },
+					});
+				}
+				return new Response(
+					JSON.stringify({
+						error: "Failed to fetch transactions",
+						message: errorMessage,
+					}),
+					{
+						status: 500,
+						headers: { "Content-Type": "application/json" },
+					},
+				);
+			}
+		}
+
+		// No route matched - return 404 with helpful error message
+		console.warn(
+			`[ServiceBinding] No route matched for ${request.method} ${path}`,
+		);
+		return new Response(
+			JSON.stringify({
+				error: "Not Found",
+				message: `No handler found for ${request.method} ${path}`,
+				path,
+				method: request.method,
+			}),
+			{
+				status: 404,
+				headers: { "Content-Type": "application/json" },
+			},
+		);
 	} catch (error) {
-		console.error("Service binding error:", error);
+		console.error("[ServiceBinding] Error processing request:", error);
 		return new Response(
 			JSON.stringify({
 				error: "Internal Server Error",
 				message: error instanceof Error ? error.message : "Unknown error",
+				path,
+				method: request.method,
 			}),
 			{
 				status: 500,

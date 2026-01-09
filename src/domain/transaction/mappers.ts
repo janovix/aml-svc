@@ -6,6 +6,7 @@ import type {
 	TransactionPaymentMethod as PrismaPaymentMethod,
 } from "@prisma/client";
 
+import { generateId } from "../../lib/id-generator";
 import type { TransactionCreateInput, TransactionUpdateInput } from "./schemas";
 import type {
 	OperationType,
@@ -110,9 +111,12 @@ function toPrismaDecimal(value: string | number): Prisma.Decimal {
 
 export function mapCreateInputToPrisma(
 	input: TransactionCreateInput,
+	organizationId: string,
 	umaValue?: Prisma.Decimal | null,
 ) {
 	return {
+		id: generateId("TRANSACTION"),
+		organizationId,
 		clientId: input.clientId,
 		operationDate: toPrismaDateOnly(input.operationDate),
 		operationType: toPrismaOperationType(input.operationType),
@@ -133,6 +137,7 @@ export function mapCreateInputToPrisma(
 		umaValue: umaValue ?? null,
 		paymentMethods: {
 			create: input.paymentMethods.map((pm) => ({
+				id: generateId("TRANSACTION_PAYMENT_METHOD"),
 				method: pm.method,
 				amount: toPrismaDecimal(pm.amount),
 			})),
@@ -165,6 +170,7 @@ export function mapUpdateInputToPrisma(
 		paymentMethods: {
 			deleteMany: {},
 			create: input.paymentMethods.map((pm) => ({
+				id: generateId("TRANSACTION_PAYMENT_METHOD"),
 				method: pm.method,
 				amount: toPrismaDecimal(pm.amount),
 			})),
@@ -211,5 +217,10 @@ export function mapPrismaTransaction(
 		createdAt: mapDate(record.createdAt),
 		updatedAt: mapDate(record.updatedAt),
 		deletedAt: mapNullableDate(record.deletedAt),
+		// Catalog enrichment fields - populated by CatalogEnrichmentService after mapping
+		brandCatalog: undefined,
+		flagCountryCatalog: undefined,
+		operationTypeCatalog: undefined,
+		currencyCatalog: undefined,
 	};
 }

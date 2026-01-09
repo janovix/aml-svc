@@ -15,47 +15,60 @@ export class TransactionService {
 		private readonly umaRepository: UmaValueRepository,
 	) {}
 
-	list(filters: TransactionFilters): Promise<TransactionListResult> {
-		return this.repository.list(filters);
+	list(
+		organizationId: string,
+		filters: TransactionFilters,
+	): Promise<TransactionListResult> {
+		return this.repository.list(organizationId, filters);
 	}
 
-	async get(id: string): Promise<TransactionEntity> {
-		const record = await this.repository.getById(id);
+	async get(organizationId: string, id: string): Promise<TransactionEntity> {
+		const record = await this.repository.getById(organizationId, id);
 		if (!record) {
 			throw new Error("TRANSACTION_NOT_FOUND");
 		}
 		return record;
 	}
 
-	async create(input: TransactionCreateInput): Promise<TransactionEntity> {
-		await this.ensureClientExists(input.clientId);
-		return this.repository.create(input);
+	async create(
+		input: TransactionCreateInput,
+		organizationId: string,
+	): Promise<TransactionEntity> {
+		await this.ensureClientExists(organizationId, input.clientId);
+		return this.repository.create(input, organizationId);
 	}
 
 	update(
+		organizationId: string,
 		id: string,
 		input: TransactionUpdateInput,
 	): Promise<TransactionEntity> {
-		return this.repository.update(id, input);
+		return this.repository.update(organizationId, id, input);
 	}
 
-	delete(id: string): Promise<void> {
-		return this.repository.delete(id);
+	delete(organizationId: string, id: string): Promise<void> {
+		return this.repository.delete(organizationId, id);
 	}
 
-	private async ensureClientExists(clientId: string): Promise<void> {
-		const client = await this.clientRepository.getById(clientId);
+	private async ensureClientExists(
+		organizationId: string,
+		clientId: string,
+	): Promise<void> {
+		const client = await this.clientRepository.getById(
+			organizationId,
+			clientId,
+		);
 		if (!client) {
 			throw new Error("CLIENT_NOT_FOUND");
 		}
 	}
 
-	getStats(): Promise<{
+	getStats(organizationId: string): Promise<{
 		transactionsToday: number;
 		suspiciousTransactions: number;
 		totalVolume: string;
 		totalVehicles: number;
 	}> {
-		return this.repository.getStats();
+		return this.repository.getStats(organizationId);
 	}
 }
