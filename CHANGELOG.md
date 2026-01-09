@@ -1,3 +1,10 @@
+# [1.2.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.2.0-rc.2...v1.2.0-rc.3) (2026-01-09)
+
+
+### Features
+
+* update client statistics retrieval to include physical and moral client counts ([01ca427](https://github.com/janovix/aml-svc/commit/01ca4274a5593cd830d3665447414fe78f547ecb))
+
 # [1.2.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.2.0-rc.1...v1.2.0-rc.2) (2026-01-09)
 
 
