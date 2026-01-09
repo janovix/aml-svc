@@ -1,3 +1,10 @@
+# [1.2.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.2.0-rc.1...v1.2.0-rc.2) (2026-01-09)
+
+
+### Features
+
+* enhance search field validation in CatalogListQuerySchema to treat empty and whitespace-only strings as undefined ([178ae5e](https://github.com/janovix/aml-svc/commit/178ae5e8b1d415676d20a05a7571bc38d21db21d))
+
 # [1.2.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.1.0...v1.2.0-rc.1) (2026-01-09)
 
 
