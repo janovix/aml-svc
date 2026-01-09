@@ -1629,6 +1629,57 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/alerts/{id}/cancel": {
+			post: {
+				tags: ["Alerts"],
+				summary: "Cancel alert",
+				description:
+					"Cancel an alert with a reason. Sets the status to CANCELLED and records the cancellation reason and user.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert identifier",
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertCancelRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alert cancelled successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Alert" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
 		"/api/v1/uma-values": {
 			get: {
 				tags: ["UMA Values"],
@@ -4240,6 +4291,18 @@ export const openAPISpec = {
 						maxLength: 1000,
 						nullable: true,
 						description: "Reason for cancellation",
+					},
+				},
+			},
+			AlertCancelRequest: {
+				type: "object",
+				required: ["reason"],
+				properties: {
+					reason: {
+						type: "string",
+						minLength: 1,
+						maxLength: 1000,
+						description: "Reason for cancelling the alert",
 					},
 				},
 			},
