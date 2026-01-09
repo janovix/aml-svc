@@ -318,32 +318,25 @@ export class ClientRepository {
 
 	async getStats(organizationId: string): Promise<{
 		totalClients: number;
-		openAlerts: number;
-		urgentReviews: number;
+		physicalClients: number;
+		moralClients: number;
 	}> {
-		const [totalClients, openAlerts, urgentReviews] = await Promise.all([
+		const [totalClients, physicalClients, moralClients] = await Promise.all([
 			this.prisma.client.count({
 				where: { organizationId, deletedAt: null },
 			}),
-			this.prisma.alert.count({
-				where: {
-					organizationId,
-					status: "DETECTED",
-				},
+			this.prisma.client.count({
+				where: { organizationId, deletedAt: null, personType: "PHYSICAL" },
 			}),
-			this.prisma.alert.count({
-				where: {
-					organizationId,
-					severity: "CRITICAL",
-					status: { in: ["DETECTED", "FILE_GENERATED"] },
-				},
+			this.prisma.client.count({
+				where: { organizationId, deletedAt: null, personType: "MORAL" },
 			}),
 		]);
 
 		return {
 			totalClients,
-			openAlerts,
-			urgentReviews,
+			physicalClients,
+			moralClients,
 		};
 	}
 }

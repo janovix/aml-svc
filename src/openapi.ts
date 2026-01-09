@@ -188,7 +188,7 @@ export const openAPISpec = {
 				tags: ["Clients"],
 				summary: "Get client statistics",
 				description:
-					"Retrieve aggregate statistics for clients including total count, open alerts, and urgent reviews.",
+					"Retrieve aggregate statistics for clients including total count and breakdown by person type.",
 				responses: {
 					"200": {
 						description: "Client statistics",
@@ -3771,23 +3771,22 @@ export const openAPISpec = {
 			},
 			ClientStats: {
 				type: "object",
-				required: ["totalClients", "openAlerts", "urgentReviews"],
+				required: ["totalClients", "physicalClients", "moralClients"],
 				properties: {
 					totalClients: {
 						type: "integer",
 						description: "Total number of active clients",
 						example: 150,
 					},
-					openAlerts: {
+					physicalClients: {
 						type: "integer",
-						description: "Number of alerts with DETECTED status",
-						example: 5,
+						description: "Number of individual/physical person clients",
+						example: 100,
 					},
-					urgentReviews: {
+					moralClients: {
 						type: "integer",
-						description:
-							"Number of CRITICAL severity alerts with DETECTED or FILE_GENERATED status",
-						example: 2,
+						description: "Number of legal entity/moral person clients",
+						example: 50,
 					},
 				},
 			},
