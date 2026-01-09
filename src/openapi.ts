@@ -62,6 +62,11 @@ export const openAPISpec = {
 			description:
 				"SAT notice management endpoints for generating and submitting XML reports to SAT (17-17 monthly cycle)",
 		},
+		{
+			name: "Audit Logs",
+			description:
+				"Tamper-evident audit trail endpoints for viewing, verifying, and exporting cryptographically-chained audit logs",
+		},
 	],
 	paths: {
 		"/healthz": {
@@ -2863,6 +2868,292 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/audit-logs": {
+			get: {
+				tags: ["Audit Logs"],
+				summary: "List audit logs",
+				description:
+					"Retrieve a paginated list of audit log entries with optional filters.",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+					},
+					{
+						name: "entityType",
+						in: "query",
+						schema: { $ref: "#/components/schemas/AuditEntityType" },
+					},
+					{
+						name: "entityId",
+						in: "query",
+						schema: { type: "string" },
+					},
+					{
+						name: "action",
+						in: "query",
+						schema: { $ref: "#/components/schemas/AuditAction" },
+					},
+					{
+						name: "actorId",
+						in: "query",
+						schema: { type: "string" },
+					},
+					{
+						name: "actorType",
+						in: "query",
+						schema: { $ref: "#/components/schemas/AuditActorType" },
+					},
+					{
+						name: "startDate",
+						in: "query",
+						schema: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+						description: "Start date filter (YYYY-MM-DD)",
+					},
+					{
+						name: "endDate",
+						in: "query",
+						schema: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+						description: "End date filter (YYYY-MM-DD)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Paginated list of audit log entries",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/AuditLogEntry" },
+										},
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/audit-logs/stats": {
+			get: {
+				tags: ["Audit Logs"],
+				summary: "Get audit log statistics",
+				description:
+					"Get statistics about audit log entries for the organization.",
+				responses: {
+					"200": {
+						description: "Audit log statistics",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AuditLogStats" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/audit-logs/verify": {
+			post: {
+				tags: ["Audit Logs"],
+				summary: "Verify audit chain integrity",
+				description:
+					"Verify the cryptographic integrity of the audit log chain. This checks that all entries are properly signed and chained.",
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								properties: {
+									startSequence: {
+										type: "integer",
+										minimum: 1,
+										description: "Starting sequence number to verify from",
+									},
+									endSequence: {
+										type: "integer",
+										minimum: 1,
+										description: "Ending sequence number to verify to",
+									},
+									limit: {
+										type: "integer",
+										minimum: 1,
+										maximum: 10000,
+										default: 1000,
+										description: "Maximum number of entries to verify",
+									},
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Chain verification result",
+						content: {
+							"application/json": {
+								schema: {
+									$ref: "#/components/schemas/ChainVerificationResult",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/audit-logs/export": {
+			post: {
+				tags: ["Audit Logs"],
+				summary: "Export audit logs",
+				description:
+					"Export audit logs for compliance purposes. Supports JSON and CSV formats.",
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								properties: {
+									format: {
+										type: "string",
+										enum: ["json", "csv"],
+										default: "json",
+									},
+									startDate: {
+										type: "string",
+										pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+										description: "Start date filter (YYYY-MM-DD)",
+									},
+									endDate: {
+										type: "string",
+										pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+										description: "End date filter (YYYY-MM-DD)",
+									},
+									entityType: { $ref: "#/components/schemas/AuditEntityType" },
+									limit: {
+										type: "integer",
+										minimum: 1,
+										maximum: 50000,
+										default: 10000,
+									},
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Exported audit logs",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/AuditLogEntry" },
+										},
+										format: { type: "string" },
+										exportedAt: { type: "string", format: "date-time" },
+										totalRecords: { type: "integer" },
+									},
+								},
+							},
+							"text/csv": {
+								schema: { type: "string" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/audit-logs/entity/{entityType}/{entityId}": {
+			get: {
+				tags: ["Audit Logs"],
+				summary: "Get entity audit history",
+				description:
+					"Get the complete audit history for a specific entity (all changes made to it).",
+				parameters: [
+					{
+						name: "entityType",
+						in: "path",
+						required: true,
+						schema: { $ref: "#/components/schemas/AuditEntityType" },
+					},
+					{
+						name: "entityId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Paginated audit history for the entity",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/AuditLogEntry" },
+										},
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/audit-logs/{id}": {
+			get: {
+				tags: ["Audit Logs"],
+				summary: "Get audit log entry",
+				description: "Retrieve a single audit log entry by ID.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Audit log entry",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AuditLogEntry" },
+							},
+						},
+					},
+					"404": {
+						description: "Audit log entry not found",
+					},
+				},
+			},
+		},
 	},
 	components: {
 		schemas: {
@@ -4806,6 +5097,169 @@ export const openAPISpec = {
 					reportedMonth: { type: "string" },
 					displayName: { type: "string" },
 					submissionDeadline: { type: "string", format: "date-time" },
+				},
+			},
+			AuditAction: {
+				type: "string",
+				enum: [
+					"CREATE",
+					"UPDATE",
+					"DELETE",
+					"READ",
+					"EXPORT",
+					"VERIFY",
+					"LOGIN",
+					"LOGOUT",
+					"SUBMIT",
+					"GENERATE",
+				],
+				description: "Type of action performed on the entity",
+			},
+			AuditActorType: {
+				type: "string",
+				enum: ["USER", "SYSTEM", "API", "SERVICE_BINDING"],
+				description: "Type of actor that performed the action",
+			},
+			AuditEntityType: {
+				type: "string",
+				enum: [
+					"CLIENT",
+					"CLIENT_DOCUMENT",
+					"CLIENT_ADDRESS",
+					"TRANSACTION",
+					"TRANSACTION_PAYMENT_METHOD",
+					"ALERT",
+					"ALERT_RULE",
+					"ALERT_RULE_CONFIG",
+					"NOTICE",
+					"REPORT",
+					"UMA_VALUE",
+					"ORGANIZATION_SETTINGS",
+					"CATALOG",
+					"CATALOG_ITEM",
+					"AUDIT_LOG",
+				],
+				description: "Type of entity that was audited",
+			},
+			AuditLogEntry: {
+				type: "object",
+				required: [
+					"id",
+					"organizationId",
+					"entityType",
+					"entityId",
+					"action",
+					"actorType",
+					"timestamp",
+					"sequenceNumber",
+					"dataHash",
+					"signature",
+					"createdAt",
+				],
+				properties: {
+					id: { type: "string" },
+					organizationId: { type: "string" },
+					entityType: { type: "string" },
+					entityId: { type: "string" },
+					action: { $ref: "#/components/schemas/AuditAction" },
+					actorId: { type: "string", nullable: true },
+					actorType: { $ref: "#/components/schemas/AuditActorType" },
+					timestamp: { type: "string", format: "date-time" },
+					oldData: {
+						type: "object",
+						nullable: true,
+						additionalProperties: true,
+						description: "Previous state of the entity (null for CREATE)",
+					},
+					newData: {
+						type: "object",
+						nullable: true,
+						additionalProperties: true,
+						description: "New state of the entity (null for DELETE)",
+					},
+					sequenceNumber: {
+						type: "integer",
+						description:
+							"Monotonically increasing sequence number per organization",
+					},
+					dataHash: {
+						type: "string",
+						description: "SHA-256 hash of the entry content",
+					},
+					previousSignature: {
+						type: "string",
+						nullable: true,
+						description:
+							"Signature of the previous entry (null for first entry)",
+					},
+					signature: {
+						type: "string",
+						description:
+							"HMAC-SHA256 signature of (dataHash + previousSignature)",
+					},
+					ipAddress: { type: "string", nullable: true },
+					userAgent: { type: "string", nullable: true },
+					metadata: {
+						type: "object",
+						nullable: true,
+						additionalProperties: true,
+						description: "Additional context about the action",
+					},
+					createdAt: { type: "string", format: "date-time" },
+				},
+			},
+			AuditLogStats: {
+				type: "object",
+				properties: {
+					totalEntries: { type: "integer" },
+					firstEntry: { type: "string", format: "date-time", nullable: true },
+					lastEntry: { type: "string", format: "date-time", nullable: true },
+					entriesByAction: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					entriesByEntityType: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					entriesByActorType: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+				},
+			},
+			ChainVerificationResult: {
+				type: "object",
+				required: ["valid", "organizationId", "entriesVerified", "verifiedAt"],
+				properties: {
+					valid: {
+						type: "boolean",
+						description: "Whether the chain integrity is valid",
+					},
+					organizationId: { type: "string" },
+					entriesVerified: {
+						type: "integer",
+						description: "Number of entries successfully verified",
+					},
+					verifiedAt: { type: "string", format: "date-time" },
+					firstInvalidEntry: {
+						type: "object",
+						nullable: true,
+						properties: {
+							id: { type: "string" },
+							sequenceNumber: { type: "integer" },
+							error: {
+								type: "string",
+								enum: [
+									"DATA_HASH_MISMATCH",
+									"SIGNATURE_MISMATCH",
+									"CHAIN_BREAK",
+								],
+							},
+						},
+						description:
+							"Details of the first invalid entry if chain is broken",
+					},
 				},
 			},
 		},
