@@ -14,7 +14,7 @@ import { writeFileSync, unlinkSync } from "node:fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const CSV_URL = "https://catalogs.janovix.ai/business-activities.csv";
+const CSV_URL = "https://catalogs.janovix.com/business-activities.csv";
 const CATALOG_KEY = "business-activities";
 
 async function downloadCsv() {
