@@ -29,5 +29,10 @@ declare namespace Cloudflare {
 		 * Queue for alert detection jobs
 		 */
 		ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
+		/**
+		 * Sentry DSN for error tracking.
+		 * If not set, Sentry will be disabled.
+		 */
+		SENTRY_DSN?: string;
 	}
 }
