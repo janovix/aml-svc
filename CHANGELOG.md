@@ -1,3 +1,10 @@
+# [1.2.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.2.0-rc.4...v1.2.0-rc.5) (2026-01-10)
+
+
+### Features
+
+* full sentry integration ([244b958](https://github.com/janovix/aml-svc/commit/244b958e31bc95d1121f630b683348fe4cafe211))
+
 # [1.2.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.2.0-rc.3...v1.2.0-rc.4) (2026-01-09)
 
 
