@@ -1,3 +1,10 @@
+# [1.4.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.3.0...v1.4.0-rc.1) (2026-01-10)
+
+
+### Features
+
+* add compatibility flags for nodejs_als in configuration files ([3cb6c19](https://github.com/janovix/aml-svc/commit/3cb6c195d01657c989334334f80b2f5e86a2b865))
+
 # [1.3.0](https://github.com/janovix/aml-svc/compare/v1.2.0...v1.3.0) (2026-01-10)
 
 
