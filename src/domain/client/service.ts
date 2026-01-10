@@ -165,8 +165,8 @@ export class ClientService {
 
 	getStats(organizationId: string): Promise<{
 		totalClients: number;
-		openAlerts: number;
-		urgentReviews: number;
+		physicalClients: number;
+		moralClients: number;
 	}> {
 		return this.repository.getStats(organizationId);
 	}

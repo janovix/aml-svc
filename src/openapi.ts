@@ -188,7 +188,7 @@ export const openAPISpec = {
 				tags: ["Clients"],
 				summary: "Get client statistics",
 				description:
-					"Retrieve aggregate statistics for clients including total count, open alerts, and urgent reviews.",
+					"Retrieve aggregate statistics for clients including total count and breakdown by person type.",
 				responses: {
 					"200": {
 						description: "Client statistics",
@@ -690,7 +690,7 @@ export const openAPISpec = {
 							maxLength: 100,
 						},
 						description:
-							"Optional case-insensitive text search across `name` and `normalizedName`.",
+							"Optional case-insensitive text search across `name` and `normalizedName`. Empty or whitespace-only strings are treated as no filter (returns all items).",
 					},
 					{
 						name: "page",
@@ -1617,6 +1617,57 @@ export const openAPISpec = {
 				responses: {
 					"204": {
 						description: "Alert deleted",
+					},
+					"404": {
+						description: "Alert not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/alerts/{id}/cancel": {
+			post: {
+				tags: ["Alerts"],
+				summary: "Cancel alert",
+				description:
+					"Cancel an alert with a reason. Sets the status to CANCELLED and records the cancellation reason and user.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert identifier",
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/AlertCancelRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alert cancelled successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Alert" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
 					},
 					"404": {
 						description: "Alert not found",
@@ -3771,23 +3822,22 @@ export const openAPISpec = {
 			},
 			ClientStats: {
 				type: "object",
-				required: ["totalClients", "openAlerts", "urgentReviews"],
+				required: ["totalClients", "physicalClients", "moralClients"],
 				properties: {
 					totalClients: {
 						type: "integer",
 						description: "Total number of active clients",
 						example: 150,
 					},
-					openAlerts: {
+					physicalClients: {
 						type: "integer",
-						description: "Number of alerts with DETECTED status",
-						example: 5,
+						description: "Number of individual/physical person clients",
+						example: 100,
 					},
-					urgentReviews: {
+					moralClients: {
 						type: "integer",
-						description:
-							"Number of CRITICAL severity alerts with DETECTED or FILE_GENERATED status",
-						example: 2,
+						description: "Number of legal entity/moral person clients",
+						example: 50,
 					},
 				},
 			},
@@ -4241,6 +4291,18 @@ export const openAPISpec = {
 						maxLength: 1000,
 						nullable: true,
 						description: "Reason for cancellation",
+					},
+				},
+			},
+			AlertCancelRequest: {
+				type: "object",
+				required: ["reason"],
+				properties: {
+					reason: {
+						type: "string",
+						minLength: 1,
+						maxLength: 1000,
+						description: "Reason for cancelling the alert",
 					},
 				},
 			},

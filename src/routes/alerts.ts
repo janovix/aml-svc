@@ -10,6 +10,7 @@ import {
 	AlertRepository,
 	AlertCreateSchema,
 	AlertUpdateSchema,
+	AlertCancelSchema,
 } from "../domain/alert";
 import type { Bindings } from "../index";
 import { getPrismaClient } from "../lib/prisma";
@@ -73,6 +74,25 @@ alertsRouter.get("/", async (c) => {
 		.catch(handleServiceError);
 
 	return c.json(result);
+});
+
+alertsRouter.post("/:id/cancel", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const user = c.get("user");
+	const params = parseWithZod(AlertIdParamSchema, c.req.param());
+	const body = await c.req.json();
+	const { reason } = parseWithZod(AlertCancelSchema, body);
+
+	const service = getService(c);
+	const updated = await service
+		.patch(organizationId, params.id, {
+			status: "CANCELLED",
+			cancelledBy: user.id,
+			cancellationReason: reason,
+		})
+		.catch(handleServiceError);
+
+	return c.json(updated);
 });
 
 alertsRouter.get("/:id", async (c) => {

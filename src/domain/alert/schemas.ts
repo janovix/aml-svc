@@ -192,6 +192,11 @@ export const AlertIdParamSchema = z.object({
 	id: ResourceIdSchema,
 });
 
+// Cancel alert schema - requires a reason
+export const AlertCancelSchema = z.object({
+	reason: z.string().min(1, "Reason is required").max(1000),
+});
+
 export type AlertRuleCreateInput = z.infer<typeof AlertRuleCreateSchema>;
 export type AlertRuleUpdateInput = z.infer<typeof AlertRuleUpdateSchema>;
 export type AlertRulePatchInput = z.infer<typeof AlertRulePatchSchema>;
@@ -206,3 +211,4 @@ export type AlertCreateInput = z.infer<typeof AlertCreateSchema>;
 export type AlertUpdateInput = z.infer<typeof AlertUpdateSchema>;
 export type AlertPatchInput = z.infer<typeof AlertPatchSchema>;
 export type AlertFilters = z.infer<typeof AlertFilterSchema>;
+export type AlertCancelInput = z.infer<typeof AlertCancelSchema>;

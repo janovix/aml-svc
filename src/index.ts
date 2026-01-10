@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { prettyJSON } from "hono/pretty-json";
+import * as Sentry from "@sentry/cloudflare";
 import pkg from "../package.json";
 import { getScalarHtml, type AppMeta } from "./app-meta";
 import { errorHandler } from "./middleware/error";
@@ -27,6 +28,17 @@ export type Bindings = {
 	ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
 	/** Secret token for synthetic data generation HTTP endpoint (local development only) */
 	SYNTHETIC_DATA_SECRET?: string;
+	/**
+	 * Cloudflare Worker version metadata.
+	 * Used for Sentry release tracking.
+	 */
+	CF_VERSION_METADATA?: WorkerVersionMetadata;
+	/**
+	 * Sentry DSN for error tracking.
+	 * If not set, Sentry will be disabled.
+	 * Configured via Cloudflare Dashboard secrets or wrangler vars.
+	 */
+	SENTRY_DSN?: string;
 };
 
 // Start a Hono app
@@ -260,5 +272,17 @@ app.route("/api/v1", apiRouter);
 // Error handler (must be registered last)
 app.onError(errorHandler);
 
-// Export the Hono app
-export default app;
+// Sentry is enabled only when SENTRY_DSN environment variable is set.
+// Configure it via wrangler secrets: `wrangler secret put SENTRY_DSN`
+export default Sentry.withSentry((env: Bindings) => {
+	const versionId = env.CF_VERSION_METADATA?.id;
+	return {
+		// When DSN is undefined/empty, Sentry SDK is disabled (no events sent)
+		dsn: env.SENTRY_DSN,
+		release: versionId,
+		environment: env.ENVIRONMENT,
+		// Adds request headers and IP for users, for more info visit:
+		// https://docs.sentry.io/platforms/javascript/guides/cloudflare/configuration/options/#sendDefaultPii
+		sendDefaultPii: true,
+	};
+}, app);
