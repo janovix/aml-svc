@@ -1,3 +1,13 @@
+# [1.3.0](https://github.com/janovix/aml-svc/compare/v1.2.0...v1.3.0) (2026-01-10)
+
+
+### Features
+
+* add endpoint to cancel alerts with reason and implement corresponding schema and tests ([eb0ebe6](https://github.com/janovix/aml-svc/commit/eb0ebe67c4da50e2a98d07a222ad7741faa8943d))
+* enhance search field validation in CatalogListQuerySchema to treat empty and whitespace-only strings as undefined ([178ae5e](https://github.com/janovix/aml-svc/commit/178ae5e8b1d415676d20a05a7571bc38d21db21d))
+* full sentry integration ([244b958](https://github.com/janovix/aml-svc/commit/244b958e31bc95d1121f630b683348fe4cafe211))
+* update client statistics retrieval to include physical and moral client counts ([01ca427](https://github.com/janovix/aml-svc/commit/01ca4274a5593cd830d3665447414fe78f547ecb))
+
 # [1.2.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.2.0-rc.4...v1.2.0-rc.5) (2026-01-10)
 
 
