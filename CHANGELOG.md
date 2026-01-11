@@ -1,3 +1,10 @@
+# [1.4.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.1...v1.4.0-rc.2) (2026-01-11)
+
+
+### Features
+
+* add audit client and auth settings integration via service binding ([a3a1199](https://github.com/janovix/aml-svc/commit/a3a1199c8bd008c33f79011b21a55133db0a888e))
+
 # [1.4.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.3.0...v1.4.0-rc.1) (2026-01-10)
 
 
