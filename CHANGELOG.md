@@ -1,3 +1,10 @@
+# [1.4.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.2...v1.4.0-rc.3) (2026-01-11)
+
+
+### Features
+
+* add organization settings route for service binding access and implement internal handling ([ebf3ba7](https://github.com/janovix/aml-svc/commit/ebf3ba7728f51c173cdf674b7c0c101920d911cf))
+
 # [1.4.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.1...v1.4.0-rc.2) (2026-01-11)
 
 
