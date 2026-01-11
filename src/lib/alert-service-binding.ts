@@ -34,6 +34,7 @@ import { TransactionRepository } from "../domain/transaction";
 import { TransactionService } from "../domain/transaction";
 import { CatalogRepository } from "../domain/catalog/repository";
 import { CatalogEnrichmentService } from "../domain/catalog/enrichment-service";
+import { handleInternalOrganizationSettingsRequest } from "../routes/internal-organization-settings";
 
 /**
  * Service binding helper functions for alert operations
@@ -413,6 +414,21 @@ export async function handleServiceBindingRequest(
 					},
 				);
 			}
+		}
+
+		// Route: /organization-settings/:organizationId (GET, PUT, PATCH)
+		// Called via: env.AML_SERVICE.fetch(new Request(`https://internal/organization-settings/${organizationId}`))
+		const orgSettingsMatch = path.match(/^\/organization-settings\/([^/]+)$/);
+		if (orgSettingsMatch) {
+			const [, organizationId] = orgSettingsMatch;
+			console.log(
+				`[ServiceBinding] Organization settings request for ${organizationId}`,
+			);
+			return handleInternalOrganizationSettingsRequest(
+				request,
+				env,
+				organizationId,
+			);
 		}
 
 		// No route matched - return 404 with helpful error message

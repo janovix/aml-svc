@@ -132,6 +132,10 @@ app.all("/clients/:id", async (c) => {
 app.all("/transactions", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
+// Organization settings route for service binding access from auth-svc
+app.all("/organization-settings/:organizationId", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
 
 // Internal synthetic data generation endpoint (for local development only)
 // Note: GitHub Actions uses the script directly, not this endpoint
