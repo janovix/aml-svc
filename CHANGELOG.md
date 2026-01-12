@@ -1,3 +1,10 @@
+# [1.4.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.3...v1.4.0-rc.4) (2026-01-12)
+
+
+### Features
+
+* enhance subscription management with new middleware and client for usage tracking and feature access ([157acc2](https://github.com/janovix/aml-svc/commit/157acc20d033a20ecd6e9c4d3bbcb6ce1cd2769f))
+
 # [1.4.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.2...v1.4.0-rc.3) (2026-01-11)
 
 
