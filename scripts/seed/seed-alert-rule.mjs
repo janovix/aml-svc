@@ -510,7 +510,7 @@ function generateSql() {
 			: "NULL";
 
 		sql.push(`
-INSERT INTO alert_rules (id, name, description, active, severity, ruleType, isManualOnly, activityCode, metadata, createdAt, updatedAt)
+INSERT INTO alert_rules (id, name, description, active, severity, rule_type, is_manual_only, activity_code, metadata, created_at, updated_at)
 VALUES (
 	${id},
 	${name},
@@ -529,11 +529,11 @@ ON CONFLICT(id) DO UPDATE SET
 	description = excluded.description,
 	active = excluded.active,
 	severity = excluded.severity,
-	ruleType = excluded.ruleType,
-	isManualOnly = excluded.isManualOnly,
-	activityCode = excluded.activityCode,
+	rule_type = excluded.rule_type,
+	is_manual_only = excluded.is_manual_only,
+	activity_code = excluded.activity_code,
 	metadata = excluded.metadata,
-	updatedAt = CURRENT_TIMESTAMP;
+	updated_at = CURRENT_TIMESTAMP;
 `);
 	}
 

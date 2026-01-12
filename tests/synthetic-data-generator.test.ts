@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { SyntheticDataGenerator } from "../src/lib/synthetic-data-generator";
 import type { PrismaClient } from "@prisma/client";
 
 describe("SyntheticDataGenerator", () => {
 	let mockPrisma: PrismaClient;
 	const organizationId = "org-123";
+	const originalRandom = Math.random;
 
 	beforeEach(() => {
 		mockPrisma = {
@@ -23,6 +24,11 @@ describe("SyntheticDataGenerator", () => {
 				create: vi.fn(),
 			},
 		} as unknown as PrismaClient;
+	});
+
+	afterEach(() => {
+		// Restore Math.random in case it was mocked
+		Math.random = originalRandom;
 	});
 
 	describe("generate", () => {
@@ -218,6 +224,21 @@ describe("SyntheticDataGenerator", () => {
 		});
 
 		it("should generate mix of physical and moral clients", async () => {
+			// Mock Math.random to ensure we get a mix of both types
+			// First 7 calls return > 0.3 (physical), next 3 return < 0.3 (moral)
+			let randomCallCount = 0;
+			const originalRandom = Math.random;
+			Math.random = vi.fn(() => {
+				randomCallCount++;
+				// Return values that will create 7 physical and 3 moral clients
+				// For physical: Math.random() > 0.3, so return 0.5
+				// For moral: Math.random() <= 0.3, so return 0.2
+				if (randomCallCount <= 7) {
+					return 0.5; // Will create physical
+				}
+				return 0.2; // Will create moral
+			}) as any;
+
 			let callCount = 0;
 			const mockCreateFn = vi.fn().mockImplementation(async () => {
 				callCount++;
@@ -225,7 +246,7 @@ describe("SyntheticDataGenerator", () => {
 					id: `CLIENT_${callCount}`,
 					rfc: `RFC${callCount}`,
 					organizationId,
-					personType: callCount % 3 === 0 ? "MORAL" : "PHYSICAL",
+					personType: callCount <= 7 ? "PHYSICAL" : "MORAL",
 					createdAt: new Date(),
 					updatedAt: new Date(),
 				} as any;
@@ -248,6 +269,10 @@ describe("SyntheticDataGenerator", () => {
 			);
 
 			expect(moralCalls.length).toBeGreaterThan(0);
+			expect(physicalCalls.length).toBeGreaterThan(0);
+
+			// Restore Math.random
+			Math.random = originalRandom;
 			expect(physicalCalls.length).toBeGreaterThan(0);
 		});
 

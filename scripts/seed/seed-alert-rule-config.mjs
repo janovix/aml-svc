@@ -151,7 +151,7 @@ function generateSql() {
 		sql.push(`
 -- Clear existing configs for alert rules we're seeding (preserves other configs)
 DELETE FROM alert_rule_config
-WHERE alertRuleId IN (${alertRuleIdsList});
+WHERE alert_rule_id IN (${alertRuleIdsList});
 `);
 	}
 
@@ -167,7 +167,7 @@ WHERE alertRuleId IN (${alertRuleIdsList});
 			: "NULL";
 
 		sql.push(`
-INSERT INTO alert_rule_config (id, alertRuleId, key, value, isHardcoded, description, createdAt, updatedAt)
+INSERT INTO alert_rule_config (id, alert_rule_id, key, value, is_hardcoded, description, created_at, updated_at)
 VALUES (
 	${id},
 	${alertRuleId},
