@@ -1381,6 +1381,242 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/alert-rules/{id}/config": {
+			get: {
+				tags: ["Alert Rules"],
+				summary: "List alert rule configs",
+				description: "Retrieve all configuration values for an alert rule",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert rule identifier",
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of alert rule configs",
+						content: {
+							"application/json": {
+								schema: {
+									type: "array",
+									items: { $ref: "#/components/schemas/AlertRuleConfig" },
+								},
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Alert Rules"],
+				summary: "Create alert rule config",
+				description: "Create a new configuration value for an alert rule",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert rule identifier",
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								$ref: "#/components/schemas/AlertRuleConfigCreateRequest",
+							},
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Alert rule config created successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRuleConfig" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/alert-rules/{id}/config/{key}": {
+			get: {
+				tags: ["Alert Rules"],
+				summary: "Get alert rule config by key",
+				description:
+					"Retrieve a specific configuration value for an alert rule",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert rule identifier",
+					},
+					{
+						name: "key",
+						in: "path",
+						required: true,
+						schema: { type: "string", minLength: 1, maxLength: 100 },
+						description: "Configuration key",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Alert rule config",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRuleConfig" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule config not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["Alert Rules"],
+				summary: "Update alert rule config",
+				description: "Update a configuration value for an alert rule",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert rule identifier",
+					},
+					{
+						name: "key",
+						in: "path",
+						required: true,
+						schema: { type: "string", minLength: 1, maxLength: 100 },
+						description: "Configuration key",
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								$ref: "#/components/schemas/AlertRuleConfigUpdateRequest",
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alert rule config updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRuleConfig" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"403": {
+						description: "Cannot modify hardcoded config value",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule config not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["Alert Rules"],
+				summary: "Delete alert rule config",
+				description: "Delete a configuration value for an alert rule",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert rule identifier",
+					},
+					{
+						name: "key",
+						in: "path",
+						required: true,
+						schema: { type: "string", minLength: 1, maxLength: 100 },
+						description: "Configuration key",
+					},
+				],
+				responses: {
+					"204": {
+						description: "Alert rule config deleted",
+					},
+					"403": {
+						description: "Cannot delete hardcoded config value",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule config not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
 		"/api/v1/alerts": {
 			get: {
 				tags: ["Alerts"],
@@ -2218,6 +2454,203 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/reports/templates": {
+			get: {
+				tags: ["Reports"],
+				summary: "List available report templates",
+				description:
+					"Retrieve all available report templates with their configurations",
+				responses: {
+					"200": {
+						description: "List of report templates",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										templates: {
+											type: "array",
+											items: {
+												$ref: "#/components/schemas/ReportTemplateConfig",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/aggregate/summary": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get executive summary aggregation",
+				description:
+					"Get aggregated metrics for alerts, transactions, and clients for a given period",
+				parameters: [
+					{
+						name: "periodStart",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "Start of the period",
+					},
+					{
+						name: "periodEnd",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "End of the period",
+					},
+					{
+						name: "comparisonPeriodStart",
+						in: "query",
+						schema: { type: "string", format: "date-time" },
+						description: "Start of comparison period (optional)",
+					},
+					{
+						name: "comparisonPeriodEnd",
+						in: "query",
+						schema: { type: "string", format: "date-time" },
+						description: "End of comparison period (optional)",
+					},
+					{
+						name: "clientId",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by client ID (optional)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Aggregated summary data",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/ReportAggregation" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/aggregate/alerts": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get alert metrics aggregation",
+				description: "Get aggregated alert metrics for a given period",
+				parameters: [
+					{
+						name: "periodStart",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "Start of the period",
+					},
+					{
+						name: "periodEnd",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "End of the period",
+					},
+					{
+						name: "clientId",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by client ID (optional)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Aggregated alert metrics",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertAggregation" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/aggregate/transactions": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get transaction metrics aggregation",
+				description: "Get aggregated transaction metrics for a given period",
+				parameters: [
+					{
+						name: "periodStart",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "Start of the period",
+					},
+					{
+						name: "periodEnd",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "End of the period",
+					},
+					{
+						name: "clientId",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by client ID (optional)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Aggregated transaction metrics",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/TransactionAggregation" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/aggregate/clients": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get client metrics aggregation",
+				description: "Get aggregated client metrics for a given period",
+				parameters: [
+					{
+						name: "periodStart",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "Start of the period",
+					},
+					{
+						name: "periodEnd",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "End of the period",
+					},
+					{
+						name: "clientId",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by client ID (optional)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Aggregated client metrics",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/ClientAggregation" },
+							},
+						},
+					},
+				},
+			},
+		},
 		"/api/v1/reports/{id}": {
 			get: {
 				tags: ["Reports"],
@@ -2365,6 +2798,41 @@ export const openAPISpec = {
 										fileUrl: { type: "string" },
 									},
 								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/{id}/aggregation": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get aggregation data for a report",
+				description:
+					"Get aggregated metrics for a specific report's period and filters",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Report identifier",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Aggregated data for the report",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/ReportAggregation" },
+							},
+						},
+					},
+					"404": {
+						description: "Report not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
 							},
 						},
 					},
@@ -4806,6 +5274,243 @@ export const openAPISpec = {
 					reportedMonth: { type: "string" },
 					displayName: { type: "string" },
 					submissionDeadline: { type: "string", format: "date-time" },
+				},
+			},
+			ReportTemplateConfig: {
+				type: "object",
+				required: [
+					"template",
+					"name",
+					"description",
+					"dataSources",
+					"defaultCharts",
+					"requiresClientId",
+				],
+				properties: {
+					template: {
+						type: "string",
+						enum: [
+							"EXECUTIVE_SUMMARY",
+							"COMPLIANCE_STATUS",
+							"TRANSACTION_ANALYSIS",
+							"CLIENT_RISK_PROFILE",
+							"ALERT_BREAKDOWN",
+							"PERIOD_COMPARISON",
+							"CUSTOM",
+						],
+					},
+					name: { type: "string" },
+					description: { type: "string" },
+					dataSources: {
+						type: "array",
+						items: {
+							type: "string",
+							enum: ["ALERTS", "TRANSACTIONS", "CLIENTS"],
+						},
+					},
+					defaultCharts: {
+						type: "array",
+						items: { $ref: "#/components/schemas/ReportChartConfig" },
+					},
+					requiresClientId: { type: "boolean" },
+				},
+			},
+			ReportChartConfig: {
+				type: "object",
+				required: ["type", "title", "dataKey"],
+				properties: {
+					type: {
+						type: "string",
+						enum: ["PIE", "BAR", "LINE", "DONUT", "STACKED_BAR"],
+					},
+					title: { type: "string", minLength: 1, maxLength: 100 },
+					dataKey: { type: "string", minLength: 1, maxLength: 50 },
+					showLegend: { type: "boolean", default: true },
+				},
+			},
+			AlertAggregation: {
+				type: "object",
+				required: [
+					"total",
+					"bySeverity",
+					"byStatus",
+					"byRule",
+					"byMonth",
+					"avgResolutionDays",
+					"overdueCount",
+				],
+				properties: {
+					total: { type: "integer" },
+					bySeverity: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					byStatus: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					byRule: {
+						type: "array",
+						items: {
+							type: "object",
+							required: ["ruleId", "ruleName", "count"],
+							properties: {
+								ruleId: { type: "string" },
+								ruleName: { type: "string" },
+								count: { type: "integer" },
+							},
+						},
+					},
+					byMonth: {
+						type: "array",
+						items: {
+							type: "object",
+							required: ["month", "count"],
+							properties: {
+								month: { type: "string" },
+								count: { type: "integer" },
+							},
+						},
+					},
+					avgResolutionDays: { type: "number" },
+					overdueCount: { type: "integer" },
+				},
+			},
+			TransactionAggregation: {
+				type: "object",
+				required: [
+					"total",
+					"totalAmount",
+					"avgAmount",
+					"byOperationType",
+					"byVehicleType",
+					"byCurrency",
+					"byMonth",
+					"topClients",
+				],
+				properties: {
+					total: { type: "integer" },
+					totalAmount: { type: "number" },
+					avgAmount: { type: "number" },
+					byOperationType: {
+						type: "object",
+						additionalProperties: {
+							type: "object",
+							required: ["count", "amount"],
+							properties: {
+								count: { type: "integer" },
+								amount: { type: "number" },
+							},
+						},
+					},
+					byVehicleType: {
+						type: "object",
+						additionalProperties: {
+							type: "object",
+							required: ["count", "amount"],
+							properties: {
+								count: { type: "integer" },
+								amount: { type: "number" },
+							},
+						},
+					},
+					byCurrency: {
+						type: "object",
+						additionalProperties: {
+							type: "object",
+							required: ["count", "amount"],
+							properties: {
+								count: { type: "integer" },
+								amount: { type: "number" },
+							},
+						},
+					},
+					byMonth: {
+						type: "array",
+						items: {
+							type: "object",
+							required: ["month", "count", "amount"],
+							properties: {
+								month: { type: "string" },
+								count: { type: "integer" },
+								amount: { type: "number" },
+							},
+						},
+					},
+					topClients: {
+						type: "array",
+						items: {
+							type: "object",
+							required: ["clientId", "clientName", "count", "amount"],
+							properties: {
+								clientId: { type: "string" },
+								clientName: { type: "string" },
+								count: { type: "integer" },
+								amount: { type: "number" },
+							},
+						},
+					},
+				},
+			},
+			ClientAggregation: {
+				type: "object",
+				required: [
+					"total",
+					"byPersonType",
+					"byCountry",
+					"withAlerts",
+					"newInPeriod",
+				],
+				properties: {
+					total: { type: "integer" },
+					byPersonType: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					byCountry: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					withAlerts: { type: "integer" },
+					newInPeriod: { type: "integer" },
+				},
+			},
+			ComparisonMetrics: {
+				type: "object",
+				properties: {
+					alertsChange: { type: "number", description: "Percentage change" },
+					transactionsChange: {
+						type: "number",
+						description: "Percentage change",
+					},
+					amountChange: { type: "number", description: "Percentage change" },
+					clientsChange: { type: "number", description: "Percentage change" },
+				},
+			},
+			RiskIndicators: {
+				type: "object",
+				required: [
+					"highRiskClients",
+					"criticalAlerts",
+					"overdueSubmissions",
+					"complianceScore",
+				],
+				properties: {
+					highRiskClients: { type: "integer" },
+					criticalAlerts: { type: "integer" },
+					overdueSubmissions: { type: "integer" },
+					complianceScore: { type: "number", minimum: 0, maximum: 100 },
+				},
+			},
+			ReportAggregation: {
+				type: "object",
+				required: ["alerts", "transactions", "clients", "riskIndicators"],
+				properties: {
+					alerts: { $ref: "#/components/schemas/AlertAggregation" },
+					transactions: { $ref: "#/components/schemas/TransactionAggregation" },
+					clients: { $ref: "#/components/schemas/ClientAggregation" },
+					comparison: { $ref: "#/components/schemas/ComparisonMetrics" },
+					riskIndicators: { $ref: "#/components/schemas/RiskIndicators" },
 				},
 			},
 		},

@@ -16,6 +16,7 @@ import type { Bindings } from "../index";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import { createSubscriptionClient } from "../lib/subscription-client";
 
 export const alertsRouter = new Hono<{
 	Bindings: Bindings;
@@ -117,6 +118,13 @@ alertsRouter.post("/", async (c) => {
 	const created = await service
 		.create(payload, organizationId)
 		.catch(handleServiceError);
+
+	// Report alert usage to auth-svc for metered billing
+	// Fire-and-forget - don't fail alert creation if billing fails
+	const subscriptionClient = createSubscriptionClient(c.env);
+	subscriptionClient.reportUsage(organizationId, "alerts", 1).catch((err) => {
+		console.error("Failed to report alert usage:", err);
+	});
 
 	return c.json(created, 201);
 });

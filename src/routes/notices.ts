@@ -29,6 +29,7 @@ import {
 	mapToSatVehicleNoticeData,
 	type SatMonthlyReportData,
 } from "../lib/sat-xml-generator";
+import { createSubscriptionClient } from "../lib/subscription-client";
 
 export const noticesRouter = new Hono<{
 	Bindings: Bindings;
@@ -145,6 +146,13 @@ noticesRouter.post("/", async (c) => {
 	const created = await service
 		.create(payload, organizationId, userId)
 		.catch(handleServiceError);
+
+	// Report notice usage to auth-svc for metered billing
+	// This is fire-and-forget - we don't want to fail notice creation if billing fails
+	const subscriptionClient = createSubscriptionClient(c.env);
+	subscriptionClient.reportUsage(organizationId, "notices", 1).catch((err) => {
+		console.error("Failed to report notice usage:", err);
+	});
 
 	return c.json(created, 201);
 });
