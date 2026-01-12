@@ -1,3 +1,10 @@
+# [1.4.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.4...v1.4.0-rc.5) (2026-01-12)
+
+
+### Features
+
+* add admin routes and authentication middleware for platform admin management ([6254ca1](https://github.com/janovix/aml-svc/commit/6254ca10058dafa4b349feefdce12f4f92de8ad3))
+
 # [1.4.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.3...v1.4.0-rc.4) (2026-01-12)
 
 
