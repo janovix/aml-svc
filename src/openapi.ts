@@ -23,6 +23,11 @@ export const openAPISpec = {
 			description: "Health check endpoints",
 		},
 		{
+			name: "Admin",
+			description:
+				"Platform admin endpoints for cross-organization monitoring (requires admin role)",
+		},
+		{
 			name: "Clients",
 			description: "Client KYC data management endpoints",
 		},

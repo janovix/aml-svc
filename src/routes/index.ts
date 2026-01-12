@@ -2,6 +2,8 @@ import { Hono } from "hono";
 
 import type { Bindings } from "../index";
 import { authMiddleware, type AuthVariables } from "../middleware/auth";
+import { type AdminAuthVariables } from "../middleware/admin-auth";
+import { adminRouter } from "./admin";
 import { alertRulesRouter } from "./alert-rules";
 import { alertsRouter } from "./alerts";
 import { catalogsRouter } from "./catalogs";
@@ -13,7 +15,10 @@ import { transactionsRouter } from "./transactions";
 import { umaValuesRouter } from "./uma-values";
 
 export function createRouter() {
-	const router = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
+	const router = new Hono<{
+		Bindings: Bindings;
+		Variables: AuthVariables & AdminAuthVariables;
+	}>();
 
 	// Apply auth middleware with organization requirement for tenant-scoped routes
 	// These routes require an active organization to be selected
@@ -32,6 +37,10 @@ export function createRouter() {
 
 	// UMA values are global (regulatory standard) - auth required but no org
 	router.use("/uma-values/*", authMiddleware());
+
+	// Admin routes use their own auth middleware (checks for admin role)
+	// No middleware applied here - adminRouter handles its own auth
+	router.route("/admin", adminRouter);
 
 	// Mount resource routers
 	router.route("/catalogs", catalogsRouter);
