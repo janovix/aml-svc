@@ -1,5 +1,6 @@
 // Prisma schema for AML Core KYC domain
 // Learn more about it in the docs: https://pris.ly/d/prisma-schema
+// NOTE: All column names use snake_case via @map directives for consistency
 
 generator client {
   provider = "prisma-client-js"
@@ -51,43 +52,43 @@ enum TransactionVehicleType {
 }
 
 model Client {
-  id                String     @id
-  rfc               String     @unique
-  organizationId    String     // Organization this client belongs to (from auth-svc)
-  personType        PersonType
-  firstName         String?
-  lastName          String?
-  secondLastName    String?
-  birthDate         DateTime?
-  curp              String?
-  businessName      String?
-  incorporationDate DateTime?
-  nationality       String?
-  email             String
-  phone             String
-  country           String
-  stateCode         String
-  city              String
-  municipality      String
-  neighborhood      String
-  street            String
-  externalNumber    String
-  internalNumber    String?
-  postalCode        String
-  reference         String?
-  notes             String?
+  id                   String     @id
+  rfc                  String     @unique
+  organizationId       String     @map("organization_id") // Organization this client belongs to (from auth-svc)
+  personType           PersonType @map("person_type")
+  firstName            String?    @map("first_name")
+  lastName             String?    @map("last_name")
+  secondLastName       String?    @map("second_last_name")
+  birthDate            DateTime?  @map("birth_date")
+  curp                 String?
+  businessName         String?    @map("business_name")
+  incorporationDate    DateTime?  @map("incorporation_date")
+  nationality          String?
+  email                String
+  phone                String
+  country              String
+  stateCode            String     @map("state_code")
+  city                 String
+  municipality         String
+  neighborhood         String
+  street               String
+  externalNumber       String     @map("external_number")
+  internalNumber       String?    @map("internal_number")
+  postalCode           String     @map("postal_code")
+  reference            String?
+  notes                String?
   // Catalog references for XML generation
-  countryCode       String?    // Reference to countries catalog (metadata.code)
-  economicActivityCode String? // Reference to economic activity catalog (7-digit code)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-  deletedAt         DateTime?
+  countryCode          String?    @map("country_code") // Reference to countries catalog (metadata.code)
+  economicActivityCode String?    @map("economic_activity_code") // Reference to economic activity catalog (7-digit code)
+  createdAt            DateTime   @default(now()) @map("created_at")
+  updatedAt            DateTime   @updatedAt @map("updated_at")
+  deletedAt            DateTime?  @map("deleted_at")
 
-  documents ClientDocument[]
-  addresses ClientAddress[]
+  documents    ClientDocument[]
+  addresses    ClientAddress[]
   transactions Transaction[]
-  alerts Alert[]
-  reports Report[]  // Reports targeting this specific client
+  alerts       Alert[]
+  reports      Report[] // Reports targeting this specific client
 
   @@map("clients")
   @@index([organizationId])
@@ -99,17 +100,17 @@ model Client {
 
 model ClientDocument {
   id             String         @id
-  clientId       String
-  documentType   DocumentType
-  documentNumber String
-  issuingCountry String?
-  issueDate      DateTime?
-  expiryDate     DateTime?
+  clientId       String         @map("client_id")
+  documentType   DocumentType   @map("document_type")
+  documentNumber String         @map("document_number")
+  issuingCountry String?        @map("issuing_country")
+  issueDate      DateTime?      @map("issue_date")
+  expiryDate     DateTime?      @map("expiry_date")
   status         DocumentStatus @default(PENDING)
-  fileUrl        String?
+  fileUrl        String?        @map("file_url")
   metadata       String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
@@ -122,19 +123,19 @@ model ClientDocument {
 
 model ClientAddress {
   id          String      @id
-  clientId    String
-  addressType AddressType @default(RESIDENTIAL)
+  clientId    String      @map("client_id")
+  addressType AddressType @default(RESIDENTIAL) @map("address_type")
   street1     String
   street2     String?
   city        String
   state       String?
-  postalCode  String?
+  postalCode  String?     @map("postal_code")
   country     String
-  isPrimary   Boolean     @default(false)
-  verifiedAt  DateTime?
+  isPrimary   Boolean     @default(false) @map("is_primary")
+  verifiedAt  DateTime?   @map("verified_at")
   reference   String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
@@ -149,9 +150,9 @@ model Catalog {
   key           String        @unique
   name          String
   active        Boolean       @default(true)
-  allowNewItems Boolean       @default(false) // When true, users can add new items to this catalog
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  allowNewItems Boolean       @default(false) @map("allow_new_items") // When true, users can add new items to this catalog
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
 
   items CatalogItem[]
 
@@ -161,13 +162,13 @@ model Catalog {
 
 model CatalogItem {
   id             String   @id
-  catalogId      String
+  catalogId      String   @map("catalog_id")
   name           String
-  normalizedName String
+  normalizedName String   @map("normalized_name")
   active         Boolean  @default(true)
   metadata       String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   catalog Catalog @relation(fields: [catalogId], references: [id], onDelete: Cascade)
 
@@ -178,34 +179,34 @@ model CatalogItem {
 }
 
 model Transaction {
-  id                String                     @id
-  organizationId    String                     // Organization this transaction belongs to (from auth-svc)
-  clientId          String
-  operationDate     DateTime
-  operationType     TransactionOperationType
-  branchPostalCode  String
-  vehicleType       TransactionVehicleType
-  brandId           String
-  model             String
-  year              Int
-  armorLevel        String?
-  engineNumber      String?
-  plates            String?
-  registrationNumber String?
-  flagCountryId     String?
-  amount            Decimal
-  currency          String
+  id                 String                   @id
+  organizationId     String                   @map("organization_id") // Organization this transaction belongs to (from auth-svc)
+  clientId           String                   @map("client_id")
+  operationDate      DateTime                 @map("operation_date")
+  operationType      TransactionOperationType @map("operation_type")
+  branchPostalCode   String                   @map("branch_postal_code")
+  vehicleType        TransactionVehicleType   @map("vehicle_type")
+  brandId            String                   @map("brand_id")
+  model              String
+  year               Int
+  armorLevel         String?                  @map("armor_level")
+  engineNumber       String?                  @map("engine_number")
+  plates             String?
+  registrationNumber String?                  @map("registration_number")
+  flagCountryId      String?                  @map("flag_country_id")
+  amount             Decimal
+  currency           String
   // Catalog references for XML generation
-  operationTypeCode String?    // Reference to veh-operation-types catalog (metadata.code, e.g., "802")
-  currencyCode      String?    // Reference to currencies catalog (metadata.code, e.g., "3" for MXN)
+  operationTypeCode  String?                  @map("operation_type_code") // Reference to veh-operation-types catalog (metadata.code, e.g., "802")
+  currencyCode       String?                  @map("currency_code") // Reference to currencies catalog (metadata.code, e.g., "3" for MXN)
   // UMA value calculation (automatically calculated and saved)
-  umaValue          Decimal?   // Calculated: amount / umaDailyValue for the transaction date
-  createdAt         DateTime                   @default(now())
-  updatedAt         DateTime                   @updatedAt
-  deletedAt         DateTime?
+  umaValue           Decimal?                 @map("uma_value") // Calculated: amount / umaDailyValue for the transaction date
+  createdAt          DateTime                 @default(now()) @map("created_at")
+  updatedAt          DateTime                 @updatedAt @map("updated_at")
+  deletedAt          DateTime?                @map("deleted_at")
 
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  paymentMethods    TransactionPaymentMethod[]
+  client         Client                     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  paymentMethods TransactionPaymentMethod[]
 
   @@map("transactions")
   @@index([organizationId])
@@ -218,12 +219,12 @@ model Transaction {
 }
 
 model TransactionPaymentMethod {
-  id            String      @id
-  transactionId String
+  id            String   @id
+  transactionId String   @map("transaction_id")
   method        String
   amount        Decimal
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
@@ -232,11 +233,11 @@ model TransactionPaymentMethod {
 }
 
 enum AlertStatus {
-  DETECTED        // Alert detected, awaiting file generation
-  FILE_GENERATED  // File generated for SAT submission, ready to submit
-  SUBMITTED       // Successfully submitted to SAT with acknowledgment
-  OVERDUE         // Submission deadline has passed (worst case - penalties)
-  CANCELLED       // Alert was cancelled/dismissed (e.g., false positive)
+  DETECTED // Alert detected, awaiting file generation
+  FILE_GENERATED // File generated for SAT submission, ready to submit
+  SUBMITTED // Successfully submitted to SAT with acknowledgment
+  OVERDUE // Submission deadline has passed (worst case - penalties)
+  CANCELLED // Alert was cancelled/dismissed (e.g., false positive)
 }
 
 enum AlertSeverity {
@@ -248,49 +249,49 @@ enum AlertSeverity {
 
 // Notice status for SAT regulatory submissions
 enum NoticeStatus {
-  DRAFT        // Created, not yet generated
-  GENERATED    // XML file generated
-  SUBMITTED    // Sent to SAT
+  DRAFT // Created, not yet generated
+  GENERATED // XML file generated
+  SUBMITTED // Sent to SAT
   ACKNOWLEDGED // SAT acknowledged receipt
 }
 
 // Report types for analytics/business intelligence (all use calendar periods)
 enum ReportPeriodType {
-  MONTHLY     // Calendar month (1st-last day)
-  QUARTERLY   // Calendar quarter
-  ANNUAL      // Calendar year
-  CUSTOM      // Custom date range
+  MONTHLY // Calendar month (1st-last day)
+  QUARTERLY // Calendar quarter
+  ANNUAL // Calendar year
+  CUSTOM // Custom date range
 }
 
 // Report templates for common use cases
 enum ReportTemplate {
-  EXECUTIVE_SUMMARY      // High-level compliance overview
-  COMPLIANCE_STATUS      // Audit-ready compliance report
-  TRANSACTION_ANALYSIS   // Transaction volume & patterns
-  CLIENT_RISK_PROFILE    // Deep-dive on specific client
-  ALERT_BREAKDOWN        // Alert management metrics
-  PERIOD_COMPARISON      // Trend analysis
-  CUSTOM                 // User-defined report
+  EXECUTIVE_SUMMARY // High-level compliance overview
+  COMPLIANCE_STATUS // Audit-ready compliance report
+  TRANSACTION_ANALYSIS // Transaction volume & patterns
+  CLIENT_RISK_PROFILE // Deep-dive on specific client
+  ALERT_BREAKDOWN // Alert management metrics
+  PERIOD_COMPARISON // Trend analysis
+  CUSTOM // User-defined report
 }
 
 // Report status (simplified - no SAT workflow)
 enum ReportStatus {
-  DRAFT        // Created, not yet generated
-  GENERATED    // PDF generated
+  DRAFT // Created, not yet generated
+  GENERATED // PDF generated
 }
 
 model AlertRule {
-  id             String   @id // Alert code (e.g., "2501", "2502", "9999")
-  name           String
-  description    String?
-  active         Boolean  @default(true)
-  severity       AlertSeverity @default(MEDIUM)
-  ruleType       String?  // Matches seeker's ruleType (null for manual-only rules)
-  isManualOnly   Boolean  @default(false) // True if only manual triggers
-  activityCode   String   @default("VEH") // VEH, JYS, INM, JOY, ART
-  metadata       String?  // Additional metadata as JSON (legal basis, category, etc.)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id           String        @id // Alert code (e.g., "2501", "2502", "9999")
+  name         String
+  description  String?
+  active       Boolean       @default(true)
+  severity     AlertSeverity @default(MEDIUM)
+  ruleType     String?       @map("rule_type") // Matches seeker's ruleType (null for manual-only rules)
+  isManualOnly Boolean       @default(false) @map("is_manual_only") // True if only manual triggers
+  activityCode String        @default("VEH") @map("activity_code") // VEH, JYS, INM, JOY, ART
+  metadata     String? // Additional metadata as JSON (legal basis, category, etc.)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
 
   alerts  Alert[]
   configs AlertRuleConfig[]
@@ -304,14 +305,14 @@ model AlertRule {
 }
 
 model AlertRuleConfig {
-  id           String   @id
-  alertRuleId  String
-  key          String   // Config key (e.g., "uma_threshold", "max_cash_amount")
-  value        String   // JSON string value
-  isHardcoded  Boolean  @default(false) // True if should not be updated via API
-  description  String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id
+  alertRuleId String   @map("alert_rule_id")
+  key         String // Config key (e.g., "uma_threshold", "max_cash_amount")
+  value       String // JSON string value
+  isHardcoded Boolean  @default(false) @map("is_hardcoded") // True if should not be updated via API
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
 
@@ -323,44 +324,41 @@ model AlertRuleConfig {
 }
 
 model Alert {
-  id                String      @id
-  organizationId    String      // Organization this alert belongs to (from auth-svc)
-  alertRuleId       String
-  clientId          String
-  reportId          String?     // Optional reference to analytics report (PDF)
-  noticeId          String?     // Optional reference to SAT notice (XML)
-  status            AlertStatus @default(DETECTED)
-  severity          AlertSeverity
+  id                       String        @id
+  organizationId           String        @map("organization_id") // Organization this alert belongs to (from auth-svc)
+  alertRuleId              String        @map("alert_rule_id")
+  clientId                 String        @map("client_id")
+  reportId                 String?       @map("report_id") // Optional reference to analytics report (PDF)
+  noticeId                 String?       @map("notice_id") // Optional reference to SAT notice (XML)
+  status                   AlertStatus   @default(DETECTED)
+  severity                 AlertSeverity
   // Idempotency key: hash of (clientId + alertRuleId + contextHash)
   // This ensures we never create duplicate alerts for the same condition
-  idempotencyKey    String      @unique
+  idempotencyKey           String        @unique @map("idempotency_key")
   // Context hash: hash of the specific data that triggered this alert
   // Example: hash of transaction IDs, amounts, dates, etc.
-  contextHash       String
+  contextHash              String        @map("context_hash")
   // Alert details stored as JSON (transaction IDs, amounts, dates, etc.)
-  metadata          String      // JSON string with alert-specific data (renamed from alertData)
+  metadata                 String // JSON string with alert-specific data (renamed from alertData)
   // Optional reference to the transaction that triggered the alert
-  transactionId     String?     // Renamed from triggerTransactionId
-  isManual          Boolean     @default(false) // True if manually created
-  
+  transactionId            String?       @map("transaction_id") // Renamed from triggerTransactionId
+  isManual                 Boolean       @default(false) @map("is_manual") // True if manually created
   // SAT Submission tracking (managed via Notice)
-  submissionDeadline DateTime?  // Deadline for SAT submission (day 17 of following month for avisos, 24h for suspicion)
-  fileGeneratedAt    DateTime?  // When the SAT file was generated (via notice)
-  submittedAt        DateTime?  // When submitted to SAT
-  satAcknowledgmentReceipt String? // File URL or reference to SAT acknowledgment (PDF/XML)
-  satFolioNumber     String?   // Folio number from SAT acknowledgment
-  isOverdue          Boolean    @default(false) // Computed: true if submissionDeadline has passed and status != SUBMITTED
-  
+  submissionDeadline       DateTime?     @map("submission_deadline") // Deadline for SAT submission (day 17 of following month for avisos, 24h for suspicion)
+  fileGeneratedAt          DateTime?     @map("file_generated_at") // When the SAT file was generated (via notice)
+  submittedAt              DateTime?     @map("submitted_at") // When submitted to SAT
+  satAcknowledgmentReceipt String?       @map("sat_acknowledgment_receipt") // File URL or reference to SAT acknowledgment (PDF/XML)
+  satFolioNumber           String?       @map("sat_folio_number") // Folio number from SAT acknowledgment
+  isOverdue                Boolean       @default(false) @map("is_overdue") // Computed: true if submissionDeadline has passed and status != SUBMITTED
   // Review and cancellation
-  notes             String?
-  reviewedAt        DateTime?
-  reviewedBy        String?
-  cancelledAt       DateTime?
-  cancelledBy       String?
-  cancellationReason String?  // Reason for cancellation
-  
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  notes                    String?
+  reviewedAt               DateTime?     @map("reviewed_at")
+  reviewedBy               String?       @map("reviewed_by")
+  cancelledAt              DateTime?     @map("cancelled_at")
+  cancelledBy              String?       @map("cancelled_by")
+  cancellationReason       String?       @map("cancellation_reason") // Reason for cancellation
+  createdAt                DateTime      @default(now()) @map("created_at")
+  updatedAt                DateTime      @updatedAt @map("updated_at")
 
   alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Restrict)
   client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -385,16 +383,16 @@ model Alert {
 }
 
 model UmaValue {
-  id          String   @id
-  year        Int      @unique // Year this UMA value applies to (e.g., 2025)
-  dailyValue  Decimal  // UMA daily value for the year
-  effectiveDate DateTime // Date when this UMA value becomes effective
-  endDate     DateTime? // Optional: date when this UMA value expires (usually end of year)
-  approvedBy  String?  // User who approved/configured this value (Compliance Officer)
-  notes       String?  // Optional notes about the UMA value
-  active      Boolean  @default(true) // Whether this is the current active UMA value
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String    @id
+  year          Int       @unique // Year this UMA value applies to (e.g., 2025)
+  dailyValue    Decimal   @map("daily_value") // UMA daily value for the year
+  effectiveDate DateTime  @map("effective_date") // Date when this UMA value becomes effective
+  endDate       DateTime? @map("end_date") // Optional: date when this UMA value expires (usually end of year)
+  approvedBy    String?   @map("approved_by") // User who approved/configured this value (Compliance Officer)
+  notes         String? // Optional notes about the UMA value
+  active        Boolean   @default(true) // Whether this is the current active UMA value
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@map("uma_values")
   @@index([year])
@@ -405,12 +403,12 @@ model UmaValue {
 // Organization Settings - stores RFC and vulnerable activity for the organization
 // Linked 1:1 to organization (from auth-svc better-auth organization plugin)
 model OrganizationSettings {
-  id                    String   @id
-  organizationId        String   @unique // Organization ID from auth-svc
-  obligatedSubjectKey   String   // RFC (clave_sujeto_obligado) - 12 characters
-  activityKey           String   // Vulnerable activity code (e.g., "VEH") - reference to vulnerable-activities catalog
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                  String   @id
+  organizationId      String   @unique @map("organization_id") // Organization ID from auth-svc
+  obligatedSubjectKey String   @map("obligated_subject_key") // RFC (clave_sujeto_obligado) - 12 characters
+  activityKey         String   @map("activity_key") // Vulnerable activity code (e.g., "VEH") - reference to vulnerable-activities catalog
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   @@map("organization_settings")
   @@index([organizationId])
@@ -420,28 +418,26 @@ model OrganizationSettings {
 
 // Notice - SAT regulatory submissions (avisos) with 17-17 period handling
 model Notice {
-  id              String       @id
-  organizationId  String       // Organization this notice belongs to
-  name            String       // Display name (e.g., "Aviso Diciembre 2024")
-  status          NoticeStatus @default(DRAFT)
-  periodStart     DateTime     // Day 17 of previous month
-  periodEnd       DateTime     // Day 16 of current month
-  reportedMonth   String       // YYYYMM format for SAT
-  recordCount     Int          @default(0) // Number of alerts included
-  
+  id             String       @id
+  organizationId String       @map("organization_id") // Organization this notice belongs to
+  name           String // Display name (e.g., "Aviso Diciembre 2024")
+  status         NoticeStatus @default(DRAFT)
+  periodStart    DateTime     @map("period_start") // Day 17 of previous month
+  periodEnd      DateTime     @map("period_end") // Day 16 of current month
+  reportedMonth  String       @map("reported_month") // YYYYMM format for SAT
+  recordCount    Int          @default(0) @map("record_count") // Number of alerts included
   // XML file output
-  xmlFileUrl      String?      // R2 URL of SAT XML
-  fileSize        Int?         // XML file size in bytes
-  
-  generatedAt     DateTime?    // When the XML was generated
-  submittedAt     DateTime?    // When submitted to SAT
-  satFolioNumber  String?      // SAT acknowledgment folio number
-  createdBy       String?      // User ID who created the notice
-  notes           String?      // Optional notes
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  xmlFileUrl     String?      @map("xml_file_url") // R2 URL of SAT XML
+  fileSize       Int?         @map("file_size") // XML file size in bytes
+  generatedAt    DateTime?    @map("generated_at") // When the XML was generated
+  submittedAt    DateTime?    @map("submitted_at") // When submitted to SAT
+  satFolioNumber String?      @map("sat_folio_number") // SAT acknowledgment folio number
+  createdBy      String?      @map("created_by") // User ID who created the notice
+  notes          String? // Optional notes
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  alerts          Alert[]      // Alerts included in this notice
+  alerts Alert[] // Alerts included in this notice
 
   @@map("notices")
   @@index([organizationId])
@@ -453,45 +449,38 @@ model Notice {
 
 // Report - Analytics and business intelligence reports (PDF)
 model Report {
-  id              String           @id
-  organizationId  String           // Organization this report belongs to
-  name            String           // Display name (e.g., "Monthly Report December 2024")
-  
+  id                    String           @id
+  organizationId        String           @map("organization_id") // Organization this report belongs to
+  name                  String // Display name (e.g., "Monthly Report December 2024")
   // Report configuration
-  template        ReportTemplate   @default(CUSTOM)
-  periodType      ReportPeriodType @default(CUSTOM)
-  periodStart     DateTime         // Start of reporting period
-  periodEnd       DateTime         // End of reporting period
-  
+  template              ReportTemplate   @default(CUSTOM)
+  periodType            ReportPeriodType @default(CUSTOM) @map("period_type")
+  periodStart           DateTime         @map("period_start") // Start of reporting period
+  periodEnd             DateTime         @map("period_end") // End of reporting period
   // Optional comparison period for trend analysis
-  comparisonPeriodStart DateTime?
-  comparisonPeriodEnd   DateTime?
-  
+  comparisonPeriodStart DateTime?        @map("comparison_period_start")
+  comparisonPeriodEnd   DateTime?        @map("comparison_period_end")
   // Data sources and filtering (stored as JSON)
-  dataSources     String           @default("[\"ALERTS\"]") // JSON array: ["ALERTS", "TRANSACTIONS", "CLIENTS"]
-  filters         String           @default("{}") // JSON object with filter configuration
-  clientId        String?          // For CLIENT_RISK_PROFILE template
-  
+  dataSources           String           @default("[\"ALERTS\"]") @map("data_sources") // JSON array: ["ALERTS", "TRANSACTIONS", "CLIENTS"]
+  filters               String           @default("{}") // JSON object with filter configuration
+  clientId              String?          @map("client_id") // For CLIENT_RISK_PROFILE template
   // Visualization settings (stored as JSON)
-  charts          String           @default("[]") // JSON array of chart configurations
-  includeSummaryCards  Boolean     @default(true)
-  includeDetailTables  Boolean     @default(true)
-  
+  charts                String           @default("[]") // JSON array of chart configurations
+  includeSummaryCards   Boolean          @default(true) @map("include_summary_cards")
+  includeDetailTables   Boolean          @default(true) @map("include_detail_tables")
   // Report state
-  status          ReportStatus     @default(DRAFT)
-  
+  status                ReportStatus     @default(DRAFT)
   // PDF output
-  pdfFileUrl      String?          // R2 URL of PDF report
-  fileSize        Int?             // PDF file size in bytes
-  
-  generatedAt     DateTime?        // When the PDF was generated
-  createdBy       String?          // User ID who created the report
-  notes           String?          // Optional notes
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  pdfFileUrl            String?          @map("pdf_file_url") // R2 URL of PDF report
+  fileSize              Int?             @map("file_size") // PDF file size in bytes
+  generatedAt           DateTime?        @map("generated_at") // When the PDF was generated
+  createdBy             String?          @map("created_by") // User ID who created the report
+  notes                 String? // Optional notes
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
 
-  alerts          Alert[]          // Alerts included in this report (for filtering/aggregation)
-  client          Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  alerts Alert[] // Alerts included in this report (for filtering/aggregation)
+  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
   @@map("reports")
   @@index([organizationId])

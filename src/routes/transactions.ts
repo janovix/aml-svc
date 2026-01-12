@@ -20,6 +20,7 @@ import { createAlertQueueService } from "../lib/alert-queue";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import { createSubscriptionClient } from "../lib/subscription-client";
 
 export const transactionsRouter = new Hono<{
 	Bindings: Bindings;
@@ -144,6 +145,15 @@ transactionsRouter.post("/", async (c) => {
 	// Queue alert detection job
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 	await alertQueue.queueTransactionCreated(created.clientId, created.id);
+
+	// Report transaction usage to auth-svc for metered billing
+	// Fire-and-forget - don't fail transaction creation if billing fails
+	const subscriptionClient = createSubscriptionClient(c.env);
+	subscriptionClient
+		.reportUsage(organizationId, "transactions", 1)
+		.catch((err) => {
+			console.error("Failed to report transaction usage:", err);
+		});
 
 	return c.json(created, 201);
 });
