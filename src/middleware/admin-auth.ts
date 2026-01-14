@@ -5,11 +5,14 @@ import type { Bindings } from "../index";
 
 /**
  * Extended JWT payload with admin role
+ * This matches the JWT claims defined in auth-svc's jwt plugin configuration
  */
 export interface AdminTokenPayload {
 	sub: string;
 	email?: string;
 	name?: string;
+	/** User role from auth-svc (admin, user, etc.) */
+	role?: string;
 	organizationId?: string | null;
 }
 
@@ -132,50 +135,17 @@ function extractBearerToken(authHeader: string | undefined): string | null {
 }
 
 /**
- * Fetches user session from auth-svc to get user role
+ * Validates that a role string represents an admin role.
+ * Supports both single role and comma-separated multiple roles.
+ *
+ * @param role - The role string from JWT payload
+ * @returns true if user has admin role
  */
-async function getUserRole(
-	token: string,
-	authServiceUrl: string,
-	authServiceBinding?: Fetcher,
-): Promise<string | null> {
-	const sessionUrl = `${authServiceUrl}/api/auth/get-session`;
-
-	let response: Response;
-
-	if (authServiceBinding) {
-		response = await authServiceBinding.fetch(
-			new Request(sessionUrl, {
-				method: "GET",
-				headers: {
-					Authorization: `Bearer ${token}`,
-					Accept: "application/json",
-				},
-			}),
-		);
-	} else {
-		response = await fetch(sessionUrl, {
-			method: "GET",
-			headers: {
-				Authorization: `Bearer ${token}`,
-				Accept: "application/json",
-				Cookie: `better-auth.session_token=${token}`,
-			},
-		});
-	}
-
-	if (!response.ok) {
-		console.error(
-			`[AdminAuth] Failed to get session: ${response.status} ${response.statusText}`,
-		);
-		return null;
-	}
-
-	const data = (await response.json()) as {
-		user?: { role?: string };
-	};
-
-	return data.user?.role ?? null;
+function isAdminRole(role: string | undefined): boolean {
+	if (!role) return false;
+	// Better-auth stores multiple roles as comma-separated string
+	const roles = role.split(",").map((r) => r.trim().toLowerCase());
+	return roles.includes("admin");
 }
 
 /**
@@ -221,7 +191,7 @@ export function adminAuthMiddleware(): MiddlewareHandler<{
 		const authServiceBinding = c.env.AUTH_SERVICE;
 
 		try {
-			// Verify JWT
+			// Verify JWT and extract payload
 			const payload = await verifyToken(
 				token,
 				authServiceUrl,
@@ -229,10 +199,9 @@ export function adminAuthMiddleware(): MiddlewareHandler<{
 				authServiceBinding,
 			);
 
-			// Get user role from auth-svc session
-			const role = await getUserRole(token, authServiceUrl, authServiceBinding);
-
-			if (!role || role !== "admin") {
+			// Check admin role from JWT payload
+			// The role is included in the JWT by auth-svc's jwt plugin configuration
+			if (!isAdminRole(payload.role)) {
 				return c.json(
 					{
 						success: false,
@@ -247,7 +216,7 @@ export function adminAuthMiddleware(): MiddlewareHandler<{
 				id: payload.sub,
 				email: payload.email,
 				name: payload.name,
-				role,
+				role: payload.role ?? "user",
 			};
 
 			c.set("adminUser", adminUser);

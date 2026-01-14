@@ -69,7 +69,8 @@ describe("Admin Routes", () => {
 		const publicJWK = await publicKeyToJWK(testKeyPair.publicKey);
 		testJWKS = { keys: [publicJWK] };
 
-		// Mock fetch for JWKS and session endpoints
+		// Mock fetch for JWKS endpoint
+		// Note: get-session is no longer called since role is now in JWT payload
 		fetchMock = vi.fn().mockImplementation(async (url: string | Request) => {
 			let urlStr: string;
 			if (typeof url === "string") {
@@ -85,17 +86,6 @@ describe("Admin Routes", () => {
 					status: 200,
 					headers: { "Content-Type": "application/json" },
 				});
-			}
-			if (urlStr.includes("/api/auth/get-session")) {
-				return new Response(
-					JSON.stringify({
-						user: { id: "admin-123", email: "admin@test.com", role: "admin" },
-					}),
-					{
-						status: 200,
-						headers: { "Content-Type": "application/json" },
-					},
-				);
 			}
 			return new Response("Not Found", { status: 404 });
 		});
@@ -327,40 +317,11 @@ describe("Admin Routes", () => {
 			// Clear cache to ensure fresh fetch
 			clearJWKSCache();
 
-			// Mock non-admin session response
-			fetchMock.mockImplementation(async (url: string | Request) => {
-				let urlStr: string;
-				if (typeof url === "string") {
-					urlStr = url;
-				} else if (url instanceof Request) {
-					urlStr = url.url;
-				} else {
-					urlStr = String(url);
-				}
-
-				if (urlStr.includes("/api/auth/jwks")) {
-					return new Response(JSON.stringify(testJWKS), {
-						status: 200,
-						headers: { "Content-Type": "application/json" },
-					});
-				}
-				if (urlStr.includes("/api/auth/get-session")) {
-					return new Response(
-						JSON.stringify({
-							user: { id: "user-123", email: "user@test.com", role: "user" },
-						}),
-						{
-							status: 200,
-							headers: { "Content-Type": "application/json" },
-						},
-					);
-				}
-				return new Response("Not Found", { status: 404 });
-			});
-
+			// Create JWT with non-admin role (role is now in JWT payload, not fetched from get-session)
 			const token = await createTestJWT(testKeyPair.privateKey, {
 				sub: "user-123",
 				email: "user@test.com",
+				role: "user", // Non-admin role in JWT payload
 			});
 
 			const res = await app.request(
@@ -385,6 +346,7 @@ describe("Admin Routes", () => {
 			const token = await createTestJWT(testKeyPair.privateKey, {
 				sub: "admin-123",
 				email: "admin@test.com",
+				role: "admin",
 			});
 
 			const res = await app.request(
@@ -411,6 +373,7 @@ describe("Admin Routes", () => {
 		it("should return alerts grouped by status", async () => {
 			const token = await createTestJWT(testKeyPair.privateKey, {
 				sub: "admin-123",
+				role: "admin",
 			});
 
 			const res = await app.request(
@@ -436,6 +399,7 @@ describe("Admin Routes", () => {
 		it("should return paginated alerts", async () => {
 			const token = await createTestJWT(testKeyPair.privateKey, {
 				sub: "admin-123",
+				role: "admin",
 			});
 
 			const res = await app.request(
@@ -460,6 +424,7 @@ describe("Admin Routes", () => {
 		it("should respect pagination parameters", async () => {
 			const token = await createTestJWT(testKeyPair.privateKey, {
 				sub: "admin-123",
+				role: "admin",
 			});
 
 			const res = await app.request(
@@ -482,6 +447,7 @@ describe("Admin Routes", () => {
 		it("should filter by status", async () => {
 			const token = await createTestJWT(testKeyPair.privateKey, {
 				sub: "admin-123",
+				role: "admin",
 			});
 
 			const res = await app.request(
@@ -509,6 +475,7 @@ describe("Admin Routes", () => {
 		it("should filter by organizationId", async () => {
 			const token = await createTestJWT(testKeyPair.privateKey, {
 				sub: "admin-123",
+				role: "admin",
 			});
 
 			const res = await app.request(
@@ -538,6 +505,7 @@ describe("Admin Routes", () => {
 		it("should return paginated notices", async () => {
 			const token = await createTestJWT(testKeyPair.privateKey, {
 				sub: "admin-123",
+				role: "admin",
 			});
 
 			const res = await app.request(
@@ -561,6 +529,7 @@ describe("Admin Routes", () => {
 		it("should filter notices by status", async () => {
 			const token = await createTestJWT(testKeyPair.privateKey, {
 				sub: "admin-123",
+				role: "admin",
 			});
 
 			const res = await app.request(
@@ -590,6 +559,7 @@ describe("Admin Routes", () => {
 		it("should return organizations with AML stats", async () => {
 			const token = await createTestJWT(testKeyPair.privateKey, {
 				sub: "admin-123",
+				role: "admin",
 			});
 
 			const res = await app.request(
@@ -615,6 +585,7 @@ describe("Admin Routes", () => {
 		it("should return detailed stats for specific organization", async () => {
 			const token = await createTestJWT(testKeyPair.privateKey, {
 				sub: "admin-123",
+				role: "admin",
 			});
 
 			const res = await app.request(
