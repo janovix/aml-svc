@@ -6,6 +6,22 @@
 -- Clients Domain
 -- ============================================================================
 
+DROP TABLE IF EXISTS clients;
+DROP TABLE IF EXISTS client_documents;
+DROP TABLE IF EXISTS client_addresses;
+DROP TABLE IF EXISTS catalogs;
+DROP TABLE IF EXISTS catalog_items;
+DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS transaction_payment_methods;
+DROP TABLE IF EXISTS uma_values;
+DROP TABLE IF EXISTS organization_settings;
+DROP TABLE IF EXISTS reports;
+DROP TABLE IF EXISTS notices;
+DROP TABLE IF EXISTS alert_rules;
+DROP TABLE IF EXISTS alert_rule_config;
+DROP TABLE IF EXISTS alerts;
+
+
 CREATE TABLE clients (
     id TEXT PRIMARY KEY NOT NULL,
     rfc TEXT NOT NULL UNIQUE,
