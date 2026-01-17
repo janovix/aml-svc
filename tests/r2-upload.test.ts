@@ -44,7 +44,7 @@ describe("uploadToR2", () => {
 		expect(result.key).toBe("test/file.xml");
 		expect(result.size).toBe(1024);
 		expect(result.etag).toBe("test-etag-123");
-		expect(result.url).toContain("r2://sat-xml-files/test/file.xml");
+		expect(result.url).toContain("r2://aml/test/file.xml");
 	});
 
 	it("should upload ArrayBuffer content to R2", async () => {

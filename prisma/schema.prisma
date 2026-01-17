@@ -491,3 +491,79 @@ model Report {
   @@index([periodEnd])
   @@index([clientId])
 }
+
+// Import status for bulk data imports
+enum ImportStatus {
+  PENDING // Uploaded, awaiting processing
+  VALIDATING // Worker is parsing and validating file
+  PROCESSING // Processing rows
+  COMPLETED // All rows processed
+  FAILED // Catastrophic error
+}
+
+// Entity types that can be imported
+enum ImportEntityType {
+  CLIENT
+  TRANSACTION
+}
+
+// Status of individual import rows
+enum ImportRowStatus {
+  PENDING
+  SUCCESS
+  WARNING
+  ERROR
+  SKIPPED
+}
+
+// Import - Bulk data import job tracking
+model Import {
+  id             String           @id
+  organizationId String           @map("organization_id")
+  entityType     ImportEntityType @map("entity_type")
+  fileName       String           @map("file_name")
+  fileUrl        String           @map("file_url") // R2 key
+  fileSize       Int              @map("file_size")
+  status         ImportStatus     @default(PENDING)
+  totalRows      Int              @default(0) @map("total_rows")
+  processedRows  Int              @default(0) @map("processed_rows")
+  successCount   Int              @default(0) @map("success_count")
+  warningCount   Int              @default(0) @map("warning_count")
+  errorCount     Int              @default(0) @map("error_count")
+  errorMessage   String?          @map("error_message") // Catastrophic error message
+  createdBy      String           @map("created_by") // User ID who initiated the import
+  startedAt      DateTime?        @map("started_at") // When processing started
+  completedAt    DateTime?        @map("completed_at") // When processing completed
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  rowResults ImportRowResult[]
+
+  @@map("imports")
+  @@index([organizationId])
+  @@index([status])
+  @@index([entityType])
+  @@index([createdAt])
+  @@index([createdBy])
+}
+
+// ImportRowResult - Individual row processing results
+model ImportRowResult {
+  id        String          @id
+  importId  String          @map("import_id")
+  rowNumber Int             @map("row_number")
+  status    ImportRowStatus @default(PENDING)
+  rawData   String          @map("raw_data") // JSON of original row data
+  entityId  String?         @map("entity_id") // Created client/transaction ID if successful
+  message   String? // Human-readable status message
+  errors    String? // JSON array of validation errors
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  import Import @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@map("import_row_results")
+  @@index([importId])
+  @@index([status])
+  @@index([rowNumber])
+}

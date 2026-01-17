@@ -1,0 +1,432 @@
+/**
+ * Import Routes
+ * API endpoints for bulk data imports with SSE support
+ */
+
+import { Hono } from "hono";
+import type { Context } from "hono";
+import { ZodError } from "zod";
+import { streamSSE } from "hono/streaming";
+
+import {
+	ImportService,
+	ImportRepository,
+	ImportCreateSchema,
+	ImportFilterSchema,
+	ImportRowFilterSchema,
+	ImportIdParamSchema,
+	ImportProgressUpdateSchema,
+	ImportStatusUpdateSchema,
+	ImportBulkRowCreateSchema,
+} from "../domain/import";
+import type { Bindings } from "../index";
+import { getPrismaClient } from "../lib/prisma";
+import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import { APIError } from "../middleware/error";
+
+// CSV templates for clients and transactions
+const CLIENT_TEMPLATE = `person_type,rfc,first_name,last_name,second_last_name,birth_date,curp,business_name,incorporation_date,nationality,email,phone,country,state_code,city,municipality,neighborhood,street,external_number,internal_number,postal_code,reference,notes
+physical,ABCD123456EF1,Juan,Pérez,García,1990-05-15,PEGJ900515HDFRRL09,,,,MX,juan@example.com,+525512345678,MX,CMX,Ciudad de México,Cuauhtémoc,Centro,Reforma,123,,06000,Near the monument,Example client
+moral,ABC123456EF1,,,,,,,Empresa SA de CV,2020-01-01,,empresa@example.com,+525598765432,MX,CMX,Ciudad de México,Miguel Hidalgo,Polanco,Masaryk,456,Suite 100,11560,Corporate building,Business client`;
+
+const TRANSACTION_TEMPLATE = `client_rfc,operation_date,operation_type,branch_postal_code,vehicle_type,brand,model,year,engine_number,plates,registration_number,flag_country_id,armor_level,amount,currency,payment_method_1,payment_amount_1,payment_method_2,payment_amount_2
+ABCD123456EF1,2025-01-15,purchase,06000,land,Toyota,Camry,2024,ENG123456,ABC1234,,,Level III-A,450000,MXN,cash,200000,transfer,250000
+ABC123456EF1,2025-01-20,sale,11560,land,BMW,X5,2023,ENG789012,XYZ5678,,,,750000,MXN,transfer,750000,,`;
+
+export const importsRouter = new Hono<{
+	Bindings: Bindings;
+	Variables: AuthVariables;
+}>();
+
+function parseWithZod<T>(
+	schema: { parse: (input: unknown) => T },
+	payload: unknown,
+): T {
+	try {
+		return schema.parse(payload);
+	} catch (error) {
+		if (error instanceof ZodError) {
+			throw new APIError(400, "Validation failed", error.format());
+		}
+		throw error;
+	}
+}
+
+function getService(
+	c: Context<{ Bindings: Bindings; Variables: AuthVariables }>,
+) {
+	const prisma = getPrismaClient(c.env.DB);
+	const repository = new ImportRepository(prisma);
+	return new ImportService(repository);
+}
+
+function handleServiceError(error: unknown): never {
+	if (error instanceof Error) {
+		if (error.message === "IMPORT_NOT_FOUND") {
+			throw new APIError(404, "Import not found");
+		}
+	}
+	throw error;
+}
+
+/**
+ * GET /imports/templates/:entityType
+ * Download CSV template for the specified entity type
+ */
+importsRouter.get("/templates/:entityType", async (c) => {
+	const entityType = c.req.param("entityType")?.toUpperCase();
+
+	if (entityType !== "CLIENT" && entityType !== "TRANSACTION") {
+		throw new APIError(
+			400,
+			"Invalid entity type. Must be CLIENT or TRANSACTION",
+		);
+	}
+
+	const template =
+		entityType === "CLIENT" ? CLIENT_TEMPLATE : TRANSACTION_TEMPLATE;
+	const filename =
+		entityType === "CLIENT"
+			? "clients_template.csv"
+			: "transactions_template.csv";
+
+	return new Response(template, {
+		status: 200,
+		headers: {
+			"Content-Type": "text/csv; charset=utf-8",
+			"Content-Disposition": `attachment; filename="${filename}"`,
+		},
+	});
+});
+
+/**
+ * GET /imports
+ * List imports for the organization
+ */
+importsRouter.get("/", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const url = new URL(c.req.url);
+	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const filters = parseWithZod(ImportFilterSchema, queryObject);
+
+	const service = getService(c);
+	const result = await service
+		.list(organizationId, filters)
+		.catch(handleServiceError);
+
+	return c.json(result);
+});
+
+/**
+ * GET /imports/:id
+ * Get import details with row results
+ */
+importsRouter.get("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const params = parseWithZod(ImportIdParamSchema, c.req.param());
+	const url = new URL(c.req.url);
+	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const rowFilters = parseWithZod(ImportRowFilterSchema, queryObject);
+
+	const service = getService(c);
+	const result = await service
+		.getWithResults(organizationId, params.id, rowFilters)
+		.catch(handleServiceError);
+
+	return c.json(result);
+});
+
+/**
+ * GET /imports/:id/rows
+ * Get paginated row results for an import
+ */
+importsRouter.get("/:id/rows", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const params = parseWithZod(ImportIdParamSchema, c.req.param());
+	const url = new URL(c.req.url);
+	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const filters = parseWithZod(ImportRowFilterSchema, queryObject);
+
+	// First verify the import exists and belongs to org
+	const service = getService(c);
+	await service.get(organizationId, params.id).catch(handleServiceError);
+
+	const result = await service.listRowResults(params.id, filters);
+
+	return c.json(result);
+});
+
+/**
+ * GET /imports/:id/events
+ * Server-Sent Events stream for real-time import updates
+ */
+importsRouter.get("/:id/events", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const params = parseWithZod(ImportIdParamSchema, c.req.param());
+
+	const service = getService(c);
+	const importRecord = await service
+		.get(organizationId, params.id)
+		.catch(handleServiceError);
+
+	return streamSSE(c, async (stream) => {
+		// Send initial connection event
+		await stream.writeSSE({
+			event: "connected",
+			data: JSON.stringify({
+				importId: importRecord.id,
+				status: importRecord.status,
+				timestamp: new Date().toISOString(),
+			}),
+		});
+
+		// Track last update time for polling
+		let lastUpdateTime = new Date();
+		let isCompleted =
+			importRecord.status === "COMPLETED" || importRecord.status === "FAILED";
+
+		// Poll for updates every 500ms
+		while (!isCompleted) {
+			// Check if connection is still alive
+			if (stream.aborted) {
+				break;
+			}
+
+			// Get recent row updates
+			const recentUpdates = await service.getRecentRowUpdates(
+				params.id,
+				lastUpdateTime,
+			);
+
+			for (const row of recentUpdates) {
+				await stream.writeSSE({
+					event: "row_update",
+					data: JSON.stringify(row),
+				});
+			}
+
+			if (recentUpdates.length > 0) {
+				lastUpdateTime = new Date();
+			}
+
+			// Check import status
+			const currentImport = await service.get(organizationId, params.id);
+			if (currentImport.status !== importRecord.status) {
+				await stream.writeSSE({
+					event: "status_change",
+					data: JSON.stringify({
+						status: currentImport.status,
+						processedRows: currentImport.processedRows,
+						totalRows: currentImport.totalRows,
+						successCount: currentImport.successCount,
+						warningCount: currentImport.warningCount,
+						errorCount: currentImport.errorCount,
+					}),
+				});
+			}
+
+			if (
+				currentImport.status === "COMPLETED" ||
+				currentImport.status === "FAILED"
+			) {
+				await stream.writeSSE({
+					event: "completed",
+					data: JSON.stringify({
+						status: currentImport.status,
+						processedRows: currentImport.processedRows,
+						totalRows: currentImport.totalRows,
+						successCount: currentImport.successCount,
+						warningCount: currentImport.warningCount,
+						errorCount: currentImport.errorCount,
+						errorMessage: currentImport.errorMessage,
+						completedAt: currentImport.completedAt,
+					}),
+				});
+				isCompleted = true;
+				break;
+			}
+
+			// Send heartbeat ping every 30 seconds worth of iterations
+			await stream.writeSSE({
+				event: "ping",
+				data: JSON.stringify({ timestamp: new Date().toISOString() }),
+			});
+
+			// Wait 500ms before next poll
+			await new Promise((resolve) => setTimeout(resolve, 500));
+		}
+	});
+});
+
+/**
+ * POST /imports
+ * Create a new import by uploading a file
+ */
+importsRouter.post("/", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const user = c.get("user");
+	if (!user) {
+		throw new APIError(401, "User not authenticated");
+	}
+
+	// Parse multipart form data
+	const formData = await c.req.formData();
+	const file = formData.get("file");
+	const entityType = formData.get("entityType");
+
+	if (!file || !(file instanceof File)) {
+		throw new APIError(400, "No file provided");
+	}
+
+	if (!entityType || typeof entityType !== "string") {
+		throw new APIError(400, "entityType is required");
+	}
+
+	// Validate file type
+	const validMimeTypes = [
+		"text/csv",
+		"application/vnd.ms-excel",
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	];
+	const validExtensions = [".csv", ".xls", ".xlsx"];
+
+	const hasValidMime = validMimeTypes.includes(file.type);
+	const hasValidExt = validExtensions.some((ext) =>
+		file.name.toLowerCase().endsWith(ext),
+	);
+
+	if (!hasValidMime && !hasValidExt) {
+		throw new APIError(
+			400,
+			"Invalid file type. Please upload a CSV or Excel file (.csv, .xls, .xlsx)",
+		);
+	}
+
+	// Validate file size (max 50MB)
+	const maxSize = 50 * 1024 * 1024;
+	if (file.size > maxSize) {
+		throw new APIError(400, `File too large. Maximum size is 50MB`);
+	}
+
+	// Validate entity type
+	const input = parseWithZod(ImportCreateSchema, {
+		entityType: entityType.toUpperCase(),
+		fileName: file.name,
+		fileSize: file.size,
+	});
+
+	// Upload file to R2
+	if (!c.env.R2_BUCKET) {
+		throw new APIError(503, "File storage not configured");
+	}
+
+	const timestamp = Date.now();
+	const random = Math.random().toString(36).substring(2, 8);
+	const fileKey = `imports/${organizationId}/${timestamp}-${random}-${file.name}`;
+
+	const arrayBuffer = await file.arrayBuffer();
+	await c.env.R2_BUCKET.put(fileKey, arrayBuffer, {
+		httpMetadata: {
+			contentType: file.type || "application/octet-stream",
+		},
+		customMetadata: {
+			organizationId,
+			userId: user.id,
+			entityType: input.entityType,
+			uploadedAt: new Date().toISOString(),
+		},
+	});
+
+	// Create import record
+	const service = getService(c);
+	const { import: importRecord, job } = await service.create(
+		organizationId,
+		user.id,
+		input,
+		fileKey,
+	);
+
+	// Queue the import job
+	if (c.env.IMPORT_PROCESSING_QUEUE) {
+		await c.env.IMPORT_PROCESSING_QUEUE.send(job);
+	} else {
+		console.warn(
+			"[Import] IMPORT_PROCESSING_QUEUE not configured, job not queued",
+		);
+	}
+
+	return c.json(
+		{
+			success: true,
+			data: importRecord,
+		},
+		201,
+	);
+});
+
+/**
+ * DELETE /imports/:id
+ * Delete an import and its row results
+ */
+importsRouter.delete("/:id", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const params = parseWithZod(ImportIdParamSchema, c.req.param());
+
+	const service = getService(c);
+	await service.delete(organizationId, params.id).catch(handleServiceError);
+
+	return c.body(null, 204);
+});
+
+// ============================================================================
+// Internal endpoints (for worker communication)
+// ============================================================================
+
+/**
+ * POST /imports/:id/status
+ * Update import status (internal, called by worker)
+ */
+importsRouter.post("/:id/status", async (c) => {
+	const params = parseWithZod(ImportIdParamSchema, c.req.param());
+	const body = await c.req.json();
+	const update = parseWithZod(ImportStatusUpdateSchema, body);
+
+	const service = getService(c);
+	const result = await service.updateStatus(params.id, update);
+
+	return c.json({ success: true, data: result });
+});
+
+/**
+ * POST /imports/:id/rows
+ * Create row results in bulk (internal, called by worker)
+ */
+importsRouter.post("/:id/rows", async (c) => {
+	const params = parseWithZod(ImportIdParamSchema, c.req.param());
+	const body = await c.req.json();
+	const input = parseWithZod(ImportBulkRowCreateSchema, body);
+
+	const service = getService(c);
+	await service.createRowResults(params.id, input);
+
+	return c.json({ success: true });
+});
+
+/**
+ * POST /imports/:id/progress
+ * Update a single row result (internal, called by worker)
+ */
+importsRouter.post("/:id/progress", async (c) => {
+	const params = parseWithZod(ImportIdParamSchema, c.req.param());
+	const body = await c.req.json();
+	const update = parseWithZod(ImportProgressUpdateSchema, body);
+
+	const service = getService(c);
+	const result = await service.updateRowResult(
+		params.id,
+		update.rowNumber,
+		update,
+	);
+
+	return c.json({ success: true, data: result });
+});

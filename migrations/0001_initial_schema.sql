@@ -20,6 +20,8 @@ DROP TABLE IF EXISTS notices;
 DROP TABLE IF EXISTS alert_rules;
 DROP TABLE IF EXISTS alert_rule_config;
 DROP TABLE IF EXISTS alerts;
+DROP TABLE IF EXISTS imports;
+DROP TABLE IF EXISTS import_row_results;
 
 
 CREATE TABLE clients (
@@ -304,6 +306,45 @@ CREATE TABLE alerts (
 );
 
 -- ============================================================================
+-- Imports Domain (Bulk Data Import)
+-- ============================================================================
+
+CREATE TABLE imports (
+    id TEXT PRIMARY KEY NOT NULL,
+    organization_id TEXT NOT NULL,
+    entity_type TEXT NOT NULL CHECK(entity_type IN ('CLIENT','TRANSACTION')),
+    file_name TEXT NOT NULL,
+    file_url TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','VALIDATING','PROCESSING','COMPLETED','FAILED')),
+    total_rows INTEGER NOT NULL DEFAULT 0,
+    processed_rows INTEGER NOT NULL DEFAULT 0,
+    success_count INTEGER NOT NULL DEFAULT 0,
+    warning_count INTEGER NOT NULL DEFAULT 0,
+    error_count INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT,
+    created_by TEXT NOT NULL,
+    started_at DATETIME,
+    completed_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE import_row_results (
+    id TEXT PRIMARY KEY NOT NULL,
+    import_id TEXT NOT NULL,
+    row_number INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','SUCCESS','WARNING','ERROR','SKIPPED')),
+    raw_data TEXT NOT NULL,
+    entity_id TEXT,
+    message TEXT,
+    errors TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (import_id) REFERENCES imports(id) ON DELETE CASCADE
+);
+
+-- ============================================================================
 -- Indexes
 -- ============================================================================
 
@@ -400,3 +441,15 @@ CREATE INDEX idx_alerts_is_overdue ON alerts(is_overdue);
 CREATE INDEX idx_alerts_submitted_at ON alerts(submitted_at);
 CREATE INDEX idx_alerts_transaction_id ON alerts(transaction_id);
 CREATE INDEX idx_alerts_is_manual ON alerts(is_manual);
+
+-- Imports indexes
+CREATE INDEX idx_imports_organization_id ON imports(organization_id);
+CREATE INDEX idx_imports_status ON imports(status);
+CREATE INDEX idx_imports_entity_type ON imports(entity_type);
+CREATE INDEX idx_imports_created_at ON imports(created_at);
+CREATE INDEX idx_imports_created_by ON imports(created_by);
+
+-- Import row results indexes
+CREATE INDEX idx_import_row_results_import_id ON import_row_results(import_id);
+CREATE INDEX idx_import_row_results_status ON import_row_results(status);
+CREATE INDEX idx_import_row_results_row_number ON import_row_results(row_number);

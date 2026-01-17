@@ -26,6 +26,8 @@ export type Bindings = {
 	AUTH_SERVICE?: Fetcher;
 	/** Queue for alert detection jobs */
 	ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
+	/** Queue for import processing jobs */
+	IMPORT_PROCESSING_QUEUE?: Queue<import("./domain/import").ImportJob>;
 	/** Secret token for synthetic data generation HTTP endpoint (local development only) */
 	SYNTHETIC_DATA_SECRET?: string;
 	/**
