@@ -1,3 +1,10 @@
+# [1.4.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.6...v1.4.0-rc.7) (2026-01-17)
+
+
+### Features
+
+* add public endpoint for downloading CSV import templates and update OpenAPI specification ([b13e319](https://github.com/janovix/aml-svc/commit/b13e319711ed4c9c6959b9880da8d7f05b9d6885))
+
 # [1.4.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.5...v1.4.0-rc.6) (2026-01-17)
 
 
