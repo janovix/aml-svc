@@ -8,7 +8,7 @@ import { alertRulesRouter } from "./alert-rules";
 import { alertsRouter } from "./alerts";
 import { catalogsRouter } from "./catalogs";
 import { clientsRouter } from "./clients";
-import { importsRouter } from "./imports";
+import { importsRouter, importTemplatesRouter } from "./imports";
 import { noticesRouter } from "./notices";
 import { organizationSettingsRouter } from "./organization-settings";
 import { reportsRouter } from "./reports";
@@ -20,6 +20,10 @@ export function createRouter() {
 		Bindings: Bindings;
 		Variables: AuthVariables & AdminAuthVariables;
 	}>();
+
+	// Public routes (no auth required)
+	// Import templates are static CSV files, no auth needed
+	router.route("/imports/templates", importTemplatesRouter);
 
 	// Apply auth middleware with organization requirement for tenant-scoped routes
 	// These routes require an active organization to be selected

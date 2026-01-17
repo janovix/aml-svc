@@ -3447,7 +3447,8 @@ export const openAPISpec = {
 				tags: ["Imports"],
 				summary: "Download import template",
 				description:
-					"Download a CSV template with example data for the specified entity type",
+					"Download a CSV template with example data for the specified entity type. This endpoint is public and does not require authentication.",
+				security: [], // Public endpoint - no auth required
 				parameters: [
 					{
 						name: "entityType",

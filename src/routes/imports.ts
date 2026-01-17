@@ -33,6 +33,49 @@ const TRANSACTION_TEMPLATE = `client_rfc,operation_date,operation_type,branch_po
 ABCD123456EF1,2025-01-15,purchase,06000,land,Toyota,Camry,2024,ENG123456,ABC1234,,,Level III-A,450000,MXN,cash,200000,transfer,250000
 ABC123456EF1,2025-01-20,sale,11560,land,BMW,X5,2023,ENG789012,XYZ5678,,,,750000,MXN,transfer,750000,,`;
 
+/**
+ * Public templates router (no auth required)
+ * Serves static CSV templates for import
+ */
+export const importTemplatesRouter = new Hono<{
+	Bindings: Bindings;
+}>();
+
+/**
+ * GET /:entityType
+ * Download CSV template for the specified entity type
+ * This endpoint is public (no auth required)
+ */
+importTemplatesRouter.get("/:entityType", async (c) => {
+	const entityType = c.req.param("entityType")?.toUpperCase();
+
+	if (entityType !== "CLIENT" && entityType !== "TRANSACTION") {
+		return c.json(
+			{
+				success: false,
+				error: "Bad Request",
+				message: "Invalid entity type. Must be CLIENT or TRANSACTION",
+			},
+			400,
+		);
+	}
+
+	const template =
+		entityType === "CLIENT" ? CLIENT_TEMPLATE : TRANSACTION_TEMPLATE;
+	const filename =
+		entityType === "CLIENT"
+			? "clients_template.csv"
+			: "transactions_template.csv";
+
+	return new Response(template, {
+		status: 200,
+		headers: {
+			"Content-Type": "text/csv; charset=utf-8",
+			"Content-Disposition": `attachment; filename="${filename}"`,
+		},
+	});
+});
+
 export const importsRouter = new Hono<{
 	Bindings: Bindings;
 	Variables: AuthVariables;
@@ -68,36 +111,6 @@ function handleServiceError(error: unknown): never {
 	}
 	throw error;
 }
-
-/**
- * GET /imports/templates/:entityType
- * Download CSV template for the specified entity type
- */
-importsRouter.get("/templates/:entityType", async (c) => {
-	const entityType = c.req.param("entityType")?.toUpperCase();
-
-	if (entityType !== "CLIENT" && entityType !== "TRANSACTION") {
-		throw new APIError(
-			400,
-			"Invalid entity type. Must be CLIENT or TRANSACTION",
-		);
-	}
-
-	const template =
-		entityType === "CLIENT" ? CLIENT_TEMPLATE : TRANSACTION_TEMPLATE;
-	const filename =
-		entityType === "CLIENT"
-			? "clients_template.csv"
-			: "transactions_template.csv";
-
-	return new Response(template, {
-		status: 200,
-		headers: {
-			"Content-Type": "text/csv; charset=utf-8",
-			"Content-Disposition": `attachment; filename="${filename}"`,
-		},
-	});
-});
 
 /**
  * GET /imports
