@@ -71,7 +71,7 @@ export async function uploadToR2(
 	// In production, you might want to use a custom domain or presigned URLs
 	// Note: R2 buckets don't have a public URL by default - you'll need to configure
 	// a custom domain or use presigned URLs. For now, return a placeholder.
-	const url = `r2://sat-xml-files/${key}`;
+	const url = `r2://aml/${key}`;
 
 	return {
 		key,

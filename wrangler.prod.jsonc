@@ -37,14 +37,14 @@
 			},
 			{
 				"binding": "IMPORT_PROCESSING_QUEUE",
-				"queue": "import-processing",
+				"queue": "aml-imports",
 			},
 		],
 	},
 	"r2_buckets": [
 		{
 			"binding": "R2_BUCKET",
-			"bucket_name": "sat-xml-files",
+			"bucket_name": "aml",
 		},
 	],
 	"vars": {

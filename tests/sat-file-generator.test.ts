@@ -128,7 +128,7 @@ describe("sat-file-generator", () => {
 			expect(result.fileKey).toContain("-alert-123.xml");
 			expect(result.fileSize).toBe(2048);
 			expect(result.etag).toBe("etag-123");
-			expect(result.fileUrl).toContain("r2://sat-xml-files/");
+			expect(result.fileUrl).toContain("r2://aml/");
 
 			expect(mockR2Bucket.put).toHaveBeenCalledTimes(1);
 			const putCall = vi.mocked(mockR2Bucket.put).mock.calls[0];
