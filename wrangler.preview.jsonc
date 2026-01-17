@@ -37,8 +37,18 @@
 				"binding": "ALERT_DETECTION_QUEUE",
 				"queue": "alert-detection-preview",
 			},
+			{
+				"binding": "IMPORT_PROCESSING_QUEUE",
+				"queue": "import-processing-preview",
+			},
 		],
 	},
+	"r2_buckets": [
+		{
+			"binding": "R2_BUCKET",
+			"bucket_name": "sat-xml-files",
+		},
+	],
 	"vars": {
 		"ENVIRONMENT": "preview",
 		"AUTH_SERVICE_URL": "https://auth-svc.janovix.workers.dev",

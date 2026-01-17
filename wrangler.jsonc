@@ -43,6 +43,10 @@
 				"binding": "ALERT_DETECTION_QUEUE",
 				"queue": "alert-detection-dev",
 			},
+			{
+				"binding": "IMPORT_PROCESSING_QUEUE",
+				"queue": "import-processing-dev",
+			},
 		],
 	},
 	"vars": {

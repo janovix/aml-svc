@@ -26,6 +26,8 @@ const EXCLUDED_MODELS = new Set([
 	"ClientAddress", // Created via Client seed
 	"Alert", // Created via alert detection worker, not seeded
 	"ComplianceOrganization", // User-specific configuration set via API, not seeded
+	"Import", // Created via import worker, not seeded
+	"ImportRowResult", // Created via import worker, not seeded
 ]);
 
 // Models that are populated, not seeded
