@@ -67,6 +67,11 @@ export const openAPISpec = {
 			description:
 				"SAT notice management endpoints for generating and submitting XML reports to SAT (17-17 monthly cycle)",
 		},
+		{
+			name: "Imports",
+			description:
+				"Bulk data import endpoints for uploading CSV/Excel files to import clients and transactions",
+		},
 	],
 	paths: {
 		"/healthz": {
@@ -3336,6 +3341,300 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/imports": {
+			get: {
+				tags: ["Imports"],
+				summary: "List imports",
+				description: "Returns a paginated list of imports for the organization",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+					},
+					{
+						name: "status",
+						in: "query",
+						schema: { $ref: "#/components/schemas/ImportStatus" },
+					},
+					{
+						name: "entityType",
+						in: "query",
+						schema: { $ref: "#/components/schemas/ImportEntityType" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of imports",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									required: ["data", "total", "page", "limit", "totalPages"],
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/Import" },
+										},
+										total: { type: "integer" },
+										page: { type: "integer" },
+										limit: { type: "integer" },
+										totalPages: { type: "integer" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Imports"],
+				summary: "Create import",
+				description:
+					"Upload a CSV or Excel file to create a new import job. The file will be processed asynchronously.",
+				requestBody: {
+					required: true,
+					content: {
+						"multipart/form-data": {
+							schema: {
+								type: "object",
+								required: ["file", "entityType"],
+								properties: {
+									file: {
+										type: "string",
+										format: "binary",
+										description:
+											"CSV or Excel file (.csv, .xls, .xlsx). Maximum 50MB.",
+									},
+									entityType: {
+										type: "string",
+										enum: ["CLIENT", "TRANSACTION"],
+										description: "Type of entities in the file",
+									},
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Import created and queued for processing",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										success: { type: "boolean", example: true },
+										data: { $ref: "#/components/schemas/Import" },
+									},
+								},
+							},
+						},
+					},
+					"400": {
+						description: "Invalid file type or missing required fields",
+					},
+				},
+			},
+		},
+		"/api/v1/imports/templates/{entityType}": {
+			get: {
+				tags: ["Imports"],
+				summary: "Download import template",
+				description:
+					"Download a CSV template with example data for the specified entity type",
+				parameters: [
+					{
+						name: "entityType",
+						in: "path",
+						required: true,
+						schema: {
+							type: "string",
+							enum: ["client", "transaction"],
+						},
+						description: "Entity type (case-insensitive)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "CSV template file",
+						content: {
+							"text/csv": {
+								schema: {
+									type: "string",
+									format: "binary",
+								},
+							},
+						},
+					},
+					"400": {
+						description: "Invalid entity type",
+					},
+				},
+			},
+		},
+		"/api/v1/imports/{id}": {
+			get: {
+				tags: ["Imports"],
+				summary: "Get import details",
+				description: "Returns import details including paginated row results",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "rowPage",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+						description: "Page number for row results",
+					},
+					{
+						name: "rowLimit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+						description: "Number of row results per page",
+					},
+					{
+						name: "rowStatus",
+						in: "query",
+						schema: { $ref: "#/components/schemas/ImportRowStatus" },
+						description: "Filter row results by status",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Import details with row results",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/ImportWithRows" },
+							},
+						},
+					},
+					"404": {
+						description: "Import not found",
+					},
+				},
+			},
+			delete: {
+				tags: ["Imports"],
+				summary: "Delete import",
+				description: "Delete an import and all its row results",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": {
+						description: "Import deleted",
+					},
+					"404": {
+						description: "Import not found",
+					},
+				},
+			},
+		},
+		"/api/v1/imports/{id}/rows": {
+			get: {
+				tags: ["Imports"],
+				summary: "Get import row results",
+				description: "Returns paginated row results for an import",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+					},
+					{
+						name: "status",
+						in: "query",
+						schema: { $ref: "#/components/schemas/ImportRowStatus" },
+						description: "Filter by row status",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Paginated row results",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									required: ["data", "total", "page", "limit", "totalPages"],
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/ImportRowResult" },
+										},
+										total: { type: "integer" },
+										page: { type: "integer" },
+										limit: { type: "integer" },
+										totalPages: { type: "integer" },
+									},
+								},
+							},
+						},
+					},
+					"404": {
+						description: "Import not found",
+					},
+				},
+			},
+		},
+		"/api/v1/imports/{id}/events": {
+			get: {
+				tags: ["Imports"],
+				summary: "Subscribe to import events (SSE)",
+				description:
+					"Server-Sent Events stream for real-time import progress updates. Events include: connected, row_update, status_change, completed, ping.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "SSE stream",
+						content: {
+							"text/event-stream": {
+								schema: {
+									type: "string",
+									description:
+										"Server-Sent Events stream with import progress updates",
+								},
+							},
+						},
+					},
+					"404": {
+						description: "Import not found",
+					},
+				},
+			},
+		},
 	},
 	components: {
 		schemas: {
@@ -5517,6 +5816,160 @@ export const openAPISpec = {
 					comparison: { $ref: "#/components/schemas/ComparisonMetrics" },
 					riskIndicators: { $ref: "#/components/schemas/RiskIndicators" },
 				},
+			},
+			ImportStatus: {
+				type: "string",
+				enum: ["PENDING", "VALIDATING", "PROCESSING", "COMPLETED", "FAILED"],
+				description: "Current status of the import job",
+			},
+			ImportEntityType: {
+				type: "string",
+				enum: ["CLIENT", "TRANSACTION"],
+				description: "Type of entities being imported",
+			},
+			ImportRowStatus: {
+				type: "string",
+				enum: ["PENDING", "SUCCESS", "WARNING", "ERROR", "SKIPPED"],
+				description: "Status of an individual row in the import",
+			},
+			Import: {
+				type: "object",
+				required: [
+					"id",
+					"organizationId",
+					"entityType",
+					"fileName",
+					"fileUrl",
+					"fileSize",
+					"status",
+					"totalRows",
+					"processedRows",
+					"successCount",
+					"warningCount",
+					"errorCount",
+					"createdBy",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: { type: "string", description: "Unique import identifier" },
+					organizationId: { type: "string" },
+					entityType: { $ref: "#/components/schemas/ImportEntityType" },
+					fileName: { type: "string", description: "Original file name" },
+					fileUrl: { type: "string", description: "R2 storage key" },
+					fileSize: { type: "integer", description: "File size in bytes" },
+					status: { $ref: "#/components/schemas/ImportStatus" },
+					totalRows: {
+						type: "integer",
+						description: "Total number of data rows in the file",
+					},
+					processedRows: {
+						type: "integer",
+						description: "Number of rows processed so far",
+					},
+					successCount: {
+						type: "integer",
+						description: "Number of rows successfully imported",
+					},
+					warningCount: {
+						type: "integer",
+						description: "Number of rows imported with warnings",
+					},
+					errorCount: {
+						type: "integer",
+						description: "Number of rows that failed to import",
+					},
+					errorMessage: {
+						type: "string",
+						nullable: true,
+						description: "Error message if the import failed",
+					},
+					createdBy: {
+						type: "string",
+						description: "User ID who initiated the import",
+					},
+					startedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When processing started",
+					},
+					completedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When processing completed",
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			ImportRowResult: {
+				type: "object",
+				required: [
+					"id",
+					"importId",
+					"rowNumber",
+					"status",
+					"rawData",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: { type: "string" },
+					importId: { type: "string" },
+					rowNumber: {
+						type: "integer",
+						description: "1-based row number in the source file",
+					},
+					status: { $ref: "#/components/schemas/ImportRowStatus" },
+					rawData: {
+						type: "string",
+						description: "JSON string of the original row data",
+					},
+					entityId: {
+						type: "string",
+						nullable: true,
+						description: "ID of the created entity (client or transaction)",
+					},
+					message: {
+						type: "string",
+						nullable: true,
+						description: "Success or warning message",
+					},
+					errors: {
+						type: "string",
+						nullable: true,
+						description: "JSON string of validation errors",
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			ImportWithRows: {
+				allOf: [
+					{ $ref: "#/components/schemas/Import" },
+					{
+						type: "object",
+						required: ["rowResults"],
+						properties: {
+							rowResults: {
+								type: "object",
+								required: ["data", "total", "page", "limit", "totalPages"],
+								properties: {
+									data: {
+										type: "array",
+										items: { $ref: "#/components/schemas/ImportRowResult" },
+									},
+									total: { type: "integer" },
+									page: { type: "integer" },
+									limit: { type: "integer" },
+									totalPages: { type: "integer" },
+								},
+							},
+						},
+					},
+				],
 			},
 		},
 	},
