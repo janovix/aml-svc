@@ -1,3 +1,10 @@
+# [1.4.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.5...v1.4.0-rc.6) (2026-01-17)
+
+
+### Features
+
+* implement bulk data import functionality with associated models, services, and routes ([0929ce1](https://github.com/janovix/aml-svc/commit/0929ce19f4c58cd99aa0b71282a0049c92871fd5))
+
 # [1.4.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.4...v1.4.0-rc.5) (2026-01-12)
 
 
