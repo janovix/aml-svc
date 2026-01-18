@@ -133,8 +133,9 @@ async function getJWKS(
 
 /**
  * Verifies a JWT using JWKS from auth-svc
+ * Exported for use in SSE endpoints where EventSource can't send headers
  */
-async function verifyToken(
+export async function verifyToken(
 	token: string,
 	authServiceUrl: string,
 	cacheTtl: number,

@@ -18,10 +18,16 @@ import {
 	ImportProgressUpdateSchema,
 	ImportStatusUpdateSchema,
 	ImportBulkRowCreateSchema,
+	type ImportEntity,
 } from "../domain/import";
 import type { Bindings } from "../index";
 import { getPrismaClient } from "../lib/prisma";
-import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import {
+	type AuthVariables,
+	type AuthTokenPayload,
+	getOrganizationId,
+	verifyToken,
+} from "../middleware/auth";
 import { APIError } from "../middleware/error";
 
 // CSV templates for clients and transactions
@@ -73,6 +79,185 @@ importTemplatesRouter.get("/:entityType", async (c) => {
 			"Content-Type": "text/csv; charset=utf-8",
 			"Content-Disposition": `attachment; filename="${filename}"`,
 		},
+	});
+});
+
+/**
+ * SSE Events router (handles its own auth from query params)
+ * EventSource API doesn't support custom headers, so we accept token from query params
+ */
+export const importEventsRouter = new Hono<{
+	Bindings: Bindings;
+}>();
+
+/**
+ * GET /:id/events
+ * Server-Sent Events stream for real-time import updates
+ * Accepts token from query param since EventSource can't send headers
+ */
+importEventsRouter.get("/:id/events", async (c) => {
+	const importId = c.req.param("id");
+	const token = c.req.query("token");
+
+	if (!token) {
+		return c.json(
+			{
+				success: false,
+				error: "Unauthorized",
+				message: "Missing token parameter",
+			},
+			401,
+		);
+	}
+
+	// Verify the token manually
+	const authServiceUrl =
+		c.env.AUTH_SERVICE_URL ?? "https://auth-svc.janovix.workers.dev";
+	const cacheTtl = 3600;
+	let payload: AuthTokenPayload;
+
+	try {
+		payload = await verifyToken(
+			token,
+			authServiceUrl,
+			cacheTtl,
+			c.env.AUTH_SERVICE,
+		);
+	} catch (error) {
+		console.error("Token verification failed:", error);
+		return c.json(
+			{
+				success: false,
+				error: "Unauthorized",
+				message: "Invalid or expired token",
+			},
+			401,
+		);
+	}
+
+	// Get organization ID from token
+	const organizationId = payload.organizationId;
+	if (!organizationId) {
+		return c.json(
+			{
+				success: false,
+				error: "Forbidden",
+				message: "No organization context in token",
+			},
+			403,
+		);
+	}
+
+	// Validate import ID and get service
+	const prisma = getPrismaClient(c.env.DB);
+	const repository = new ImportRepository(prisma);
+	const service = new ImportService(repository);
+
+	let importRecord: ImportEntity;
+	try {
+		importRecord = await service.get(organizationId, importId);
+	} catch (error) {
+		if (error instanceof Error && error.message === "IMPORT_NOT_FOUND") {
+			return c.json(
+				{
+					success: false,
+					error: "Not Found",
+					message: "Import not found",
+				},
+				404,
+			);
+		}
+		throw error;
+	}
+
+	return streamSSE(c, async (stream) => {
+		// Send initial connection event
+		await stream.writeSSE({
+			event: "connected",
+			data: JSON.stringify({
+				importId: importRecord.id,
+				status: importRecord.status,
+				timestamp: new Date().toISOString(),
+			}),
+		});
+
+		// Track last update time for polling
+		let lastUpdateTime = new Date();
+		let currentStatus = importRecord.status;
+		let isCompleted =
+			currentStatus === "COMPLETED" || currentStatus === "FAILED";
+
+		// Poll for updates every 500ms
+		while (!isCompleted) {
+			// Check if connection is still alive
+			if (stream.aborted) {
+				break;
+			}
+
+			// Get recent row updates
+			const recentUpdates = await service.getRecentRowUpdates(
+				importId,
+				lastUpdateTime,
+			);
+
+			for (const row of recentUpdates) {
+				await stream.writeSSE({
+					event: "row_update",
+					data: JSON.stringify(row),
+				});
+			}
+
+			if (recentUpdates.length > 0) {
+				lastUpdateTime = new Date();
+			}
+
+			// Check import status
+			const currentImport = await service.get(organizationId, importId);
+			if (currentImport.status !== currentStatus) {
+				await stream.writeSSE({
+					event: "status_change",
+					data: JSON.stringify({
+						status: currentImport.status,
+						processedRows: currentImport.processedRows,
+						totalRows: currentImport.totalRows,
+						successCount: currentImport.successCount,
+						warningCount: currentImport.warningCount,
+						errorCount: currentImport.errorCount,
+					}),
+				});
+				currentStatus = currentImport.status;
+			}
+
+			if (
+				currentImport.status === "COMPLETED" ||
+				currentImport.status === "FAILED"
+			) {
+				await stream.writeSSE({
+					event: "completed",
+					data: JSON.stringify({
+						status: currentImport.status,
+						processedRows: currentImport.processedRows,
+						totalRows: currentImport.totalRows,
+						successCount: currentImport.successCount,
+						warningCount: currentImport.warningCount,
+						errorCount: currentImport.errorCount,
+						errorMessage: currentImport.errorMessage,
+						completedAt: currentImport.completedAt,
+					}),
+				});
+				isCompleted = true;
+				break;
+			}
+
+			// Send heartbeat ping
+			await stream.writeSSE({
+				event: "ping",
+				data: JSON.stringify({ timestamp: new Date().toISOString() }),
+			});
+
+			// Wait 500ms before next poll
+			await new Promise((resolve) => setTimeout(resolve, 500));
+		}
 	});
 });
 
@@ -167,108 +352,6 @@ importsRouter.get("/:id/rows", async (c) => {
 	const result = await service.listRowResults(params.id, filters);
 
 	return c.json(result);
-});
-
-/**
- * GET /imports/:id/events
- * Server-Sent Events stream for real-time import updates
- */
-importsRouter.get("/:id/events", async (c) => {
-	const organizationId = getOrganizationId(c);
-	const params = parseWithZod(ImportIdParamSchema, c.req.param());
-
-	const service = getService(c);
-	const importRecord = await service
-		.get(organizationId, params.id)
-		.catch(handleServiceError);
-
-	return streamSSE(c, async (stream) => {
-		// Send initial connection event
-		await stream.writeSSE({
-			event: "connected",
-			data: JSON.stringify({
-				importId: importRecord.id,
-				status: importRecord.status,
-				timestamp: new Date().toISOString(),
-			}),
-		});
-
-		// Track last update time for polling
-		let lastUpdateTime = new Date();
-		let isCompleted =
-			importRecord.status === "COMPLETED" || importRecord.status === "FAILED";
-
-		// Poll for updates every 500ms
-		while (!isCompleted) {
-			// Check if connection is still alive
-			if (stream.aborted) {
-				break;
-			}
-
-			// Get recent row updates
-			const recentUpdates = await service.getRecentRowUpdates(
-				params.id,
-				lastUpdateTime,
-			);
-
-			for (const row of recentUpdates) {
-				await stream.writeSSE({
-					event: "row_update",
-					data: JSON.stringify(row),
-				});
-			}
-
-			if (recentUpdates.length > 0) {
-				lastUpdateTime = new Date();
-			}
-
-			// Check import status
-			const currentImport = await service.get(organizationId, params.id);
-			if (currentImport.status !== importRecord.status) {
-				await stream.writeSSE({
-					event: "status_change",
-					data: JSON.stringify({
-						status: currentImport.status,
-						processedRows: currentImport.processedRows,
-						totalRows: currentImport.totalRows,
-						successCount: currentImport.successCount,
-						warningCount: currentImport.warningCount,
-						errorCount: currentImport.errorCount,
-					}),
-				});
-			}
-
-			if (
-				currentImport.status === "COMPLETED" ||
-				currentImport.status === "FAILED"
-			) {
-				await stream.writeSSE({
-					event: "completed",
-					data: JSON.stringify({
-						status: currentImport.status,
-						processedRows: currentImport.processedRows,
-						totalRows: currentImport.totalRows,
-						successCount: currentImport.successCount,
-						warningCount: currentImport.warningCount,
-						errorCount: currentImport.errorCount,
-						errorMessage: currentImport.errorMessage,
-						completedAt: currentImport.completedAt,
-					}),
-				});
-				isCompleted = true;
-				break;
-			}
-
-			// Send heartbeat ping every 30 seconds worth of iterations
-			await stream.writeSSE({
-				event: "ping",
-				data: JSON.stringify({ timestamp: new Date().toISOString() }),
-			});
-
-			// Wait 500ms before next poll
-			await new Promise((resolve) => setTimeout(resolve, 500));
-		}
-	});
 });
 
 /**
