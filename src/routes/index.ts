@@ -12,6 +12,7 @@ import {
 	importsRouter,
 	importTemplatesRouter,
 	importEventsRouter,
+	importInternalRouter,
 } from "./imports";
 import { noticesRouter } from "./notices";
 import { organizationSettingsRouter } from "./organization-settings";
@@ -30,6 +31,8 @@ export function createRouter() {
 	router.route("/imports/templates", importTemplatesRouter);
 	// Import SSE events handle their own auth (EventSource can't send headers)
 	router.route("/imports", importEventsRouter);
+	// Internal routes for worker-to-service communication (no auth, service binding only)
+	router.route("/internal/imports", importInternalRouter);
 
 	// Apply auth middleware with organization requirement for tenant-scoped routes
 	// These routes require an active organization to be selected

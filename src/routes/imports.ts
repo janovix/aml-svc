@@ -475,19 +475,34 @@ importsRouter.delete("/:id", async (c) => {
 });
 
 // ============================================================================
-// Internal endpoints (for worker communication)
+// Internal router (for worker communication - no auth required)
 // ============================================================================
+
+/**
+ * Internal imports router (no auth required)
+ * These endpoints are called by the aml-import-worker via service binding
+ */
+export const importInternalRouter = new Hono<{
+	Bindings: Bindings;
+}>();
+
+// Helper to get service without auth context
+function getInternalService(c: Context<{ Bindings: Bindings }>) {
+	const prisma = getPrismaClient(c.env.DB);
+	const repository = new ImportRepository(prisma);
+	return new ImportService(repository);
+}
 
 /**
  * POST /imports/:id/status
  * Update import status (internal, called by worker)
  */
-importsRouter.post("/:id/status", async (c) => {
+importInternalRouter.post("/:id/status", async (c) => {
 	const params = parseWithZod(ImportIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const update = parseWithZod(ImportStatusUpdateSchema, body);
 
-	const service = getService(c);
+	const service = getInternalService(c);
 	const result = await service.updateStatus(params.id, update);
 
 	return c.json({ success: true, data: result });
@@ -497,12 +512,12 @@ importsRouter.post("/:id/status", async (c) => {
  * POST /imports/:id/rows
  * Create row results in bulk (internal, called by worker)
  */
-importsRouter.post("/:id/rows", async (c) => {
+importInternalRouter.post("/:id/rows", async (c) => {
 	const params = parseWithZod(ImportIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const input = parseWithZod(ImportBulkRowCreateSchema, body);
 
-	const service = getService(c);
+	const service = getInternalService(c);
 	await service.createRowResults(params.id, input);
 
 	return c.json({ success: true });
@@ -512,12 +527,12 @@ importsRouter.post("/:id/rows", async (c) => {
  * POST /imports/:id/progress
  * Update a single row result (internal, called by worker)
  */
-importsRouter.post("/:id/progress", async (c) => {
+importInternalRouter.post("/:id/progress", async (c) => {
 	const params = parseWithZod(ImportIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const update = parseWithZod(ImportProgressUpdateSchema, body);
 
-	const service = getService(c);
+	const service = getInternalService(c);
 	const result = await service.updateRowResult(
 		params.id,
 		update.rowNumber,
