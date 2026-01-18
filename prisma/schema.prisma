@@ -53,14 +53,14 @@ enum TransactionVehicleType {
 
 model Client {
   id                   String     @id
-  rfc                  String     @unique
+  rfc                  String // RFC is unique per organization, not globally
   organizationId       String     @map("organization_id") // Organization this client belongs to (from auth-svc)
   personType           PersonType @map("person_type")
   firstName            String?    @map("first_name")
   lastName             String?    @map("last_name")
   secondLastName       String?    @map("second_last_name")
   birthDate            DateTime?  @map("birth_date")
-  curp                 String?
+  curp                 String? // CURP is unique per organization, not globally
   businessName         String?    @map("business_name")
   incorporationDate    DateTime?  @map("incorporation_date")
   nationality          String?
@@ -91,7 +91,9 @@ model Client {
   reports      Report[] // Reports targeting this specific client
 
   @@map("clients")
+  @@unique([organizationId, rfc]) // RFC must be unique within each organization
   @@index([organizationId])
+  @@index([rfc]) // Keep index for lookups
   @@index([personType])
   @@index([deletedAt])
   @@index([countryCode])

@@ -26,7 +26,7 @@ DROP TABLE IF EXISTS import_row_results;
 
 CREATE TABLE clients (
     id TEXT PRIMARY KEY NOT NULL,
-    rfc TEXT NOT NULL UNIQUE,
+    rfc TEXT NOT NULL, -- RFC is unique per organization, not globally
     organization_id TEXT NOT NULL,
     person_type TEXT NOT NULL CHECK(person_type IN ('PHYSICAL','MORAL','TRUST')),
     first_name TEXT,
@@ -349,6 +349,7 @@ CREATE TABLE import_row_results (
 -- ============================================================================
 
 -- Clients indexes
+CREATE UNIQUE INDEX idx_clients_organization_id_rfc ON clients(organization_id, rfc); -- RFC is unique per organization
 CREATE INDEX idx_clients_organization_id ON clients(organization_id);
 CREATE INDEX idx_clients_rfc ON clients(rfc);
 CREATE INDEX idx_clients_person_type ON clients(person_type);
