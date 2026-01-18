@@ -1,3 +1,10 @@
+# [1.4.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.7...v1.4.0-rc.8) (2026-01-18)
+
+
+### Features
+
+* add SSE endpoint for real-time import updates with token verification from query parameters ([c52b5d6](https://github.com/janovix/aml-svc/commit/c52b5d6b44dbb72e889703b8910a88e8915dc82f))
+
 # [1.4.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.6...v1.4.0-rc.7) (2026-01-17)
 
 
