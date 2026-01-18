@@ -1,3 +1,10 @@
+# [1.4.0-rc.12](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.11...v1.4.0-rc.12) (2026-01-18)
+
+
+### Features
+
+* enhance error handling in internal API routes for clients, imports, and transactions ([d385e2b](https://github.com/janovix/aml-svc/commit/d385e2b2913e884e9086c68db2bcbc9fbd575841))
+
 # [1.4.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.10...v1.4.0-rc.11) (2026-01-18)
 
 
