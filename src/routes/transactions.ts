@@ -181,3 +181,58 @@ transactionsRouter.delete("/:id", async (c) => {
 
 	return c.body(null, 204);
 });
+
+// ============================================================================
+// Internal router (for worker communication - no auth required)
+// ============================================================================
+
+/**
+ * Internal transactions router (no auth required)
+ * These endpoints are called by the aml-import-worker via service binding
+ */
+export const transactionsInternalRouter = new Hono<{
+	Bindings: Bindings;
+}>();
+
+function getInternalService(c: Context<{ Bindings: Bindings }>) {
+	const prisma = getPrismaClient(c.env.DB);
+	const umaRepository = new UmaValueRepository(prisma);
+	const catalogRepository = new CatalogRepository(prisma);
+	const catalogEnrichmentService = new CatalogEnrichmentService(
+		catalogRepository,
+	);
+	const transactionRepository = new TransactionRepository(
+		prisma,
+		umaRepository,
+		catalogEnrichmentService,
+	);
+	const clientRepository = new ClientRepository(prisma);
+	return new TransactionService(
+		transactionRepository,
+		clientRepository,
+		umaRepository,
+	);
+}
+
+/**
+ * POST /internal/transactions
+ * Create a transaction (internal, called by worker)
+ */
+transactionsInternalRouter.post("/", async (c) => {
+	const organizationId = c.req.header("X-Organization-Id");
+	if (!organizationId) {
+		return c.json({ error: "Missing X-Organization-Id header" }, 400);
+	}
+
+	const body = await c.req.json();
+	const payload = parseWithZod(TransactionCreateSchema, body);
+
+	const service = getInternalService(c);
+	const created = await service.create(payload, organizationId);
+
+	// Queue alert detection job for new transaction
+	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
+	await alertQueue.queueTransactionCreated(created.clientId, created.id);
+
+	return c.json(created, 201);
+});

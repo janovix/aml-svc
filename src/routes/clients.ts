@@ -287,3 +287,64 @@ clientsRouter.delete("/:clientId/addresses/:addressId", async (c) => {
 		.catch(handleServiceError);
 	return c.body(null, 204);
 });
+
+// ============================================================================
+// Internal router (for worker communication - no auth required)
+// ============================================================================
+
+/**
+ * Internal clients router (no auth required)
+ * These endpoints are called by the aml-import-worker via service binding
+ */
+export const clientsInternalRouter = new Hono<{
+	Bindings: Bindings;
+}>();
+
+function getInternalService(c: Context<{ Bindings: Bindings }>) {
+	const prisma = getPrismaClient(c.env.DB);
+	const repository = new ClientRepository(prisma);
+	return new ClientService(repository);
+}
+
+/**
+ * GET /internal/clients
+ * List/search clients (internal, called by worker)
+ */
+clientsInternalRouter.get("/", async (c) => {
+	const organizationId = c.req.header("X-Organization-Id");
+	if (!organizationId) {
+		return c.json({ error: "Missing X-Organization-Id header" }, 400);
+	}
+
+	const url = new URL(c.req.url);
+	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const filters = parseWithZod(ClientFilterSchema, queryObject);
+
+	const service = getInternalService(c);
+	const result = await service.list(organizationId, filters);
+
+	return c.json(result);
+});
+
+/**
+ * POST /internal/clients
+ * Create a client (internal, called by worker)
+ */
+clientsInternalRouter.post("/", async (c) => {
+	const organizationId = c.req.header("X-Organization-Id");
+	if (!organizationId) {
+		return c.json({ error: "Missing X-Organization-Id header" }, 400);
+	}
+
+	const body = await c.req.json();
+	const payload = parseWithZod(ClientCreateSchema, body);
+
+	const service = getInternalService(c);
+	const created = await service.create(organizationId, payload);
+
+	// Queue alert detection job for new client
+	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
+	await alertQueue.queueClientCreated(created.id);
+
+	return c.json(created, 201);
+});

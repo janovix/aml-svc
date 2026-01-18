@@ -7,7 +7,7 @@ import { adminRouter } from "./admin";
 import { alertRulesRouter } from "./alert-rules";
 import { alertsRouter } from "./alerts";
 import { catalogsRouter } from "./catalogs";
-import { clientsRouter } from "./clients";
+import { clientsRouter, clientsInternalRouter } from "./clients";
 import {
 	importsRouter,
 	importTemplatesRouter,
@@ -17,7 +17,7 @@ import {
 import { noticesRouter } from "./notices";
 import { organizationSettingsRouter } from "./organization-settings";
 import { reportsRouter } from "./reports";
-import { transactionsRouter } from "./transactions";
+import { transactionsRouter, transactionsInternalRouter } from "./transactions";
 import { umaValuesRouter } from "./uma-values";
 
 export function createRouter() {
@@ -33,6 +33,8 @@ export function createRouter() {
 	router.route("/imports", importEventsRouter);
 	// Internal routes for worker-to-service communication (no auth, service binding only)
 	router.route("/internal/imports", importInternalRouter);
+	router.route("/internal/clients", clientsInternalRouter);
+	router.route("/internal/transactions", transactionsInternalRouter);
 
 	// Apply auth middleware with organization requirement for tenant-scoped routes
 	// These routes require an active organization to be selected
