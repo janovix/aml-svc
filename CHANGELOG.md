@@ -1,3 +1,10 @@
+# [1.4.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.9...v1.4.0-rc.10) (2026-01-18)
+
+
+### Features
+
+* add internal clients and transactions routers for worker communication without auth ([8ffd26e](https://github.com/janovix/aml-svc/commit/8ffd26ebeadd8f2d1fc3561da68927f6bd8053ab))
+
 # [1.4.0-rc.9](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.8...v1.4.0-rc.9) (2026-01-18)
 
 
