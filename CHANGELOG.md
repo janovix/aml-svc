@@ -1,3 +1,10 @@
+# [1.4.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.10...v1.4.0-rc.11) (2026-01-18)
+
+
+### Bug Fixes
+
+* update RFC uniqueness constraint in clients table and adjust Prisma model accordingly ([fdce47f](https://github.com/janovix/aml-svc/commit/fdce47ff4639173d20ee7924adf6acca12a51cbc))
+
 # [1.4.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.9...v1.4.0-rc.10) (2026-01-18)
 
 
