@@ -1,3 +1,10 @@
+# [1.4.0-rc.9](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.8...v1.4.0-rc.9) (2026-01-18)
+
+
+### Features
+
+* add internal imports router for worker communication without auth ([3550764](https://github.com/janovix/aml-svc/commit/3550764966f7eb703d0db07bee2e94723e29928f))
+
 # [1.4.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.7...v1.4.0-rc.8) (2026-01-18)
 
 
