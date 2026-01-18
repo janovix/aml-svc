@@ -215,24 +215,85 @@ function getInternalService(c: Context<{ Bindings: Bindings }>) {
 }
 
 /**
+ * Format error for internal API responses
+ * Ensures error messages are always properly propagated
+ */
+function formatInternalError(error: unknown): {
+	message: string;
+	details?: unknown;
+} {
+	if (error instanceof APIError) {
+		return { message: error.message, details: error.details };
+	}
+
+	if (error instanceof Error) {
+		// Check for Prisma unique constraint violation
+		if (error.message.includes("UNIQUE constraint failed")) {
+			const match = error.message.match(/UNIQUE constraint failed: \w+\.(\w+)/);
+			const field = match ? match[1] : "field";
+			return {
+				message: `Duplicate value: A record with this ${field} already exists`,
+				details: { constraint: "unique", field },
+			};
+		}
+
+		// Check for foreign key constraint errors
+		if (error.message.includes("Foreign key constraint failed")) {
+			return {
+				message: "Referenced record not found (client may not exist)",
+				details: { constraint: "foreign_key" },
+			};
+		}
+
+		// Check for client not found error
+		if (error.message.includes("CLIENT_NOT_FOUND")) {
+			return {
+				message: "Client not found with the provided clientId",
+				details: { code: "CLIENT_NOT_FOUND" },
+			};
+		}
+
+		return { message: error.message };
+	}
+
+	return { message: "Unknown error occurred" };
+}
+
+/**
  * POST /internal/transactions
  * Create a transaction (internal, called by worker)
  */
 transactionsInternalRouter.post("/", async (c) => {
 	const organizationId = c.req.header("X-Organization-Id");
 	if (!organizationId) {
-		return c.json({ error: "Missing X-Organization-Id header" }, 400);
+		return c.json(
+			{ error: "Bad Request", message: "Missing X-Organization-Id header" },
+			400,
+		);
 	}
 
-	const body = await c.req.json();
-	const payload = parseWithZod(TransactionCreateSchema, body);
+	try {
+		const body = await c.req.json();
+		const payload = parseWithZod(TransactionCreateSchema, body);
 
-	const service = getInternalService(c);
-	const created = await service.create(payload, organizationId);
+		const service = getInternalService(c);
+		const created = await service.create(payload, organizationId);
 
-	// Queue alert detection job for new transaction
-	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
-	await alertQueue.queueTransactionCreated(created.clientId, created.id);
+		// Queue alert detection job for new transaction
+		const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
+		await alertQueue.queueTransactionCreated(created.clientId, created.id);
 
-	return c.json(created, 201);
+		return c.json(created, 201);
+	} catch (error) {
+		console.error("[InternalTransactions] POST error:", error);
+		const { message, details } = formatInternalError(error);
+
+		// Return 404 for client not found
+		if (error instanceof Error && error.message.includes("CLIENT_NOT_FOUND")) {
+			return c.json({ error: "Not Found", message, details }, 404);
+		}
+
+		const status = error instanceof APIError ? error.statusCode : 500;
+		return c.json({ error: "Error", message, details }, status as 400);
+	}
 });

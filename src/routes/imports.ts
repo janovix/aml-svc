@@ -494,18 +494,49 @@ function getInternalService(c: Context<{ Bindings: Bindings }>) {
 }
 
 /**
+ * Format error for internal API responses
+ * Ensures error messages are always properly propagated
+ */
+function formatInternalError(error: unknown): {
+	message: string;
+	details?: unknown;
+} {
+	if (error instanceof APIError) {
+		return { message: error.message, details: error.details };
+	}
+
+	if (error instanceof Error) {
+		// Check for not found errors
+		if (error.message.includes("NOT_FOUND")) {
+			return { message: "Import not found", details: { code: "NOT_FOUND" } };
+		}
+
+		return { message: error.message };
+	}
+
+	return { message: "Unknown error occurred" };
+}
+
+/**
  * POST /imports/:id/status
  * Update import status (internal, called by worker)
  */
 importInternalRouter.post("/:id/status", async (c) => {
-	const params = parseWithZod(ImportIdParamSchema, c.req.param());
-	const body = await c.req.json();
-	const update = parseWithZod(ImportStatusUpdateSchema, body);
+	try {
+		const params = parseWithZod(ImportIdParamSchema, c.req.param());
+		const body = await c.req.json();
+		const update = parseWithZod(ImportStatusUpdateSchema, body);
 
-	const service = getInternalService(c);
-	const result = await service.updateStatus(params.id, update);
+		const service = getInternalService(c);
+		const result = await service.updateStatus(params.id, update);
 
-	return c.json({ success: true, data: result });
+		return c.json({ success: true, data: result });
+	} catch (error) {
+		console.error("[InternalImports] POST status error:", error);
+		const { message, details } = formatInternalError(error);
+		const status = error instanceof APIError ? error.statusCode : 500;
+		return c.json({ error: "Error", message, details }, status as 400);
+	}
 });
 
 /**
@@ -513,14 +544,21 @@ importInternalRouter.post("/:id/status", async (c) => {
  * Create row results in bulk (internal, called by worker)
  */
 importInternalRouter.post("/:id/rows", async (c) => {
-	const params = parseWithZod(ImportIdParamSchema, c.req.param());
-	const body = await c.req.json();
-	const input = parseWithZod(ImportBulkRowCreateSchema, body);
+	try {
+		const params = parseWithZod(ImportIdParamSchema, c.req.param());
+		const body = await c.req.json();
+		const input = parseWithZod(ImportBulkRowCreateSchema, body);
 
-	const service = getInternalService(c);
-	await service.createRowResults(params.id, input);
+		const service = getInternalService(c);
+		await service.createRowResults(params.id, input);
 
-	return c.json({ success: true });
+		return c.json({ success: true });
+	} catch (error) {
+		console.error("[InternalImports] POST rows error:", error);
+		const { message, details } = formatInternalError(error);
+		const status = error instanceof APIError ? error.statusCode : 500;
+		return c.json({ error: "Error", message, details }, status as 400);
+	}
 });
 
 /**
@@ -528,16 +566,23 @@ importInternalRouter.post("/:id/rows", async (c) => {
  * Update a single row result (internal, called by worker)
  */
 importInternalRouter.post("/:id/progress", async (c) => {
-	const params = parseWithZod(ImportIdParamSchema, c.req.param());
-	const body = await c.req.json();
-	const update = parseWithZod(ImportProgressUpdateSchema, body);
+	try {
+		const params = parseWithZod(ImportIdParamSchema, c.req.param());
+		const body = await c.req.json();
+		const update = parseWithZod(ImportProgressUpdateSchema, body);
 
-	const service = getInternalService(c);
-	const result = await service.updateRowResult(
-		params.id,
-		update.rowNumber,
-		update,
-	);
+		const service = getInternalService(c);
+		const result = await service.updateRowResult(
+			params.id,
+			update.rowNumber,
+			update,
+		);
 
-	return c.json({ success: true, data: result });
+		return c.json({ success: true, data: result });
+	} catch (error) {
+		console.error("[InternalImports] POST progress error:", error);
+		const { message, details } = formatInternalError(error);
+		const status = error instanceof APIError ? error.statusCode : 500;
+		return c.json({ error: "Error", message, details }, status as 400);
+	}
 });

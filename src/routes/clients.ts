@@ -307,23 +307,71 @@ function getInternalService(c: Context<{ Bindings: Bindings }>) {
 }
 
 /**
+ * Format error for internal API responses
+ * Ensures error messages are always properly propagated
+ */
+function formatInternalError(error: unknown): {
+	message: string;
+	details?: unknown;
+} {
+	if (error instanceof APIError) {
+		return { message: error.message, details: error.details };
+	}
+
+	if (error instanceof Error) {
+		// Check for Prisma unique constraint violation
+		if (error.message.includes("UNIQUE constraint failed")) {
+			// Extract field name from error message if possible
+			const match = error.message.match(/UNIQUE constraint failed: \w+\.(\w+)/);
+			const field = match ? match[1] : "field";
+			return {
+				message: `Duplicate value: A record with this ${field} already exists`,
+				details: { constraint: "unique", field },
+			};
+		}
+
+		// Check for other common Prisma errors
+		if (error.message.includes("Foreign key constraint failed")) {
+			return {
+				message: "Referenced record not found",
+				details: { constraint: "foreign_key" },
+			};
+		}
+
+		return { message: error.message };
+	}
+
+	return { message: "Unknown error occurred" };
+}
+
+/**
  * GET /internal/clients
  * List/search clients (internal, called by worker)
  */
 clientsInternalRouter.get("/", async (c) => {
 	const organizationId = c.req.header("X-Organization-Id");
 	if (!organizationId) {
-		return c.json({ error: "Missing X-Organization-Id header" }, 400);
+		return c.json(
+			{ error: "Bad Request", message: "Missing X-Organization-Id header" },
+			400,
+		);
 	}
 
-	const url = new URL(c.req.url);
-	const queryObject = Object.fromEntries(url.searchParams.entries());
-	const filters = parseWithZod(ClientFilterSchema, queryObject);
+	try {
+		const url = new URL(c.req.url);
+		const queryObject = Object.fromEntries(url.searchParams.entries());
+		const filters = parseWithZod(ClientFilterSchema, queryObject);
 
-	const service = getInternalService(c);
-	const result = await service.list(organizationId, filters);
+		const service = getInternalService(c);
+		const result = await service.list(organizationId, filters);
 
-	return c.json(result);
+		return c.json(result);
+	} catch (error) {
+		console.error("[InternalClients] GET error:", error);
+		const { message, details } = formatInternalError(error);
+		const status = error instanceof APIError ? error.statusCode : 500;
+		return c.json({ error: "Error", message, details }, status as 400);
+	}
 });
 
 /**
@@ -333,18 +381,37 @@ clientsInternalRouter.get("/", async (c) => {
 clientsInternalRouter.post("/", async (c) => {
 	const organizationId = c.req.header("X-Organization-Id");
 	if (!organizationId) {
-		return c.json({ error: "Missing X-Organization-Id header" }, 400);
+		return c.json(
+			{ error: "Bad Request", message: "Missing X-Organization-Id header" },
+			400,
+		);
 	}
 
-	const body = await c.req.json();
-	const payload = parseWithZod(ClientCreateSchema, body);
+	try {
+		const body = await c.req.json();
+		const payload = parseWithZod(ClientCreateSchema, body);
 
-	const service = getInternalService(c);
-	const created = await service.create(organizationId, payload);
+		const service = getInternalService(c);
+		const created = await service.create(organizationId, payload);
 
-	// Queue alert detection job for new client
-	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
-	await alertQueue.queueClientCreated(created.id);
+		// Queue alert detection job for new client
+		const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
+		await alertQueue.queueClientCreated(created.id);
 
-	return c.json(created, 201);
+		return c.json(created, 201);
+	} catch (error) {
+		console.error("[InternalClients] POST error:", error);
+		const { message, details } = formatInternalError(error);
+
+		// Return 409 for duplicate key errors
+		if (
+			error instanceof Error &&
+			error.message.includes("UNIQUE constraint failed")
+		) {
+			return c.json({ error: "Conflict", message, details }, 409);
+		}
+
+		const status = error instanceof APIError ? error.statusCode : 500;
+		return c.json({ error: "Error", message, details }, status as 400);
+	}
 });
