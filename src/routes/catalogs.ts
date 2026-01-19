@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { ZodError } from "zod";
+import * as Sentry from "@sentry/cloudflare";
 
 import {
 	CatalogItemCreateSchema,
@@ -15,6 +16,44 @@ import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 
 export const catalogsRouter = new Hono<{ Bindings: Bindings }>();
+
+// Timeout for catalog operations (in milliseconds)
+// D1 queries should complete well under this limit
+const CATALOG_OPERATION_TIMEOUT_MS = 25000; // 25 seconds (Workers have 30s limit)
+
+/**
+ * Wraps a promise with a timeout to prevent indefinite hangs.
+ * This is a safety net for cases where D1 queries might hang.
+ */
+async function withTimeout<T>(
+	promise: Promise<T>,
+	timeoutMs: number,
+	operationName: string,
+): Promise<T> {
+	let timeoutId: ReturnType<typeof setTimeout>;
+
+	const timeoutPromise = new Promise<never>((_, reject) => {
+		timeoutId = setTimeout(() => {
+			const error = new Error(
+				`Operation "${operationName}" timed out after ${timeoutMs}ms`,
+			);
+			error.name = "TimeoutError";
+			Sentry.captureException(error, {
+				tags: { operation: operationName, timeout: timeoutMs },
+			});
+			reject(error);
+		}, timeoutMs);
+	});
+
+	try {
+		const result = await Promise.race([promise, timeoutPromise]);
+		clearTimeout(timeoutId!);
+		return result;
+	} catch (error) {
+		clearTimeout(timeoutId!);
+		throw error;
+	}
+}
 
 function parseWithZod<T>(
 	schema: { parse: (input: unknown) => T },
@@ -38,6 +77,13 @@ function getService(c: Context<{ Bindings: Bindings }>) {
 
 function handleServiceError(error: unknown): never {
 	if (error instanceof Error) {
+		// Handle timeout errors
+		if (error.name === "TimeoutError") {
+			throw new APIError(504, "Gateway Timeout", {
+				message: error.message,
+			});
+		}
+
 		switch (error.message) {
 			case "CATALOG_NOT_FOUND":
 				throw new APIError(404, "Catalog not found");
@@ -59,9 +105,13 @@ catalogsRouter.get("/:catalogKey", async (c) => {
 	const query = parseWithZod(CatalogListQuerySchema, queryObject);
 
 	const service = getService(c);
-	const result = await service
-		.list(params.catalogKey, query)
-		.catch(handleServiceError);
+	const operationName = `catalog.list.${params.catalogKey}`;
+
+	const result = await withTimeout(
+		service.list(params.catalogKey, query),
+		CATALOG_OPERATION_TIMEOUT_MS,
+		operationName,
+	).catch(handleServiceError);
 
 	return c.json(result);
 });
@@ -70,9 +120,13 @@ catalogsRouter.get("/:catalogKey/items/:itemId", async (c) => {
 	const params = parseWithZod(CatalogItemIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	const item = await service
-		.getItemById(params.catalogKey, params.itemId)
-		.catch(handleServiceError);
+	const operationName = `catalog.getItem.${params.catalogKey}.${params.itemId}`;
+
+	const item = await withTimeout(
+		service.getItemById(params.catalogKey, params.itemId),
+		CATALOG_OPERATION_TIMEOUT_MS,
+		operationName,
+	).catch(handleServiceError);
 
 	return c.json(item);
 });
@@ -83,9 +137,13 @@ catalogsRouter.post("/:catalogKey/items", async (c) => {
 	const input = parseWithZod(CatalogItemCreateSchema, body);
 
 	const service = getService(c);
-	const item = await service
-		.createItem(params.catalogKey, input.name)
-		.catch(handleServiceError);
+	const operationName = `catalog.createItem.${params.catalogKey}`;
+
+	const item = await withTimeout(
+		service.createItem(params.catalogKey, input.name),
+		CATALOG_OPERATION_TIMEOUT_MS,
+		operationName,
+	).catch(handleServiceError);
 
 	return c.json(item, 201);
 });
