@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { ZodError } from "zod";
+import { Prisma } from "@prisma/client";
 
 import {
 	AddressIdParamSchema,
@@ -53,7 +54,55 @@ function getService(
 }
 
 function handleServiceError(error: unknown): never {
+	// Handle Prisma unique constraint violations
+	if (error instanceof Prisma.PrismaClientKnownRequestError) {
+		if (error.code === "P2002") {
+			// Unique constraint failed
+			const target = error.meta?.target;
+			// Check if it's the RFC unique constraint
+			if (
+				Array.isArray(target) &&
+				target.includes("organization_id") &&
+				target.includes("rfc")
+			) {
+				throw new APIError(
+					409,
+					"Ya existe un cliente con este RFC en la organización",
+					{
+						code: "DUPLICATE_RFC",
+						field: "rfc",
+					},
+				);
+			}
+			// Generic unique constraint message
+			throw new APIError(409, "A record with this value already exists", {
+				code: "DUPLICATE_VALUE",
+				target,
+			});
+		}
+	}
+
 	if (error instanceof Error) {
+		// Handle UNIQUE constraint failed from D1/SQLite (alternative error format)
+		if (
+			error.message.includes("UNIQUE constraint failed") ||
+			error.message.includes("Unique constraint failed")
+		) {
+			if (error.message.includes("rfc")) {
+				throw new APIError(
+					409,
+					"Ya existe un cliente con este RFC en la organización",
+					{
+						code: "DUPLICATE_RFC",
+						field: "rfc",
+					},
+				);
+			}
+			throw new APIError(409, "A record with this value already exists", {
+				code: "DUPLICATE_VALUE",
+			});
+		}
+
 		if (error.message === "CLIENT_NOT_FOUND") {
 			throw new APIError(404, "Client not found");
 		}
