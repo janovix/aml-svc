@@ -1,3 +1,10 @@
+# [1.4.0-rc.13](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.12...v1.4.0-rc.13) (2026-01-19)
+
+
+### Features
+
+* enhance Prisma client initialization with caching and timeout handling in catalog operations ([701d09a](https://github.com/janovix/aml-svc/commit/701d09a8d927c53e026db745b2296031cfd47501))
+
 # [1.4.0-rc.12](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.11...v1.4.0-rc.12) (2026-01-18)
 
 
