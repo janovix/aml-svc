@@ -489,15 +489,16 @@ describe("CatalogRepository", () => {
 		});
 
 		it("returns item when found by shortName", async () => {
+			// Raw SQL returns snake_case column names as defined in the database
 			const mockItem = {
 				id: "item-1",
-				catalogId: "catalog-1",
+				catalog_id: "catalog-1",
 				name: "Mexican Peso",
-				normalizedName: "mexican peso",
+				normalized_name: "mexican peso",
 				active: 1, // SQLite returns 1/0 for booleans
 				metadata: '{"shortName": "MXN", "code": "3"}',
-				createdAt: new Date("2024-01-01"),
-				updatedAt: new Date("2024-01-01"),
+				created_at: new Date("2024-01-01"),
+				updated_at: new Date("2024-01-01"),
 			};
 
 			// First call (by ID) returns null
@@ -516,15 +517,16 @@ describe("CatalogRepository", () => {
 		});
 
 		it("returns item when found by code", async () => {
+			// Raw SQL returns snake_case column names as defined in the database
 			const mockItem = {
 				id: "item-1",
-				catalogId: "catalog-1",
+				catalog_id: "catalog-1",
 				name: "Mexican Peso",
-				normalizedName: "mexican peso",
+				normalized_name: "mexican peso",
 				active: 1, // SQLite returns 1/0 for booleans
 				metadata: '{"shortName": "MXN", "code": "3"}',
-				createdAt: new Date("2024-01-01"),
-				updatedAt: new Date("2024-01-01"),
+				created_at: new Date("2024-01-01"),
+				updated_at: new Date("2024-01-01"),
 			};
 
 			// First call (by ID) returns null
