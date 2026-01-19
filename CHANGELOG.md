@@ -1,3 +1,10 @@
+# [1.4.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.13...v1.4.0-rc.14) (2026-01-19)
+
+
+### Features
+
+* improve error handling for unique constraint violations in client routes ([eb6bad1](https://github.com/janovix/aml-svc/commit/eb6bad1847bb6c260debd061bd74550cd5c70b24))
+
 # [1.4.0-rc.13](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.12...v1.4.0-rc.13) (2026-01-19)
 
 
