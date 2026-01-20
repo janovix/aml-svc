@@ -1,3 +1,10 @@
+# [1.4.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.14...v1.4.0-rc.15) (2026-01-20)
+
+
+### Features
+
+* add zip codes catalog population script and initial migration for AML core schema ([068c4d5](https://github.com/janovix/aml-svc/commit/068c4d5065f8bebd4b3b3652afecf66ac8b89439))
+
 # [1.4.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.13...v1.4.0-rc.14) (2026-01-19)
 
 
