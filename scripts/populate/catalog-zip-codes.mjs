@@ -178,6 +178,24 @@ function generateCatalogId(catalogKey) {
 		.padStart(32, "0");
 }
 
+// Helper to sleep for a given number of milliseconds
+function sleep(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Check if error is a transient D1 error that should be retried
+function isTransientD1Error(errorOutput) {
+	const transientPatterns = [
+		"D1_RESET_DO",
+		"D1_ERROR",
+		"code: 7500",
+		"ECONNRESET",
+		"ETIMEDOUT",
+		"socket hang up",
+	];
+	return transientPatterns.some((pattern) => errorOutput.includes(pattern));
+}
+
 async function checkIfPopulated(isRemote, configFlag) {
 	const catalogId = generateCatalogId(CATALOG_KEY);
 	const sqlQuery = `SELECT COUNT(*) as count FROM catalog_items WHERE catalog_id = '${catalogId}'`;
@@ -186,19 +204,43 @@ async function checkIfPopulated(isRemote, configFlag) {
 		? `wrangler d1 execute DB ${configFlag} --remote --command "${sqlQuery}" --json`
 		: `wrangler d1 execute DB ${configFlag} --local --command "${sqlQuery}" --json`;
 
-	try {
-		const result = execSync(command, {
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "pipe"],
-		});
-		const parsed = JSON.parse(result);
-		// D1 returns results in format: [{ results: [{ count: N }] }]
-		const count = parsed?.[0]?.results?.[0]?.count ?? 0;
-		return count >= MIN_POPULATED_COUNT;
-	} catch {
-		// If query fails, assume not populated
-		return false;
+	const maxRetries = 3;
+	const retryDelayMs = 5000; // 5 seconds between retries
+
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			const result = execSync(command, {
+				encoding: "utf-8",
+				stdio: ["pipe", "pipe", "pipe"],
+			});
+			const parsed = JSON.parse(result);
+			// D1 returns results in format: [{ results: [{ count: N }] }]
+			const count = parsed?.[0]?.results?.[0]?.count ?? 0;
+			return { populated: count >= MIN_POPULATED_COUNT, error: null };
+		} catch (error) {
+			const errorOutput = error.stderr?.toString() || error.message || "";
+
+			if (isTransientD1Error(errorOutput)) {
+				if (attempt < maxRetries) {
+					console.log(
+						`⚠️  D1 transient error on attempt ${attempt}/${maxRetries}, retrying in ${retryDelayMs / 1000}s...`,
+					);
+					await sleep(retryDelayMs);
+					continue;
+				}
+				// All retries exhausted - return error so caller can decide
+				console.error(
+					`❌ D1 transient error persists after ${maxRetries} attempts`,
+				);
+				return { populated: false, error: "D1_TRANSIENT_ERROR" };
+			}
+
+			// Non-transient error (e.g., table doesn't exist) - assume not populated
+			return { populated: false, error: null };
+		}
 	}
+
+	return { populated: false, error: null };
 }
 
 async function populateZipCodesCatalog() {
@@ -226,8 +268,20 @@ async function populateZipCodesCatalog() {
 	// Check if already populated (unless forcing repopulation)
 	if (process.env.FORCE_ZIP_CODES !== "true") {
 		console.log("🔍 Checking if zip codes catalog is already populated...");
-		const isPopulated = await checkIfPopulated(isRemote, configFlag);
-		if (isPopulated) {
+		const { populated, error } = await checkIfPopulated(isRemote, configFlag);
+
+		if (error === "D1_TRANSIENT_ERROR") {
+			// D1 is having issues - skip this catalog to avoid blocking the build
+			// The catalog can be populated manually later or on the next deploy
+			console.log("⚠️  Skipping zip codes catalog due to D1 transient errors.");
+			console.log(
+				"   The catalog will be populated on the next successful deploy.",
+			);
+			console.log("   (Or run manually with FORCE_ZIP_CODES=true)");
+			return;
+		}
+
+		if (populated) {
 			console.log(
 				`✅ Zip codes catalog already populated (>${MIN_POPULATED_COUNT.toLocaleString()} entries). Skipping.`,
 			);
