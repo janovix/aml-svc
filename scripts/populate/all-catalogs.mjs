@@ -26,6 +26,7 @@ const catalogScripts = [
 	"catalog-maritime-vehicle-brands.mjs",
 	"catalog-air-vehicle-brands.mjs",
 	"catalog-vulnerable-activities.mjs",
+	"catalog-zip-codes.mjs",
 ];
 
 async function populateAllCatalogs() {
