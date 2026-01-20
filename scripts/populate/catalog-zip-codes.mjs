@@ -8,9 +8,12 @@
  * Source: SEPOMEX (Servicio Postal Mexicano)
  * CSV hosted at: https://catalogs.janovix.com/zip-codes.csv
  *
+ * NOTE: This catalog has ~157K entries and is too large for Cloudflare build environments.
+ * It is skipped by default in CI and should be populated via GitHub Actions workflow.
+ *
  * Environment variables:
  * - SKIP_ZIP_CODES=true: Skip this catalog entirely
- * - FORCE_ZIP_CODES=true: Force repopulation even if already populated
+ * - FORCE_ZIP_CODES=true: Force population (required for CI/remote)
  */
 
 import { execSync } from "node:child_process";
@@ -27,10 +30,6 @@ const CATALOG_NAME = "Códigos Postales (México)";
 
 // Batch size for SQL execution to avoid memory issues
 const BATCH_SIZE = 5000;
-
-// Minimum number of entries to consider the catalog "populated"
-// Mexican zip codes have ~150K+ entries; 100K is a safe threshold
-const MIN_POPULATED_COUNT = 100000;
 
 async function downloadCsv() {
 	console.log("📥 Downloading zip-codes.csv...");
@@ -105,6 +104,13 @@ function generateDeterministicId(catalogId, normalizedName) {
 	return Math.abs(hash).toString(16).padStart(32, "0");
 }
 
+function generateCatalogId(catalogKey) {
+	return Array.from(catalogKey)
+		.reduce((acc, char) => acc + char.charCodeAt(0), 0)
+		.toString(16)
+		.padStart(32, "0");
+}
+
 function generateSqlBatch(catalogId, items, isFirst = false) {
 	const sql = [];
 
@@ -171,87 +177,29 @@ async function executeSql(sqlFile, isRemote, configFlag) {
 	execSync(command, { stdio: "inherit" });
 }
 
-function generateCatalogId(catalogKey) {
-	return Array.from(catalogKey)
-		.reduce((acc, char) => acc + char.charCodeAt(0), 0)
-		.toString(16)
-		.padStart(32, "0");
-}
-
-// Helper to sleep for a given number of milliseconds
-function sleep(ms) {
-	return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// Check if error is a transient D1 error that should be retried
-function isTransientD1Error(errorOutput) {
-	const transientPatterns = [
-		"D1_RESET_DO",
-		"D1_ERROR",
-		"code: 7500",
-		"ECONNRESET",
-		"ETIMEDOUT",
-		"socket hang up",
-	];
-	return transientPatterns.some((pattern) => errorOutput.includes(pattern));
-}
-
-async function checkIfPopulated(isRemote, configFlag) {
-	const catalogId = generateCatalogId(CATALOG_KEY);
-	const sqlQuery = `SELECT COUNT(*) as count FROM catalog_items WHERE catalog_id = '${catalogId}'`;
-
-	const command = isRemote
-		? `wrangler d1 execute DB ${configFlag} --remote --command "${sqlQuery}" --json`
-		: `wrangler d1 execute DB ${configFlag} --local --command "${sqlQuery}" --json`;
-
-	const maxRetries = 3;
-	const retryDelayMs = 5000; // 5 seconds between retries
-
-	for (let attempt = 1; attempt <= maxRetries; attempt++) {
-		try {
-			const result = execSync(command, {
-				encoding: "utf-8",
-				stdio: ["pipe", "pipe", "pipe"],
-			});
-			const parsed = JSON.parse(result);
-			// D1 returns results in format: [{ results: [{ count: N }] }]
-			const count = parsed?.[0]?.results?.[0]?.count ?? 0;
-			return { populated: count >= MIN_POPULATED_COUNT, error: null };
-		} catch (error) {
-			const errorOutput = error.stderr?.toString() || error.message || "";
-
-			if (isTransientD1Error(errorOutput)) {
-				if (attempt < maxRetries) {
-					console.log(
-						`⚠️  D1 transient error on attempt ${attempt}/${maxRetries}, retrying in ${retryDelayMs / 1000}s...`,
-					);
-					await sleep(retryDelayMs);
-					continue;
-				}
-				// All retries exhausted - return error so caller can decide
-				console.error(
-					`❌ D1 transient error persists after ${maxRetries} attempts`,
-				);
-				return { populated: false, error: "D1_TRANSIENT_ERROR" };
-			}
-
-			// Non-transient error (e.g., table doesn't exist) - assume not populated
-			return { populated: false, error: null };
-		}
-	}
-
-	return { populated: false, error: null };
-}
-
 async function populateZipCodesCatalog() {
+	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
+
 	// Check if explicitly skipped
 	if (process.env.SKIP_ZIP_CODES === "true") {
 		console.log("⏭️  Skipping zip codes catalog (SKIP_ZIP_CODES=true)");
 		return;
 	}
 
-	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
-	// Use WRANGLER_CONFIG if set, otherwise detect preview environment
+	// Skip by default in CI/remote environments unless explicitly forced
+	// The zip-codes catalog has 157K+ entries and is too large for Cloudflare builds
+	// Use the GitHub Actions workflow "Populate Zip Codes" instead
+	if (isRemote && process.env.FORCE_ZIP_CODES !== "true") {
+		console.log(
+			"⏭️  Skipping zip codes catalog in CI (too large for Cloudflare builds)",
+		);
+		console.log(
+			"   Use GitHub Actions workflow 'Populate Zip Codes' to populate this catalog.",
+		);
+		return;
+	}
+
+	// Determine config file
 	let configFile = process.env.WRANGLER_CONFIG;
 	if (!configFile) {
 		const branch = process.env.CF_PAGES_BRANCH || process.env.WORKERS_CI_BRANCH;
@@ -264,31 +212,6 @@ async function populateZipCodesCatalog() {
 		}
 	}
 	const configFlag = configFile ? `--config ${configFile}` : "";
-
-	// Check if already populated (unless forcing repopulation)
-	if (process.env.FORCE_ZIP_CODES !== "true") {
-		console.log("🔍 Checking if zip codes catalog is already populated...");
-		const { populated, error } = await checkIfPopulated(isRemote, configFlag);
-
-		if (error === "D1_TRANSIENT_ERROR") {
-			// D1 is having issues - skip this catalog to avoid blocking the build
-			// The catalog can be populated manually later or on the next deploy
-			console.log("⚠️  Skipping zip codes catalog due to D1 transient errors.");
-			console.log(
-				"   The catalog will be populated on the next successful deploy.",
-			);
-			console.log("   (Or run manually with FORCE_ZIP_CODES=true)");
-			return;
-		}
-
-		if (populated) {
-			console.log(
-				`✅ Zip codes catalog already populated (>${MIN_POPULATED_COUNT.toLocaleString()} entries). Skipping.`,
-			);
-			console.log("   (Set FORCE_ZIP_CODES=true to repopulate)");
-			return;
-		}
-	}
 
 	try {
 		console.log(

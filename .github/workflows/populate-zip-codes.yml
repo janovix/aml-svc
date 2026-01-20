@@ -1,0 +1,65 @@
+name: Populate Zip Codes
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+          - preview
+        default: dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: populate-zip-codes-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  populate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HUSKY: 0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Determine wrangler config
+        id: config
+        run: |
+          case "${{ github.event.inputs.environment }}" in
+            prod)
+              echo "config=wrangler.prod.jsonc" >> $GITHUB_OUTPUT
+              ;;
+            preview)
+              echo "config=wrangler.preview.jsonc" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "config=wrangler.jsonc" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Populate zip codes catalog
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FORCE_ZIP_CODES: "true"
+          REMOTE: "true"
+          WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
+        run: node scripts/populate/catalog-zip-codes.mjs
