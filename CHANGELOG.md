@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/janovix/aml-svc/compare/v1.3.0...v1.4.0) (2026-01-10)
+
+
+### Features
+
+* add compatibility flags for nodejs_als in configuration files ([3cb6c19](https://github.com/janovix/aml-svc/commit/3cb6c195d01657c989334334f80b2f5e86a2b865))
+
 # [1.4.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.14...v1.4.0-rc.15) (2026-01-20)
 
 
@@ -95,6 +102,7 @@
 ### Features
 
 * add audit client and auth settings integration via service binding ([a3a1199](https://github.com/janovix/aml-svc/commit/a3a1199c8bd008c33f79011b21a55133db0a888e))
+
 
 # [1.4.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.3.0...v1.4.0-rc.1) (2026-01-10)
 
