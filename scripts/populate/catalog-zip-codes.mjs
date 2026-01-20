@@ -7,6 +7,10 @@
  *
  * Source: SEPOMEX (Servicio Postal Mexicano)
  * CSV hosted at: https://catalogs.janovix.com/zip-codes.csv
+ *
+ * Environment variables:
+ * - SKIP_ZIP_CODES=true: Skip this catalog entirely
+ * - FORCE_ZIP_CODES=true: Force repopulation even if already populated
  */
 
 import { execSync } from "node:child_process";
@@ -23,6 +27,10 @@ const CATALOG_NAME = "Códigos Postales (México)";
 
 // Batch size for SQL execution to avoid memory issues
 const BATCH_SIZE = 5000;
+
+// Minimum number of entries to consider the catalog "populated"
+// Mexican zip codes have ~150K+ entries; 100K is a safe threshold
+const MIN_POPULATED_COUNT = 100000;
 
 async function downloadCsv() {
 	console.log("📥 Downloading zip-codes.csv...");
@@ -97,13 +105,6 @@ function generateDeterministicId(catalogId, normalizedName) {
 	return Math.abs(hash).toString(16).padStart(32, "0");
 }
 
-function generateCatalogId(catalogKey) {
-	return Array.from(catalogKey)
-		.reduce((acc, char) => acc + char.charCodeAt(0), 0)
-		.toString(16)
-		.padStart(32, "0");
-}
-
 function generateSqlBatch(catalogId, items, isFirst = false) {
 	const sql = [];
 
@@ -170,7 +171,43 @@ async function executeSql(sqlFile, isRemote, configFlag) {
 	execSync(command, { stdio: "inherit" });
 }
 
+function generateCatalogId(catalogKey) {
+	return Array.from(catalogKey)
+		.reduce((acc, char) => acc + char.charCodeAt(0), 0)
+		.toString(16)
+		.padStart(32, "0");
+}
+
+async function checkIfPopulated(isRemote, configFlag) {
+	const catalogId = generateCatalogId(CATALOG_KEY);
+	const sqlQuery = `SELECT COUNT(*) as count FROM catalog_items WHERE catalog_id = '${catalogId}'`;
+
+	const command = isRemote
+		? `wrangler d1 execute DB ${configFlag} --remote --command "${sqlQuery}" --json`
+		: `wrangler d1 execute DB ${configFlag} --local --command "${sqlQuery}" --json`;
+
+	try {
+		const result = execSync(command, {
+			encoding: "utf-8",
+			stdio: ["pipe", "pipe", "pipe"],
+		});
+		const parsed = JSON.parse(result);
+		// D1 returns results in format: [{ results: [{ count: N }] }]
+		const count = parsed?.[0]?.results?.[0]?.count ?? 0;
+		return count >= MIN_POPULATED_COUNT;
+	} catch {
+		// If query fails, assume not populated
+		return false;
+	}
+}
+
 async function populateZipCodesCatalog() {
+	// Check if explicitly skipped
+	if (process.env.SKIP_ZIP_CODES === "true") {
+		console.log("⏭️  Skipping zip codes catalog (SKIP_ZIP_CODES=true)");
+		return;
+	}
+
 	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
 	// Use WRANGLER_CONFIG if set, otherwise detect preview environment
 	let configFile = process.env.WRANGLER_CONFIG;
@@ -185,6 +222,19 @@ async function populateZipCodesCatalog() {
 		}
 	}
 	const configFlag = configFile ? `--config ${configFile}` : "";
+
+	// Check if already populated (unless forcing repopulation)
+	if (process.env.FORCE_ZIP_CODES !== "true") {
+		console.log("🔍 Checking if zip codes catalog is already populated...");
+		const isPopulated = await checkIfPopulated(isRemote, configFlag);
+		if (isPopulated) {
+			console.log(
+				`✅ Zip codes catalog already populated (>${MIN_POPULATED_COUNT.toLocaleString()} entries). Skipping.`,
+			);
+			console.log("   (Set FORCE_ZIP_CODES=true to repopulate)");
+			return;
+		}
+	}
 
 	try {
 		console.log(
