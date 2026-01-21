@@ -238,21 +238,22 @@ export class CatalogRepository {
 		const activeFilter = includeInactive ? "" : "AND active = 1";
 
 		// Use raw SQL with json_extract for efficient filtering at database level
+		// Note: column names use snake_case as defined in Prisma schema @map directives
 		const result = await this.prisma.$queryRawUnsafe<
 			Array<{
 				id: string;
-				catalogId: string;
+				catalog_id: string;
 				name: string;
-				normalizedName: string;
+				normalized_name: string;
 				active: number;
 				metadata: string | null;
-				createdAt: Date;
-				updatedAt: Date;
+				created_at: Date;
+				updated_at: Date;
 			}>
 		>(
 			`
 				SELECT * FROM catalog_items
-				WHERE catalogId = ?
+				WHERE catalog_id = ?
 					${activeFilter}
 					AND (
 						json_extract(metadata, '$.shortName') = ?
@@ -270,15 +271,16 @@ export class CatalogRepository {
 		}
 
 		const item = result[0];
+		// Map snake_case DB columns to camelCase Prisma model
 		return mapCatalogItem({
 			id: item.id,
-			catalogId: item.catalogId,
+			catalogId: item.catalog_id,
 			name: item.name,
-			normalizedName: item.normalizedName,
+			normalizedName: item.normalized_name,
 			active: Boolean(item.active),
 			metadata: item.metadata,
-			createdAt: item.createdAt,
-			updatedAt: item.updatedAt,
+			createdAt: item.created_at,
+			updatedAt: item.updated_at,
 		} as PrismaCatalogItem);
 	}
 

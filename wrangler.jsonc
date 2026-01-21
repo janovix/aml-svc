@@ -28,7 +28,7 @@
 	"r2_buckets": [
 		{
 			"binding": "R2_BUCKET",
-			"bucket_name": "sat-xml-files",
+			"bucket_name": "aml-dev",
 		},
 	],
 	"services": [
@@ -41,7 +41,11 @@
 		"producers": [
 			{
 				"binding": "ALERT_DETECTION_QUEUE",
-				"queue": "alert-detection-dev",
+				"queue": "aml-alert-detection-dev",
+			},
+			{
+				"binding": "IMPORT_PROCESSING_QUEUE",
+				"queue": "aml-imports-dev",
 			},
 		],
 	},

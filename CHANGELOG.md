@@ -1,9 +1,132 @@
+# [1.5.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.4.0...v1.5.0-rc.1) (2026-01-20)
+
+
+### Bug Fixes
+
+* update RFC uniqueness constraint in clients table and adjust Prisma model accordingly ([fdce47f](https://github.com/janovix/aml-svc/commit/fdce47ff4639173d20ee7924adf6acca12a51cbc))
+
+
+### Features
+
+* add admin routes and authentication middleware for platform admin management ([6254ca1](https://github.com/janovix/aml-svc/commit/6254ca10058dafa4b349feefdce12f4f92de8ad3))
+* add audit client and auth settings integration via service binding ([a3a1199](https://github.com/janovix/aml-svc/commit/a3a1199c8bd008c33f79011b21a55133db0a888e))
+* add internal clients and transactions routers for worker communication without auth ([8ffd26e](https://github.com/janovix/aml-svc/commit/8ffd26ebeadd8f2d1fc3561da68927f6bd8053ab))
+* add internal imports router for worker communication without auth ([3550764](https://github.com/janovix/aml-svc/commit/3550764966f7eb703d0db07bee2e94723e29928f))
+* add organization settings route for service binding access and implement internal handling ([ebf3ba7](https://github.com/janovix/aml-svc/commit/ebf3ba7728f51c173cdf674b7c0c101920d911cf))
+* add public endpoint for downloading CSV import templates and update OpenAPI specification ([b13e319](https://github.com/janovix/aml-svc/commit/b13e319711ed4c9c6959b9880da8d7f05b9d6885))
+* add SSE endpoint for real-time import updates with token verification from query parameters ([c52b5d6](https://github.com/janovix/aml-svc/commit/c52b5d6b44dbb72e889703b8910a88e8915dc82f))
+* add zip codes catalog population script and initial migration for AML core schema ([068c4d5](https://github.com/janovix/aml-svc/commit/068c4d5065f8bebd4b3b3652afecf66ac8b89439))
+* enhance error handling in internal API routes for clients, imports, and transactions ([d385e2b](https://github.com/janovix/aml-svc/commit/d385e2b2913e884e9086c68db2bcbc9fbd575841))
+* enhance Prisma client initialization with caching and timeout handling in catalog operations ([701d09a](https://github.com/janovix/aml-svc/commit/701d09a8d927c53e026db745b2296031cfd47501))
+* enhance subscription management with new middleware and client for usage tracking and feature access ([157acc2](https://github.com/janovix/aml-svc/commit/157acc20d033a20ecd6e9c4d3bbcb6ce1cd2769f))
+* implement bulk data import functionality with associated models, services, and routes ([0929ce1](https://github.com/janovix/aml-svc/commit/0929ce19f4c58cd99aa0b71282a0049c92871fd5))
+* improve error handling for unique constraint violations in client routes ([eb6bad1](https://github.com/janovix/aml-svc/commit/eb6bad1847bb6c260debd061bd74550cd5c70b24))
+
 # [1.4.0](https://github.com/janovix/aml-svc/compare/v1.3.0...v1.4.0) (2026-01-10)
 
 
 ### Features
 
 * add compatibility flags for nodejs_als in configuration files ([3cb6c19](https://github.com/janovix/aml-svc/commit/3cb6c195d01657c989334334f80b2f5e86a2b865))
+
+# [1.4.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.14...v1.4.0-rc.15) (2026-01-20)
+
+
+### Features
+
+* add zip codes catalog population script and initial migration for AML core schema ([068c4d5](https://github.com/janovix/aml-svc/commit/068c4d5065f8bebd4b3b3652afecf66ac8b89439))
+
+# [1.4.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.13...v1.4.0-rc.14) (2026-01-19)
+
+
+### Features
+
+* improve error handling for unique constraint violations in client routes ([eb6bad1](https://github.com/janovix/aml-svc/commit/eb6bad1847bb6c260debd061bd74550cd5c70b24))
+
+# [1.4.0-rc.13](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.12...v1.4.0-rc.13) (2026-01-19)
+
+
+### Features
+
+* enhance Prisma client initialization with caching and timeout handling in catalog operations ([701d09a](https://github.com/janovix/aml-svc/commit/701d09a8d927c53e026db745b2296031cfd47501))
+
+# [1.4.0-rc.12](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.11...v1.4.0-rc.12) (2026-01-18)
+
+
+### Features
+
+* enhance error handling in internal API routes for clients, imports, and transactions ([d385e2b](https://github.com/janovix/aml-svc/commit/d385e2b2913e884e9086c68db2bcbc9fbd575841))
+
+# [1.4.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.10...v1.4.0-rc.11) (2026-01-18)
+
+
+### Bug Fixes
+
+* update RFC uniqueness constraint in clients table and adjust Prisma model accordingly ([fdce47f](https://github.com/janovix/aml-svc/commit/fdce47ff4639173d20ee7924adf6acca12a51cbc))
+
+# [1.4.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.9...v1.4.0-rc.10) (2026-01-18)
+
+
+### Features
+
+* add internal clients and transactions routers for worker communication without auth ([8ffd26e](https://github.com/janovix/aml-svc/commit/8ffd26ebeadd8f2d1fc3561da68927f6bd8053ab))
+
+# [1.4.0-rc.9](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.8...v1.4.0-rc.9) (2026-01-18)
+
+
+### Features
+
+* add internal imports router for worker communication without auth ([3550764](https://github.com/janovix/aml-svc/commit/3550764966f7eb703d0db07bee2e94723e29928f))
+
+# [1.4.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.7...v1.4.0-rc.8) (2026-01-18)
+
+
+### Features
+
+* add SSE endpoint for real-time import updates with token verification from query parameters ([c52b5d6](https://github.com/janovix/aml-svc/commit/c52b5d6b44dbb72e889703b8910a88e8915dc82f))
+
+# [1.4.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.6...v1.4.0-rc.7) (2026-01-17)
+
+
+### Features
+
+* add public endpoint for downloading CSV import templates and update OpenAPI specification ([b13e319](https://github.com/janovix/aml-svc/commit/b13e319711ed4c9c6959b9880da8d7f05b9d6885))
+
+# [1.4.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.5...v1.4.0-rc.6) (2026-01-17)
+
+
+### Features
+
+* implement bulk data import functionality with associated models, services, and routes ([0929ce1](https://github.com/janovix/aml-svc/commit/0929ce19f4c58cd99aa0b71282a0049c92871fd5))
+
+# [1.4.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.4...v1.4.0-rc.5) (2026-01-12)
+
+
+### Features
+
+* add admin routes and authentication middleware for platform admin management ([6254ca1](https://github.com/janovix/aml-svc/commit/6254ca10058dafa4b349feefdce12f4f92de8ad3))
+
+# [1.4.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.3...v1.4.0-rc.4) (2026-01-12)
+
+
+### Features
+
+* enhance subscription management with new middleware and client for usage tracking and feature access ([157acc2](https://github.com/janovix/aml-svc/commit/157acc20d033a20ecd6e9c4d3bbcb6ce1cd2769f))
+
+# [1.4.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.2...v1.4.0-rc.3) (2026-01-11)
+
+
+### Features
+
+* add organization settings route for service binding access and implement internal handling ([ebf3ba7](https://github.com/janovix/aml-svc/commit/ebf3ba7728f51c173cdf674b7c0c101920d911cf))
+
+# [1.4.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.4.0-rc.1...v1.4.0-rc.2) (2026-01-11)
+
+
+### Features
+
+* add audit client and auth settings integration via service binding ([a3a1199](https://github.com/janovix/aml-svc/commit/a3a1199c8bd008c33f79011b21a55133db0a888e))
+
 
 # [1.4.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.3.0...v1.4.0-rc.1) (2026-01-10)
 

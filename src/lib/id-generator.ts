@@ -33,6 +33,8 @@ export const ID_PREFIXES = {
 	ORGANIZATION_SETTINGS: "ORG",
 	REPORT: "RPT",
 	NOTICE: "NTC",
+	IMPORT: "IMP",
+	IMPORT_ROW_RESULT: "IRR",
 } as const;
 
 export type EntityType = keyof typeof ID_PREFIXES;

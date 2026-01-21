@@ -20,6 +20,7 @@ import { createAlertQueueService } from "../lib/alert-queue";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import { createSubscriptionClient } from "../lib/subscription-client";
 
 export const transactionsRouter = new Hono<{
 	Bindings: Bindings;
@@ -145,6 +146,15 @@ transactionsRouter.post("/", async (c) => {
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 	await alertQueue.queueTransactionCreated(created.clientId, created.id);
 
+	// Report transaction usage to auth-svc for metered billing
+	// Fire-and-forget - don't fail transaction creation if billing fails
+	const subscriptionClient = createSubscriptionClient(c.env);
+	subscriptionClient
+		.reportUsage(organizationId, "transactions", 1)
+		.catch((err) => {
+			console.error("Failed to report transaction usage:", err);
+		});
+
 	return c.json(created, 201);
 });
 
@@ -170,4 +180,120 @@ transactionsRouter.delete("/:id", async (c) => {
 	await service.delete(organizationId, params.id).catch(handleServiceError);
 
 	return c.body(null, 204);
+});
+
+// ============================================================================
+// Internal router (for worker communication - no auth required)
+// ============================================================================
+
+/**
+ * Internal transactions router (no auth required)
+ * These endpoints are called by the aml-import-worker via service binding
+ */
+export const transactionsInternalRouter = new Hono<{
+	Bindings: Bindings;
+}>();
+
+function getInternalService(c: Context<{ Bindings: Bindings }>) {
+	const prisma = getPrismaClient(c.env.DB);
+	const umaRepository = new UmaValueRepository(prisma);
+	const catalogRepository = new CatalogRepository(prisma);
+	const catalogEnrichmentService = new CatalogEnrichmentService(
+		catalogRepository,
+	);
+	const transactionRepository = new TransactionRepository(
+		prisma,
+		umaRepository,
+		catalogEnrichmentService,
+	);
+	const clientRepository = new ClientRepository(prisma);
+	return new TransactionService(
+		transactionRepository,
+		clientRepository,
+		umaRepository,
+	);
+}
+
+/**
+ * Format error for internal API responses
+ * Ensures error messages are always properly propagated
+ */
+function formatInternalError(error: unknown): {
+	message: string;
+	details?: unknown;
+} {
+	if (error instanceof APIError) {
+		return { message: error.message, details: error.details };
+	}
+
+	if (error instanceof Error) {
+		// Check for Prisma unique constraint violation
+		if (error.message.includes("UNIQUE constraint failed")) {
+			const match = error.message.match(/UNIQUE constraint failed: \w+\.(\w+)/);
+			const field = match ? match[1] : "field";
+			return {
+				message: `Duplicate value: A record with this ${field} already exists`,
+				details: { constraint: "unique", field },
+			};
+		}
+
+		// Check for foreign key constraint errors
+		if (error.message.includes("Foreign key constraint failed")) {
+			return {
+				message: "Referenced record not found (client may not exist)",
+				details: { constraint: "foreign_key" },
+			};
+		}
+
+		// Check for client not found error
+		if (error.message.includes("CLIENT_NOT_FOUND")) {
+			return {
+				message: "Client not found with the provided clientId",
+				details: { code: "CLIENT_NOT_FOUND" },
+			};
+		}
+
+		return { message: error.message };
+	}
+
+	return { message: "Unknown error occurred" };
+}
+
+/**
+ * POST /internal/transactions
+ * Create a transaction (internal, called by worker)
+ */
+transactionsInternalRouter.post("/", async (c) => {
+	const organizationId = c.req.header("X-Organization-Id");
+	if (!organizationId) {
+		return c.json(
+			{ error: "Bad Request", message: "Missing X-Organization-Id header" },
+			400,
+		);
+	}
+
+	try {
+		const body = await c.req.json();
+		const payload = parseWithZod(TransactionCreateSchema, body);
+
+		const service = getInternalService(c);
+		const created = await service.create(payload, organizationId);
+
+		// Queue alert detection job for new transaction
+		const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
+		await alertQueue.queueTransactionCreated(created.clientId, created.id);
+
+		return c.json(created, 201);
+	} catch (error) {
+		console.error("[InternalTransactions] POST error:", error);
+		const { message, details } = formatInternalError(error);
+
+		// Return 404 for client not found
+		if (error instanceof Error && error.message.includes("CLIENT_NOT_FOUND")) {
+			return c.json({ error: "Not Found", message, details }, 404);
+		}
+
+		const status = error instanceof APIError ? error.statusCode : 500;
+		return c.json({ error: "Error", message, details }, status as 400);
+	}
 });

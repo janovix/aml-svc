@@ -60,7 +60,7 @@ function generateSql() {
 UPDATE uma_values SET active = 0 WHERE active = 1 AND id != ${id};
 
 -- Insert or replace UMA value for 2025
-INSERT OR REPLACE INTO uma_values (id, year, dailyValue, effectiveDate, endDate, notes, active, createdAt, updatedAt)
+INSERT OR REPLACE INTO uma_values (id, year, daily_value, effective_date, end_date, notes, active, created_at, updated_at)
 VALUES (
 	${id},
 	${year},
@@ -69,7 +69,7 @@ VALUES (
 	${endDate},
 	${notes},
 	${active},
-	COALESCE((SELECT createdAt FROM uma_values WHERE id = ${id}), CURRENT_TIMESTAMP),
+	COALESCE((SELECT created_at FROM uma_values WHERE id = ${id}), CURRENT_TIMESTAMP),
 	CURRENT_TIMESTAMP
 );
 `;

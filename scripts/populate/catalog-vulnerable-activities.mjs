@@ -82,7 +82,7 @@ function generateSql(catalogId, items) {
 
 	// Insert catalog if it doesn't exist
 	sql.push(`
-		INSERT OR IGNORE INTO catalogs (id, key, name, active, createdAt, updatedAt)
+		INSERT OR IGNORE INTO catalogs (id, key, name, active, created_at, updated_at)
 		VALUES ('${catalogId}', '${CATALOG_KEY}', 'Actividades Vulnerables', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 	`);
 
@@ -106,7 +106,7 @@ function generateSql(catalogId, items) {
 		const itemId = generateDeterministicId(catalogId, normalizedName);
 
 		sql.push(`
-			INSERT OR REPLACE INTO catalog_items (id, catalogId, name, normalizedName, active, metadata, createdAt, updatedAt)
+			INSERT OR REPLACE INTO catalog_items (id, catalog_id, name, normalized_name, active, metadata, created_at, updated_at)
 			VALUES (
 				'${itemId}',
 				'${catalogId}',
@@ -114,7 +114,7 @@ function generateSql(catalogId, items) {
 				'${normalizedName}',
 				1,
 				'${metadata}',
-				COALESCE((SELECT createdAt FROM catalog_items WHERE id = '${itemId}'), CURRENT_TIMESTAMP),
+				COALESCE((SELECT created_at FROM catalog_items WHERE id = '${itemId}'), CURRENT_TIMESTAMP),
 				CURRENT_TIMESTAMP
 			);
 		`);

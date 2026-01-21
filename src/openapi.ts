@@ -23,6 +23,11 @@ export const openAPISpec = {
 			description: "Health check endpoints",
 		},
 		{
+			name: "Admin",
+			description:
+				"Platform admin endpoints for cross-organization monitoring (requires admin role)",
+		},
+		{
 			name: "Clients",
 			description: "Client KYC data management endpoints",
 		},
@@ -61,6 +66,11 @@ export const openAPISpec = {
 			name: "Notices",
 			description:
 				"SAT notice management endpoints for generating and submitting XML reports to SAT (17-17 monthly cycle)",
+		},
+		{
+			name: "Imports",
+			description:
+				"Bulk data import endpoints for uploading CSV/Excel files to import clients and transactions",
 		},
 	],
 	paths: {
@@ -1381,6 +1391,242 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/alert-rules/{id}/config": {
+			get: {
+				tags: ["Alert Rules"],
+				summary: "List alert rule configs",
+				description: "Retrieve all configuration values for an alert rule",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert rule identifier",
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of alert rule configs",
+						content: {
+							"application/json": {
+								schema: {
+									type: "array",
+									items: { $ref: "#/components/schemas/AlertRuleConfig" },
+								},
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Alert Rules"],
+				summary: "Create alert rule config",
+				description: "Create a new configuration value for an alert rule",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert rule identifier",
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								$ref: "#/components/schemas/AlertRuleConfigCreateRequest",
+							},
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Alert rule config created successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRuleConfig" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/alert-rules/{id}/config/{key}": {
+			get: {
+				tags: ["Alert Rules"],
+				summary: "Get alert rule config by key",
+				description:
+					"Retrieve a specific configuration value for an alert rule",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert rule identifier",
+					},
+					{
+						name: "key",
+						in: "path",
+						required: true,
+						schema: { type: "string", minLength: 1, maxLength: 100 },
+						description: "Configuration key",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Alert rule config",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRuleConfig" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule config not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["Alert Rules"],
+				summary: "Update alert rule config",
+				description: "Update a configuration value for an alert rule",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert rule identifier",
+					},
+					{
+						name: "key",
+						in: "path",
+						required: true,
+						schema: { type: "string", minLength: 1, maxLength: 100 },
+						description: "Configuration key",
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								$ref: "#/components/schemas/AlertRuleConfigUpdateRequest",
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alert rule config updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertRuleConfig" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"403": {
+						description: "Cannot modify hardcoded config value",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule config not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["Alert Rules"],
+				summary: "Delete alert rule config",
+				description: "Delete a configuration value for an alert rule",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Alert rule identifier",
+					},
+					{
+						name: "key",
+						in: "path",
+						required: true,
+						schema: { type: "string", minLength: 1, maxLength: 100 },
+						description: "Configuration key",
+					},
+				],
+				responses: {
+					"204": {
+						description: "Alert rule config deleted",
+					},
+					"403": {
+						description: "Cannot delete hardcoded config value",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "Alert rule config not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
 		"/api/v1/alerts": {
 			get: {
 				tags: ["Alerts"],
@@ -2218,6 +2464,203 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/reports/templates": {
+			get: {
+				tags: ["Reports"],
+				summary: "List available report templates",
+				description:
+					"Retrieve all available report templates with their configurations",
+				responses: {
+					"200": {
+						description: "List of report templates",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										templates: {
+											type: "array",
+											items: {
+												$ref: "#/components/schemas/ReportTemplateConfig",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/aggregate/summary": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get executive summary aggregation",
+				description:
+					"Get aggregated metrics for alerts, transactions, and clients for a given period",
+				parameters: [
+					{
+						name: "periodStart",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "Start of the period",
+					},
+					{
+						name: "periodEnd",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "End of the period",
+					},
+					{
+						name: "comparisonPeriodStart",
+						in: "query",
+						schema: { type: "string", format: "date-time" },
+						description: "Start of comparison period (optional)",
+					},
+					{
+						name: "comparisonPeriodEnd",
+						in: "query",
+						schema: { type: "string", format: "date-time" },
+						description: "End of comparison period (optional)",
+					},
+					{
+						name: "clientId",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by client ID (optional)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Aggregated summary data",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/ReportAggregation" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/aggregate/alerts": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get alert metrics aggregation",
+				description: "Get aggregated alert metrics for a given period",
+				parameters: [
+					{
+						name: "periodStart",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "Start of the period",
+					},
+					{
+						name: "periodEnd",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "End of the period",
+					},
+					{
+						name: "clientId",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by client ID (optional)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Aggregated alert metrics",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/AlertAggregation" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/aggregate/transactions": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get transaction metrics aggregation",
+				description: "Get aggregated transaction metrics for a given period",
+				parameters: [
+					{
+						name: "periodStart",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "Start of the period",
+					},
+					{
+						name: "periodEnd",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "End of the period",
+					},
+					{
+						name: "clientId",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by client ID (optional)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Aggregated transaction metrics",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/TransactionAggregation" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/aggregate/clients": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get client metrics aggregation",
+				description: "Get aggregated client metrics for a given period",
+				parameters: [
+					{
+						name: "periodStart",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "Start of the period",
+					},
+					{
+						name: "periodEnd",
+						in: "query",
+						required: true,
+						schema: { type: "string", format: "date-time" },
+						description: "End of the period",
+					},
+					{
+						name: "clientId",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by client ID (optional)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Aggregated client metrics",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/ClientAggregation" },
+							},
+						},
+					},
+				},
+			},
+		},
 		"/api/v1/reports/{id}": {
 			get: {
 				tags: ["Reports"],
@@ -2365,6 +2808,41 @@ export const openAPISpec = {
 										fileUrl: { type: "string" },
 									},
 								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/reports/{id}/aggregation": {
+			get: {
+				tags: ["Reports"],
+				summary: "Get aggregation data for a report",
+				description:
+					"Get aggregated metrics for a specific report's period and filters",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Report identifier",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Aggregated data for the report",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/ReportAggregation" },
+							},
+						},
+					},
+					"404": {
+						description: "Report not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
 							},
 						},
 					},
@@ -2859,6 +3337,301 @@ export const openAPISpec = {
 					},
 					"400": {
 						description: "Notice must be submitted before acknowledgment",
+					},
+				},
+			},
+		},
+		"/api/v1/imports": {
+			get: {
+				tags: ["Imports"],
+				summary: "List imports",
+				description: "Returns a paginated list of imports for the organization",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+					},
+					{
+						name: "status",
+						in: "query",
+						schema: { $ref: "#/components/schemas/ImportStatus" },
+					},
+					{
+						name: "entityType",
+						in: "query",
+						schema: { $ref: "#/components/schemas/ImportEntityType" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of imports",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									required: ["data", "total", "page", "limit", "totalPages"],
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/Import" },
+										},
+										total: { type: "integer" },
+										page: { type: "integer" },
+										limit: { type: "integer" },
+										totalPages: { type: "integer" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Imports"],
+				summary: "Create import",
+				description:
+					"Upload a CSV or Excel file to create a new import job. The file will be processed asynchronously.",
+				requestBody: {
+					required: true,
+					content: {
+						"multipart/form-data": {
+							schema: {
+								type: "object",
+								required: ["file", "entityType"],
+								properties: {
+									file: {
+										type: "string",
+										format: "binary",
+										description:
+											"CSV or Excel file (.csv, .xls, .xlsx). Maximum 50MB.",
+									},
+									entityType: {
+										type: "string",
+										enum: ["CLIENT", "TRANSACTION"],
+										description: "Type of entities in the file",
+									},
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Import created and queued for processing",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										success: { type: "boolean", example: true },
+										data: { $ref: "#/components/schemas/Import" },
+									},
+								},
+							},
+						},
+					},
+					"400": {
+						description: "Invalid file type or missing required fields",
+					},
+				},
+			},
+		},
+		"/api/v1/imports/templates/{entityType}": {
+			get: {
+				tags: ["Imports"],
+				summary: "Download import template",
+				description:
+					"Download a CSV template with example data for the specified entity type. This endpoint is public and does not require authentication.",
+				security: [], // Public endpoint - no auth required
+				parameters: [
+					{
+						name: "entityType",
+						in: "path",
+						required: true,
+						schema: {
+							type: "string",
+							enum: ["client", "transaction"],
+						},
+						description: "Entity type (case-insensitive)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "CSV template file",
+						content: {
+							"text/csv": {
+								schema: {
+									type: "string",
+									format: "binary",
+								},
+							},
+						},
+					},
+					"400": {
+						description: "Invalid entity type",
+					},
+				},
+			},
+		},
+		"/api/v1/imports/{id}": {
+			get: {
+				tags: ["Imports"],
+				summary: "Get import details",
+				description: "Returns import details including paginated row results",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "rowPage",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+						description: "Page number for row results",
+					},
+					{
+						name: "rowLimit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+						description: "Number of row results per page",
+					},
+					{
+						name: "rowStatus",
+						in: "query",
+						schema: { $ref: "#/components/schemas/ImportRowStatus" },
+						description: "Filter row results by status",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Import details with row results",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/ImportWithRows" },
+							},
+						},
+					},
+					"404": {
+						description: "Import not found",
+					},
+				},
+			},
+			delete: {
+				tags: ["Imports"],
+				summary: "Delete import",
+				description: "Delete an import and all its row results",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": {
+						description: "Import deleted",
+					},
+					"404": {
+						description: "Import not found",
+					},
+				},
+			},
+		},
+		"/api/v1/imports/{id}/rows": {
+			get: {
+				tags: ["Imports"],
+				summary: "Get import row results",
+				description: "Returns paginated row results for an import",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+					},
+					{
+						name: "status",
+						in: "query",
+						schema: { $ref: "#/components/schemas/ImportRowStatus" },
+						description: "Filter by row status",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Paginated row results",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									required: ["data", "total", "page", "limit", "totalPages"],
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/ImportRowResult" },
+										},
+										total: { type: "integer" },
+										page: { type: "integer" },
+										limit: { type: "integer" },
+										totalPages: { type: "integer" },
+									},
+								},
+							},
+						},
+					},
+					"404": {
+						description: "Import not found",
+					},
+				},
+			},
+		},
+		"/api/v1/imports/{id}/events": {
+			get: {
+				tags: ["Imports"],
+				summary: "Subscribe to import events (SSE)",
+				description:
+					"Server-Sent Events stream for real-time import progress updates. Events include: connected, row_update, status_change, completed, ping.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "SSE stream",
+						content: {
+							"text/event-stream": {
+								schema: {
+									type: "string",
+									description:
+										"Server-Sent Events stream with import progress updates",
+								},
+							},
+						},
+					},
+					"404": {
+						description: "Import not found",
 					},
 				},
 			},
@@ -4807,6 +5580,397 @@ export const openAPISpec = {
 					displayName: { type: "string" },
 					submissionDeadline: { type: "string", format: "date-time" },
 				},
+			},
+			ReportTemplateConfig: {
+				type: "object",
+				required: [
+					"template",
+					"name",
+					"description",
+					"dataSources",
+					"defaultCharts",
+					"requiresClientId",
+				],
+				properties: {
+					template: {
+						type: "string",
+						enum: [
+							"EXECUTIVE_SUMMARY",
+							"COMPLIANCE_STATUS",
+							"TRANSACTION_ANALYSIS",
+							"CLIENT_RISK_PROFILE",
+							"ALERT_BREAKDOWN",
+							"PERIOD_COMPARISON",
+							"CUSTOM",
+						],
+					},
+					name: { type: "string" },
+					description: { type: "string" },
+					dataSources: {
+						type: "array",
+						items: {
+							type: "string",
+							enum: ["ALERTS", "TRANSACTIONS", "CLIENTS"],
+						},
+					},
+					defaultCharts: {
+						type: "array",
+						items: { $ref: "#/components/schemas/ReportChartConfig" },
+					},
+					requiresClientId: { type: "boolean" },
+				},
+			},
+			ReportChartConfig: {
+				type: "object",
+				required: ["type", "title", "dataKey"],
+				properties: {
+					type: {
+						type: "string",
+						enum: ["PIE", "BAR", "LINE", "DONUT", "STACKED_BAR"],
+					},
+					title: { type: "string", minLength: 1, maxLength: 100 },
+					dataKey: { type: "string", minLength: 1, maxLength: 50 },
+					showLegend: { type: "boolean", default: true },
+				},
+			},
+			AlertAggregation: {
+				type: "object",
+				required: [
+					"total",
+					"bySeverity",
+					"byStatus",
+					"byRule",
+					"byMonth",
+					"avgResolutionDays",
+					"overdueCount",
+				],
+				properties: {
+					total: { type: "integer" },
+					bySeverity: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					byStatus: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					byRule: {
+						type: "array",
+						items: {
+							type: "object",
+							required: ["ruleId", "ruleName", "count"],
+							properties: {
+								ruleId: { type: "string" },
+								ruleName: { type: "string" },
+								count: { type: "integer" },
+							},
+						},
+					},
+					byMonth: {
+						type: "array",
+						items: {
+							type: "object",
+							required: ["month", "count"],
+							properties: {
+								month: { type: "string" },
+								count: { type: "integer" },
+							},
+						},
+					},
+					avgResolutionDays: { type: "number" },
+					overdueCount: { type: "integer" },
+				},
+			},
+			TransactionAggregation: {
+				type: "object",
+				required: [
+					"total",
+					"totalAmount",
+					"avgAmount",
+					"byOperationType",
+					"byVehicleType",
+					"byCurrency",
+					"byMonth",
+					"topClients",
+				],
+				properties: {
+					total: { type: "integer" },
+					totalAmount: { type: "number" },
+					avgAmount: { type: "number" },
+					byOperationType: {
+						type: "object",
+						additionalProperties: {
+							type: "object",
+							required: ["count", "amount"],
+							properties: {
+								count: { type: "integer" },
+								amount: { type: "number" },
+							},
+						},
+					},
+					byVehicleType: {
+						type: "object",
+						additionalProperties: {
+							type: "object",
+							required: ["count", "amount"],
+							properties: {
+								count: { type: "integer" },
+								amount: { type: "number" },
+							},
+						},
+					},
+					byCurrency: {
+						type: "object",
+						additionalProperties: {
+							type: "object",
+							required: ["count", "amount"],
+							properties: {
+								count: { type: "integer" },
+								amount: { type: "number" },
+							},
+						},
+					},
+					byMonth: {
+						type: "array",
+						items: {
+							type: "object",
+							required: ["month", "count", "amount"],
+							properties: {
+								month: { type: "string" },
+								count: { type: "integer" },
+								amount: { type: "number" },
+							},
+						},
+					},
+					topClients: {
+						type: "array",
+						items: {
+							type: "object",
+							required: ["clientId", "clientName", "count", "amount"],
+							properties: {
+								clientId: { type: "string" },
+								clientName: { type: "string" },
+								count: { type: "integer" },
+								amount: { type: "number" },
+							},
+						},
+					},
+				},
+			},
+			ClientAggregation: {
+				type: "object",
+				required: [
+					"total",
+					"byPersonType",
+					"byCountry",
+					"withAlerts",
+					"newInPeriod",
+				],
+				properties: {
+					total: { type: "integer" },
+					byPersonType: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					byCountry: {
+						type: "object",
+						additionalProperties: { type: "integer" },
+					},
+					withAlerts: { type: "integer" },
+					newInPeriod: { type: "integer" },
+				},
+			},
+			ComparisonMetrics: {
+				type: "object",
+				properties: {
+					alertsChange: { type: "number", description: "Percentage change" },
+					transactionsChange: {
+						type: "number",
+						description: "Percentage change",
+					},
+					amountChange: { type: "number", description: "Percentage change" },
+					clientsChange: { type: "number", description: "Percentage change" },
+				},
+			},
+			RiskIndicators: {
+				type: "object",
+				required: [
+					"highRiskClients",
+					"criticalAlerts",
+					"overdueSubmissions",
+					"complianceScore",
+				],
+				properties: {
+					highRiskClients: { type: "integer" },
+					criticalAlerts: { type: "integer" },
+					overdueSubmissions: { type: "integer" },
+					complianceScore: { type: "number", minimum: 0, maximum: 100 },
+				},
+			},
+			ReportAggregation: {
+				type: "object",
+				required: ["alerts", "transactions", "clients", "riskIndicators"],
+				properties: {
+					alerts: { $ref: "#/components/schemas/AlertAggregation" },
+					transactions: { $ref: "#/components/schemas/TransactionAggregation" },
+					clients: { $ref: "#/components/schemas/ClientAggregation" },
+					comparison: { $ref: "#/components/schemas/ComparisonMetrics" },
+					riskIndicators: { $ref: "#/components/schemas/RiskIndicators" },
+				},
+			},
+			ImportStatus: {
+				type: "string",
+				enum: ["PENDING", "VALIDATING", "PROCESSING", "COMPLETED", "FAILED"],
+				description: "Current status of the import job",
+			},
+			ImportEntityType: {
+				type: "string",
+				enum: ["CLIENT", "TRANSACTION"],
+				description: "Type of entities being imported",
+			},
+			ImportRowStatus: {
+				type: "string",
+				enum: ["PENDING", "SUCCESS", "WARNING", "ERROR", "SKIPPED"],
+				description: "Status of an individual row in the import",
+			},
+			Import: {
+				type: "object",
+				required: [
+					"id",
+					"organizationId",
+					"entityType",
+					"fileName",
+					"fileUrl",
+					"fileSize",
+					"status",
+					"totalRows",
+					"processedRows",
+					"successCount",
+					"warningCount",
+					"errorCount",
+					"createdBy",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: { type: "string", description: "Unique import identifier" },
+					organizationId: { type: "string" },
+					entityType: { $ref: "#/components/schemas/ImportEntityType" },
+					fileName: { type: "string", description: "Original file name" },
+					fileUrl: { type: "string", description: "R2 storage key" },
+					fileSize: { type: "integer", description: "File size in bytes" },
+					status: { $ref: "#/components/schemas/ImportStatus" },
+					totalRows: {
+						type: "integer",
+						description: "Total number of data rows in the file",
+					},
+					processedRows: {
+						type: "integer",
+						description: "Number of rows processed so far",
+					},
+					successCount: {
+						type: "integer",
+						description: "Number of rows successfully imported",
+					},
+					warningCount: {
+						type: "integer",
+						description: "Number of rows imported with warnings",
+					},
+					errorCount: {
+						type: "integer",
+						description: "Number of rows that failed to import",
+					},
+					errorMessage: {
+						type: "string",
+						nullable: true,
+						description: "Error message if the import failed",
+					},
+					createdBy: {
+						type: "string",
+						description: "User ID who initiated the import",
+					},
+					startedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When processing started",
+					},
+					completedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When processing completed",
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			ImportRowResult: {
+				type: "object",
+				required: [
+					"id",
+					"importId",
+					"rowNumber",
+					"status",
+					"rawData",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: { type: "string" },
+					importId: { type: "string" },
+					rowNumber: {
+						type: "integer",
+						description: "1-based row number in the source file",
+					},
+					status: { $ref: "#/components/schemas/ImportRowStatus" },
+					rawData: {
+						type: "string",
+						description: "JSON string of the original row data",
+					},
+					entityId: {
+						type: "string",
+						nullable: true,
+						description: "ID of the created entity (client or transaction)",
+					},
+					message: {
+						type: "string",
+						nullable: true,
+						description: "Success or warning message",
+					},
+					errors: {
+						type: "string",
+						nullable: true,
+						description: "JSON string of validation errors",
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			ImportWithRows: {
+				allOf: [
+					{ $ref: "#/components/schemas/Import" },
+					{
+						type: "object",
+						required: ["rowResults"],
+						properties: {
+							rowResults: {
+								type: "object",
+								required: ["data", "total", "page", "limit", "totalPages"],
+								properties: {
+									data: {
+										type: "array",
+										items: { $ref: "#/components/schemas/ImportRowResult" },
+									},
+									total: { type: "integer" },
+									page: { type: "integer" },
+									limit: { type: "integer" },
+									totalPages: { type: "integer" },
+								},
+							},
+						},
+					},
+				],
 			},
 		},
 	},

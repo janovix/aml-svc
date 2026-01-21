@@ -11,6 +11,12 @@ export default defineWorkersConfig({
 	esbuild: {
 		target: "esnext",
 	},
+	// Required for zod which fails to import in Workers runtime on Windows
+	// See: https://developers.cloudflare.com/workers/testing/vitest-integration/known-issues/#module-resolution
+	ssr: {
+		// Force Vite to bundle zod instead of externalizing it
+		noExternal: ["zod"],
+	},
 	test: {
 		coverage: {
 			provider: "istanbul",

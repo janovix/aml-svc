@@ -81,7 +81,7 @@ async function seedOrganizationSettings() {
 		// Build SQL insert statements
 		const sqlStatements = organizationSettings.map((settings) => {
 			const id = `lower(hex(randomblob(16)))`;
-			return `INSERT OR IGNORE INTO organization_settings (id, organizationId, obligatedSubjectKey, activityKey, createdAt, updatedAt)
+			return `INSERT OR IGNORE INTO organization_settings (id, organization_id, obligated_subject_key, activity_key, created_at, updated_at)
 VALUES (${id}, '${settings.organizationId}', '${settings.obligatedSubjectKey}', '${settings.activityKey}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`;
 		});
 

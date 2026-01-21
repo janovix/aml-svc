@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { ZodError } from "zod";
+import { Prisma } from "@prisma/client";
 
 import {
 	AddressIdParamSchema,
@@ -53,7 +54,55 @@ function getService(
 }
 
 function handleServiceError(error: unknown): never {
+	// Handle Prisma unique constraint violations
+	if (error instanceof Prisma.PrismaClientKnownRequestError) {
+		if (error.code === "P2002") {
+			// Unique constraint failed
+			const target = error.meta?.target;
+			// Check if it's the RFC unique constraint
+			if (
+				Array.isArray(target) &&
+				target.includes("organization_id") &&
+				target.includes("rfc")
+			) {
+				throw new APIError(
+					409,
+					"Ya existe un cliente con este RFC en la organización",
+					{
+						code: "DUPLICATE_RFC",
+						field: "rfc",
+					},
+				);
+			}
+			// Generic unique constraint message
+			throw new APIError(409, "A record with this value already exists", {
+				code: "DUPLICATE_VALUE",
+				target,
+			});
+		}
+	}
+
 	if (error instanceof Error) {
+		// Handle UNIQUE constraint failed from D1/SQLite (alternative error format)
+		if (
+			error.message.includes("UNIQUE constraint failed") ||
+			error.message.includes("Unique constraint failed")
+		) {
+			if (error.message.includes("rfc")) {
+				throw new APIError(
+					409,
+					"Ya existe un cliente con este RFC en la organización",
+					{
+						code: "DUPLICATE_RFC",
+						field: "rfc",
+					},
+				);
+			}
+			throw new APIError(409, "A record with this value already exists", {
+				code: "DUPLICATE_VALUE",
+			});
+		}
+
 		if (error.message === "CLIENT_NOT_FOUND") {
 			throw new APIError(404, "Client not found");
 		}
@@ -286,4 +335,132 @@ clientsRouter.delete("/:clientId/addresses/:addressId", async (c) => {
 		.deleteAddress(organizationId, params.clientId, params.addressId)
 		.catch(handleServiceError);
 	return c.body(null, 204);
+});
+
+// ============================================================================
+// Internal router (for worker communication - no auth required)
+// ============================================================================
+
+/**
+ * Internal clients router (no auth required)
+ * These endpoints are called by the aml-import-worker via service binding
+ */
+export const clientsInternalRouter = new Hono<{
+	Bindings: Bindings;
+}>();
+
+function getInternalService(c: Context<{ Bindings: Bindings }>) {
+	const prisma = getPrismaClient(c.env.DB);
+	const repository = new ClientRepository(prisma);
+	return new ClientService(repository);
+}
+
+/**
+ * Format error for internal API responses
+ * Ensures error messages are always properly propagated
+ */
+function formatInternalError(error: unknown): {
+	message: string;
+	details?: unknown;
+} {
+	if (error instanceof APIError) {
+		return { message: error.message, details: error.details };
+	}
+
+	if (error instanceof Error) {
+		// Check for Prisma unique constraint violation
+		if (error.message.includes("UNIQUE constraint failed")) {
+			// Extract field name from error message if possible
+			const match = error.message.match(/UNIQUE constraint failed: \w+\.(\w+)/);
+			const field = match ? match[1] : "field";
+			return {
+				message: `Duplicate value: A record with this ${field} already exists`,
+				details: { constraint: "unique", field },
+			};
+		}
+
+		// Check for other common Prisma errors
+		if (error.message.includes("Foreign key constraint failed")) {
+			return {
+				message: "Referenced record not found",
+				details: { constraint: "foreign_key" },
+			};
+		}
+
+		return { message: error.message };
+	}
+
+	return { message: "Unknown error occurred" };
+}
+
+/**
+ * GET /internal/clients
+ * List/search clients (internal, called by worker)
+ */
+clientsInternalRouter.get("/", async (c) => {
+	const organizationId = c.req.header("X-Organization-Id");
+	if (!organizationId) {
+		return c.json(
+			{ error: "Bad Request", message: "Missing X-Organization-Id header" },
+			400,
+		);
+	}
+
+	try {
+		const url = new URL(c.req.url);
+		const queryObject = Object.fromEntries(url.searchParams.entries());
+		const filters = parseWithZod(ClientFilterSchema, queryObject);
+
+		const service = getInternalService(c);
+		const result = await service.list(organizationId, filters);
+
+		return c.json(result);
+	} catch (error) {
+		console.error("[InternalClients] GET error:", error);
+		const { message, details } = formatInternalError(error);
+		const status = error instanceof APIError ? error.statusCode : 500;
+		return c.json({ error: "Error", message, details }, status as 400);
+	}
+});
+
+/**
+ * POST /internal/clients
+ * Create a client (internal, called by worker)
+ */
+clientsInternalRouter.post("/", async (c) => {
+	const organizationId = c.req.header("X-Organization-Id");
+	if (!organizationId) {
+		return c.json(
+			{ error: "Bad Request", message: "Missing X-Organization-Id header" },
+			400,
+		);
+	}
+
+	try {
+		const body = await c.req.json();
+		const payload = parseWithZod(ClientCreateSchema, body);
+
+		const service = getInternalService(c);
+		const created = await service.create(organizationId, payload);
+
+		// Queue alert detection job for new client
+		const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
+		await alertQueue.queueClientCreated(created.id);
+
+		return c.json(created, 201);
+	} catch (error) {
+		console.error("[InternalClients] POST error:", error);
+		const { message, details } = formatInternalError(error);
+
+		// Return 409 for duplicate key errors
+		if (
+			error instanceof Error &&
+			error.message.includes("UNIQUE constraint failed")
+		) {
+			return c.json({ error: "Conflict", message, details }, 409);
+		}
+
+		const status = error instanceof APIError ? error.statusCode : 500;
+		return c.json({ error: "Error", message, details }, status as 400);
+	}
 });
