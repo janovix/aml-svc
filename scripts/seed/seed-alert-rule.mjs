@@ -463,23 +463,6 @@ const alertRules = [
 			legalBasis: "LFPIORPI",
 		},
 	},
-	{
-		id: "AUTO_NEW_CLIENT_HIGH",
-		name: "Cliente sin historial adquiriendo vehículo de muy alto valor",
-		description:
-			"Cliente sin historial previo que adquiere un vehículo de muy alto valor, indicando posible riesgo de lavado de activos.",
-		active: true,
-		severity: "HIGH",
-		ruleType: "new_client_high_value", // Has seeker
-		isManualOnly: false,
-		activityCode: "VEH",
-		metadata: {
-			category: "operaciones_inusuales",
-			obligation: "debida_diligencia_reforzada",
-			risk: "lavado_activos",
-			legalBasis: "LFPIORPI",
-		},
-	},
 ];
 
 function escapeSqlString(str) {
