@@ -25,6 +25,12 @@ function createMockPrisma(): PrismaClient {
 			updateMany: vi.fn(),
 			count: vi.fn(),
 		},
+		alertRule: {
+			findMany: vi.fn(),
+		},
+		client: {
+			findMany: vi.fn(),
+		},
 		transaction: {
 			findMany: vi.fn(),
 		},
@@ -420,22 +426,42 @@ describe("NoticeRepository", () => {
 	});
 
 	describe("getAlertsWithTransactionsForNotice", () => {
-		it("returns alerts with their associated transactions", async () => {
+		it("returns alerts with their associated transactions, clients, and alertRules", async () => {
 			const alerts = [
-				{ ...mockAlert, noticeId: "NTC_123", transactionId: "txn_001" },
+				{
+					...mockAlert,
+					noticeId: "NTC_123",
+					transactionId: "txn_001",
+					clientId: "client_001",
+					alertRuleId: "rule_001",
+				},
 				{
 					...mockAlert,
 					id: "alt_456",
 					noticeId: "NTC_123",
 					transactionId: "txn_002",
+					clientId: "client_002",
+					alertRuleId: "rule_001",
 				},
 			];
+			const clients = [
+				{ id: "client_001", organizationId: "org_123" },
+				{ id: "client_002", organizationId: "org_123" },
+			];
+			const alertRules = [{ id: "rule_001", organizationId: "org_123" }];
 			const transactions = [
 				{ id: "txn_001", organizationId: "org_123" },
 				{ id: "txn_002", organizationId: "org_123" },
 			];
+
 			vi.mocked(prisma.alert.findMany).mockResolvedValue(
 				alerts as unknown as Alert[],
+			);
+			vi.mocked(prisma.client.findMany).mockResolvedValue(
+				clients as unknown as never,
+			);
+			vi.mocked(prisma.alertRule.findMany).mockResolvedValue(
+				alertRules as unknown as never,
 			);
 			vi.mocked(prisma.transaction.findMany).mockResolvedValue(
 				transactions as unknown as never,
@@ -448,12 +474,21 @@ describe("NoticeRepository", () => {
 
 			expect(result).toHaveLength(2);
 			expect(result[0].transaction).toBeDefined();
+			expect(result[0].client).toBeDefined();
+			expect(result[0].alertRule).toBeDefined();
 			expect(result[1].transaction).toBeDefined();
+			expect(result[1].client).toBeDefined();
+			expect(result[1].alertRule).toBeDefined();
+
+			// Alerts fetched without includes (batch approach)
 			expect(prisma.alert.findMany).toHaveBeenCalledWith({
 				where: { noticeId: "NTC_123", organizationId: "org_123" },
-				include: { alertRule: true, client: true },
 				orderBy: { createdAt: "asc" },
 			});
+
+			// Clients, alertRules, and transactions fetched separately in batches
+			expect(prisma.client.findMany).toHaveBeenCalled();
+			expect(prisma.alertRule.findMany).toHaveBeenCalled();
 			expect(prisma.transaction.findMany).toHaveBeenCalledWith({
 				where: {
 					id: { in: ["txn_001", "txn_002"] },
@@ -465,11 +500,23 @@ describe("NoticeRepository", () => {
 
 		it("returns alerts with null transaction when transactionId is null", async () => {
 			const alerts = [
-				{ ...mockAlert, noticeId: "NTC_123", transactionId: null },
+				{
+					...mockAlert,
+					noticeId: "NTC_123",
+					transactionId: null,
+					clientId: "client_001",
+					alertRuleId: null,
+				},
 			];
+			const clients = [{ id: "client_001", organizationId: "org_123" }];
+
 			vi.mocked(prisma.alert.findMany).mockResolvedValue(
 				alerts as unknown as Alert[],
 			);
+			vi.mocked(prisma.client.findMany).mockResolvedValue(
+				clients as unknown as never,
+			);
+			vi.mocked(prisma.alertRule.findMany).mockResolvedValue([]);
 
 			const result = await repository.getAlertsWithTransactionsForNotice(
 				"org_123",
@@ -478,7 +525,24 @@ describe("NoticeRepository", () => {
 
 			expect(result).toHaveLength(1);
 			expect(result[0].transaction).toBeNull();
+			expect(result[0].client).toBeDefined();
+			expect(result[0].alertRule).toBeNull();
 			// Should NOT call transaction.findMany when there are no transaction IDs
+			expect(prisma.transaction.findMany).not.toHaveBeenCalled();
+		});
+
+		it("returns empty array when no alerts exist", async () => {
+			vi.mocked(prisma.alert.findMany).mockResolvedValue([]);
+
+			const result = await repository.getAlertsWithTransactionsForNotice(
+				"org_123",
+				"NTC_123",
+			);
+
+			expect(result).toHaveLength(0);
+			// Should not fetch related entities when there are no alerts
+			expect(prisma.client.findMany).not.toHaveBeenCalled();
+			expect(prisma.alertRule.findMany).not.toHaveBeenCalled();
 			expect(prisma.transaction.findMany).not.toHaveBeenCalled();
 		});
 	});

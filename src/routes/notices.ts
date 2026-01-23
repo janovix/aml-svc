@@ -227,7 +227,8 @@ noticesRouter.post("/:id/generate", async (c) => {
 	const avisos = alertsWithTransactions
 		.filter((alert) => alert.transaction && alert.client)
 		.map((alert) => {
-			const clientEntity = mapPrismaClient(alert.client);
+			// Non-null assertions are safe here because of the filter above
+			const clientEntity = mapPrismaClient(alert.client!);
 			const transactionEntity = mapPrismaTransaction(alert.transaction!);
 			const alertEntity = {
 				...mapPrismaAlert(alert),
