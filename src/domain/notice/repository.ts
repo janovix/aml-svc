@@ -311,16 +311,26 @@ export class NoticeRepository {
 			.map((a) => a.transactionId)
 			.filter((id): id is string => id != null);
 
-		// Fetch transactions in batch
-		const transactions = await this.prisma.transaction.findMany({
-			where: {
-				id: { in: transactionIds },
-				organizationId,
-			},
-			include: {
-				paymentMethods: true,
-			},
-		});
+		// Fetch transactions in batches to avoid SQLite's ~999 variable limit
+		// D1/SQLite throws "too many SQL variables" when using large IN clauses
+		const BATCH_SIZE = 500;
+		const transactions: Awaited<
+			ReturnType<typeof this.prisma.transaction.findMany>
+		> = [];
+
+		for (let i = 0; i < transactionIds.length; i += BATCH_SIZE) {
+			const batchIds = transactionIds.slice(i, i + BATCH_SIZE);
+			const batchTransactions = await this.prisma.transaction.findMany({
+				where: {
+					id: { in: batchIds },
+					organizationId,
+				},
+				include: {
+					paymentMethods: true,
+				},
+			});
+			transactions.push(...batchTransactions);
+		}
 
 		// Create a map for quick lookup
 		const transactionMap = new Map(transactions.map((t) => [t.id, t]));

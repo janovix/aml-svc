@@ -470,7 +470,6 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.alert.findMany).mockResolvedValue(
 				alerts as unknown as Alert[],
 			);
-			vi.mocked(prisma.transaction.findMany).mockResolvedValue([]);
 
 			const result = await repository.getAlertsWithTransactionsForNotice(
 				"org_123",
@@ -479,14 +478,8 @@ describe("NoticeRepository", () => {
 
 			expect(result).toHaveLength(1);
 			expect(result[0].transaction).toBeNull();
-			// Should only fetch transactions for non-null transaction IDs
-			expect(prisma.transaction.findMany).toHaveBeenCalledWith({
-				where: {
-					id: { in: [] },
-					organizationId: "org_123",
-				},
-				include: { paymentMethods: true },
-			});
+			// Should NOT call transaction.findMany when there are no transaction IDs
+			expect(prisma.transaction.findMany).not.toHaveBeenCalled();
 		});
 	});
 

@@ -323,32 +323,40 @@ export class CatalogRepository {
 		// Remove duplicates
 		const uniqueIds = [...new Set(ids)];
 
-		const where: Prisma.CatalogItemWhereInput = {
-			id: { in: uniqueIds },
-		};
-
-		if (!includeInactive) {
-			where.active = true;
-		}
-
-		if (catalogKeys && catalogKeys.length > 0) {
-			where.catalog = {
-				key: { in: catalogKeys },
-			};
-		}
-
-		const items = await this.prisma.catalogItem.findMany({
-			where,
-			include: {
-				catalog: {
-					select: { key: true },
-				},
-			},
-		});
-
+		// Batch fetching to avoid SQLite's ~999 variable limit
+		// D1/SQLite throws "too many SQL variables" when using large IN clauses
+		const BATCH_SIZE = 500;
 		const resultMap = new Map<string, EnrichedCatalogItem>();
-		for (const item of items) {
-			resultMap.set(item.id, mapCatalogItemWithKey(item));
+
+		for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
+			const batchIds = uniqueIds.slice(i, i + BATCH_SIZE);
+
+			const where: Prisma.CatalogItemWhereInput = {
+				id: { in: batchIds },
+			};
+
+			if (!includeInactive) {
+				where.active = true;
+			}
+
+			if (catalogKeys && catalogKeys.length > 0) {
+				where.catalog = {
+					key: { in: catalogKeys },
+				};
+			}
+
+			const items = await this.prisma.catalogItem.findMany({
+				where,
+				include: {
+					catalog: {
+						select: { key: true },
+					},
+				},
+			});
+
+			for (const item of items) {
+				resultMap.set(item.id, mapCatalogItemWithKey(item));
+			}
 		}
 
 		return resultMap;
