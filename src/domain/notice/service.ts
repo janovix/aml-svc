@@ -240,11 +240,15 @@ export class NoticeService {
 
 	/**
 	 * Get available months for creating notices
-	 * Returns the past 12 months with status information:
+	 * Returns months with status information:
 	 * - hasPendingNotice: true if there's a DRAFT/GENERATED notice (blocks creation)
 	 * - hasSubmittedNotice: true if there's a SUBMITTED/ACKNOWLEDGED notice
 	 * - noticeCount: total number of notices for this period
 	 * - hasNotice: kept for backward compatibility (true if hasPendingNotice)
+	 *
+	 * SAT periods use a 17-17 cycle (day 17 of previous month to day 16 of current month).
+	 * If we're past day 16 of the current month, alerts created now belong to the next
+	 * month's period, so we include the next month in the available options.
 	 */
 	async getAvailableMonths(organizationId: string): Promise<
 		Array<{
@@ -258,6 +262,7 @@ export class NoticeService {
 		}>
 	> {
 		const now = new Date();
+		const currentDay = now.getDate();
 		const months: Array<{
 			year: number;
 			month: number;
@@ -268,7 +273,12 @@ export class NoticeService {
 			noticeCount: number;
 		}> = [];
 
-		for (let i = 0; i < 12; i++) {
+		// Determine starting offset: if we're past day 16, include next month (i = -1)
+		// This accounts for the SAT 17-17 period cycle where alerts created after
+		// day 16 belong to the next month's reporting period
+		const startOffset = currentDay > 16 ? -1 : 0;
+
+		for (let i = startOffset; i < 12; i++) {
 			const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
 			const year = date.getFullYear();
 			const month = date.getMonth() + 1;
