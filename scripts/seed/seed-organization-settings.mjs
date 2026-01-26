@@ -60,9 +60,11 @@ async function seedOrganizationSettings() {
 		);
 		try {
 			writeFileSync(checkFile, checkSql);
+			const wranglerCmd =
+				process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
 			const checkCommand = isRemote
-				? `wrangler d1 execute DB ${configFlag} --remote --file "${checkFile}"`
-				: `wrangler d1 execute DB ${configFlag} --local --file "${checkFile}"`;
+				? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${checkFile}"`
+				: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${checkFile}"`;
 			const checkOutput = execSync(checkCommand, { encoding: "utf-8" });
 			// Parse the count from output (format may vary)
 			const countMatch = checkOutput.match(/count\s*\|\s*(\d+)/i);
@@ -90,9 +92,11 @@ VALUES (${id}, '${settings.organizationId}', '${settings.obligatedSubjectKey}', 
 
 		try {
 			writeFileSync(sqlFile, sql);
+			const wranglerCmd =
+				process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
 			const command = isRemote
-				? `wrangler d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
-				: `wrangler d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
+				? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
+				: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
 
 			execSync(command, { stdio: "inherit" });
 			console.log(

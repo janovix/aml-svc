@@ -178,9 +178,11 @@ function sleep(ms) {
 }
 
 async function executeSql(sqlFile, isRemote, configFlag) {
+	// Use pnpm wrangler in CI, otherwise use wrangler directly
+	const wranglerCmd = process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
 	const command = isRemote
-		? `wrangler d1 execute DB ${configFlag} --remote --file "${sqlFile}" --json`
-		: `wrangler d1 execute DB ${configFlag} --local --file "${sqlFile}" --json`;
+		? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${sqlFile}" --json`
+		: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${sqlFile}" --json`;
 
 	// Use pipe to suppress verbose JSON output, check for errors via exit code
 	execSync(command, { stdio: "pipe" });
