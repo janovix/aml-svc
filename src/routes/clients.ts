@@ -19,9 +19,11 @@ import {
 	ClientUpdateSchema,
 	DocumentIdParamSchema,
 	ClientRepository,
+	ClientPEPStatusUpdateSchema,
 } from "../domain/client";
 import type { Bindings } from "../index";
 import { createAlertQueueService } from "../lib/alert-queue";
+import { createPEPQueueService } from "../lib/pep-queue";
 import { getPrismaClient } from "../lib/prisma";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { APIError } from "../middleware/error";
@@ -140,6 +142,138 @@ clientsRouter.get("/stats", async (c) => {
 	return c.json(stats);
 });
 
+/**
+ * GET /clients/:id/kyc-status
+ * Get KYC completion status for a client
+ * Returns requirements based on person type and completion percentage
+ * Note: Uses raw SQL until Prisma client is regenerated with new schema fields
+ */
+clientsRouter.get("/:id/kyc-status", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const params = parseWithZod(ClientIdParamSchema, c.req.param());
+	const prisma = getPrismaClient(c.env.DB);
+
+	// Get client
+	const client = await prisma.client.findFirst({
+		where: { organizationId, id: params.id, deletedAt: null },
+	});
+
+	if (!client) {
+		throw new APIError(404, "Client not found");
+	}
+
+	// Get documents for this client using raw query to include new fields
+	const documents = await prisma.$queryRaw<
+		Array<{
+			id: string;
+			document_type: string;
+			status: string;
+			verification_status: string | null;
+		}>
+	>`
+		SELECT id, document_type, status, verification_status
+		FROM client_documents
+		WHERE client_id = ${client.id}
+	`;
+
+	// Get UBOs for this client using raw query
+	const ubos = await prisma.$queryRaw<
+		Array<{
+			id: string;
+			id_document_id: string | null;
+		}>
+	>`
+		SELECT id, id_document_id
+		FROM ultimate_beneficial_owners
+		WHERE client_id = ${client.id}
+	`;
+
+	// Define document requirements per person type
+	const documentRequirements: Record<string, string[]> = {
+		PHYSICAL: ["NATIONAL_ID", "PROOF_OF_ADDRESS", "TAX_ID"],
+		MORAL: [
+			"ACTA_CONSTITUTIVA",
+			"TAX_ID",
+			"PODER_NOTARIAL",
+			"PROOF_OF_ADDRESS",
+		],
+		TRUST: ["TRUST_AGREEMENT", "TAX_ID", "PROOF_OF_ADDRESS"],
+	};
+
+	const requiredDocs = documentRequirements[client.personType] || [];
+	const uploadedDocTypes = documents.map((d) => d.document_type);
+	const missingDocs = requiredDocs.filter((d) => !uploadedDocTypes.includes(d));
+
+	// Check document verification status
+	const verifiedDocs = documents.filter(
+		(d) => d.status === "VERIFIED" || d.verification_status === "APPROVED",
+	).length;
+	const pendingDocs = documents.filter(
+		(d) => d.status === "PENDING" || d.verification_status === "REVIEW",
+	).length;
+
+	// UBO requirements for MORAL/TRUST
+	const requiresUBO = ["MORAL", "TRUST"].includes(client.personType);
+	const hasUBO = ubos.length > 0;
+	const uboHasDocs = requiresUBO
+		? ubos.every((ubo) => ubo.id_document_id !== null)
+		: true;
+
+	// Calculate completion percentage
+	let totalRequirements = requiredDocs.length;
+	let completedRequirements = requiredDocs.length - missingDocs.length;
+
+	if (requiresUBO) {
+		totalRequirements += 2; // UBO exists + UBO has docs
+		if (hasUBO) completedRequirements += 1;
+		if (uboHasDocs) completedRequirements += 1;
+	}
+
+	const completionPercentage =
+		totalRequirements > 0
+			? Math.round((completedRequirements / totalRequirements) * 100)
+			: 100;
+
+	// Determine overall KYC status
+	let kycStatus = "INCOMPLETE";
+	if (missingDocs.length === 0 && (!requiresUBO || hasUBO)) {
+		if (verifiedDocs === documents.length && documents.length > 0) {
+			kycStatus = "COMPLETE";
+		} else if (pendingDocs > 0) {
+			kycStatus = "PENDING_VERIFICATION";
+		}
+	}
+
+	return c.json({
+		clientId: client.id,
+		personType: client.personType,
+		kycStatus,
+		completionPercentage,
+		documents: {
+			required: requiredDocs,
+			uploaded: uploadedDocTypes,
+			missing: missingDocs,
+			verified: verifiedDocs,
+			pending: pendingDocs,
+			total: documents.length,
+		},
+		ubos: requiresUBO
+			? {
+					required: true,
+					hasUBO,
+					count: ubos.length,
+					allHaveDocuments: uboHasDocs,
+				}
+			: { required: false },
+		// PEP status will be available after Prisma regeneration
+		pep: {
+			status: "PENDING",
+			isPEP: false,
+			checkedAt: null,
+		},
+	});
+});
+
 clientsRouter.get("/:id", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
@@ -166,6 +300,19 @@ clientsRouter.post("/", async (c) => {
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 	await alertQueue.queueClientCreated(created.id);
 
+	// Queue PEP check for new client (non-blocking)
+	const pepQueue = createPEPQueueService(c.env.PEP_CHECK_QUEUE);
+	const fullName =
+		created.personType === "physical"
+			? `${created.firstName} ${created.lastName} ${created.secondLastName || ""}`.trim()
+			: created.businessName || "";
+	if (fullName) {
+		await pepQueue.queueClientPEPCheck(created.id, fullName, {
+			organizationId,
+			triggeredBy: "create",
+		});
+	}
+
 	return c.json(created, 201);
 });
 
@@ -183,6 +330,19 @@ clientsRouter.put("/:id", async (c) => {
 	// Queue alert detection job for updated client
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 	await alertQueue.queueClientUpdated(updated.id);
+
+	// Queue PEP check for updated client (non-blocking)
+	const pepQueue = createPEPQueueService(c.env.PEP_CHECK_QUEUE);
+	const fullName =
+		updated.personType === "physical"
+			? `${updated.firstName} ${updated.lastName} ${updated.secondLastName || ""}`.trim()
+			: updated.businessName || "";
+	if (fullName) {
+		await pepQueue.queueClientPEPCheck(updated.id, fullName, {
+			organizationId,
+			triggeredBy: "update",
+		});
+	}
 
 	return c.json(updated);
 });
@@ -205,6 +365,27 @@ clientsRouter.patch("/:id", async (c) => {
 	// Queue alert detection job for updated client
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 	await alertQueue.queueClientUpdated(updated.id);
+
+	// Queue PEP check if name-related fields changed
+	const nameFieldsChanged =
+		payload.firstName !== undefined ||
+		payload.lastName !== undefined ||
+		payload.secondLastName !== undefined ||
+		payload.businessName !== undefined;
+
+	if (nameFieldsChanged) {
+		const pepQueue = createPEPQueueService(c.env.PEP_CHECK_QUEUE);
+		const fullName =
+			updated.personType === "physical"
+				? `${updated.firstName} ${updated.lastName} ${updated.secondLastName || ""}`.trim()
+				: updated.businessName || "";
+		if (fullName) {
+			await pepQueue.queueClientPEPCheck(updated.id, fullName, {
+				organizationId,
+				triggeredBy: "update",
+			});
+		}
+	}
 
 	return c.json(updated);
 });
@@ -462,5 +643,111 @@ clientsInternalRouter.post("/", async (c) => {
 
 		const status = error instanceof APIError ? error.statusCode : 500;
 		return c.json({ error: "Error", message, details }, status as 400);
+	}
+});
+
+// ============================================================================
+// Internal PEP Status endpoints (for pep-check-worker)
+// ============================================================================
+
+/**
+ * PATCH /internal/clients/:id/pep-status
+ * Update PEP status for a client (called by pep-check-worker)
+ * Note: Uses raw SQL until Prisma client is regenerated with new schema fields
+ */
+clientsInternalRouter.patch("/:id/pep-status", async (c) => {
+	const clientId = c.req.param("id");
+	const body = await c.req.json();
+
+	try {
+		const payload = parseWithZod(ClientPEPStatusUpdateSchema, body);
+		const prisma = getPrismaClient(c.env.DB);
+
+		// Use raw SQL to bypass Prisma type checking until client is regenerated
+		await prisma.$executeRaw`
+			UPDATE clients 
+			SET 
+				is_pep = ${payload.isPEP ? 1 : 0},
+				pep_status = ${payload.pepStatus},
+				pep_details = ${payload.pepDetails ?? null},
+				pep_match_confidence = ${payload.pepMatchConfidence ?? null},
+				pep_checked_at = ${new Date(payload.pepCheckedAt).toISOString()},
+				pep_check_source = ${payload.pepCheckSource ?? null},
+				updated_at = ${new Date().toISOString()}
+			WHERE id = ${clientId}
+		`;
+
+		return c.json({ success: true });
+	} catch (error) {
+		console.error("[InternalClients] PATCH pep-status error:", error);
+		if (error instanceof APIError) {
+			return c.json({ error: error.message }, error.statusCode as 400);
+		}
+		if (error instanceof Error) {
+			return c.json({ error: error.message }, 500);
+		}
+		return c.json({ error: "Unknown error" }, 500);
+	}
+});
+
+/**
+ * GET /internal/clients/stale-pep-checks
+ * Get clients with stale PEP checks (for cron refresh)
+ * Note: Uses raw SQL until Prisma client is regenerated with new schema fields
+ */
+clientsInternalRouter.get("/stale-pep-checks", async (c) => {
+	const thresholdStr = c.req.query("threshold");
+	const limitStr = c.req.query("limit");
+
+	if (!thresholdStr) {
+		return c.json({ error: "threshold query parameter is required" }, 400);
+	}
+
+	const threshold = new Date(thresholdStr);
+	const limit = limitStr ? parseInt(limitStr, 10) : 100;
+
+	try {
+		const prisma = getPrismaClient(c.env.DB);
+
+		// Use raw SQL to bypass Prisma type checking until client is regenerated
+		const clients = await prisma.$queryRaw<
+			Array<{
+				id: string;
+				organization_id: string;
+				person_type: string;
+				first_name: string | null;
+				last_name: string | null;
+				second_last_name: string | null;
+				business_name: string | null;
+			}>
+		>`
+			SELECT 
+				id, 
+				organization_id, 
+				person_type, 
+				first_name, 
+				last_name, 
+				second_last_name, 
+				business_name
+			FROM clients
+			WHERE deleted_at IS NULL
+			AND (pep_checked_at IS NULL OR pep_checked_at < ${threshold.toISOString()})
+			LIMIT ${limit}
+		`;
+
+		return c.json({
+			data: clients.map((client) => ({
+				id: client.id,
+				organizationId: client.organization_id,
+				type: "client" as const,
+				name:
+					client.person_type === "PHYSICAL"
+						? `${client.first_name} ${client.last_name} ${client.second_last_name || ""}`.trim()
+						: client.business_name || "",
+			})),
+		});
+	} catch (error) {
+		console.error("[InternalClients] GET stale-pep-checks error:", error);
+		return c.json({ error: "Failed to get stale clients" }, 500);
 	}
 });

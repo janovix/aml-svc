@@ -3,14 +3,59 @@ import { z } from "zod";
 export const PERSON_TYPE_VALUES = ["physical", "moral", "trust"] as const;
 export const PersonTypeSchema = z.enum(PERSON_TYPE_VALUES);
 export const DOCUMENT_TYPE_VALUES = [
+	// ID Documents
 	"PASSPORT",
-	"NATIONAL_ID",
+	"NATIONAL_ID", // INE
 	"DRIVERS_LICENSE",
-	"TAX_ID",
+	"CEDULA_PROFESIONAL",
+	"CARTILLA_MILITAR",
+	// Tax Documents
+	"TAX_ID", // RFC / Constancia de Situación Fiscal
+	// Address Proof
 	"PROOF_OF_ADDRESS",
+	"UTILITY_BILL",
+	"BANK_STATEMENT",
+	// Corporate Documents
+	"ACTA_CONSTITUTIVA",
+	"PODER_NOTARIAL",
+	"TRUST_AGREEMENT",
+	"CORPORATE_BYLAWS",
+	// Other
 	"OTHER",
 ] as const;
 export const DocumentTypeSchema = z.enum(DOCUMENT_TYPE_VALUES);
+
+// KYC Status values
+export const KYC_STATUS_VALUES = [
+	"INCOMPLETE",
+	"PENDING_VERIFICATION",
+	"COMPLETE",
+	"EXPIRED",
+] as const;
+export const KYCStatusSchema = z.enum(KYC_STATUS_VALUES);
+
+// PEP Status values
+export const PEP_STATUS_VALUES = [
+	"PENDING",
+	"CONFIRMED",
+	"NOT_PEP",
+	"ERROR",
+] as const;
+export const PEPStatusSchema = z.enum(PEP_STATUS_VALUES);
+
+// Gender values
+export const GENDER_VALUES = ["M", "F", "OTHER"] as const;
+export const GenderSchema = z.enum(GENDER_VALUES);
+
+// Marital Status values
+export const MARITAL_STATUS_VALUES = [
+	"SINGLE",
+	"MARRIED",
+	"DIVORCED",
+	"WIDOWED",
+	"OTHER",
+] as const;
+export const MaritalStatusSchema = z.enum(MARITAL_STATUS_VALUES);
 export const DOCUMENT_STATUS_VALUES = [
 	"PENDING",
 	"VERIFIED",
@@ -200,19 +245,30 @@ const CommonSchemaPhysical = z
 	.merge(AddressSchema)
 	.merge(ContactSchema);
 
-const PhysicalDetailsSchema = z.object({
-	personType: z.literal("physical"),
-	firstName: z.string().min(1),
-	lastName: z.string().min(1),
-	secondLastName: z.string().optional().nullable(),
-	birthDate: dateOnlyString,
-	curp: z
-		.string()
-		.regex(CURP_REGEX, "Invalid CURP")
-		.transform((value) => value.toUpperCase()),
-	businessName: z.string().optional().nullable(),
-	incorporationDate: isoString.optional().nullable(),
+// Enhanced KYC fields schema (optional for create, can be added later)
+const EnhancedKYCFieldsSchema = z.object({
+	gender: GenderSchema.optional().nullable(),
+	occupation: z.string().max(200).optional().nullable(),
+	maritalStatus: MaritalStatusSchema.optional().nullable(),
+	sourceOfFunds: z.string().max(500).optional().nullable(),
+	sourceOfWealth: z.string().max(500).optional().nullable(),
 });
+
+const PhysicalDetailsSchema = z
+	.object({
+		personType: z.literal("physical"),
+		firstName: z.string().min(1),
+		lastName: z.string().min(1),
+		secondLastName: z.string().optional().nullable(),
+		birthDate: dateOnlyString,
+		curp: z
+			.string()
+			.regex(CURP_REGEX, "Invalid CURP")
+			.transform((value) => value.toUpperCase()),
+		businessName: z.string().optional().nullable(),
+		incorporationDate: isoString.optional().nullable(),
+	})
+	.merge(EnhancedKYCFieldsSchema);
 
 const MoralDetailsSchema = z.object({
 	personType: z.literal("moral"),
@@ -327,6 +383,25 @@ export const ClientPatchSchema = z.object({
 	notes: z.string().max(500).optional().nullable(),
 	countryCode: z.string().optional().nullable(), // Reference to countries catalog (metadata.code)
 	economicActivityCode: z.string().optional().nullable(), // Reference to economic activity catalog (7-digit code)
+	// Enhanced KYC fields
+	gender: GenderSchema.optional().nullable(),
+	occupation: z.string().max(200).optional().nullable(),
+	maritalStatus: MaritalStatusSchema.optional().nullable(),
+	sourceOfFunds: z.string().max(500).optional().nullable(),
+	sourceOfWealth: z.string().max(500).optional().nullable(),
+	// KYC status (can only be updated internally or by system)
+	kycStatus: KYCStatusSchema.optional(),
+	kycCompletedAt: isoString.optional().nullable(),
+});
+
+// PEP Status update schema (for internal API use by pep-check-worker)
+export const ClientPEPStatusUpdateSchema = z.object({
+	isPEP: z.boolean(),
+	pepStatus: PEPStatusSchema,
+	pepDetails: z.string().optional().nullable(),
+	pepMatchConfidence: z.string().optional().nullable(), // "exact", "possible"
+	pepCheckedAt: isoString,
+	pepCheckSource: z.string().optional().nullable(), // "VECTORIZE", "GROK"
 });
 
 export const ClientFilterSchema = z.object({
@@ -375,6 +450,14 @@ export const AddressIdParamSchema = z.object({
 	addressId: ResourceIdSchema,
 });
 
+// Document verification status values (from doc-svc)
+export const VERIFICATION_STATUS_VALUES = [
+	"APPROVED",
+	"REVIEW",
+	"REJECTED",
+] as const;
+export const VerificationStatusSchema = z.enum(VERIFICATION_STATUS_VALUES);
+
 export const ClientDocumentCreateSchema = z.object({
 	clientId: z
 		.string()
@@ -396,6 +479,13 @@ export const ClientDocumentCreateSchema = z.object({
 	status: DocumentStatusSchema.default("PENDING"),
 	fileUrl: z.string().url().optional().nullable(),
 	metadata: z.record(z.string(), z.any()).optional().nullable(),
+	// doc-svc integration fields (optional on create, populated after upload)
+	docSvcDocumentId: z.string().optional().nullable(),
+	docSvcJobId: z.string().optional().nullable(),
+	verificationStatus: VerificationStatusSchema.optional().nullable(),
+	verificationScore: z.number().min(0).max(1).optional().nullable(),
+	extractedData: z.record(z.string(), z.any()).optional().nullable(),
+	verifiedAt: isoString.optional().nullable(),
 });
 
 export const ClientDocumentUpdateSchema = ClientDocumentCreateSchema.omit({
@@ -418,6 +508,13 @@ export const ClientDocumentPatchSchema = z
 		status: DocumentStatusSchema.optional(),
 		fileUrl: z.string().url().optional().nullable(),
 		metadata: z.record(z.string(), z.any()).optional().nullable(),
+		// doc-svc integration fields
+		docSvcDocumentId: z.string().optional().nullable(),
+		docSvcJobId: z.string().optional().nullable(),
+		verificationStatus: VerificationStatusSchema.optional().nullable(),
+		verificationScore: z.number().min(0).max(1).optional().nullable(),
+		extractedData: z.record(z.string(), z.any()).optional().nullable(),
+		verifiedAt: isoString.optional().nullable(),
 	})
 	.refine((data) => Object.keys(data).length > 0, {
 		message: "Payload is empty",
@@ -493,3 +590,11 @@ export type ClientAddressUpdateInput = z.infer<
 	typeof ClientAddressUpdateSchema
 >;
 export type ClientAddressPatchInput = z.infer<typeof ClientAddressPatchSchema>;
+export type ClientPEPStatusUpdateInput = z.infer<
+	typeof ClientPEPStatusUpdateSchema
+>;
+export type KYCStatus = z.infer<typeof KYCStatusSchema>;
+export type PEPStatus = z.infer<typeof PEPStatusSchema>;
+export type Gender = z.infer<typeof GenderSchema>;
+export type MaritalStatus = z.infer<typeof MaritalStatusSchema>;
+export type VerificationStatus = z.infer<typeof VerificationStatusSchema>;

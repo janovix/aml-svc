@@ -1,3 +1,12 @@
+// Import types from schemas.ts (inferred from Zod schemas)
+import type {
+	KYCStatus,
+	PEPStatus,
+	Gender,
+	MaritalStatus,
+	VerificationStatus,
+} from "./schemas";
+
 export interface ClientEntity {
 	id: string; // RFC is now the ID
 	rfc: string; // Keep RFC field for backward compatibility/API clarity
@@ -26,6 +35,23 @@ export interface ClientEntity {
 	notes?: string | null;
 	countryCode?: string | null; // Reference to countries catalog (metadata.code)
 	economicActivityCode?: string | null; // Reference to economic activity catalog (7-digit code)
+	// Enhanced KYC fields
+	gender?: Gender | null;
+	occupation?: string | null;
+	maritalStatus?: MaritalStatus | null;
+	sourceOfFunds?: string | null;
+	sourceOfWealth?: string | null;
+	// KYC status tracking
+	kycStatus: KYCStatus;
+	kycCompletedAt?: string | null;
+	// PEP status tracking
+	isPEP: boolean;
+	pepStatus: PEPStatus;
+	pepDetails?: string | null;
+	pepMatchConfidence?: string | null;
+	pepCheckedAt?: string | null;
+	pepCheckSource?: string | null;
+	// Timestamps
 	createdAt: string;
 	updatedAt: string;
 	deletedAt?: string | null;
@@ -44,6 +70,14 @@ export interface ClientDocumentEntity {
 	status: string;
 	fileUrl?: string | null;
 	metadata?: Record<string, unknown> | null;
+	// doc-svc integration fields
+	docSvcDocumentId?: string | null;
+	docSvcJobId?: string | null;
+	verificationStatus?: VerificationStatus | null;
+	verificationScore?: number | null;
+	extractedData?: Record<string, unknown> | null;
+	verifiedAt?: string | null;
+	// Timestamps
 	createdAt: string;
 	updatedAt: string;
 }

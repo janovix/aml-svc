@@ -47,6 +47,10 @@
 				"binding": "IMPORT_PROCESSING_QUEUE",
 				"queue": "aml-imports-dev",
 			},
+			{
+				"binding": "PEP_CHECK_QUEUE",
+				"queue": "pep-check-dev",
+			},
 		],
 	},
 	"vars": {

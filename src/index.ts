@@ -10,6 +10,7 @@ import { openAPISpec } from "./openapi";
 import { createRouter } from "./routes";
 import { handleServiceBindingRequest } from "./lib/alert-service-binding";
 import type { AlertJob } from "./lib/alert-queue";
+import type { PEPJob } from "./lib/pep-queue";
 
 export type Bindings = {
 	DB: D1Database;
@@ -28,6 +29,8 @@ export type Bindings = {
 	ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
 	/** Queue for import processing jobs */
 	IMPORT_PROCESSING_QUEUE?: Queue<import("./domain/import").ImportJob>;
+	/** Queue for PEP check jobs */
+	PEP_CHECK_QUEUE?: Queue<PEPJob>;
 	/** Secret token for synthetic data generation HTTP endpoint (local development only) */
 	SYNTHETIC_DATA_SECRET?: string;
 	/**
