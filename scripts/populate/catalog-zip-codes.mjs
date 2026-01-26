@@ -33,7 +33,8 @@ const CATALOG_NAME = "Códigos Postales (México)";
 const BATCH_SIZE = 500;
 
 // Delay between batches in ms to allow runtime cleanup
-const BATCH_DELAY_MS = 100;
+// Increased to handle D1 rate limits and resource constraints
+const BATCH_DELAY_MS = 1000;
 
 async function downloadCsv() {
 	console.log("📥 Downloading zip-codes.csv...");
@@ -177,15 +178,39 @@ function sleep(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function executeSql(sqlFile, isRemote, configFlag) {
+async function executeSql(sqlFile, isRemote, configFlag, retries = 3) {
 	// Use pnpm wrangler in CI, otherwise use wrangler directly
 	const wranglerCmd = process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
 	const command = isRemote
 		? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${sqlFile}" --json`
 		: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${sqlFile}" --json`;
 
-	// Use pipe to suppress verbose JSON output, check for errors via exit code
-	execSync(command, { stdio: "pipe" });
+	for (let attempt = 1; attempt <= retries; attempt++) {
+		try {
+			// Use pipe to suppress verbose JSON output, check for errors via exit code
+			execSync(command, { stdio: "pipe" });
+			return; // Success
+		} catch (error) {
+			if (attempt === retries) {
+				// Last attempt failed, show error
+				console.error(
+					`❌ SQL execution failed after ${retries} attempts. Re-running with verbose output:`,
+				);
+				try {
+					execSync(command, { stdio: "inherit" });
+				} catch {
+					// Error already shown via inherit
+				}
+				throw error;
+			}
+			// Retry with exponential backoff
+			const delayMs = 2000 * attempt;
+			console.warn(
+				`   ⚠️  Attempt ${attempt}/${retries} failed, retrying in ${delayMs}ms...`,
+			);
+			await sleep(delayMs);
+		}
+	}
 }
 
 async function populateZipCodesCatalog() {
