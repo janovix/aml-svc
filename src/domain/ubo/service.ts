@@ -155,6 +155,23 @@ export class UBOService {
 		const relationshipType =
 			input.relationshipType || currentUBO.relationshipType;
 
+		// Validate ownership percentage is required when switching to SHAREHOLDER
+		if (
+			relationshipType === "SHAREHOLDER" &&
+			(input.ownershipPercentage === undefined ||
+				input.ownershipPercentage === null)
+		) {
+			// If switching to SHAREHOLDER, require ownershipPercentage
+			if (
+				input.relationshipType === "SHAREHOLDER" &&
+				currentUBO.relationshipType !== "SHAREHOLDER"
+			) {
+				throw new Error("OWNERSHIP_PERCENTAGE_REQUIRED");
+			}
+			// If already a SHAREHOLDER and not updating percentage, use current value
+			// (no validation needed)
+		}
+
 		// If updating ownership percentage for a shareholder
 		if (
 			relationshipType === "SHAREHOLDER" &&

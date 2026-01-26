@@ -61,7 +61,10 @@ function handleServiceError(error: unknown): never {
 		if (error.message === "CLIENT_NOT_FOUND") {
 			throw new APIError(404, "Client not found");
 		}
-		if (error.message === "OWNERSHIP_PERCENTAGE_REQUIRED_FOR_SHAREHOLDER") {
+		if (
+			error.message === "OWNERSHIP_PERCENTAGE_REQUIRED_FOR_SHAREHOLDER" ||
+			error.message === "OWNERSHIP_PERCENTAGE_REQUIRED"
+		) {
 			throw new APIError(
 				400,
 				"Ownership percentage is required for shareholders",
@@ -215,6 +218,27 @@ ubosRouter.patch("/:clientId/ubos/:uboId", async (c) => {
 		throw new APIError(400, "Payload is empty");
 	}
 
+	// Block mutation of internal verification/PEP fields
+	const internalFields = [
+		"isPEP",
+		"pepStatus",
+		"pepDetails",
+		"pepMatchConfidence",
+		"pepCheckedAt",
+		"verifiedAt",
+		"verifiedBy",
+	];
+	const forbiddenFields = Object.keys(payload).filter((key) =>
+		internalFields.includes(key),
+	);
+
+	if (forbiddenFields.length > 0) {
+		throw new APIError(
+			400,
+			`Cannot update internal fields: ${forbiddenFields.join(", ")}`,
+		);
+	}
+
 	const service = getService(c);
 	const updated = await service
 		.patch(organizationId, params.clientId, params.uboId, payload)
@@ -308,8 +332,27 @@ ubosInternalRouter.get("/stale-pep-checks", async (c) => {
 		return c.json({ error: "threshold query parameter is required" }, 400);
 	}
 
+	// Validate threshold is a valid date
 	const threshold = new Date(thresholdStr);
-	const limit = limitStr ? parseInt(limitStr, 10) : 100;
+	if (isNaN(threshold.getTime())) {
+		return c.json(
+			{ error: "Invalid threshold date format. Use ISO 8601 format." },
+			400,
+		);
+	}
+
+	// Validate and clamp limit to sensible range (1-1000)
+	let limit = 100; // default
+	if (limitStr) {
+		const parsedLimit = parseInt(limitStr, 10);
+		if (isNaN(parsedLimit) || parsedLimit < 1) {
+			return c.json(
+				{ error: "Invalid limit. Must be a positive integer." },
+				400,
+			);
+		}
+		limit = Math.min(parsedLimit, 1000); // clamp to max 1000
+	}
 
 	try {
 		const service = getInternalService(c);

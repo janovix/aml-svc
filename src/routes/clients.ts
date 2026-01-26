@@ -710,6 +710,9 @@ clientsInternalRouter.get("/stale-pep-checks", async (c) => {
 		const prisma = getPrismaClient(c.env.DB);
 
 		// Use raw SQL to bypass Prisma type checking until client is regenerated
+		// Note: $queryRaw returns DB enum values in uppercase (e.g., "PHYSICAL"),
+		// whereas mappers.ts converts Prisma/DB enums to lowercase for public routes.
+		// The uppercase comparison below is intentional for this internal handler.
 		const clients = await prisma.$queryRaw<
 			Array<{
 				id: string;

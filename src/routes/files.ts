@@ -127,7 +127,9 @@ filesRouter.get(
 			}
 
 			// Verify the key belongs to this organization (security check)
-			if (!key.includes(organizationId)) {
+			// Expected key structure: {category}/{organizationId}/{...}
+			const parts = key.split("/");
+			if (parts.length < 2 || parts[1] !== organizationId) {
 				throw new APIError(403, "Access denied");
 			}
 

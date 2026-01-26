@@ -3762,7 +3762,9 @@ export const openAPISpec = {
 						in: "path",
 						required: true,
 						schema: { type: "string" },
-						description: "File key in R2 storage (path after /api/v1/files/)",
+						description:
+							"File key in R2 storage (path after /api/v1/files/). Keys containing '/' must be URL-encoded (e.g., use '%2F' instead of '/') to avoid 404 errors. Example: 'client-documents/ORG123/CLIENT456/file.pdf' should be encoded as 'client-documents%2FORG123%2FCLIENT456%2Ffile.pdf'.",
+						allowReserved: true,
 					},
 				],
 				responses: {

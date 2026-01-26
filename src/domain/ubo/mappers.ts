@@ -17,9 +17,11 @@ export function mapPrismaUBO(record: UltimateBeneficialOwner): UBOEntity {
 		nationality: record.nationality,
 		curp: record.curp,
 		rfc: record.rfc,
-		ownershipPercentage: record.ownershipPercentage
-			? Number(record.ownershipPercentage)
-			: null,
+		ownershipPercentage:
+			record.ownershipPercentage !== null &&
+			record.ownershipPercentage !== undefined
+				? Number(record.ownershipPercentage)
+				: null,
 		relationshipType: record.relationshipType as UBORelationshipType,
 		position: record.position,
 		email: record.email,
