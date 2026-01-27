@@ -84,11 +84,17 @@ filesRouter.post(
 				},
 			});
 
+			// Build public URL to access the file via this service
+			// The URL will be: https://{worker-url}/api/v1/files/{key}
+			const requestUrl = new URL(c.req.url);
+			const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+			const publicUrl = `${baseUrl}/api/v1/files/${key}`;
+
 			// Return upload result
 			return c.json(
 				{
 					key,
-					url: `r2://aml/${key}`, // Placeholder URL format
+					url: publicUrl,
 					size: object.size,
 					etag: object.etag,
 				},
