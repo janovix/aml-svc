@@ -50,6 +50,9 @@ describe("sat-file-generator", () => {
 		street: "Calle Principal",
 		externalNumber: "123",
 		postalCode: "06000",
+		kycStatus: "INCOMPLETE",
+		isPEP: false,
+		pepStatus: "PENDING",
 		createdAt: "2024-01-01T00:00:00Z",
 		updatedAt: "2024-01-01T00:00:00Z",
 	};

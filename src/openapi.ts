@@ -72,6 +72,11 @@ export const openAPISpec = {
 			description:
 				"Bulk data import endpoints for uploading CSV/Excel files to import clients and transactions",
 		},
+		{
+			name: "Files",
+			description:
+				"File storage endpoints for uploading and downloading files to R2 storage",
+		},
 	],
 	paths: {
 		"/healthz": {
@@ -3632,6 +3637,205 @@ export const openAPISpec = {
 					},
 					"404": {
 						description: "Import not found",
+					},
+				},
+			},
+		},
+		"/api/v1/files/upload": {
+			post: {
+				tags: ["Files"],
+				summary: "Upload file to R2 storage",
+				description:
+					"Upload a file to R2 storage with optional client and document association. Files are organized by category and organization.",
+				requestBody: {
+					required: true,
+					content: {
+						"multipart/form-data": {
+							schema: {
+								type: "object",
+								required: ["file"],
+								properties: {
+									file: {
+										type: "string",
+										format: "binary",
+										description: "The file to upload",
+									},
+									clientId: {
+										type: "string",
+										description:
+											"Optional client ID to associate with the file",
+									},
+									documentId: {
+										type: "string",
+										description:
+											"Optional document ID to associate with the file",
+									},
+									category: {
+										type: "string",
+										default: "client-documents",
+										description:
+											"File category for organization (e.g., client-documents, reports)",
+									},
+									metadata: {
+										type: "string",
+										description:
+											"Optional JSON string with additional metadata",
+									},
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "File uploaded successfully",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										key: {
+											type: "string",
+											description: "R2 storage key for the uploaded file",
+										},
+										url: {
+											type: "string",
+											description: "URL to access the file",
+										},
+										size: {
+											type: "integer",
+											description: "File size in bytes",
+										},
+										etag: {
+											type: "string",
+											description: "ETag of the uploaded file",
+										},
+									},
+								},
+							},
+						},
+					},
+					"400": {
+						description: "Bad request - no file provided",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"403": {
+						description: "Forbidden - authentication required",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"500": {
+						description: "Internal server error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"503": {
+						description: "Service unavailable - file storage not configured",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/files/{key}": {
+			get: {
+				tags: ["Files"],
+				summary: "Download file from R2 storage",
+				description:
+					"Download a file from R2 storage by its key. Access is restricted to files belonging to the authenticated organization.",
+				parameters: [
+					{
+						name: "key",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description:
+							"File key in R2 storage (path after /api/v1/files/). Keys containing '/' must be URL-encoded (e.g., use '%2F' instead of '/') to avoid 404 errors. Example: 'client-documents/ORG123/CLIENT456/file.pdf' should be encoded as 'client-documents%2FORG123%2FCLIENT456%2Ffile.pdf'.",
+						allowReserved: true,
+					},
+				],
+				responses: {
+					"200": {
+						description: "File downloaded successfully",
+						content: {
+							"application/octet-stream": {
+								schema: {
+									type: "string",
+									format: "binary",
+								},
+							},
+						},
+						headers: {
+							"Content-Type": {
+								schema: { type: "string" },
+								description: "MIME type of the file",
+							},
+							"Content-Length": {
+								schema: { type: "integer" },
+								description: "File size in bytes",
+							},
+							ETag: {
+								schema: { type: "string" },
+								description: "ETag of the file",
+							},
+							"Cache-Control": {
+								schema: { type: "string" },
+								description: "Cache control header",
+							},
+						},
+					},
+					"400": {
+						description: "Bad request - file key is required",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"403": {
+						description: "Forbidden - access denied to this file",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "File not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"500": {
+						description: "Internal server error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"503": {
+						description: "Service unavailable - file storage not configured",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
 					},
 				},
 			},

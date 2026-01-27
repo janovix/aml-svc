@@ -18,12 +18,52 @@ enum PersonType {
 }
 
 enum DocumentType {
+  // ID Documents
   PASSPORT
-  NATIONAL_ID
+  NATIONAL_ID // INE
   DRIVERS_LICENSE
-  TAX_ID
+  CEDULA_PROFESIONAL
+  CARTILLA_MILITAR
+  // Tax Documents
+  TAX_ID // RFC / Constancia de Situación Fiscal
+  // Address Proof
   PROOF_OF_ADDRESS
+  UTILITY_BILL
+  BANK_STATEMENT
+  // Corporate Documents
+  ACTA_CONSTITUTIVA
+  PODER_NOTARIAL
+  TRUST_AGREEMENT
+  CORPORATE_BYLAWS
+  // Other
   OTHER
+}
+
+// KYC completion status
+enum KYCStatus {
+  INCOMPLETE // Missing required documents or information
+  PENDING_VERIFICATION // Documents uploaded, awaiting verification
+  COMPLETE // All requirements met
+  EXPIRED // Documents have expired, needs renewal
+}
+
+// PEP check status
+enum PEPStatus {
+  PENDING // Not yet checked
+  CONFIRMED // Confirmed as PEP
+  NOT_PEP // Confirmed not a PEP
+  ERROR // Check failed, needs retry
+}
+
+// UBO relationship types
+enum UBORelationshipType {
+  SHAREHOLDER // Direct shareholder with 25%+ ownership
+  DIRECTOR // Board member or director
+  LEGAL_REP // Legal representative
+  TRUSTEE // Trustee (for trusts)
+  SETTLOR // Settlor/Grantor (for trusts)
+  BENEFICIARY // Beneficiary (for trusts)
+  CONTROLLER // Person with effective control
 }
 
 enum DocumentStatus {
@@ -80,6 +120,23 @@ model Client {
   // Catalog references for XML generation
   countryCode          String?    @map("country_code") // Reference to countries catalog (metadata.code)
   economicActivityCode String?    @map("economic_activity_code") // Reference to economic activity catalog (7-digit code)
+  // Enhanced KYC fields
+  gender               String? // M, F, OTHER
+  occupation           String? // Occupation or business activity description
+  maritalStatus        String?    @map("marital_status") // SINGLE, MARRIED, DIVORCED, WIDOWED, OTHER
+  sourceOfFunds        String?    @map("source_of_funds") // Description of source of funds
+  sourceOfWealth       String?    @map("source_of_wealth") // Description of source of wealth
+  // KYC status tracking
+  kycStatus            KYCStatus  @default(INCOMPLETE) @map("kyc_status")
+  kycCompletedAt       DateTime?  @map("kyc_completed_at")
+  // PEP status tracking
+  isPEP                Boolean    @default(false) @map("is_pep")
+  pepStatus            PEPStatus  @default(PENDING) @map("pep_status")
+  pepDetails           String?    @map("pep_details") // Details from watchlist-svc
+  pepMatchConfidence   String?    @map("pep_match_confidence") // exact, possible
+  pepCheckedAt         DateTime?  @map("pep_checked_at") // Last PEP check timestamp
+  pepCheckSource       String?    @map("pep_check_source") // VECTORIZE, GROK
+  // Timestamps
   createdAt            DateTime   @default(now()) @map("created_at")
   updatedAt            DateTime   @updatedAt @map("updated_at")
   deletedAt            DateTime?  @map("deleted_at")
@@ -89,6 +146,7 @@ model Client {
   transactions Transaction[]
   alerts       Alert[]
   reports      Report[] // Reports targeting this specific client
+  ubos         UltimateBeneficialOwner[] // UBOs for moral/trust entities
 
   @@map("clients")
   @@unique([organizationId, rfc]) // RFC must be unique within each organization
@@ -98,6 +156,9 @@ model Client {
   @@index([deletedAt])
   @@index([countryCode])
   @@index([economicActivityCode])
+  @@index([kycStatus])
+  @@index([pepStatus])
+  @@index([pepCheckedAt])
 }
 
 model ClientDocument {
@@ -111,16 +172,29 @@ model ClientDocument {
   status         DocumentStatus @default(PENDING)
   fileUrl        String?        @map("file_url")
   metadata       String?
+  // doc-svc integration fields
+  docSvcDocumentId   String?    @map("doc_svc_document_id") // Reference to doc-svc document
+  docSvcJobId        String?    @map("doc_svc_job_id") // Processing job ID
+  verificationStatus String?    @map("verification_status") // APPROVED, REVIEW, REJECTED
+  verificationScore  Float?     @map("verification_score")
+  extractedData      String?    @map("extracted_data") // JSON from doc-svc extraction
+  verifiedAt         DateTime?  @map("verified_at")
+  // Timestamps
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  // Relations for UBO documents
+  uboIdDocuments      UltimateBeneficialOwner[] @relation("UBOIdDocument")
+  uboAddressProofs    UltimateBeneficialOwner[] @relation("UBOAddressProof")
 
   @@map("client_documents")
   @@index([clientId])
   @@index([documentType])
   @@index([status])
   @@index([expiryDate])
+  @@index([docSvcDocumentId])
+  @@index([verificationStatus])
 }
 
 model ClientAddress {
@@ -145,6 +219,60 @@ model ClientAddress {
   @@index([clientId])
   @@index([addressType])
   @@index([country])
+}
+
+// Ultimate Beneficial Owner - for MORAL and TRUST entities
+// Required by LFPIORPI for entities where a single person owns 25%+ shares
+model UltimateBeneficialOwner {
+  id                  String              @id
+  clientId            String              @map("client_id")
+  // Personal information
+  firstName           String              @map("first_name")
+  lastName            String              @map("last_name")
+  secondLastName      String?             @map("second_last_name")
+  birthDate           DateTime?           @map("birth_date")
+  nationality         String?
+  curp                String? // Mexican CURP if applicable
+  rfc                 String? // Mexican RFC if applicable
+  // Ownership/relationship details
+  ownershipPercentage Decimal?            @map("ownership_percentage") // Percentage of ownership (for shareholders)
+  relationshipType    UBORelationshipType @map("relationship_type")
+  position            String? // Job title or position description
+  // Contact information
+  email               String?
+  phone               String?
+  // Address
+  country             String?
+  stateCode           String?             @map("state_code")
+  city                String?
+  street              String?
+  postalCode          String?             @map("postal_code")
+  // Document references
+  idDocumentId        String?             @map("id_document_id") // FK to ClientDocument
+  addressProofId      String?             @map("address_proof_id") // FK to ClientDocument
+  // PEP status tracking (UBOs also need PEP checking)
+  isPEP               Boolean             @default(false) @map("is_pep")
+  pepStatus           PEPStatus           @default(PENDING) @map("pep_status")
+  pepDetails          String?             @map("pep_details")
+  pepMatchConfidence  String?             @map("pep_match_confidence")
+  pepCheckedAt        DateTime?           @map("pep_checked_at")
+  // Verification
+  verifiedAt          DateTime?           @map("verified_at")
+  verifiedBy          String?             @map("verified_by")
+  notes               String?
+  // Timestamps
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+
+  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  idDocument   ClientDocument? @relation("UBOIdDocument", fields: [idDocumentId], references: [id], onDelete: SetNull)
+  addressProof ClientDocument? @relation("UBOAddressProof", fields: [addressProofId], references: [id], onDelete: SetNull)
+
+  @@map("ultimate_beneficial_owners")
+  @@index([clientId])
+  @@index([relationshipType])
+  @@index([pepStatus])
+  @@index([pepCheckedAt])
 }
 
 model Catalog {

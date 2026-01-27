@@ -19,6 +19,8 @@ import { organizationSettingsRouter } from "./organization-settings";
 import { reportsRouter } from "./reports";
 import { transactionsRouter, transactionsInternalRouter } from "./transactions";
 import { umaValuesRouter } from "./uma-values";
+import { ubosRouter, ubosInternalRouter } from "./ubos";
+import { filesRouter } from "./files";
 
 export function createRouter() {
 	const router = new Hono<{
@@ -35,6 +37,7 @@ export function createRouter() {
 	router.route("/internal/imports", importInternalRouter);
 	router.route("/internal/clients", clientsInternalRouter);
 	router.route("/internal/transactions", transactionsInternalRouter);
+	router.route("/internal/ubos", ubosInternalRouter);
 
 	// Apply auth middleware with organization requirement for tenant-scoped routes
 	// These routes require an active organization to be selected
@@ -45,6 +48,7 @@ export function createRouter() {
 	router.use("/notices/*", authMiddleware({ requireOrganization: true }));
 	router.use("/reports/*", authMiddleware({ requireOrganization: true }));
 	router.use("/imports/*", authMiddleware({ requireOrganization: true }));
+	router.use("/files/*", authMiddleware({ requireOrganization: true }));
 
 	// Organization settings requires auth and organization context
 	router.use(
@@ -62,6 +66,7 @@ export function createRouter() {
 	// Mount resource routers
 	router.route("/catalogs", catalogsRouter);
 	router.route("/clients", clientsRouter);
+	router.route("/clients", ubosRouter); // UBO routes nested under clients (/:clientId/ubos/*)
 	router.route("/transactions", transactionsRouter);
 	router.route("/alert-rules", alertRulesRouter);
 	router.route("/alerts", alertsRouter);
@@ -70,6 +75,7 @@ export function createRouter() {
 	router.route("/uma-values", umaValuesRouter);
 	router.route("/organization-settings", organizationSettingsRouter);
 	router.route("/imports", importsRouter);
+	router.route("/files", filesRouter);
 
 	return router;
 }

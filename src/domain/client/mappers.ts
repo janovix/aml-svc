@@ -138,6 +138,22 @@ function basePrismaPayload(input: ClientCreateInput | ClientUpdateInput) {
 			"economicActivityCode" in input
 				? normalizeOptional(input.economicActivityCode)
 				: undefined,
+		// Enhanced KYC fields
+		gender: "gender" in input ? normalizeOptional(input.gender) : undefined,
+		occupation:
+			"occupation" in input ? normalizeOptional(input.occupation) : undefined,
+		maritalStatus:
+			"maritalStatus" in input
+				? normalizeOptional(input.maritalStatus)
+				: undefined,
+		sourceOfFunds:
+			"sourceOfFunds" in input
+				? normalizeOptional(input.sourceOfFunds)
+				: undefined,
+		sourceOfWealth:
+			"sourceOfWealth" in input
+				? normalizeOptional(input.sourceOfWealth)
+				: undefined,
 	};
 }
 
@@ -188,6 +204,13 @@ export function mapPatchInputToPrisma(input: ClientPatchInput) {
 		"notes",
 		"countryCode",
 		"economicActivityCode",
+		// Enhanced KYC fields
+		"gender",
+		"occupation",
+		"maritalStatus",
+		"sourceOfFunds",
+		"sourceOfWealth",
+		"kycStatus",
 	];
 
 	for (const key of passthroughKeys) {
@@ -203,6 +226,10 @@ export function mapPatchInputToPrisma(input: ClientPatchInput) {
 
 	if (input.incorporationDate !== undefined) {
 		payload.incorporationDate = toPrismaDate(input.incorporationDate);
+	}
+
+	if (input.kycCompletedAt !== undefined) {
+		payload.kycCompletedAt = toPrismaDate(input.kycCompletedAt);
 	}
 
 	return payload;
@@ -242,6 +269,37 @@ export function mapPrismaClient(
 		notes: record.notes ?? null,
 		countryCode: record.countryCode ?? null,
 		economicActivityCode: record.economicActivityCode ?? null,
+		// Enhanced KYC fields
+		gender: (record.gender as "M" | "F" | "OTHER" | null) ?? null,
+		occupation: record.occupation ?? null,
+		maritalStatus:
+			(record.maritalStatus as
+				| "SINGLE"
+				| "MARRIED"
+				| "DIVORCED"
+				| "WIDOWED"
+				| "OTHER"
+				| null) ?? null,
+		sourceOfFunds: record.sourceOfFunds ?? null,
+		sourceOfWealth: record.sourceOfWealth ?? null,
+		// KYC status
+		kycStatus:
+			(record.kycStatus as
+				| "INCOMPLETE"
+				| "PENDING_VERIFICATION"
+				| "COMPLETE"
+				| "EXPIRED") ?? "INCOMPLETE",
+		kycCompletedAt: mapDateTime(record.kycCompletedAt),
+		// PEP status
+		isPEP: Boolean(record.isPEP),
+		pepStatus:
+			(record.pepStatus as "PENDING" | "CONFIRMED" | "NOT_PEP" | "ERROR") ??
+			"PENDING",
+		pepDetails: record.pepDetails ?? null,
+		pepMatchConfidence: record.pepMatchConfidence ?? null,
+		pepCheckedAt: mapDateTime(record.pepCheckedAt),
+		pepCheckSource: record.pepCheckSource ?? null,
+		// Timestamps
 		createdAt: mapDateTime(record.createdAt) ?? new Date().toISOString(),
 		updatedAt: mapDateTime(record.updatedAt) ?? new Date().toISOString(),
 		deletedAt: mapDateTime(record.deletedAt) ?? null,
@@ -264,6 +322,13 @@ export function mapDocumentCreateInputToPrisma(
 		status: input.status ?? "PENDING",
 		fileUrl: normalizeOptional(input.fileUrl),
 		metadata: serializeMetadata(input.metadata),
+		// doc-svc integration fields
+		docSvcDocumentId: normalizeOptional(input.docSvcDocumentId),
+		docSvcJobId: normalizeOptional(input.docSvcJobId),
+		verificationStatus: normalizeOptional(input.verificationStatus),
+		verificationScore: normalizeOptional(input.verificationScore),
+		extractedData: serializeMetadata(input.extractedData),
+		verifiedAt: toPrismaDate(input.verifiedAt),
 	};
 }
 
@@ -279,6 +344,13 @@ export function mapDocumentUpdateInputToPrisma(
 		status: input.status ?? "PENDING",
 		fileUrl: normalizeOptional(input.fileUrl),
 		metadata: serializeMetadata(input.metadata),
+		// doc-svc integration fields
+		docSvcDocumentId: normalizeOptional(input.docSvcDocumentId),
+		docSvcJobId: normalizeOptional(input.docSvcJobId),
+		verificationStatus: normalizeOptional(input.verificationStatus),
+		verificationScore: normalizeOptional(input.verificationScore),
+		extractedData: serializeMetadata(input.extractedData),
+		verifiedAt: toPrismaDate(input.verifiedAt),
 	};
 }
 
@@ -298,6 +370,19 @@ export function mapDocumentPatchInputToPrisma(input: ClientDocumentPatchInput) {
 		payload.fileUrl = normalizeOptional(input.fileUrl);
 	if (input.metadata !== undefined)
 		payload.metadata = serializeMetadata(input.metadata);
+	// doc-svc integration fields
+	if (input.docSvcDocumentId !== undefined)
+		payload.docSvcDocumentId = normalizeOptional(input.docSvcDocumentId);
+	if (input.docSvcJobId !== undefined)
+		payload.docSvcJobId = normalizeOptional(input.docSvcJobId);
+	if (input.verificationStatus !== undefined)
+		payload.verificationStatus = normalizeOptional(input.verificationStatus);
+	if (input.verificationScore !== undefined)
+		payload.verificationScore = normalizeOptional(input.verificationScore);
+	if (input.extractedData !== undefined)
+		payload.extractedData = serializeMetadata(input.extractedData);
+	if (input.verifiedAt !== undefined)
+		payload.verifiedAt = toPrismaDate(input.verifiedAt);
 	return payload;
 }
 
@@ -315,6 +400,19 @@ export function mapPrismaDocument(
 		status: record.status,
 		fileUrl: record.fileUrl ?? null,
 		metadata: parseMetadata(record.metadata),
+		// doc-svc integration fields
+		docSvcDocumentId: record.docSvcDocumentId ?? null,
+		docSvcJobId: record.docSvcJobId ?? null,
+		verificationStatus:
+			(record.verificationStatus as
+				| "APPROVED"
+				| "REVIEW"
+				| "REJECTED"
+				| null) ?? null,
+		verificationScore: record.verificationScore ?? null,
+		extractedData: parseMetadata(record.extractedData),
+		verifiedAt: mapDateTime(record.verifiedAt),
+		// Timestamps
 		createdAt: mapDateTime(record.createdAt) ?? new Date().toISOString(),
 		updatedAt: mapDateTime(record.updatedAt) ?? new Date().toISOString(),
 	};

@@ -1,0 +1,124 @@
+name: Populate / Seed Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Operation to perform"
+        required: true
+        type: choice
+        options:
+          - populate-all
+          - populate-catalogs
+          - populate-zip-codes
+          - seed
+        default: populate-all
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+          - preview
+        default: dev
+      skip_zip_codes:
+        description: "Skip zip codes catalog (for populate-all/populate-catalogs)"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: populate-seed-${{ github.event.inputs.environment }}-${{ github.event.inputs.operation }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: ${{ github.event.inputs.operation }} (${{ github.event.inputs.environment }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HUSKY: 0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Determine wrangler config
+        id: config
+        run: |
+          case "${{ github.event.inputs.environment }}" in
+            prod)
+              echo "config=wrangler.prod.jsonc" >> $GITHUB_OUTPUT
+              ;;
+            preview)
+              echo "config=wrangler.preview.jsonc" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "config=wrangler.jsonc" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Run populate-all
+        if: github.event.inputs.operation == 'populate-all'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REMOTE: "true"
+          WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
+          SKIP_ZIP_CODES: ${{ github.event.inputs.skip_zip_codes }}
+        run: node scripts/populate/all.mjs
+
+      - name: Run populate-catalogs
+        if: github.event.inputs.operation == 'populate-catalogs'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REMOTE: "true"
+          WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
+          SKIP_ZIP_CODES: ${{ github.event.inputs.skip_zip_codes }}
+        run: node scripts/populate/all-catalogs.mjs
+
+      - name: Run populate-zip-codes
+        if: github.event.inputs.operation == 'populate-zip-codes'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REMOTE: "true"
+          WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
+          FORCE_ZIP_CODES: "true"
+        run: node scripts/populate/catalog-zip-codes.mjs
+
+      - name: Run seed
+        if: github.event.inputs.operation == 'seed'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REMOTE: "true"
+          WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
+        run: node scripts/seed/all.mjs
+
+      - name: Summary
+        run: |
+          echo "## Database Operation Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Operation | \`${{ github.event.inputs.operation }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | \`${{ github.event.inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Config | \`${{ steps.config.outputs.config }}\` |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event.inputs.operation }}" != "seed" ] && [ "${{ github.event.inputs.operation }}" != "populate-zip-codes" ]; then
+            echo "| Skip Zip Codes | \`${{ github.event.inputs.skip_zip_codes }}\` |" >> $GITHUB_STEP_SUMMARY
+          fi

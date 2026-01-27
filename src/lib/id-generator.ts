@@ -35,6 +35,8 @@ export const ID_PREFIXES = {
 	NOTICE: "NTC",
 	IMPORT: "IMP",
 	IMPORT_ROW_RESULT: "IRR",
+	UBO: "UBO", // Ultimate Beneficial Owner
+	FILE: "FIL", // File uploads to R2
 } as const;
 
 export type EntityType = keyof typeof ID_PREFIXES;
