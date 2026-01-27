@@ -6,6 +6,7 @@
 -- Clients Domain
 -- ============================================================================
 
+DROP TABLE IF EXISTS ultimate_beneficial_owners;
 DROP TABLE IF EXISTS clients;
 DROP TABLE IF EXISTS client_documents;
 DROP TABLE IF EXISTS client_addresses;
@@ -52,6 +53,23 @@ CREATE TABLE clients (
     notes TEXT,
     country_code TEXT,
     economic_activity_code TEXT,
+    -- Enhanced KYC fields
+    gender TEXT, -- M, F, OTHER
+    occupation TEXT,
+    marital_status TEXT, -- SINGLE, MARRIED, DIVORCED, WIDOWED, OTHER
+    source_of_funds TEXT,
+    source_of_wealth TEXT,
+    -- KYC status tracking
+    kyc_status TEXT NOT NULL DEFAULT 'INCOMPLETE' CHECK(kyc_status IN ('INCOMPLETE','PENDING_VERIFICATION','COMPLETE','EXPIRED')),
+    kyc_completed_at DATETIME,
+    -- PEP status tracking
+    is_pep INTEGER NOT NULL DEFAULT 0 CHECK(is_pep IN (0, 1)),
+    pep_status TEXT NOT NULL DEFAULT 'PENDING' CHECK(pep_status IN ('PENDING','CONFIRMED','NOT_PEP','ERROR')),
+    pep_details TEXT,
+    pep_match_confidence TEXT, -- exact, possible
+    pep_checked_at DATETIME,
+    pep_check_source TEXT, -- VECTORIZE, GROK
+    -- Timestamps
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at DATETIME
@@ -60,7 +78,7 @@ CREATE TABLE clients (
 CREATE TABLE client_documents (
     id TEXT PRIMARY KEY NOT NULL,
     client_id TEXT NOT NULL,
-    document_type TEXT NOT NULL CHECK(document_type IN ('PASSPORT','NATIONAL_ID','DRIVERS_LICENSE','TAX_ID','PROOF_OF_ADDRESS','OTHER')),
+    document_type TEXT NOT NULL CHECK(document_type IN ('PASSPORT','NATIONAL_ID','DRIVERS_LICENSE','CEDULA_PROFESIONAL','CARTILLA_MILITAR','TAX_ID','PROOF_OF_ADDRESS','UTILITY_BILL','BANK_STATEMENT','ACTA_CONSTITUTIVA','PODER_NOTARIAL','TRUST_AGREEMENT','CORPORATE_BYLAWS','OTHER')),
     document_number TEXT NOT NULL,
     issuing_country TEXT,
     issue_date DATETIME,
@@ -68,6 +86,14 @@ CREATE TABLE client_documents (
     status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','VERIFIED','REJECTED','EXPIRED')),
     file_url TEXT,
     metadata TEXT,
+    -- doc-svc integration fields
+    doc_svc_document_id TEXT, -- Reference to doc-svc document
+    doc_svc_job_id TEXT, -- Processing job ID
+    verification_status TEXT, -- APPROVED, REVIEW, REJECTED
+    verification_score REAL,
+    extracted_data TEXT, -- JSON from doc-svc extraction
+    verified_at DATETIME,
+    -- Timestamps
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
@@ -86,6 +112,51 @@ CREATE TABLE client_addresses (
     is_primary INTEGER NOT NULL DEFAULT 0 CHECK(is_primary IN (0, 1)),
     verified_at DATETIME,
     reference TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+);
+
+-- Ultimate Beneficial Owners - for MORAL and TRUST entities
+-- Required by LFPIORPI for entities where a single person owns 25%+ shares
+CREATE TABLE ultimate_beneficial_owners (
+    id TEXT PRIMARY KEY NOT NULL,
+    client_id TEXT NOT NULL,
+    -- Personal information
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    second_last_name TEXT,
+    birth_date DATETIME,
+    nationality TEXT,
+    curp TEXT, -- Mexican CURP if applicable
+    rfc TEXT, -- Mexican RFC if applicable
+    -- Ownership/relationship details
+    ownership_percentage NUMERIC, -- Percentage of ownership (for shareholders)
+    relationship_type TEXT NOT NULL CHECK(relationship_type IN ('SHAREHOLDER','DIRECTOR','LEGAL_REP','TRUSTEE','SETTLOR','BENEFICIARY','CONTROLLER')),
+    position TEXT, -- Job title or position description
+    -- Contact information
+    email TEXT,
+    phone TEXT,
+    -- Address
+    country TEXT,
+    state_code TEXT,
+    city TEXT,
+    street TEXT,
+    postal_code TEXT,
+    -- Document references
+    id_document_id TEXT REFERENCES client_documents(id) ON DELETE SET NULL,
+    address_proof_id TEXT REFERENCES client_documents(id) ON DELETE SET NULL,
+    -- PEP status tracking (UBOs also need PEP checking)
+    is_pep INTEGER NOT NULL DEFAULT 0 CHECK(is_pep IN (0, 1)),
+    pep_status TEXT NOT NULL DEFAULT 'PENDING' CHECK(pep_status IN ('PENDING','CONFIRMED','NOT_PEP','ERROR')),
+    pep_details TEXT,
+    pep_match_confidence TEXT,
+    pep_checked_at DATETIME,
+    -- Verification
+    verified_at DATETIME,
+    verified_by TEXT,
+    notes TEXT,
+    -- Timestamps
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
@@ -356,17 +427,28 @@ CREATE INDEX idx_clients_person_type ON clients(person_type);
 CREATE INDEX idx_clients_deleted_at ON clients(deleted_at);
 CREATE INDEX idx_clients_country_code ON clients(country_code);
 CREATE INDEX idx_clients_economic_activity_code ON clients(economic_activity_code);
+CREATE INDEX idx_clients_kyc_status ON clients(kyc_status);
+CREATE INDEX idx_clients_pep_status ON clients(pep_status);
+CREATE INDEX idx_clients_pep_checked_at ON clients(pep_checked_at);
 
 -- Client documents indexes
 CREATE INDEX idx_client_documents_client_id ON client_documents(client_id);
 CREATE INDEX idx_client_documents_document_type ON client_documents(document_type);
 CREATE INDEX idx_client_documents_status ON client_documents(status);
 CREATE INDEX idx_client_documents_expiry_date ON client_documents(expiry_date);
+CREATE INDEX idx_client_documents_doc_svc_document_id ON client_documents(doc_svc_document_id);
+CREATE INDEX idx_client_documents_verification_status ON client_documents(verification_status);
 
 -- Client addresses indexes
 CREATE INDEX idx_client_addresses_client_id ON client_addresses(client_id);
 CREATE INDEX idx_client_addresses_address_type ON client_addresses(address_type);
 CREATE INDEX idx_client_addresses_country ON client_addresses(country);
+
+-- Ultimate beneficial owners indexes
+CREATE INDEX idx_ubos_client_id ON ultimate_beneficial_owners(client_id);
+CREATE INDEX idx_ubos_relationship_type ON ultimate_beneficial_owners(relationship_type);
+CREATE INDEX idx_ubos_pep_status ON ultimate_beneficial_owners(pep_status);
+CREATE INDEX idx_ubos_pep_checked_at ON ultimate_beneficial_owners(pep_checked_at);
 
 -- Catalogs indexes
 CREATE INDEX idx_catalogs_active ON catalogs(active);

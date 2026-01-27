@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { calculateNoticePeriod, getNoticeSubmissionDeadline } from "./types";
 import { NoticeService } from "./service";
 import type { NoticeRepository } from "./repository";
@@ -183,6 +183,8 @@ describe("NoticeService", () => {
 	};
 
 	beforeEach(() => {
+		vi.useFakeTimers();
+
 		mockRepository = {
 			hasPendingNoticeForPeriod: vi.fn(),
 			getNoticeStatsForPeriod: vi.fn(),
@@ -202,6 +204,10 @@ describe("NoticeService", () => {
 		} as unknown as NoticeRepository;
 
 		service = new NoticeService(mockRepository);
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
 	});
 
 	describe("create", () => {
@@ -272,7 +278,10 @@ describe("NoticeService", () => {
 	});
 
 	describe("getAvailableMonths", () => {
-		it("returns months with correct status flags", async () => {
+		it("returns months with correct status flags when day <= 16", async () => {
+			// Set date to day 15 (before the 17-17 cutoff)
+			vi.setSystemTime(new Date(2026, 0, 15)); // January 15, 2026
+
 			// Mock different scenarios for different months
 			vi.mocked(mockRepository.getNoticeStatsForPeriod)
 				.mockResolvedValueOnce({
@@ -319,7 +328,52 @@ describe("NoticeService", () => {
 			expect(months[2].noticeCount).toBe(1);
 		});
 
+		it("includes next month when current day > 16 for SAT 17-17 period cycle", async () => {
+			// Set date to day 23 (after the 17-17 cutoff)
+			vi.setSystemTime(new Date(2026, 0, 23)); // January 23, 2026
+
+			vi.mocked(mockRepository.getNoticeStatsForPeriod).mockResolvedValue({
+				hasPendingNotice: false,
+				hasSubmittedNotice: false,
+				noticeCount: 0,
+			});
+
+			const months = await service.getAvailableMonths("org_123");
+
+			// Should include next month (February 2026) when we're past day 16
+			expect(months).toHaveLength(13);
+			expect(months[0].year).toBe(2026);
+			expect(months[0].month).toBe(2); // February
+			expect(months[0].displayName).toBe("Febrero 2026");
+
+			// Second should be current month (January 2026)
+			expect(months[1].year).toBe(2026);
+			expect(months[1].month).toBe(1); // January
+			expect(months[1].displayName).toBe("Enero 2026");
+		});
+
+		it("does not include next month when current day <= 16", async () => {
+			// Set date to day 16 (exactly on the cutoff, still in current period)
+			vi.setSystemTime(new Date(2026, 0, 16)); // January 16, 2026
+
+			vi.mocked(mockRepository.getNoticeStatsForPeriod).mockResolvedValue({
+				hasPendingNotice: false,
+				hasSubmittedNotice: false,
+				noticeCount: 0,
+			});
+
+			const months = await service.getAvailableMonths("org_123");
+
+			// Should NOT include next month when we're on or before day 16
+			expect(months).toHaveLength(12);
+			expect(months[0].year).toBe(2026);
+			expect(months[0].month).toBe(1); // January (current month)
+			expect(months[0].displayName).toBe("Enero 2026");
+		});
+
 		it("marks hasNotice as true only for pending notices", async () => {
+			vi.setSystemTime(new Date(2026, 0, 15)); // January 15, 2026
+
 			// All submitted notices
 			vi.mocked(mockRepository.getNoticeStatsForPeriod).mockResolvedValue({
 				hasPendingNotice: false,

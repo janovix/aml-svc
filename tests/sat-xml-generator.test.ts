@@ -48,6 +48,9 @@ describe("sat-xml-generator", () => {
 		street: "Calle Principal",
 		externalNumber: "123",
 		postalCode: "06000",
+		kycStatus: "INCOMPLETE",
+		isPEP: false,
+		pepStatus: "PENDING",
 		createdAt: "2024-01-01T00:00:00Z",
 		updatedAt: "2024-01-01T00:00:00Z",
 	};
@@ -70,6 +73,9 @@ describe("sat-xml-generator", () => {
 		street: "Avenida Principal",
 		externalNumber: "456",
 		postalCode: "44100",
+		kycStatus: "INCOMPLETE",
+		isPEP: false,
+		pepStatus: "PENDING",
 		createdAt: "2024-01-01T00:00:00Z",
 		updatedAt: "2024-01-01T00:00:00Z",
 	};

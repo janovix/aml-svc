@@ -28,8 +28,13 @@ const CSV_URL = "https://catalogs.janovix.com/zip-codes.csv";
 const CATALOG_KEY = "zip-codes";
 const CATALOG_NAME = "Códigos Postales (México)";
 
-// Batch size for SQL execution to avoid memory issues
-const BATCH_SIZE = 5000;
+// Batch size for SQL execution - kept small to avoid wrangler/workerd memory issues
+// The workerd runtime has hash table issues with large batches
+const BATCH_SIZE = 500;
+
+// Delay between batches in ms to allow runtime cleanup
+// Increased to handle D1 rate limits and resource constraints
+const BATCH_DELAY_MS = 1000;
 
 async function downloadCsv() {
 	console.log("📥 Downloading zip-codes.csv...");
@@ -169,12 +174,43 @@ function generateSqlBatch(catalogId, items, isFirst = false) {
 	return sql.join("\n");
 }
 
-async function executeSql(sqlFile, isRemote, configFlag) {
-	const command = isRemote
-		? `wrangler d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
-		: `wrangler d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
+function sleep(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-	execSync(command, { stdio: "inherit" });
+async function executeSql(sqlFile, isRemote, configFlag, retries = 3) {
+	// Use pnpm wrangler in CI, otherwise use wrangler directly
+	const wranglerCmd = process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
+	const command = isRemote
+		? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${sqlFile}" --json`
+		: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${sqlFile}" --json`;
+
+	for (let attempt = 1; attempt <= retries; attempt++) {
+		try {
+			// Use pipe to suppress verbose JSON output, check for errors via exit code
+			execSync(command, { stdio: "pipe" });
+			return; // Success
+		} catch (error) {
+			if (attempt === retries) {
+				// Last attempt failed, show error
+				console.error(
+					`❌ SQL execution failed after ${retries} attempts. Re-running with verbose output:`,
+				);
+				try {
+					execSync(command, { stdio: "inherit" });
+				} catch {
+					// Error already shown via inherit
+				}
+				throw error;
+			}
+			// Retry with exponential backoff
+			const delayMs = 2000 * attempt;
+			console.warn(
+				`   ⚠️  Attempt ${attempt}/${retries} failed, retrying in ${delayMs}ms...`,
+			);
+			await sleep(delayMs);
+		}
+	}
 }
 
 async function populateZipCodesCatalog() {
@@ -234,14 +270,25 @@ async function populateZipCodesCatalog() {
 			`📊 Processing ${totalBatches} batches of ${BATCH_SIZE} items each...`,
 		);
 
+		let successCount = 0;
+		const startTime = Date.now();
+
 		for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
 			const start = batchNum * BATCH_SIZE;
 			const end = Math.min(start + BATCH_SIZE, items.length);
 			const batchItems = items.slice(start, end);
 
-			console.log(
-				`   Batch ${batchNum + 1}/${totalBatches}: items ${start + 1} - ${end}`,
-			);
+			// Progress indicator every 10 batches or on first/last
+			if (
+				batchNum === 0 ||
+				batchNum === totalBatches - 1 ||
+				batchNum % 10 === 0
+			) {
+				const percent = Math.round(((batchNum + 1) / totalBatches) * 100);
+				console.log(
+					`   Batch ${batchNum + 1}/${totalBatches} (${percent}%): items ${start + 1} - ${end}`,
+				);
+			}
 
 			// Generate SQL for this batch
 			const sql = generateSqlBatch(catalogId, batchItems, batchNum === 0);
@@ -253,6 +300,7 @@ async function populateZipCodesCatalog() {
 			try {
 				writeFileSync(sqlFile, sql);
 				await executeSql(sqlFile, isRemote, configFlag);
+				successCount += batchItems.length;
 			} finally {
 				// Clean up temp file
 				try {
@@ -261,7 +309,17 @@ async function populateZipCodesCatalog() {
 					// Ignore cleanup errors
 				}
 			}
+
+			// Add delay between batches to allow runtime cleanup
+			if (batchNum < totalBatches - 1) {
+				await sleep(BATCH_DELAY_MS);
+			}
 		}
+
+		const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+		console.log(
+			`   Processed ${successCount.toLocaleString()} items in ${elapsed}s`,
+		);
 
 		console.log("✅ Zip codes catalog populated successfully!");
 	} catch (error) {

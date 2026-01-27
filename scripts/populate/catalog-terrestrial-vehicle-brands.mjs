@@ -36,9 +36,10 @@ try {
 		`📦 Populating terrestrial-vehicle-brands catalog (${isRemote ? "remote" : "local"})...`,
 	);
 
+	const wranglerCmd = process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
 	const command = isRemote
-		? `wrangler d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
-		: `wrangler d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
+		? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
+		: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
 
 	execSync(command, { stdio: "inherit" });
 	console.log("✅ Terrestrial vehicle brands catalog populated successfully!");

@@ -243,7 +243,7 @@ export class ImportRepository {
 			id: generateId("IMPORT_ROW_RESULT"),
 			importId,
 			rowNumber: row.rowNumber,
-			rawData: row.rawData,
+			rawData: row.rawData, // Already a JSON string from schema validation
 			status: "PENDING" as const,
 		}));
 

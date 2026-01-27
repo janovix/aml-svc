@@ -51,6 +51,8 @@ export type AuthBindings = Bindings & {
 	AUTH_JWKS_CACHE_TTL?: string;
 	/** Service binding to auth-svc for direct worker-to-worker communication */
 	AUTH_SERVICE?: Fetcher;
+	/** Environment name (local, development, staging, production) */
+	ENVIRONMENT?: string;
 };
 
 /**
@@ -80,6 +82,7 @@ async function getJWKS(
 	authServiceUrl: string,
 	cacheTtl: number,
 	authServiceBinding?: Fetcher,
+	environment?: string,
 ): Promise<jose.JSONWebKeySet> {
 	const now = Date.now();
 
@@ -92,7 +95,11 @@ async function getJWKS(
 	const jwksUrl = `${authServiceUrl}/api/auth/jwks`;
 	let response: Response;
 
-	if (authServiceBinding) {
+	// Service bindings don't work reliably in local development with wrangler dev
+	// Skip service binding in local environment and use regular HTTP fetch instead
+	const useServiceBinding = authServiceBinding && environment !== "local";
+
+	if (useServiceBinding) {
 		// Use service binding for direct worker-to-worker communication
 		// This bypasses the public URL and avoids routing issues
 		response = await authServiceBinding.fetch(
@@ -140,8 +147,14 @@ export async function verifyToken(
 	authServiceUrl: string,
 	cacheTtl: number,
 	authServiceBinding?: Fetcher,
+	environment?: string,
 ): Promise<AuthTokenPayload> {
-	const jwks = await getJWKS(authServiceUrl, cacheTtl, authServiceBinding);
+	const jwks = await getJWKS(
+		authServiceUrl,
+		cacheTtl,
+		authServiceBinding,
+		environment,
+	);
 
 	// Create a local JWKS for verification
 	const jwksInstance = jose.createLocalJWKSet(jwks);
@@ -246,6 +259,7 @@ export function authMiddleware(options?: {
 				authServiceUrl,
 				cacheTtl,
 				authServiceBinding,
+				c.env.ENVIRONMENT,
 			);
 
 			// Attach user info to context

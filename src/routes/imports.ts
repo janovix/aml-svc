@@ -122,6 +122,7 @@ importEventsRouter.get("/:id/events", async (c) => {
 			authServiceUrl,
 			cacheTtl,
 			c.env.AUTH_SERVICE,
+			c.env.ENVIRONMENT,
 		);
 	} catch (error) {
 		console.error("Token verification failed:", error);
