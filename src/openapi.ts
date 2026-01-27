@@ -77,6 +77,11 @@ export const openAPISpec = {
 			description:
 				"File storage endpoints for uploading and downloading files to R2 storage",
 		},
+		{
+			name: "UBOs",
+			description:
+				"Ultimate Beneficial Owner (UBO) management endpoints for tracking shareholders, directors, and other beneficial owners",
+		},
 	],
 	paths: {
 		"/healthz": {
@@ -3840,6 +3845,288 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/clients/{clientId}/ubos": {
+			get: {
+				tags: ["UBOs"],
+				summary: "List all UBOs for a client",
+				description:
+					"Get all Ultimate Beneficial Owners (UBOs) associated with a client. UBOs include shareholders, directors, legal representatives, and other beneficial owners.",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string", pattern: "^CLT[A-Za-z0-9]{9}$" },
+						description: "Client ID (format: CLT + 9 characters)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of UBOs retrieved successfully",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/UBO" },
+										},
+										total: { type: "integer" },
+									},
+								},
+							},
+						},
+					},
+					"404": {
+						description: "Client not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["UBOs"],
+				summary: "Create a new UBO",
+				description:
+					"Create a new Ultimate Beneficial Owner (UBO) for a client. Automatically triggers a PEP (Politically Exposed Person) check.",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string", pattern: "^CLT[A-Za-z0-9]{9}$" },
+						description: "Client ID (format: CLT + 9 characters)",
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/UBOCreate" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "UBO created successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UBO" },
+							},
+						},
+					},
+					"400": {
+						description:
+							"Validation error (e.g., ownership percentage required for shareholders, cap table exceeds 100%)",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "Client not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/clients/{clientId}/ubos/{uboId}": {
+			get: {
+				tags: ["UBOs"],
+				summary: "Get a single UBO",
+				description: "Retrieve details of a specific UBO by ID",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string", pattern: "^CLT[A-Za-z0-9]{9}$" },
+						description: "Client ID (format: CLT + 9 characters)",
+					},
+					{
+						name: "uboId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "UBO ID",
+					},
+				],
+				responses: {
+					"200": {
+						description: "UBO retrieved successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UBO" },
+							},
+						},
+					},
+					"404": {
+						description: "UBO or client not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			put: {
+				tags: ["UBOs"],
+				summary: "Update a UBO (full update)",
+				description:
+					"Update all fields of a UBO. Automatically triggers a PEP check if name fields change.",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string", pattern: "^CLT[A-Za-z0-9]{9}$" },
+						description: "Client ID (format: CLT + 9 characters)",
+					},
+					{
+						name: "uboId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "UBO ID",
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/UBOUpdate" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "UBO updated successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UBO" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "UBO or client not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["UBOs"],
+				summary: "Patch a UBO (partial update)",
+				description:
+					"Update specific fields of a UBO. Internal verification/PEP fields cannot be updated through this endpoint. Automatically triggers a PEP check if name fields change.",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string", pattern: "^CLT[A-Za-z0-9]{9}$" },
+						description: "Client ID (format: CLT + 9 characters)",
+					},
+					{
+						name: "uboId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "UBO ID",
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/UBOPatch" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "UBO patched successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/UBO" },
+							},
+						},
+					},
+					"400": {
+						description:
+							"Validation error (e.g., empty payload, attempting to update internal fields)",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"404": {
+						description: "UBO or client not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["UBOs"],
+				summary: "Delete a UBO",
+				description: "Delete a UBO from a client",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string", pattern: "^CLT[A-Za-z0-9]{9}$" },
+						description: "Client ID (format: CLT + 9 characters)",
+					},
+					{
+						name: "uboId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "UBO ID",
+					},
+				],
+				responses: {
+					"204": {
+						description: "UBO deleted successfully",
+					},
+					"404": {
+						description: "UBO or client not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
 	},
 	components: {
 		schemas: {
@@ -4858,6 +5145,556 @@ export const openAPISpec = {
 					error: { type: "string" },
 					message: { type: "string" },
 					details: { type: "object" },
+				},
+			},
+			UBORelationshipType: {
+				type: "string",
+				enum: [
+					"SHAREHOLDER",
+					"DIRECTOR",
+					"LEGAL_REP",
+					"TRUSTEE",
+					"SETTLOR",
+					"BENEFICIARY",
+					"CONTROLLER",
+				],
+				description:
+					"Type of relationship between the UBO and the client entity",
+			},
+			PEPStatus: {
+				type: "string",
+				enum: ["PENDING", "CONFIRMED", "NOT_PEP", "ERROR"],
+				description:
+					"PEP (Politically Exposed Person) verification status. PENDING: check in progress, CONFIRMED: verified as PEP, NOT_PEP: verified as not a PEP, ERROR: check failed",
+			},
+			UBO: {
+				type: "object",
+				required: [
+					"id",
+					"clientId",
+					"firstName",
+					"lastName",
+					"relationshipType",
+					"isPEP",
+					"pepStatus",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: {
+						type: "string",
+						description: "Unique UBO identifier",
+					},
+					clientId: {
+						type: "string",
+						pattern: "^CLT[A-Za-z0-9]{9}$",
+						description: "Client ID this UBO belongs to",
+					},
+					firstName: {
+						type: "string",
+						description: "First name",
+					},
+					lastName: {
+						type: "string",
+						description: "Last name (paternal surname)",
+					},
+					secondLastName: {
+						type: "string",
+						nullable: true,
+						description: "Second last name (maternal surname)",
+					},
+					birthDate: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "Date of birth (ISO 8601 format)",
+					},
+					nationality: {
+						type: "string",
+						minLength: 2,
+						maxLength: 2,
+						nullable: true,
+						description: "Nationality (ISO 3166-1 alpha-2 country code)",
+					},
+					curp: {
+						type: "string",
+						pattern: "^[A-Z][AEIOUX][A-Z]{2}\\d{6}[HM][A-Z]{5}[A-Z0-9]{2}$",
+						nullable: true,
+						description: "CURP (Clave Única de Registro de Población)",
+					},
+					rfc: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3,4}\\d{6}[A-Z0-9]{3}$",
+						nullable: true,
+						description: "RFC (Registro Federal de Contribuyentes)",
+					},
+					ownershipPercentage: {
+						type: "number",
+						minimum: 0,
+						maximum: 100,
+						nullable: true,
+						description:
+							"Ownership percentage (required for shareholders, minimum 25% for reporting)",
+					},
+					relationshipType: {
+						$ref: "#/components/schemas/UBORelationshipType",
+					},
+					position: {
+						type: "string",
+						maxLength: 200,
+						nullable: true,
+						description: "Position or title in the organization",
+					},
+					email: {
+						type: "string",
+						format: "email",
+						nullable: true,
+						description: "Email address",
+					},
+					phone: {
+						type: "string",
+						nullable: true,
+						description: "Phone number",
+					},
+					country: {
+						type: "string",
+						minLength: 2,
+						maxLength: 2,
+						nullable: true,
+						description: "Country (ISO 3166-1 alpha-2 code)",
+					},
+					stateCode: {
+						type: "string",
+						nullable: true,
+						description: "State/province code",
+					},
+					city: {
+						type: "string",
+						nullable: true,
+						description: "City",
+					},
+					street: {
+						type: "string",
+						nullable: true,
+						description: "Street address",
+					},
+					postalCode: {
+						type: "string",
+						nullable: true,
+						description: "Postal/ZIP code",
+					},
+					idDocumentId: {
+						type: "string",
+						nullable: true,
+						description: "Reference to uploaded ID document",
+					},
+					addressProofId: {
+						type: "string",
+						nullable: true,
+						description: "Reference to uploaded address proof document",
+					},
+					isPEP: {
+						type: "boolean",
+						description: "Whether this person is a Politically Exposed Person",
+					},
+					pepStatus: {
+						$ref: "#/components/schemas/PEPStatus",
+					},
+					pepDetails: {
+						type: "string",
+						nullable: true,
+						description: "Details about PEP status (if applicable)",
+					},
+					pepMatchConfidence: {
+						type: "string",
+						nullable: true,
+						description: "Confidence score of PEP match",
+					},
+					pepCheckedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When PEP check was last performed",
+					},
+					verifiedAt: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "When this UBO was verified",
+					},
+					verifiedBy: {
+						type: "string",
+						nullable: true,
+						description: "User ID who verified this UBO",
+					},
+					notes: {
+						type: "string",
+						maxLength: 500,
+						nullable: true,
+						description: "Additional notes",
+					},
+					createdAt: {
+						type: "string",
+						format: "date-time",
+						description: "Creation timestamp",
+					},
+					updatedAt: {
+						type: "string",
+						format: "date-time",
+						description: "Last update timestamp",
+					},
+				},
+			},
+			UBOCreate: {
+				type: "object",
+				required: ["firstName", "lastName", "relationshipType"],
+				properties: {
+					firstName: {
+						type: "string",
+						minLength: 1,
+						description: "First name",
+					},
+					lastName: {
+						type: "string",
+						minLength: 1,
+						description: "Last name (paternal surname)",
+					},
+					secondLastName: {
+						type: "string",
+						nullable: true,
+						description: "Second last name (maternal surname)",
+					},
+					birthDate: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "Date of birth (ISO 8601 format)",
+					},
+					nationality: {
+						type: "string",
+						minLength: 2,
+						maxLength: 2,
+						nullable: true,
+						description: "Nationality (ISO 3166-1 alpha-2 country code)",
+					},
+					curp: {
+						type: "string",
+						pattern: "^[A-Z][AEIOUX][A-Z]{2}\\d{6}[HM][A-Z]{5}[A-Z0-9]{2}$",
+						nullable: true,
+						description: "CURP (Clave Única de Registro de Población)",
+					},
+					rfc: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3,4}\\d{6}[A-Z0-9]{3}$",
+						nullable: true,
+						description: "RFC (Registro Federal de Contribuyentes)",
+					},
+					ownershipPercentage: {
+						type: "number",
+						minimum: 0,
+						maximum: 100,
+						nullable: true,
+						description:
+							"Ownership percentage (required for shareholders, minimum 25% for reporting)",
+					},
+					relationshipType: {
+						$ref: "#/components/schemas/UBORelationshipType",
+					},
+					position: {
+						type: "string",
+						maxLength: 200,
+						nullable: true,
+						description: "Position or title in the organization",
+					},
+					email: {
+						type: "string",
+						format: "email",
+						nullable: true,
+						description: "Email address",
+					},
+					phone: {
+						type: "string",
+						nullable: true,
+						description: "Phone number",
+					},
+					country: {
+						type: "string",
+						minLength: 2,
+						maxLength: 2,
+						nullable: true,
+						description: "Country (ISO 3166-1 alpha-2 code)",
+					},
+					stateCode: {
+						type: "string",
+						nullable: true,
+						description: "State/province code",
+					},
+					city: {
+						type: "string",
+						nullable: true,
+						description: "City",
+					},
+					street: {
+						type: "string",
+						nullable: true,
+						description: "Street address",
+					},
+					postalCode: {
+						type: "string",
+						nullable: true,
+						description: "Postal/ZIP code",
+					},
+					idDocumentId: {
+						type: "string",
+						nullable: true,
+						description: "Reference to uploaded ID document",
+					},
+					addressProofId: {
+						type: "string",
+						nullable: true,
+						description: "Reference to uploaded address proof document",
+					},
+					notes: {
+						type: "string",
+						maxLength: 500,
+						nullable: true,
+						description: "Additional notes",
+					},
+				},
+			},
+			UBOUpdate: {
+				type: "object",
+				required: ["firstName", "lastName", "relationshipType"],
+				properties: {
+					firstName: {
+						type: "string",
+						minLength: 1,
+						description: "First name",
+					},
+					lastName: {
+						type: "string",
+						minLength: 1,
+						description: "Last name (paternal surname)",
+					},
+					secondLastName: {
+						type: "string",
+						nullable: true,
+						description: "Second last name (maternal surname)",
+					},
+					birthDate: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "Date of birth (ISO 8601 format)",
+					},
+					nationality: {
+						type: "string",
+						minLength: 2,
+						maxLength: 2,
+						nullable: true,
+						description: "Nationality (ISO 3166-1 alpha-2 country code)",
+					},
+					curp: {
+						type: "string",
+						pattern: "^[A-Z][AEIOUX][A-Z]{2}\\d{6}[HM][A-Z]{5}[A-Z0-9]{2}$",
+						nullable: true,
+						description: "CURP (Clave Única de Registro de Población)",
+					},
+					rfc: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3,4}\\d{6}[A-Z0-9]{3}$",
+						nullable: true,
+						description: "RFC (Registro Federal de Contribuyentes)",
+					},
+					ownershipPercentage: {
+						type: "number",
+						minimum: 0,
+						maximum: 100,
+						nullable: true,
+						description:
+							"Ownership percentage (required for shareholders, minimum 25% for reporting)",
+					},
+					relationshipType: {
+						$ref: "#/components/schemas/UBORelationshipType",
+					},
+					position: {
+						type: "string",
+						maxLength: 200,
+						nullable: true,
+						description: "Position or title in the organization",
+					},
+					email: {
+						type: "string",
+						format: "email",
+						nullable: true,
+						description: "Email address",
+					},
+					phone: {
+						type: "string",
+						nullable: true,
+						description: "Phone number",
+					},
+					country: {
+						type: "string",
+						minLength: 2,
+						maxLength: 2,
+						nullable: true,
+						description: "Country (ISO 3166-1 alpha-2 code)",
+					},
+					stateCode: {
+						type: "string",
+						nullable: true,
+						description: "State/province code",
+					},
+					city: {
+						type: "string",
+						nullable: true,
+						description: "City",
+					},
+					street: {
+						type: "string",
+						nullable: true,
+						description: "Street address",
+					},
+					postalCode: {
+						type: "string",
+						nullable: true,
+						description: "Postal/ZIP code",
+					},
+					idDocumentId: {
+						type: "string",
+						nullable: true,
+						description: "Reference to uploaded ID document",
+					},
+					addressProofId: {
+						type: "string",
+						nullable: true,
+						description: "Reference to uploaded address proof document",
+					},
+					notes: {
+						type: "string",
+						maxLength: 500,
+						nullable: true,
+						description: "Additional notes",
+					},
+				},
+			},
+			UBOPatch: {
+				type: "object",
+				description:
+					"Partial update schema for UBO. All fields are optional. Internal verification/PEP fields (isPEP, pepStatus, pepDetails, pepMatchConfidence, pepCheckedAt, verifiedAt, verifiedBy) cannot be updated through this endpoint.",
+				properties: {
+					firstName: {
+						type: "string",
+						minLength: 1,
+						description: "First name",
+					},
+					lastName: {
+						type: "string",
+						minLength: 1,
+						description: "Last name (paternal surname)",
+					},
+					secondLastName: {
+						type: "string",
+						nullable: true,
+						description: "Second last name (maternal surname)",
+					},
+					birthDate: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+						description: "Date of birth (ISO 8601 format)",
+					},
+					nationality: {
+						type: "string",
+						minLength: 2,
+						maxLength: 2,
+						nullable: true,
+						description: "Nationality (ISO 3166-1 alpha-2 country code)",
+					},
+					curp: {
+						type: "string",
+						pattern: "^[A-Z][AEIOUX][A-Z]{2}\\d{6}[HM][A-Z]{5}[A-Z0-9]{2}$",
+						nullable: true,
+						description: "CURP (Clave Única de Registro de Población)",
+					},
+					rfc: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3,4}\\d{6}[A-Z0-9]{3}$",
+						nullable: true,
+						description: "RFC (Registro Federal de Contribuyentes)",
+					},
+					ownershipPercentage: {
+						type: "number",
+						minimum: 0,
+						maximum: 100,
+						nullable: true,
+						description:
+							"Ownership percentage (required for shareholders, minimum 25% for reporting)",
+					},
+					relationshipType: {
+						$ref: "#/components/schemas/UBORelationshipType",
+					},
+					position: {
+						type: "string",
+						maxLength: 200,
+						nullable: true,
+						description: "Position or title in the organization",
+					},
+					email: {
+						type: "string",
+						format: "email",
+						nullable: true,
+						description: "Email address",
+					},
+					phone: {
+						type: "string",
+						nullable: true,
+						description: "Phone number",
+					},
+					country: {
+						type: "string",
+						minLength: 2,
+						maxLength: 2,
+						nullable: true,
+						description: "Country (ISO 3166-1 alpha-2 code)",
+					},
+					stateCode: {
+						type: "string",
+						nullable: true,
+						description: "State/province code",
+					},
+					city: {
+						type: "string",
+						nullable: true,
+						description: "City",
+					},
+					street: {
+						type: "string",
+						nullable: true,
+						description: "Street address",
+					},
+					postalCode: {
+						type: "string",
+						nullable: true,
+						description: "Postal/ZIP code",
+					},
+					idDocumentId: {
+						type: "string",
+						nullable: true,
+						description: "Reference to uploaded ID document",
+					},
+					addressProofId: {
+						type: "string",
+						nullable: true,
+						description: "Reference to uploaded address proof document",
+					},
+					notes: {
+						type: "string",
+						maxLength: 500,
+						nullable: true,
+						description: "Additional notes",
+					},
 				},
 			},
 			AlertSeverity: {

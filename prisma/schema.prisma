@@ -149,7 +149,8 @@ model Client {
   ubos         UltimateBeneficialOwner[] // UBOs for moral/trust entities
 
   @@map("clients")
-  @@unique([organizationId, rfc]) // RFC must be unique within each organization
+  // Note: RFC uniqueness is enforced via partial unique index in migration (WHERE deleted_at IS NULL)
+  // This allows re-adding clients with same RFC after soft deletion
   @@index([organizationId])
   @@index([rfc]) // Keep index for lookups
   @@index([personType])

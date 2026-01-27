@@ -420,7 +420,7 @@ CREATE TABLE import_row_results (
 -- ============================================================================
 
 -- Clients indexes
-CREATE UNIQUE INDEX idx_clients_organization_id_rfc ON clients(organization_id, rfc); -- RFC is unique per organization
+CREATE UNIQUE INDEX idx_clients_organization_id_rfc ON clients(organization_id, rfc) WHERE deleted_at IS NULL; -- RFC is unique per organization (only for non-deleted clients)
 CREATE INDEX idx_clients_organization_id ON clients(organization_id);
 CREATE INDEX idx_clients_rfc ON clients(rfc);
 CREATE INDEX idx_clients_person_type ON clients(person_type);
