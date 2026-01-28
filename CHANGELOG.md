@@ -1,3 +1,10 @@
+# [1.5.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.5.0-rc.2...v1.5.0-rc.3) (2026-01-28)
+
+
+### Features
+
+* add TRUSTED_ORIGINS configuration to environment files and implement CORS middleware ([3683d30](https://github.com/janovix/aml-svc/commit/3683d30e02646fcf3a49732ae4f84ac559efea6f))
+
 # [1.5.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.5.0-rc.1...v1.5.0-rc.2) (2026-01-28)
 
 
