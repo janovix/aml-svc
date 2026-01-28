@@ -291,33 +291,71 @@ export class NoticeRepository {
 	/**
 	 * Get all alerts for a notice with their transactions (for XML generation)
 	 * Fetches alerts with client, alertRule, and their linked transactions
+	 *
+	 * Uses batch fetching to avoid D1/SQLite's ~999 variable limit in IN clauses.
+	 * Instead of using Prisma includes (which generate large IN queries), we:
+	 * 1. Fetch alerts without includes
+	 * 2. Batch fetch related entities (clients, alertRules, transactions) separately
+	 * 3. Manually join the data
 	 */
 	async getAlertsWithTransactionsForNotice(
 		organizationId: string,
 		noticeId: string,
 	) {
-		// Get alerts with client and alertRule
+		// D1/SQLite limit is ~999 variables, use a safe batch size
+		const BATCH_SIZE = 500;
+
+		// Get alerts without includes to avoid Prisma generating large IN queries
 		const alerts = await this.prisma.alert.findMany({
 			where: { noticeId, organizationId },
-			include: {
-				alertRule: true,
-				client: true,
-			},
 			orderBy: { createdAt: "asc" },
 		});
 
-		// Get transaction IDs from alerts (filter out null/undefined)
+		if (alerts.length === 0) {
+			return [];
+		}
+
+		// Collect unique IDs for batch fetching
+		const clientIds = [...new Set(alerts.map((a) => a.clientId))];
+		const alertRuleIds = [
+			...new Set(
+				alerts
+					.map((a) => a.alertRuleId)
+					.filter((id): id is string => id != null),
+			),
+		];
 		const transactionIds = alerts
 			.map((a) => a.transactionId)
 			.filter((id): id is string => id != null);
 
-		// Fetch transactions in batches to avoid SQLite's ~999 variable limit
-		// D1/SQLite throws "too many SQL variables" when using large IN clauses
-		const BATCH_SIZE = 500;
+		// Batch fetch clients
+		const clients: Awaited<ReturnType<typeof this.prisma.client.findMany>> = [];
+		for (let i = 0; i < clientIds.length; i += BATCH_SIZE) {
+			const batchIds = clientIds.slice(i, i + BATCH_SIZE);
+			const batchClients = await this.prisma.client.findMany({
+				where: { id: { in: batchIds }, organizationId },
+			});
+			clients.push(...batchClients);
+		}
+		const clientMap = new Map(clients.map((c) => [c.id, c]));
+
+		// Batch fetch alert rules (alert rules are global, not per-organization)
+		const alertRules: Awaited<
+			ReturnType<typeof this.prisma.alertRule.findMany>
+		> = [];
+		for (let i = 0; i < alertRuleIds.length; i += BATCH_SIZE) {
+			const batchIds = alertRuleIds.slice(i, i + BATCH_SIZE);
+			const batchRules = await this.prisma.alertRule.findMany({
+				where: { id: { in: batchIds } },
+			});
+			alertRules.push(...batchRules);
+		}
+		const alertRuleMap = new Map(alertRules.map((r) => [r.id, r]));
+
+		// Batch fetch transactions with payment methods
 		const transactions: Awaited<
 			ReturnType<typeof this.prisma.transaction.findMany>
 		> = [];
-
 		for (let i = 0; i < transactionIds.length; i += BATCH_SIZE) {
 			const batchIds = transactionIds.slice(i, i + BATCH_SIZE);
 			const batchTransactions = await this.prisma.transaction.findMany({
@@ -331,13 +369,15 @@ export class NoticeRepository {
 			});
 			transactions.push(...batchTransactions);
 		}
-
-		// Create a map for quick lookup
 		const transactionMap = new Map(transactions.map((t) => [t.id, t]));
 
-		// Attach transactions to alerts
+		// Manually join all the data
 		return alerts.map((alert) => ({
 			...alert,
+			client: clientMap.get(alert.clientId) ?? null,
+			alertRule: alert.alertRuleId
+				? (alertRuleMap.get(alert.alertRuleId) ?? null)
+				: null,
 			transaction: alert.transactionId
 				? (transactionMap.get(alert.transactionId) ?? null)
 				: null,
