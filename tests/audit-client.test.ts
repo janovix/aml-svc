@@ -48,7 +48,7 @@ describe("AuditClient", () => {
 
 	describe("log", () => {
 		it("should return null when AUTH_SERVICE binding is not available", async () => {
-			const env = { AUTH_SERVICE: undefined } as Bindings;
+			const env = { AUTH_SERVICE: undefined } as unknown as Bindings;
 			const client = new AuditClient(env);
 
 			const input: AuditLogInput = {
