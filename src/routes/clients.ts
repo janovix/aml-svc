@@ -21,7 +21,7 @@ import {
 	ClientRepository,
 	ClientPEPStatusUpdateSchema,
 } from "../domain/client";
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import { createAlertQueueService } from "../lib/alert-queue";
 import { createPEPQueueService } from "../lib/pep-queue";
 import { getPrismaClient } from "../lib/prisma";

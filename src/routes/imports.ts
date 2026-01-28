@@ -20,7 +20,7 @@ import {
 	ImportBulkRowCreateSchema,
 	type ImportEntity,
 } from "../domain/import";
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
 import {
 	type AuthVariables,

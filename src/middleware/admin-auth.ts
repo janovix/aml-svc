@@ -1,7 +1,7 @@
 import type { Context, MiddlewareHandler } from "hono";
 import * as jose from "jose";
 
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 
 /**
  * Extended JWT payload with admin role

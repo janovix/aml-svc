@@ -12,7 +12,7 @@ import {
 	UmaValueUpdateSchema,
 	UmaValueYearParamSchema,
 } from "../domain/uma";
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 

@@ -57,5 +57,6 @@
 		"ENVIRONMENT": "dev",
 		"AUTH_SERVICE_URL": "https://auth-svc.janovix.workers.dev",
 		"AUTH_JWKS_CACHE_TTL": "3600",
+		"TRUSTED_ORIGINS": "https://aml.janovix.workers.dev,https://auth.janovix.workers.dev,http://localhost:3000,http://localhost:3001,http://localhost:3002",
 	},
 }

@@ -51,5 +51,6 @@
 		"ENVIRONMENT": "production",
 		"AUTH_SERVICE_URL": "https://auth-svc.janovix.com",
 		"AUTH_JWKS_CACHE_TTL": "3600",
+		"TRUSTED_ORIGINS": "https://aml.janovix.com,https://auth.janovix.com",
 	},
 }

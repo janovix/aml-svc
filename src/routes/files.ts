@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { APIError } from "../middleware/error";
 import { generateId } from "../lib/id-generator";

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import { authMiddleware, type AuthVariables } from "../middleware/auth";
 import { type AdminAuthVariables } from "../middleware/admin-auth";
 import { adminRouter } from "./admin";

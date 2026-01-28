@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Hono, type Context } from "hono";
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import {
 	requireUsageQuota,
 	requireFeature,

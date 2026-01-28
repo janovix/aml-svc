@@ -13,7 +13,7 @@ import {
 	UBORepository,
 } from "../domain/ubo";
 import { ClientRepository } from "../domain/client";
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import { createPEPQueueService } from "../lib/pep-queue";
 import { getPrismaClient } from "../lib/prisma";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
