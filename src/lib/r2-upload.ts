@@ -1,15 +1,24 @@
 /**
- * R2 Upload Service
- * Handles file uploads to Cloudflare R2 storage
+ * R2 File Service
+ * Unified file upload/download operations for Cloudflare R2 storage
+ *
+ * Consolidates R2 operations from:
+ * - files.ts
+ * - imports.ts
+ * - reports.ts
+ * - notices.ts
  */
 
+import { generateId } from "./id-generator";
+
 // R2Bucket type from Cloudflare Workers runtime
-type R2Bucket = {
+export type R2Bucket = {
 	put(
 		key: string,
 		value: ReadableStream | ArrayBuffer | ArrayBufferView | string | null,
 		options?: R2PutOptions,
 	): Promise<R2Object>;
+	get(key: string): Promise<R2ObjectBody | null>;
 };
 
 type R2PutOptions = {
@@ -28,9 +37,16 @@ type R2Object = {
 	etag: string;
 };
 
+type R2ObjectBody = R2Object & {
+	body: ReadableStream;
+	httpMetadata?: {
+		contentType?: string;
+	};
+};
+
 export interface R2UploadOptions {
 	bucket: R2Bucket;
-	key: string; // Object key (path) in R2
+	key: string;
 	content: string | ArrayBuffer | Uint8Array;
 	contentType?: string;
 	metadata?: Record<string, string>;
@@ -38,7 +54,6 @@ export interface R2UploadOptions {
 
 export interface R2UploadResult {
 	key: string;
-	url: string; // Public URL or presigned URL
 	size: number;
 	etag: string;
 }
@@ -46,9 +61,7 @@ export interface R2UploadResult {
 /**
  * Uploads content to R2 bucket
  */
-export async function uploadToR2(
-	options: R2UploadOptions,
-): Promise<R2UploadResult> {
+export async function uploadToR2(options: R2UploadOptions): Promise<R2UploadResult> {
 	const { bucket, key, content, contentType, metadata } = options;
 
 	// Convert string content to ArrayBuffer if needed
@@ -59,33 +72,113 @@ export async function uploadToR2(
 		body = content;
 	}
 
-	// Upload to R2
 	const object = await bucket.put(key, body, {
 		httpMetadata: {
-			contentType: contentType || "application/xml",
+			contentType: contentType || "application/octet-stream",
 		},
 		customMetadata: metadata,
 	});
 
-	// Generate public URL (assuming public bucket or custom domain)
-	// In production, you might want to use a custom domain or presigned URLs
-	// Note: R2 buckets don't have a public URL by default - you'll need to configure
-	// a custom domain or use presigned URLs. For now, return a placeholder.
-	const url = `r2://aml/${key}`;
-
 	return {
 		key,
-		url,
 		size: object.size,
 		etag: object.etag,
 	};
 }
 
 /**
- * Generates a unique key for alert XML files
- * Format: alerts/{alertId}/{timestamp}-{alertId}.xml
+ * Upload a file (from FormData) to R2
  */
-export function generateAlertFileKey(alertId: string): string {
+export async function uploadFileToR2(
+	bucket: R2Bucket,
+	file: File,
+	options: {
+		category: string;
+		organizationId: string;
+		clientId?: string;
+		documentId?: string;
+		metadata?: Record<string, string>;
+	},
+): Promise<R2UploadResult & { key: string }> {
+	const { category, organizationId, clientId, documentId, metadata } = options;
+
+	// Generate unique file key
+	const fileId = generateId("FILE");
 	const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-	return `alerts/${alertId}/${timestamp}-${alertId}.xml`;
+	const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+
+	// Build key: {category}/{organizationId}/{clientId?}/{documentId?}/{timestamp}-{fileId}-{filename}
+	const keyParts = [category, organizationId];
+	if (clientId) keyParts.push(clientId);
+	if (documentId) keyParts.push(documentId);
+	keyParts.push(`${timestamp}-${fileId}-${sanitizedFileName}`);
+	const key = keyParts.join("/");
+
+	const arrayBuffer = await file.arrayBuffer();
+
+	const object = await bucket.put(key, arrayBuffer, {
+		httpMetadata: {
+			contentType: file.type || "application/octet-stream",
+		},
+		customMetadata: {
+			organizationId,
+			originalFileName: sanitizedFileName,
+			uploadedAt: new Date().toISOString(),
+			...metadata,
+		},
+	});
+
+	return {
+		key,
+		size: object.size,
+		etag: object.etag,
+	};
+}
+
+/**
+ * Generate a file key with timestamp for a specific category
+ */
+export function generateFileKey(
+	category: string,
+	organizationId: string,
+	filename: string,
+): string {
+	const timestamp = Date.now();
+	const random = Math.random().toString(36).substring(2, 8);
+	return `${category}/${organizationId}/${timestamp}-${random}-${filename}`;
+}
+
+/**
+ * Generate a file key for reports
+ */
+export function generateReportFileKey(
+	organizationId: string,
+	reportId: string,
+	periodStart: string,
+	periodEnd: string,
+): string {
+	return `reports/${organizationId}/${reportId}_${periodStart.substring(0, 10)}_${periodEnd.substring(0, 10)}.html`;
+}
+
+/**
+ * Generate a file key for notices
+ */
+export function generateNoticeFileKey(
+	organizationId: string,
+	noticeId: string,
+	reportedMonth: string,
+): string {
+	return `notices/${organizationId}/${noticeId}_${reportedMonth}.xml`;
+}
+
+/**
+ * Generate a file key for imports
+ */
+export function generateImportFileKey(
+	organizationId: string,
+	filename: string,
+): string {
+	const timestamp = Date.now();
+	const random = Math.random().toString(36).substring(2, 8);
+	return `imports/${organizationId}/${timestamp}-${random}-${filename}`;
 }

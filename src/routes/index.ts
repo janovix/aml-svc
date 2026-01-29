@@ -48,7 +48,10 @@ export function createRouter() {
 	router.use("/notices/*", authMiddleware({ requireOrganization: true }));
 	router.use("/reports/*", authMiddleware({ requireOrganization: true }));
 	router.use("/imports/*", authMiddleware({ requireOrganization: true }));
-	router.use("/files/*", authMiddleware({ requireOrganization: true }));
+	// Files upload and presign endpoints require JWT auth
+	router.use("/files/upload", authMiddleware({ requireOrganization: true }));
+	router.use("/files/presign", authMiddleware({ requireOrganization: true }));
+	// Files download endpoint (GET /files/*) handles auth internally (JWT or presigned token)
 
 	// Organization settings requires auth and organization context
 	router.use(

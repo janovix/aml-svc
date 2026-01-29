@@ -20,6 +20,8 @@ export type Bindings = {
 	API_VERSION?: string;
 	AUTH_SERVICE_URL?: string;
 	AUTH_JWKS_CACHE_TTL?: string;
+	/** Secret for signing presigned file URLs */
+	PRESIGNED_URL_SECRET: string;
 	SAT_CLAVE_SUJETO_OBLIGADO?: string; // 12-character obligated subject identifier (RFC)
 	SAT_CLAVE_ACTIVIDAD?: string; // Activity code (e.g., "VEH" for vehicle notices)
 	SAT_CLAVE_ENTIDAD_COLEGIADA?: string; // Optional collegiate entity identifier

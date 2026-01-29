@@ -29,6 +29,7 @@ import {
 	mapToSatVehicleNoticeData,
 	type SatMonthlyReportData,
 } from "../lib/sat-xml-generator";
+import { generateNoticeFileKey } from "../lib/r2-upload";
 import { createSubscriptionClient } from "../lib/subscription-client";
 
 export const noticesRouter = new Hono<{
@@ -285,7 +286,11 @@ noticesRouter.post("/:id/generate", async (c) => {
 	let xmlFileUrl: string | null = null;
 
 	if (c.env.R2_BUCKET) {
-		const fileName = `notices/${organizationId}/${notice.id}_${notice.reportedMonth}.xml`;
+		const fileName = generateNoticeFileKey(
+			organizationId,
+			notice.id,
+			notice.reportedMonth,
+		);
 		await c.env.R2_BUCKET.put(fileName, xmlBytes, {
 			httpMetadata: {
 				contentType: "application/xml",
@@ -297,7 +302,6 @@ noticesRouter.post("/:id/generate", async (c) => {
 				generatedAt: new Date().toISOString(),
 			},
 		});
-		// Construct the R2 public URL or use a signed URL in production
 		xmlFileUrl = fileName;
 	}
 

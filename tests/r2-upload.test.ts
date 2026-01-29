@@ -1,8 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
 	uploadToR2,
-	generateAlertFileKey,
+	generateFileKey,
+	generateReportFileKey,
+	generateNoticeFileKey,
+	generateImportFileKey,
 	type R2UploadOptions,
+	type R2Bucket,
 } from "../src/lib/r2-upload";
 
 describe("uploadToR2", () => {
@@ -15,6 +19,7 @@ describe("uploadToR2", () => {
 				size: 1024,
 				etag: "test-etag-123",
 			}),
+			get: vi.fn(),
 		} as unknown as R2Bucket;
 	});
 
@@ -44,7 +49,6 @@ describe("uploadToR2", () => {
 		expect(result.key).toBe("test/file.xml");
 		expect(result.size).toBe(1024);
 		expect(result.etag).toBe("test-etag-123");
-		expect(result.url).toContain("r2://aml/test/file.xml");
 	});
 
 	it("should upload ArrayBuffer content to R2", async () => {
@@ -102,7 +106,7 @@ describe("uploadToR2", () => {
 			expect.any(Uint8Array),
 			expect.objectContaining({
 				httpMetadata: {
-					contentType: "application/xml",
+					contentType: "application/octet-stream",
 				},
 			}),
 		);
@@ -122,7 +126,7 @@ describe("uploadToR2", () => {
 			expect.any(Uint8Array),
 			expect.objectContaining({
 				httpMetadata: {
-					contentType: "application/xml",
+					contentType: "application/octet-stream",
 				},
 				customMetadata: undefined,
 			}),
@@ -130,34 +134,43 @@ describe("uploadToR2", () => {
 	});
 });
 
-describe("generateAlertFileKey", () => {
-	it("should generate a file key with alert ID and timestamp", () => {
-		const alertId = "alert-123";
-		const key = generateAlertFileKey(alertId);
+describe("generateFileKey", () => {
+	it("should generate a file key with category, org, and filename", () => {
+		const key = generateFileKey("documents", "org-123", "test.pdf");
 
-		expect(key).toContain("alerts/alert-123/");
-		expect(key).toContain("-alert-123.xml");
-		expect(key).toMatch(
-			/^alerts\/alert-123\/\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-alert-123\.xml$/,
-		);
+		expect(key).toContain("documents/org-123/");
+		expect(key).toContain("test.pdf");
+	});
+});
+
+describe("generateReportFileKey", () => {
+	it("should generate a report file key", () => {
+		const key = generateReportFileKey("org-123", "report-1", "2024-01-01", "2024-01-31");
+
+		expect(key).toBe("reports/org-123/report-1_2024-01-01_2024-01-31.html");
+	});
+});
+
+describe("generateNoticeFileKey", () => {
+	it("should generate a notice file key", () => {
+		const key = generateNoticeFileKey("org-123", "notice-1", "2024-01");
+
+		expect(key).toBe("notices/org-123/notice-1_2024-01.xml");
+	});
+});
+
+describe("generateImportFileKey", () => {
+	it("should generate an import file key", () => {
+		const key = generateImportFileKey("org-123", "data.csv");
+
+		expect(key).toContain("imports/org-123/");
+		expect(key).toContain("data.csv");
 	});
 
-	it("should generate unique keys for different alerts", () => {
-		const key1 = generateAlertFileKey("alert-1");
-		const key2 = generateAlertFileKey("alert-2");
+	it("should generate unique keys for same filename", () => {
+		const key1 = generateImportFileKey("org-123", "data.csv");
+		const key2 = generateImportFileKey("org-123", "data.csv");
 
 		expect(key1).not.toBe(key2);
-		expect(key1).toContain("alert-1");
-		expect(key2).toContain("alert-2");
-	});
-
-	it("should replace colons and dots in timestamp", () => {
-		const alertId = "test-alert";
-		const key = generateAlertFileKey(alertId);
-
-		// Should not contain colons or dots (except in .xml extension)
-		const timestampPart = key.split("/")[2]?.split("-test-alert")[0] || "";
-		expect(timestampPart).not.toContain(":");
-		expect(timestampPart).not.toContain(".");
 	});
 });

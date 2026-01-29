@@ -26,6 +26,7 @@ import {
 	generatePdfReportHtml,
 	type AlertSummaryForPdf,
 } from "../lib/pdf-report-generator";
+import { generateReportFileKey } from "../lib/r2-upload";
 
 export const reportsRouter = new Hono<{
 	Bindings: Bindings;
@@ -348,7 +349,12 @@ reportsRouter.post("/:id/generate", async (c) => {
 	const fileSize = new TextEncoder().encode(htmlContent).length;
 
 	if (c.env.R2_BUCKET) {
-		const filename = `reports/${organizationId}/${report.id}_${report.periodStart.substring(0, 10)}_${report.periodEnd.substring(0, 10)}.html`;
+		const filename = generateReportFileKey(
+			organizationId,
+			report.id,
+			report.periodStart,
+			report.periodEnd,
+		);
 		await c.env.R2_BUCKET.put(filename, htmlContent, {
 			httpMetadata: {
 				contentType: "text/html; charset=utf-8",

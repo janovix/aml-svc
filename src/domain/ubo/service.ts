@@ -6,9 +6,63 @@ import type {
 	PEPStatusUpdateInput,
 } from "./schemas";
 import type { UBOEntity, UBORelationshipType, UBOListResult } from "./types";
+import { formatFullName } from "../../lib/route-helpers";
 
 export class UBOService {
 	constructor(private readonly repository: UBORepository) {}
+
+	// =============== Private validation helpers ===============
+
+	/**
+	 * Validate that ownership percentage is provided for shareholders
+	 */
+	private validateOwnershipPercentageRequired(
+		relationshipType: UBORelationshipType,
+		ownershipPercentage: number | null | undefined,
+	): void {
+		if (
+			relationshipType === "SHAREHOLDER" &&
+			(ownershipPercentage === undefined || ownershipPercentage === null)
+		) {
+			throw new Error("OWNERSHIP_PERCENTAGE_REQUIRED_FOR_SHAREHOLDER");
+		}
+	}
+
+	/**
+	 * Validate minimum ownership percentage (legal requirement: 25% or more)
+	 */
+	private validateMinimumOwnershipPercentage(
+		ownershipPercentage: number | null | undefined,
+	): void {
+		if (
+			ownershipPercentage !== null &&
+			ownershipPercentage !== undefined &&
+			ownershipPercentage < 25
+		) {
+			throw new Error("MINIMUM_OWNERSHIP_PERCENTAGE_NOT_MET");
+		}
+	}
+
+	/**
+	 * Validate cap table doesn't exceed 100%
+	 */
+	private async validateCapTable(
+		clientId: string,
+		newPercentage: number,
+		excludeUboId?: string,
+	): Promise<void> {
+		const existingUBOs = await this.repository.list(clientId, "SHAREHOLDER");
+		const currentTotal = existingUBOs.data
+			.filter((ubo) => (excludeUboId ? ubo.id !== excludeUboId : true))
+			.reduce((sum, ubo) => sum + (ubo.ownershipPercentage || 0), 0);
+		const newTotal = currentTotal + newPercentage;
+
+		if (newTotal > 100) {
+			throw new Error("CAP_TABLE_EXCEEDS_100_PERCENT");
+		}
+	}
+
+	// =============== Public methods ===============
 
 	/**
 	 * List all UBOs for a client
@@ -45,43 +99,17 @@ export class UBOService {
 		organizationId: string,
 		input: UBOCreateInput,
 	): Promise<UBOEntity> {
-		// Validate ownership percentage for shareholders
-		if (
-			input.relationshipType === "SHAREHOLDER" &&
-			(input.ownershipPercentage === undefined ||
-				input.ownershipPercentage === null)
-		) {
-			throw new Error("OWNERSHIP_PERCENTAGE_REQUIRED_FOR_SHAREHOLDER");
-		}
-
-		// Validate minimum ownership percentage (legal requirement: 25% or more)
-		if (
-			input.relationshipType === "SHAREHOLDER" &&
-			input.ownershipPercentage !== null &&
-			input.ownershipPercentage !== undefined &&
-			input.ownershipPercentage < 25
-		) {
-			throw new Error("MINIMUM_OWNERSHIP_PERCENTAGE_NOT_MET");
-		}
-
-		// Validate cap table doesn't exceed 100%
-		if (
-			input.relationshipType === "SHAREHOLDER" &&
-			input.ownershipPercentage !== null &&
-			input.ownershipPercentage !== undefined
-		) {
-			const existingUBOs = await this.repository.list(
-				input.clientId,
-				"SHAREHOLDER",
+		if (input.relationshipType === "SHAREHOLDER") {
+			this.validateOwnershipPercentageRequired(
+				input.relationshipType,
+				input.ownershipPercentage,
 			);
-			const currentTotal = existingUBOs.data.reduce(
-				(sum, ubo) => sum + (ubo.ownershipPercentage || 0),
-				0,
-			);
-			const newTotal = currentTotal + input.ownershipPercentage;
-
-			if (newTotal > 100) {
-				throw new Error("CAP_TABLE_EXCEEDS_100_PERCENT");
+			this.validateMinimumOwnershipPercentage(input.ownershipPercentage);
+			if (
+				input.ownershipPercentage !== null &&
+				input.ownershipPercentage !== undefined
+			) {
+				await this.validateCapTable(input.clientId, input.ownershipPercentage);
 			}
 		}
 
@@ -97,39 +125,17 @@ export class UBOService {
 		uboId: string,
 		input: UBOUpdateInput,
 	): Promise<UBOEntity> {
-		// Validate ownership percentage for shareholders
-		if (
-			input.relationshipType === "SHAREHOLDER" &&
-			(input.ownershipPercentage === undefined ||
-				input.ownershipPercentage === null)
-		) {
-			throw new Error("OWNERSHIP_PERCENTAGE_REQUIRED_FOR_SHAREHOLDER");
-		}
-
-		// Validate minimum ownership percentage (legal requirement: 25% or more)
-		if (
-			input.relationshipType === "SHAREHOLDER" &&
-			input.ownershipPercentage !== null &&
-			input.ownershipPercentage !== undefined &&
-			input.ownershipPercentage < 25
-		) {
-			throw new Error("MINIMUM_OWNERSHIP_PERCENTAGE_NOT_MET");
-		}
-
-		// Validate cap table doesn't exceed 100%
-		if (
-			input.relationshipType === "SHAREHOLDER" &&
-			input.ownershipPercentage !== null &&
-			input.ownershipPercentage !== undefined
-		) {
-			const existingUBOs = await this.repository.list(clientId, "SHAREHOLDER");
-			const currentTotal = existingUBOs.data
-				.filter((ubo) => ubo.id !== uboId) // Exclude the UBO being updated
-				.reduce((sum, ubo) => sum + (ubo.ownershipPercentage || 0), 0);
-			const newTotal = currentTotal + input.ownershipPercentage;
-
-			if (newTotal > 100) {
-				throw new Error("CAP_TABLE_EXCEEDS_100_PERCENT");
+		if (input.relationshipType === "SHAREHOLDER") {
+			this.validateOwnershipPercentageRequired(
+				input.relationshipType,
+				input.ownershipPercentage,
+			);
+			this.validateMinimumOwnershipPercentage(input.ownershipPercentage);
+			if (
+				input.ownershipPercentage !== null &&
+				input.ownershipPercentage !== undefined
+			) {
+				await this.validateCapTable(clientId, input.ownershipPercentage, uboId);
 			}
 		}
 
@@ -155,43 +161,25 @@ export class UBOService {
 		const relationshipType =
 			input.relationshipType || currentUBO.relationshipType;
 
-		// Validate ownership percentage is required when switching to SHAREHOLDER
-		if (
-			relationshipType === "SHAREHOLDER" &&
-			(input.ownershipPercentage === undefined ||
-				input.ownershipPercentage === null)
-		) {
+		// Validate ownership percentage when working with shareholders
+		if (relationshipType === "SHAREHOLDER") {
 			// If switching to SHAREHOLDER, require ownershipPercentage
 			if (
 				input.relationshipType === "SHAREHOLDER" &&
-				currentUBO.relationshipType !== "SHAREHOLDER"
+				currentUBO.relationshipType !== "SHAREHOLDER" &&
+				(input.ownershipPercentage === undefined ||
+					input.ownershipPercentage === null)
 			) {
 				throw new Error("OWNERSHIP_PERCENTAGE_REQUIRED");
 			}
-			// If already a SHAREHOLDER and not updating percentage, use current value
-			// (no validation needed)
-		}
 
-		// If updating ownership percentage for a shareholder
-		if (
-			relationshipType === "SHAREHOLDER" &&
-			input.ownershipPercentage !== undefined &&
-			input.ownershipPercentage !== null
-		) {
-			// Validate minimum ownership percentage (legal requirement: 25% or more)
-			if (input.ownershipPercentage < 25) {
-				throw new Error("MINIMUM_OWNERSHIP_PERCENTAGE_NOT_MET");
-			}
-
-			// Validate cap table doesn't exceed 100%
-			const existingUBOs = await this.repository.list(clientId, "SHAREHOLDER");
-			const currentTotal = existingUBOs.data
-				.filter((ubo) => ubo.id !== uboId) // Exclude the UBO being updated
-				.reduce((sum, ubo) => sum + (ubo.ownershipPercentage || 0), 0);
-			const newTotal = currentTotal + input.ownershipPercentage;
-
-			if (newTotal > 100) {
-				throw new Error("CAP_TABLE_EXCEEDS_100_PERCENT");
+			// If updating ownership percentage, validate it
+			if (
+				input.ownershipPercentage !== undefined &&
+				input.ownershipPercentage !== null
+			) {
+				this.validateMinimumOwnershipPercentage(input.ownershipPercentage);
+				await this.validateCapTable(clientId, input.ownershipPercentage, uboId);
 			}
 		}
 
@@ -239,6 +227,6 @@ export class UBOService {
 	 * Get the full name of a UBO for PEP checking
 	 */
 	getUBOFullName(ubo: UBOEntity): string {
-		return `${ubo.firstName} ${ubo.lastName} ${ubo.secondLastName || ""}`.trim();
+		return formatFullName(ubo.firstName, ubo.lastName, ubo.secondLastName);
 	}
 }
