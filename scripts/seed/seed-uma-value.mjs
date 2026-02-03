@@ -101,11 +101,9 @@ async function seedUmaValue() {
 		const checkFile = join(__dirname, `temp-check-uma-${Date.now()}.sql`);
 		try {
 			writeFileSync(checkFile, checkSql);
-			const wranglerCmd =
-				process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
 			const checkCommand = isRemote
-				? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${checkFile}"`
-				: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${checkFile}"`;
+				? `wrangler d1 execute DB ${configFlag} --remote --file "${checkFile}"`
+				: `wrangler d1 execute DB ${configFlag} --local --file "${checkFile}"`;
 			const checkOutput = execSync(checkCommand, { encoding: "utf-8" });
 			// Parse the count from output (format may vary)
 			const countMatch = checkOutput.match(/count\s*\|\s*(\d+)/i);
@@ -134,11 +132,9 @@ async function seedUmaValue() {
 			writeFileSync(sqlFile, sql);
 
 			// Execute SQL
-			const wranglerCmd =
-				process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
 			const command = isRemote
-				? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
-				: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
+				? `wrangler d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
+				: `wrangler d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
 
 			execSync(command, { stdio: "inherit" });
 
@@ -163,7 +159,11 @@ async function seedUmaValue() {
 export { seedUmaValue };
 
 // If run directly, execute seed
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Compare normalized paths for cross-platform compatibility
+const isDirectRun =
+	process.argv[1] && __filename.toLowerCase() === process.argv[1].toLowerCase();
+
+if (isDirectRun) {
 	seedUmaValue().catch((error) => {
 		console.error("Fatal error:", error);
 		process.exit(1);

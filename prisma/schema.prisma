@@ -147,6 +147,7 @@ model Client {
   alerts       Alert[]
   reports      Report[] // Reports targeting this specific client
   ubos         UltimateBeneficialOwner[] // UBOs for moral/trust entities
+  uploadLinks  UploadLink[] // Upload links created for this client
 
   @@map("clients")
   // Note: RFC uniqueness is enforced via partial unique index in migration (WHERE deleted_at IS NULL)
@@ -173,18 +174,17 @@ model ClientDocument {
   status         DocumentStatus @default(PENDING)
   fileUrl        String?        @map("file_url")
   metadata       String?
-  // doc-svc integration fields
+  // doc-svc integration fields (simplified MVP)
   docSvcDocumentId   String?    @map("doc_svc_document_id") // Reference to doc-svc document
-  docSvcJobId        String?    @map("doc_svc_job_id") // Processing job ID
-  verificationStatus String?    @map("verification_status") // APPROVED, REVIEW, REJECTED
-  verificationScore  Float?     @map("verification_score")
-  extractedData      String?    @map("extracted_data") // JSON from doc-svc extraction
+  uploadLinkId       String?    @map("upload_link_id") // Reference to upload link used
   verifiedAt         DateTime?  @map("verified_at")
+  verifiedBy         String?    @map("verified_by") // User who verified
   // Timestamps
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client     Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  uploadLink UploadLink? @relation(fields: [uploadLinkId], references: [id], onDelete: SetNull)
   // Relations for UBO documents
   uboIdDocuments      UltimateBeneficialOwner[] @relation("UBOIdDocument")
   uboAddressProofs    UltimateBeneficialOwner[] @relation("UBOAddressProof")
@@ -195,7 +195,39 @@ model ClientDocument {
   @@index([status])
   @@index([expiryDate])
   @@index([docSvcDocumentId])
-  @@index([verificationStatus])
+  @@index([uploadLinkId])
+}
+
+// Upload link status
+enum UploadLinkStatus {
+  ACTIVE
+  EXPIRED
+  COMPLETED
+}
+
+// Upload Links - shareable links for document uploads via doc-svc
+model UploadLink {
+  id                String           @id
+  organizationId    String           @map("organization_id")
+  clientId          String?          @map("client_id") // Optional link to client
+  createdBy         String           @map("created_by")
+  docSvcLinkId      String           @map("doc_svc_link_id") // Reference to doc-svc upload link
+  expiresAt         DateTime         @map("expires_at")
+  status            UploadLinkStatus @default(ACTIVE)
+  requiredDocuments String?          @map("required_documents") // JSON array of required document types
+  notes             String?
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  client    Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  documents ClientDocument[]
+
+  @@map("upload_links")
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([docSvcLinkId])
+  @@index([status])
+  @@index([expiresAt])
 }
 
 model ClientAddress {

@@ -34,5 +34,9 @@ declare namespace Cloudflare {
 		 * If not set, Sentry will be disabled.
 		 */
 		SENTRY_DSN?: string;
+		/**
+		 * Service binding to doc-svc for document processing
+		 */
+		DOC_SERVICE?: Fetcher;
 	}
 }

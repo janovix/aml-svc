@@ -81,11 +81,9 @@ describe("ClientRepository", () => {
 		fileUrl: "https://example.com/file.pdf",
 		metadata: null,
 		docSvcDocumentId: null,
-		docSvcJobId: null,
-		verificationStatus: null,
-		verificationScore: null,
-		extractedData: null,
+		uploadLinkId: null,
 		verifiedAt: null,
+		verifiedBy: null,
 		createdAt: new Date("2024-01-01"),
 		updatedAt: new Date("2024-01-01"),
 	};

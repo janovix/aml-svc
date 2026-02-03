@@ -85,7 +85,11 @@ async function seedTransactions() {
 export { seedTransactions };
 
 // If run directly, execute seed
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Compare normalized paths for cross-platform compatibility
+const isDirectRun =
+	process.argv[1] && __filename.toLowerCase() === process.argv[1].toLowerCase();
+
+if (isDirectRun) {
 	seedTransactions().catch((error) => {
 		console.error("Fatal error:", error);
 		process.exit(1);

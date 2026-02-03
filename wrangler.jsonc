@@ -36,6 +36,10 @@
 			"binding": "AUTH_SERVICE",
 			"service": "auth-svc",
 		},
+		{
+			"binding": "DOC_SERVICE",
+			"service": "doc-svc",
+		},
 	],
 	"queues": {
 		"producers": [

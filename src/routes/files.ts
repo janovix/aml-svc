@@ -55,7 +55,7 @@ filesRouter.post(
 			// Generate unique file key
 			const fileId = generateId("FILE");
 			const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-			const extension = file.name.split(".").pop() || "bin";
+			const _extension = file.name.split(".").pop() || "bin"; // Extension available if needed
 			const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
 
 			// Build key: {category}/{organizationId}/{clientId}/{documentId}/{timestamp}-{fileId}.{ext}
@@ -262,7 +262,6 @@ filesRouter.get(
 				throw new APIError(404, "File not found");
 			}
 
-			
 			// Return file with appropriate headers
 			return new Response(object.body, {
 				headers: {

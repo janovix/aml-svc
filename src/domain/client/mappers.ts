@@ -322,13 +322,11 @@ export function mapDocumentCreateInputToPrisma(
 		status: input.status ?? "PENDING",
 		fileUrl: normalizeOptional(input.fileUrl),
 		metadata: serializeMetadata(input.metadata),
-		// doc-svc integration fields
+		// doc-svc integration fields (simplified MVP)
 		docSvcDocumentId: normalizeOptional(input.docSvcDocumentId),
-		docSvcJobId: normalizeOptional(input.docSvcJobId),
-		verificationStatus: normalizeOptional(input.verificationStatus),
-		verificationScore: normalizeOptional(input.verificationScore),
-		extractedData: serializeMetadata(input.extractedData),
+		uploadLinkId: normalizeOptional(input.uploadLinkId),
 		verifiedAt: toPrismaDate(input.verifiedAt),
+		verifiedBy: normalizeOptional(input.verifiedBy),
 	};
 }
 
@@ -344,13 +342,11 @@ export function mapDocumentUpdateInputToPrisma(
 		status: input.status ?? "PENDING",
 		fileUrl: normalizeOptional(input.fileUrl),
 		metadata: serializeMetadata(input.metadata),
-		// doc-svc integration fields
+		// doc-svc integration fields (simplified MVP)
 		docSvcDocumentId: normalizeOptional(input.docSvcDocumentId),
-		docSvcJobId: normalizeOptional(input.docSvcJobId),
-		verificationStatus: normalizeOptional(input.verificationStatus),
-		verificationScore: normalizeOptional(input.verificationScore),
-		extractedData: serializeMetadata(input.extractedData),
+		uploadLinkId: normalizeOptional(input.uploadLinkId),
 		verifiedAt: toPrismaDate(input.verifiedAt),
+		verifiedBy: normalizeOptional(input.verifiedBy),
 	};
 }
 
@@ -373,16 +369,12 @@ export function mapDocumentPatchInputToPrisma(input: ClientDocumentPatchInput) {
 	// doc-svc integration fields
 	if (input.docSvcDocumentId !== undefined)
 		payload.docSvcDocumentId = normalizeOptional(input.docSvcDocumentId);
-	if (input.docSvcJobId !== undefined)
-		payload.docSvcJobId = normalizeOptional(input.docSvcJobId);
-	if (input.verificationStatus !== undefined)
-		payload.verificationStatus = normalizeOptional(input.verificationStatus);
-	if (input.verificationScore !== undefined)
-		payload.verificationScore = normalizeOptional(input.verificationScore);
-	if (input.extractedData !== undefined)
-		payload.extractedData = serializeMetadata(input.extractedData);
+	if (input.uploadLinkId !== undefined)
+		payload.uploadLinkId = normalizeOptional(input.uploadLinkId);
 	if (input.verifiedAt !== undefined)
 		payload.verifiedAt = toPrismaDate(input.verifiedAt);
+	if (input.verifiedBy !== undefined)
+		payload.verifiedBy = normalizeOptional(input.verifiedBy);
 	return payload;
 }
 
@@ -400,18 +392,11 @@ export function mapPrismaDocument(
 		status: record.status,
 		fileUrl: record.fileUrl ?? null,
 		metadata: parseMetadata(record.metadata),
-		// doc-svc integration fields
+		// doc-svc integration fields (simplified MVP)
 		docSvcDocumentId: record.docSvcDocumentId ?? null,
-		docSvcJobId: record.docSvcJobId ?? null,
-		verificationStatus:
-			(record.verificationStatus as
-				| "APPROVED"
-				| "REVIEW"
-				| "REJECTED"
-				| null) ?? null,
-		verificationScore: record.verificationScore ?? null,
-		extractedData: parseMetadata(record.extractedData),
+		uploadLinkId: record.uploadLinkId ?? null,
 		verifiedAt: mapDateTime(record.verifiedAt),
+		verifiedBy: record.verifiedBy ?? null,
 		// Timestamps
 		createdAt: mapDateTime(record.createdAt) ?? new Date().toISOString(),
 		updatedAt: mapDateTime(record.updatedAt) ?? new Date().toISOString(),

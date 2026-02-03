@@ -9,6 +9,7 @@
 DROP TABLE IF EXISTS ultimate_beneficial_owners;
 DROP TABLE IF EXISTS clients;
 DROP TABLE IF EXISTS client_documents;
+DROP TABLE IF EXISTS upload_links;
 DROP TABLE IF EXISTS client_addresses;
 DROP TABLE IF EXISTS catalogs;
 DROP TABLE IF EXISTS catalog_items;
@@ -75,6 +76,21 @@ CREATE TABLE clients (
     deleted_at DATETIME
 );
 
+-- Upload Links - shareable links for document uploads via doc-svc
+CREATE TABLE upload_links (
+    id TEXT PRIMARY KEY NOT NULL,
+    organization_id TEXT NOT NULL,
+    client_id TEXT REFERENCES clients(id) ON DELETE SET NULL,
+    created_by TEXT NOT NULL,
+    doc_svc_link_id TEXT NOT NULL, -- Reference to doc-svc upload link
+    expires_at DATETIME NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','EXPIRED','COMPLETED')),
+    required_documents TEXT, -- JSON array of required document types
+    notes TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE client_documents (
     id TEXT PRIMARY KEY NOT NULL,
     client_id TEXT NOT NULL,
@@ -86,13 +102,11 @@ CREATE TABLE client_documents (
     status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','VERIFIED','REJECTED','EXPIRED')),
     file_url TEXT,
     metadata TEXT,
-    -- doc-svc integration fields
+    -- doc-svc integration fields (simplified MVP)
     doc_svc_document_id TEXT, -- Reference to doc-svc document
-    doc_svc_job_id TEXT, -- Processing job ID
-    verification_status TEXT, -- APPROVED, REVIEW, REJECTED
-    verification_score REAL,
-    extracted_data TEXT, -- JSON from doc-svc extraction
+    upload_link_id TEXT REFERENCES upload_links(id) ON DELETE SET NULL,
     verified_at DATETIME,
+    verified_by TEXT, -- User who verified
     -- Timestamps
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -431,13 +445,20 @@ CREATE INDEX idx_clients_kyc_status ON clients(kyc_status);
 CREATE INDEX idx_clients_pep_status ON clients(pep_status);
 CREATE INDEX idx_clients_pep_checked_at ON clients(pep_checked_at);
 
+-- Upload links indexes
+CREATE INDEX idx_upload_links_organization_id ON upload_links(organization_id);
+CREATE INDEX idx_upload_links_client_id ON upload_links(client_id);
+CREATE INDEX idx_upload_links_doc_svc_link_id ON upload_links(doc_svc_link_id);
+CREATE INDEX idx_upload_links_status ON upload_links(status);
+CREATE INDEX idx_upload_links_expires_at ON upload_links(expires_at);
+
 -- Client documents indexes
 CREATE INDEX idx_client_documents_client_id ON client_documents(client_id);
 CREATE INDEX idx_client_documents_document_type ON client_documents(document_type);
 CREATE INDEX idx_client_documents_status ON client_documents(status);
 CREATE INDEX idx_client_documents_expiry_date ON client_documents(expiry_date);
 CREATE INDEX idx_client_documents_doc_svc_document_id ON client_documents(doc_svc_document_id);
-CREATE INDEX idx_client_documents_verification_status ON client_documents(verification_status);
+CREATE INDEX idx_client_documents_upload_link_id ON client_documents(upload_link_id);
 
 -- Client addresses indexes
 CREATE INDEX idx_client_addresses_client_id ON client_addresses(client_id);

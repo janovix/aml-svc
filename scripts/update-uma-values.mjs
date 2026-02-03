@@ -26,7 +26,7 @@ const UMA_VALUES = {
 			"UMA value for 2025 - Source: INEGI. Verified against official PDF: https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2025/uma/uma2025.pdf. Note: 2026 UMA starts February 1st.",
 	},
 	2026: {
-		dailyValue: 0, // PLACEHOLDER - Update with exact value when available
+		dailyValue: 117.31,
 		effectiveDate: "2026-02-01T00:00:00Z", // Starts February 1st, not January 1st
 		endDate: "2026-12-31T23:59:59Z",
 		notes:

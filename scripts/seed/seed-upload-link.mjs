@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Seed Reports
+ * Seed UploadLinks
  *
- * Generates synthetic report data for dev/preview environments.
+ * Generates synthetic upload link data for dev/preview environments.
  * This is SEED data (not real data) and should NOT run in production.
  */
 
@@ -14,7 +14,7 @@ import { writeFileSync, unlinkSync } from "node:fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-async function seedReports() {
+async function seedUploadLinks() {
 	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
 	// Use WRANGLER_CONFIG if set, otherwise detect preview environment
 	let configFile = process.env.WRANGLER_CONFIG;
@@ -31,11 +31,16 @@ async function seedReports() {
 	const configFlag = configFile ? `--config ${configFile}` : "";
 
 	try {
-		console.log(`🌱 Seeding reports (${isRemote ? "remote" : "local"})...`);
+		console.log(
+			`🌱 Seeding upload links (${isRemote ? "remote" : "local"})...`,
+		);
 
-		// Check if reports already exist
-		const checkSql = "SELECT COUNT(*) as count FROM reports;";
-		const checkFile = join(__dirname, `temp-check-reports-${Date.now()}.sql`);
+		// Check if upload links already exist
+		const checkSql = "SELECT COUNT(*) as count FROM upload_links;";
+		const checkFile = join(
+			__dirname,
+			`temp-check-upload-links-${Date.now()}.sql`,
+		);
 		try {
 			writeFileSync(checkFile, checkSql);
 			const wranglerCmd =
@@ -47,13 +52,13 @@ async function seedReports() {
 			// Parse the count from output (format may vary)
 			const countMatch = checkOutput.match(/count\s*\|\s*(\d+)/i);
 			if (countMatch && parseInt(countMatch[1], 10) > 0) {
-				console.log(`⏭️  Reports already exist. Skipping seed.`);
+				console.log(`⏭️  Upload links already exist. Skipping seed.`);
 				return;
 			}
 		} catch {
 			// If check fails, continue with seeding
 			console.warn(
-				"⚠️  Could not check existing reports, proceeding with seed...",
+				"⚠️  Could not check existing upload links, proceeding with seed...",
 			);
 		} finally {
 			try {
@@ -63,19 +68,21 @@ async function seedReports() {
 			}
 		}
 
-		// TODO: Implement report seeding logic
-		// Generate synthetic reports with realistic data for testing
-		// Note: Requires alerts to exist first (reports reference alerts)
-		// For now, skip if no reports exist
-		console.log("✅ Report seeding completed (no synthetic data generated)");
+		// TODO: Implement upload link seeding logic
+		// Generate synthetic upload links with realistic data for testing
+		// Note: UploadLinks reference doc-svc upload links and may be linked to clients
+		// For now, skip if no upload links exist
+		console.log(
+			"✅ Upload link seeding completed (no synthetic data generated)",
+		);
 	} catch (error) {
-		console.error("❌ Error seeding reports:", error);
+		console.error("❌ Error seeding upload links:", error);
 		throw error;
 	}
 }
 
 // Export for use in all.mjs
-export { seedReports };
+export { seedUploadLinks };
 
 // If run directly, execute seed
 // Compare normalized paths for cross-platform compatibility
@@ -83,7 +90,7 @@ const isDirectRun =
 	process.argv[1] && __filename.toLowerCase() === process.argv[1].toLowerCase();
 
 if (isDirectRun) {
-	seedReports().catch((error) => {
+	seedUploadLinks().catch((error) => {
 		console.error("Fatal error:", error);
 		process.exit(1);
 	});

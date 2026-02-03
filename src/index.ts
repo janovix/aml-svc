@@ -27,6 +27,8 @@ export type Bindings = {
 	SAT_CLAVE_ENTIDAD_COLEGIADA?: string; // Optional collegiate entity identifier
 	/** Service binding to auth-svc for worker-to-worker communication */
 	AUTH_SERVICE?: Fetcher;
+	/** Service binding to doc-svc for document processing */
+	DOC_SERVICE?: Fetcher;
 	/** Queue for alert detection jobs */
 	ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
 	/** Queue for import processing jobs */
@@ -105,6 +107,7 @@ app.get("/docsz", (c) => {
 // Service binding routes (internal worker-to-worker communication)
 // Note: When using service bindings with https://internal/..., Cloudflare strips the /internal prefix
 // So we need to handle both /internal/* routes (for direct HTTP calls) and direct paths (for service bindings)
+
 app.all("/internal/*", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });

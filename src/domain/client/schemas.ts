@@ -479,13 +479,11 @@ export const ClientDocumentCreateSchema = z.object({
 	status: DocumentStatusSchema.default("PENDING"),
 	fileUrl: z.string().url().optional().nullable(),
 	metadata: z.record(z.string(), z.any()).optional().nullable(),
-	// doc-svc integration fields (optional on create, populated after upload)
+	// doc-svc integration fields (simplified MVP)
 	docSvcDocumentId: z.string().optional().nullable(),
-	docSvcJobId: z.string().optional().nullable(),
-	verificationStatus: VerificationStatusSchema.optional().nullable(),
-	verificationScore: z.number().min(0).max(1).optional().nullable(),
-	extractedData: z.record(z.string(), z.any()).optional().nullable(),
+	uploadLinkId: z.string().optional().nullable(),
 	verifiedAt: isoString.optional().nullable(),
+	verifiedBy: z.string().optional().nullable(),
 });
 
 export const ClientDocumentUpdateSchema = ClientDocumentCreateSchema.omit({
@@ -508,13 +506,11 @@ export const ClientDocumentPatchSchema = z
 		status: DocumentStatusSchema.optional(),
 		fileUrl: z.string().url().optional().nullable(),
 		metadata: z.record(z.string(), z.any()).optional().nullable(),
-		// doc-svc integration fields
+		// doc-svc integration fields (simplified MVP)
 		docSvcDocumentId: z.string().optional().nullable(),
-		docSvcJobId: z.string().optional().nullable(),
-		verificationStatus: VerificationStatusSchema.optional().nullable(),
-		verificationScore: z.number().min(0).max(1).optional().nullable(),
-		extractedData: z.record(z.string(), z.any()).optional().nullable(),
+		uploadLinkId: z.string().optional().nullable(),
 		verifiedAt: isoString.optional().nullable(),
+		verifiedBy: z.string().optional().nullable(),
 	})
 	.refine((data) => Object.keys(data).length > 0, {
 		message: "Payload is empty",

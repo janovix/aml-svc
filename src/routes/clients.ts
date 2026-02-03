@@ -88,16 +88,15 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 		throw new APIError(404, "Client not found");
 	}
 
-	// Get documents for this client using raw query to include new fields
+	// Get documents for this client using raw query
 	const documents = await prisma.$queryRaw<
 		Array<{
 			id: string;
 			document_type: string;
 			status: string;
-			verification_status: string | null;
 		}>
 	>`
-		SELECT id, document_type, status, verification_status
+		SELECT id, document_type, status
 		FROM client_documents
 		WHERE client_id = ${client.id}
 	`;
@@ -131,12 +130,8 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 	const missingDocs = requiredDocs.filter((d) => !uploadedDocTypes.includes(d));
 
 	// Check document verification status
-	const verifiedDocs = documents.filter(
-		(d) => d.status === "VERIFIED" || d.verification_status === "APPROVED",
-	).length;
-	const pendingDocs = documents.filter(
-		(d) => d.status === "PENDING" || d.verification_status === "REVIEW",
-	).length;
+	const verifiedDocs = documents.filter((d) => d.status === "VERIFIED").length;
+	const pendingDocs = documents.filter((d) => d.status === "PENDING").length;
 
 	// UBO requirements for MORAL/TRUST
 	const requiresUBO = ["MORAL", "TRUST"].includes(client.personType);

@@ -145,7 +145,12 @@ describe("generateFileKey", () => {
 
 describe("generateReportFileKey", () => {
 	it("should generate a report file key", () => {
-		const key = generateReportFileKey("org-123", "report-1", "2024-01-01", "2024-01-31");
+		const key = generateReportFileKey(
+			"org-123",
+			"report-1",
+			"2024-01-01",
+			"2024-01-31",
+		);
 
 		expect(key).toBe("reports/org-123/report-1_2024-01-01_2024-01-31.html");
 	});

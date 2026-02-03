@@ -61,7 +61,9 @@ export interface R2UploadResult {
 /**
  * Uploads content to R2 bucket
  */
-export async function uploadToR2(options: R2UploadOptions): Promise<R2UploadResult> {
+export async function uploadToR2(
+	options: R2UploadOptions,
+): Promise<R2UploadResult> {
 	const { bucket, key, content, contentType, metadata } = options;
 
 	// Convert string content to ArrayBuffer if needed
