@@ -12,7 +12,7 @@ import {
 	AlertUpdateSchema,
 	AlertCancelSchema,
 } from "../domain/alert";
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";

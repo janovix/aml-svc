@@ -5086,7 +5086,12 @@ export const openAPISpec = {
 			},
 			ClientStats: {
 				type: "object",
-				required: ["totalClients", "physicalClients", "moralClients"],
+				required: [
+					"totalClients",
+					"physicalClients",
+					"moralClients",
+					"trustClients",
+				],
 				properties: {
 					totalClients: {
 						type: "integer",
@@ -5102,6 +5107,11 @@ export const openAPISpec = {
 						type: "integer",
 						description: "Number of legal entity/moral person clients",
 						example: 50,
+					},
+					trustClients: {
+						type: "integer",
+						description: "Number of trust clients",
+						example: 0,
 					},
 				},
 			},

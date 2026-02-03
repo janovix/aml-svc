@@ -15,7 +15,7 @@ import {
 	TransactionUpdateSchema,
 } from "../domain/transaction";
 import { UmaValueRepository } from "../domain/uma";
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import { createAlertQueueService } from "../lib/alert-queue";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";

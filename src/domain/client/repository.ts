@@ -320,23 +320,29 @@ export class ClientRepository {
 		totalClients: number;
 		physicalClients: number;
 		moralClients: number;
+		trustClients: number;
 	}> {
-		const [totalClients, physicalClients, moralClients] = await Promise.all([
-			this.prisma.client.count({
-				where: { organizationId, deletedAt: null },
-			}),
-			this.prisma.client.count({
-				where: { organizationId, deletedAt: null, personType: "PHYSICAL" },
-			}),
-			this.prisma.client.count({
-				where: { organizationId, deletedAt: null, personType: "MORAL" },
-			}),
-		]);
+		const [totalClients, physicalClients, moralClients, trustClients] =
+			await Promise.all([
+				this.prisma.client.count({
+					where: { organizationId, deletedAt: null },
+				}),
+				this.prisma.client.count({
+					where: { organizationId, deletedAt: null, personType: "PHYSICAL" },
+				}),
+				this.prisma.client.count({
+					where: { organizationId, deletedAt: null, personType: "MORAL" },
+				}),
+				this.prisma.client.count({
+					where: { organizationId, deletedAt: null, personType: "TRUST" },
+				}),
+			]);
 
 		return {
 			totalClients,
 			physicalClients,
 			moralClients,
+			trustClients,
 		};
 	}
 }

@@ -3,7 +3,7 @@
  */
 
 import type { Context, MiddlewareHandler } from "hono";
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import type { AuthVariables } from "./auth";
 import {
 	SubscriptionClient,

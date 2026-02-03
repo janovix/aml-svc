@@ -50,7 +50,7 @@ describe("auth-settings", () => {
 		};
 
 		it("should return null when AUTH_SERVICE binding is not available", async () => {
-			const env = { AUTH_SERVICE: undefined } as Bindings;
+			const env = { AUTH_SERVICE: undefined } as unknown as Bindings;
 
 			const result = await getResolvedSettings(env, "user-123");
 

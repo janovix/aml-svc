@@ -5,7 +5,7 @@
  * via Cloudflare service binding.
  */
 
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 
 /**
  * Theme options

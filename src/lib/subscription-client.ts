@@ -5,7 +5,7 @@
  * reporting usage, and verifying features via auth-svc service binding.
  */
 
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 
 /**
  * Plan tiers

@@ -14,7 +14,7 @@
  * Or using the helper methods defined below.
  */
 
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import { getPrismaClient } from "./prisma";
 import {
 	AlertRuleRepository,

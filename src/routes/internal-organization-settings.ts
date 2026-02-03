@@ -9,7 +9,7 @@ import {
 	organizationSettingsCreateSchema,
 	organizationSettingsUpdateSchema,
 } from "../domain/organization-settings";
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 
 /**
  * Handle internal organization settings requests from service bindings

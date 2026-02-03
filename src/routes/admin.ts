@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { AlertStatus, NoticeStatus, Prisma } from "@prisma/client";
 
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import {
 	adminAuthMiddleware,
 	type AdminAuthVariables,

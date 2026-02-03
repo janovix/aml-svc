@@ -495,6 +495,7 @@ describe("ClientService", () => {
 				totalClients: 100,
 				physicalClients: 70,
 				moralClients: 30,
+				trustClients: 0,
 			};
 
 			vi.mocked(mockRepository.getStats).mockResolvedValue(stats);
