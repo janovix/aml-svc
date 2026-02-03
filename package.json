@@ -51,9 +51,7 @@
 		"typescript": "5.9.3",
 		"typescript-eslint": "8.49.0",
 		"vitest": "3.2.4",
-		"wrangler": "4.51.0",
-		"@stryker-mutator/core": "^8.7.1",
-		"@stryker-mutator/vitest-runner": "^8.7.1"
+		"wrangler": "4.51.0"
 	},
 	"packageManager": "pnpm@10.0.0",
 	"private": true,
@@ -100,7 +98,6 @@
 		"vitest": "vitest --config tests/vitest.config.mts",
 		"vitest:coverage": "vitest run --coverage --config tests/vitest.config.mts",
 		"test": "pnpm run vitest",
-		"test:mutation": "pnpm exec stryker run",
 		"sentry:sourcemaps": "_SENTRY_RELEASE=$(sentry-cli releases propose-version) && sentry-cli releases new $_SENTRY_RELEASE && sentry-cli sourcemaps upload --release=$_SENTRY_RELEASE --strip-prefix 'dist/..' dist",
 		"postdeploy:dev": "pnpm sentry:sourcemaps || true",
 		"postdeploy:prod": "pnpm sentry:sourcemaps || true"
