@@ -16,12 +16,33 @@ const API_TOKEN = process.env.API_TOKEN || "";
 
 /**
  * Determines if a UMA value is currently active based on effective dates.
+ * If endDate is missing or invalid, the UMA is treated as valid indefinitely.
  */
 function isCurrentlyActive(umaData) {
 	const now = new Date();
 	const effectiveDate = new Date(umaData.effectiveDate);
+
+	// Check if effectiveDate is valid
+	if (isNaN(effectiveDate.getTime())) {
+		return false;
+	}
+
+	// Check if we're past the effective date
+	if (now < effectiveDate) {
+		return false;
+	}
+
+	// If endDate is missing or invalid, treat as valid indefinitely
+	if (!umaData.endDate) {
+		return true;
+	}
+
 	const endDate = new Date(umaData.endDate);
-	return now >= effectiveDate && now <= endDate;
+	if (isNaN(endDate.getTime())) {
+		return true; // Invalid endDate means no end (valid indefinitely)
+	}
+
+	return now <= endDate;
 }
 
 // UMA values from INEGI
