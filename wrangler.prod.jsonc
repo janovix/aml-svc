@@ -51,7 +51,7 @@
 		"ENVIRONMENT": "production",
 		"AUTH_SERVICE_URL": "https://auth-svc.janovix.com",
 		"AUTH_JWKS_CACHE_TTL": "3600",
-		"TRUSTED_ORIGINS": "https://aml.janovix.com,https://auth.janovix.com",
+		"TRUSTED_ORIGINS": "*.janovix.com,https://janovix.com",
 	},
 	// IMPORTANT: PRESIGNED_URL_SECRET must be configured via:
 	// wrangler secret put PRESIGNED_URL_SECRET --config wrangler.prod.jsonc
