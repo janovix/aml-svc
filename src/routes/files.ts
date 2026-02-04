@@ -186,7 +186,7 @@ filesRouter.post(
 );
 
 /**
- * OPTIONS /files/:key
+ * OPTIONS /files/*
  * Handle CORS preflight requests
  */
 filesRouter.options("/*", async () => {
@@ -194,7 +194,7 @@ filesRouter.options("/*", async () => {
 		status: 204,
 		headers: {
 			"Access-Control-Allow-Origin": "*",
-			"Access-Control-Allow-Methods": "GET, OPTIONS",
+			"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 			"Access-Control-Allow-Headers": "Content-Type, Authorization",
 			"Access-Control-Max-Age": "86400", // 24 hours
 		},
@@ -272,7 +272,7 @@ filesRouter.get(
 					"Cache-Control": "public, max-age=3600", // Cache for 1 hour (presigned URLs expire)
 					// CORS headers for cross-origin access
 					"Access-Control-Allow-Origin": "*",
-					"Access-Control-Allow-Methods": "GET, OPTIONS",
+					"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 					"Access-Control-Allow-Headers": "Content-Type, Authorization",
 					// ORB (Opaque Response Blocking) bypass
 					"Cross-Origin-Resource-Policy": "cross-origin",

@@ -116,9 +116,10 @@ export async function uploadFileToR2(
 	keyParts.push(`${timestamp}-${fileId}-${sanitizedFileName}`);
 	const key = keyParts.join("/");
 
-	const arrayBuffer = await file.arrayBuffer();
+	// Use stream() instead of arrayBuffer() for memory efficiency with large files
+	const stream = file.stream();
 
-	const object = await bucket.put(key, arrayBuffer, {
+	const object = await bucket.put(key, stream, {
 		httpMetadata: {
 			contentType: file.type || "application/octet-stream",
 		},

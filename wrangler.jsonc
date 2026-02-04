@@ -62,5 +62,7 @@
 		"AUTH_SERVICE_URL": "https://auth-svc.janovix.workers.dev",
 		"AUTH_JWKS_CACHE_TTL": "3600",
 		"TRUSTED_ORIGINS": "https://aml.janovix.workers.dev,https://auth.janovix.workers.dev,http://localhost:3000,http://localhost:3001,http://localhost:3002",
+		// For local development only - in production, use: wrangler secret put PRESIGNED_URL_SECRET
+		"PRESIGNED_URL_SECRET": "dev-secret-key-for-presigned-urls-change-in-production",
 	},
 }

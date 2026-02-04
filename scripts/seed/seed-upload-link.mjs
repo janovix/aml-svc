@@ -6,15 +6,23 @@
  * This is SEED data (not real data) and should NOT run in production.
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { writeFileSync, unlinkSync } from "node:fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 async function seedUploadLinks() {
+	// Production guard - refuse to seed in production
+	const isProd =
+		process.env.NODE_ENV === "production" ||
+		process.env.ENVIRONMENT === "production";
+	if (isProd) {
+		throw new Error("Refusing to seed upload links in production.");
+	}
+
 	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
 	// Use WRANGLER_CONFIG if set, otherwise detect preview environment
 	let configFile = process.env.WRANGLER_CONFIG;
@@ -28,7 +36,7 @@ async function seedUploadLinks() {
 			configFile = "wrangler.preview.jsonc";
 		}
 	}
-	const configFlag = configFile ? `--config ${configFile}` : "";
+	const configArgs = configFile ? ["--config", configFile] : [];
 
 	try {
 		console.log(
@@ -43,12 +51,22 @@ async function seedUploadLinks() {
 		);
 		try {
 			writeFileSync(checkFile, checkSql);
-			const wranglerCmd =
-				process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
-			const checkCommand = isRemote
-				? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${checkFile}"`
-				: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${checkFile}"`;
-			const checkOutput = execSync(checkCommand, { encoding: "utf-8" });
+			const usePnpm = process.env.CI === "true";
+			const wranglerCmd = usePnpm ? "pnpm" : "wrangler";
+			const baseArgs = usePnpm ? ["wrangler"] : [];
+			const checkArgs = [
+				...baseArgs,
+				"d1",
+				"execute",
+				"DB",
+				...configArgs,
+				isRemote ? "--remote" : "--local",
+				"--file",
+				checkFile,
+			];
+			const checkOutput = execFileSync(wranglerCmd, checkArgs, {
+				encoding: "utf-8",
+			});
 			// Parse the count from output (format may vary)
 			const countMatch = checkOutput.match(/count\s*\|\s*(\d+)/i);
 			if (countMatch && parseInt(countMatch[1], 10) > 0) {
@@ -87,7 +105,8 @@ export { seedUploadLinks };
 // If run directly, execute seed
 // Compare normalized paths for cross-platform compatibility
 const isDirectRun =
-	process.argv[1] && __filename.toLowerCase() === process.argv[1].toLowerCase();
+	process.argv[1] &&
+	resolve(__filename).toLowerCase() === resolve(process.argv[1]).toLowerCase();
 
 if (isDirectRun) {
 	seedUploadLinks().catch((error) => {
