@@ -137,7 +137,29 @@ filesRouter.post(
 
 		try {
 			const body = await c.req.json();
-			const { url, expiresInMinutes = 60 } = body;
+			const { url, expiresInMinutes: rawExpiresInMinutes } = body;
+
+			// Validate and clamp expiresInMinutes (1-1440 minutes, default 60)
+			let expiresInMinutes = 60; // default
+			if (rawExpiresInMinutes !== undefined) {
+				if (
+					typeof rawExpiresInMinutes !== "number" ||
+					!Number.isFinite(rawExpiresInMinutes) ||
+					!Number.isInteger(rawExpiresInMinutes)
+				) {
+					throw new APIError(
+						400,
+						"expiresInMinutes must be an integer between 1 and 1440",
+					);
+				}
+				if (rawExpiresInMinutes < 1 || rawExpiresInMinutes > 1440) {
+					throw new APIError(
+						400,
+						"expiresInMinutes must be between 1 and 1440",
+					);
+				}
+				expiresInMinutes = rawExpiresInMinutes;
+			}
 
 			if (!url || typeof url !== "string") {
 				throw new APIError(400, "File URL is required");

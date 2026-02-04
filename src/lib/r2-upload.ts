@@ -139,6 +139,14 @@ export async function uploadFileToR2(
 }
 
 /**
+ * Sanitize a filename by replacing unsafe characters with underscores.
+ * This ensures the filename is safe for use in R2 keys and URLs.
+ */
+function sanitizeFilename(filename: string): string {
+	return filename.replace(/[^a-zA-Z0-9.-]/g, "_");
+}
+
+/**
  * Generate a file key with timestamp for a specific category
  */
 export function generateFileKey(
@@ -148,7 +156,8 @@ export function generateFileKey(
 ): string {
 	const timestamp = Date.now();
 	const random = Math.random().toString(36).substring(2, 8);
-	return `${category}/${organizationId}/${timestamp}-${random}-${filename}`;
+	const safeName = sanitizeFilename(filename);
+	return `${category}/${organizationId}/${timestamp}-${random}-${safeName}`;
 }
 
 /**
@@ -183,5 +192,6 @@ export function generateImportFileKey(
 ): string {
 	const timestamp = Date.now();
 	const random = Math.random().toString(36).substring(2, 8);
-	return `imports/${organizationId}/${timestamp}-${random}-${filename}`;
+	const safeName = sanitizeFilename(filename);
+	return `imports/${organizationId}/${timestamp}-${random}-${safeName}`;
 }
