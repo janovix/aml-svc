@@ -1,3 +1,18 @@
+# [1.5.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.5.0-rc.4...v1.5.0-rc.5) (2026-02-06)
+
+
+### Bug Fixes
+
+* address additional CodeRabbit review items ([405f2de](https://github.com/janovix/aml-svc/commit/405f2def8aa3cb2c17654987464091dab295a4ac))
+* address CodeRabbit review items for PR [#42](https://github.com/janovix/aml-svc/issues/42) ([5e56482](https://github.com/janovix/aml-svc/commit/5e5648211ff2ba973a0f7f03a9d653fb8d08d889))
+* address CodeRabbit review items from PR [#42](https://github.com/janovix/aml-svc/issues/42) ([0b3383d](https://github.com/janovix/aml-svc/commit/0b3383d625f1cc9fb82b2c7f13d2ae5baef2a295))
+
+
+### Features
+
+* implement presigned URL generation and document viewer components ([cf85652](https://github.com/janovix/aml-svc/commit/cf8565217a681ac445121e8bc2bd510e0b77816d))
+* update CORS middleware to support wildcard patterns for TRUSTED_ORIGINS ([193e5a4](https://github.com/janovix/aml-svc/commit/193e5a46247d9a421e73f44bbe0bf3c9592ba4de))
+
 # [1.5.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.5.0-rc.3...v1.5.0-rc.4) (2026-02-06)
 
 
