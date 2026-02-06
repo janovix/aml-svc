@@ -29,5 +29,6 @@
 		"ENVIRONMENT": "test",
 		"AUTH_SERVICE_URL": "https://auth-svc.test",
 		"AUTH_JWKS_CACHE_TTL": "3600",
+		"TRUSTED_ORIGINS": "*.test.janovix.com,http://localhost:*",
 	},
 }

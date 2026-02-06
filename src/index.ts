@@ -60,6 +60,7 @@ app.get("/docsz", (c) => {
 // Service binding routes (internal worker-to-worker communication)
 // Note: When using service bindings with https://internal/..., Cloudflare strips the /internal prefix
 // So we need to handle both /internal/* routes (for direct HTTP calls) and direct paths (for service bindings)
+
 app.all("/internal/*", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
@@ -85,13 +86,13 @@ app.all("/uma-values/active", async (c) => {
 app.all("/alert-rules/:id/config/:key", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
-app.all("/clients/:id/transactions", async (c) => {
+app.all("/clients/:id/operations", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 app.all("/clients/:id", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
-app.all("/transactions", async (c) => {
+app.all("/operations", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 // Organization settings route for service binding access from auth-svc

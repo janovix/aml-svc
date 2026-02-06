@@ -36,8 +36,13 @@ export const openAPISpec = {
 			description: "Generic catalog listing endpoints",
 		},
 		{
-			name: "Transactions",
-			description: "Vehicle transaction endpoints",
+			name: "Operations",
+			description: "AML operation endpoints for tracking vulnerable activities",
+		},
+		{
+			name: "Invoices",
+			description:
+				"CFDI invoice management endpoints for parsing and storing Mexican tax invoices",
 		},
 		{
 			name: "Alert Rules",
@@ -70,7 +75,7 @@ export const openAPISpec = {
 		{
 			name: "Imports",
 			description:
-				"Bulk data import endpoints for uploading CSV/Excel files to import clients and transactions",
+				"Bulk data import endpoints for uploading CSV/Excel files to import clients and operations",
 		},
 		{
 			name: "Files",
@@ -730,6 +735,20 @@ export const openAPISpec = {
 						schema: { type: "boolean" },
 						description: "Filter items by their `active` flag (true/false).",
 					},
+					{
+						name: "vaCode",
+						in: "query",
+						schema: { type: "string", maxLength: 10 },
+						description:
+							"Filter by vulnerable activity code in metadata (for pld-alert-types catalog).",
+					},
+					{
+						name: "excludeAutomatable",
+						in: "query",
+						schema: { type: "boolean" },
+						description:
+							"Exclude automatable items (for pld-alert-types catalog, shows only manual-only alerts).",
+					},
 				],
 				responses: {
 					"200": {
@@ -892,12 +911,12 @@ export const openAPISpec = {
 				},
 			},
 		},
-		"/api/v1/transactions": {
+		"/api/v1/operations": {
 			get: {
-				tags: ["Transactions"],
-				summary: "List transactions",
+				tags: ["Operations"],
+				summary: "List operations",
 				description:
-					"Retrieve a paginated list of transactions filtered by client, operation metadata, vehicle type, or date range.",
+					"Retrieve a paginated list of operations filtered by client, activity code, operation type, or date range.",
 				parameters: [
 					{
 						name: "clientId",
@@ -968,7 +987,7 @@ export const openAPISpec = {
 						content: {
 							"application/json": {
 								schema: {
-									$ref: "#/components/schemas/TransactionListResponse",
+									$ref: "#/components/schemas/OperationListResponse",
 								},
 							},
 						},
@@ -992,7 +1011,7 @@ export const openAPISpec = {
 					required: true,
 					content: {
 						"application/json": {
-							schema: { $ref: "#/components/schemas/TransactionCreateRequest" },
+							schema: { $ref: "#/components/schemas/OperationCreateRequest" },
 						},
 					},
 				},
@@ -1001,7 +1020,7 @@ export const openAPISpec = {
 						description: "Transaction created successfully.",
 						content: {
 							"application/json": {
-								schema: { $ref: "#/components/schemas/Transaction" },
+								schema: { $ref: "#/components/schemas/Operation" },
 							},
 						},
 					},
@@ -1016,29 +1035,29 @@ export const openAPISpec = {
 				},
 			},
 		},
-		"/api/v1/transactions/stats": {
+		"/api/v1/operations/stats": {
 			get: {
-				tags: ["Transactions"],
-				summary: "Get transaction statistics",
+				tags: ["Operations"],
+				summary: "Get operation statistics",
 				description:
-					"Retrieve aggregate statistics for transactions including today's count, suspicious transactions, total volume, and unique vehicles.",
+					"Retrieve aggregate statistics for operations including today's count, suspicious operations, total volume, and activity breakdown.",
 				responses: {
 					"200": {
 						description: "Transaction statistics",
 						content: {
 							"application/json": {
-								schema: { $ref: "#/components/schemas/TransactionStats" },
+								schema: { $ref: "#/components/schemas/OperationStats" },
 							},
 						},
 					},
 				},
 			},
 		},
-		"/api/v1/transactions/{id}": {
+		"/api/v1/operations/{id}": {
 			get: {
-				tags: ["Transactions"],
-				summary: "Get transaction by ID",
-				description: "Retrieve a single transaction record.",
+				tags: ["Operations"],
+				summary: "Get operation by ID",
+				description: "Retrieve a single operation record.",
 				parameters: [
 					{
 						name: "id",
@@ -1056,7 +1075,7 @@ export const openAPISpec = {
 						description: "Transaction detail response.",
 						content: {
 							"application/json": {
-								schema: { $ref: "#/components/schemas/Transaction" },
+								schema: { $ref: "#/components/schemas/Operation" },
 							},
 						},
 					},
@@ -1071,10 +1090,10 @@ export const openAPISpec = {
 				},
 			},
 			put: {
-				tags: ["Transactions"],
-				summary: "Update transaction",
+				tags: ["Operations"],
+				summary: "Update operation",
 				description:
-					"Replace an existing transaction (client relationship remains immutable).",
+					"Update an existing operation (client relationship and activity code remain immutable).",
 				parameters: [
 					{
 						name: "id",
@@ -1090,7 +1109,7 @@ export const openAPISpec = {
 					required: true,
 					content: {
 						"application/json": {
-							schema: { $ref: "#/components/schemas/TransactionUpdateRequest" },
+							schema: { $ref: "#/components/schemas/OperationUpdateRequest" },
 						},
 					},
 				},
@@ -1099,7 +1118,7 @@ export const openAPISpec = {
 						description: "Transaction updated successfully.",
 						content: {
 							"application/json": {
-								schema: { $ref: "#/components/schemas/Transaction" },
+								schema: { $ref: "#/components/schemas/Operation" },
 							},
 						},
 					},
@@ -1140,6 +1159,351 @@ export const openAPISpec = {
 					"204": { description: "Transaction deleted" },
 					"404": {
 						description: "Transaction not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/invoices": {
+			get: {
+				tags: ["Invoices"],
+				summary: "List invoices",
+				description:
+					"Retrieve a paginated list of CFDI invoices with optional filters.",
+				parameters: [
+					{
+						name: "issuerRfc",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by issuer RFC",
+					},
+					{
+						name: "receiverRfc",
+						in: "query",
+						schema: { type: "string" },
+						description: "Filter by receiver RFC",
+					},
+					{
+						name: "uuid",
+						in: "query",
+						schema: { type: "string", format: "uuid" },
+						description: "Filter by CFDI UUID",
+					},
+					{
+						name: "voucherTypeCode",
+						in: "query",
+						schema: { type: "string", maxLength: 2 },
+						description: "Filter by voucher type code",
+					},
+					{
+						name: "startDate",
+						in: "query",
+						schema: { type: "string", format: "date" },
+						description: "Filter by issue date start (YYYY-MM-DD)",
+					},
+					{
+						name: "endDate",
+						in: "query",
+						schema: { type: "string", format: "date" },
+						description: "Filter by issue date end (YYYY-MM-DD)",
+					},
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", minimum: 1, default: 1 },
+						description: "Page number",
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", minimum: 1, maximum: 100, default: 10 },
+						description: "Items per page",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Paginated list of invoices",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/InvoiceListResponse" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Invoices"],
+				summary: "Create invoice manually",
+				description: "Create a new invoice manually without XML parsing",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/InvoiceCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Invoice created successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Invoice" },
+							},
+						},
+					},
+					"400": {
+						description: "Validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"409": {
+						description: "Duplicate CFDI UUID",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/invoices/parse-xml": {
+			post: {
+				tags: ["Invoices"],
+				summary: "Parse CFDI XML and create invoice",
+				description:
+					"Parse a CFDI XML document and create an invoice record. Returns PLD hints for activity detection.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								required: ["xmlContent"],
+								properties: {
+									xmlContent: {
+										type: "string",
+										description: "CFDI XML content as string",
+									},
+									notes: {
+										type: "string",
+										maxLength: 2000,
+										nullable: true,
+										description: "Optional notes",
+									},
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Invoice created from XML with PLD hints",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										invoice: { $ref: "#/components/schemas/Invoice" },
+										pldHints: {
+											type: "object",
+											properties: {
+												suggestedActivityCode: {
+													type: "string",
+													nullable: true,
+												},
+												paymentFormCode: { type: "string", nullable: true },
+												monetaryInstrumentCode: {
+													type: "string",
+													nullable: true,
+												},
+												itemHints: {
+													type: "array",
+													items: {
+														type: "object",
+														properties: {
+															productServiceCode: { type: "string" },
+															description: { type: "string" },
+															amount: { type: "string" },
+															metadata: { type: "object", nullable: true },
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					"400": {
+						description: "Invalid XML or validation error",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+					"409": {
+						description: "Duplicate CFDI UUID",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/invoices/{id}": {
+			get: {
+				tags: ["Invoices"],
+				summary: "Get invoice by ID",
+				description: "Retrieve a single invoice by its ID",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string", format: "uuid" },
+						description: "Invoice ID",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Invoice details",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Invoice" },
+							},
+						},
+					},
+					"404": {
+						description: "Invoice not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			put: {
+				tags: ["Invoices"],
+				summary: "Update invoice notes",
+				description: "Update the notes field of an invoice",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string", format: "uuid" },
+						description: "Invoice ID",
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								properties: {
+									notes: {
+										type: "string",
+										maxLength: 2000,
+										nullable: true,
+									},
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Invoice updated successfully",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Invoice" },
+							},
+						},
+					},
+					"404": {
+						description: "Invoice not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+			delete: {
+				tags: ["Invoices"],
+				summary: "Delete invoice",
+				description: "Soft delete an invoice",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string", format: "uuid" },
+						description: "Invoice ID",
+					},
+				],
+				responses: {
+					"204": { description: "Invoice deleted successfully" },
+					"404": {
+						description: "Invoice not found",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/invoices/uuid/{uuid}": {
+			get: {
+				tags: ["Invoices"],
+				summary: "Get invoice by CFDI UUID",
+				description: "Retrieve a single invoice by its CFDI UUID",
+				parameters: [
+					{
+						name: "uuid",
+						in: "path",
+						required: true,
+						schema: { type: "string", format: "uuid" },
+						description: "CFDI UUID",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Invoice details",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Invoice" },
+							},
+						},
+					},
+					"404": {
+						description: "Invoice not found",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
@@ -2625,7 +2989,7 @@ export const openAPISpec = {
 						description: "Aggregated transaction metrics",
 						content: {
 							"application/json": {
-								schema: { $ref: "#/components/schemas/TransactionAggregation" },
+								schema: { $ref: "#/components/schemas/OperationAggregation" },
 							},
 						},
 					},
@@ -4135,15 +4499,36 @@ export const openAPISpec = {
 				enum: ["physical", "moral", "trust"],
 				description: "Discriminator for the client type",
 			},
-			TransactionOperationType: {
+			ActivityCode: {
 				type: "string",
-				enum: ["purchase", "sale"],
-				description: "Supported transaction operation types.",
+				enum: [
+					"VEH",
+					"INM",
+					"MJR",
+					"AVI",
+					"JYS",
+					"ARI",
+					"BLI",
+					"DON",
+					"MPC",
+					"FEP",
+					"FES",
+					"SPR",
+					"CHV",
+					"TSC",
+					"TPP",
+					"TDR",
+					"TCV",
+					"OBA",
+					"DIN",
+				],
+				description:
+					"Vulnerable activity codes as defined by Mexican AML regulations.",
 			},
-			TransactionVehicleType: {
+			VehicleType: {
 				type: "string",
-				enum: ["land", "marine", "air"],
-				description: "Supported transaction vehicle types.",
+				enum: ["LAND", "MARINE", "AIR"],
+				description: "Vehicle types for VEH activity operations.",
 			},
 			Client: {
 				type: "object",
@@ -4787,21 +5172,17 @@ export const openAPISpec = {
 					updatedAt: { type: "string", format: "date-time" },
 				},
 			},
-			Transaction: {
+			Operation: {
 				type: "object",
 				required: [
 					"id",
 					"clientId",
 					"operationDate",
-					"operationType",
+					"activityCode",
 					"branchPostalCode",
-					"vehicleType",
-					"brand",
-					"model",
-					"year",
 					"amount",
-					"currency",
-					"paymentMethods",
+					"currencyCode",
+					"payments",
 					"createdAt",
 					"updatedAt",
 				],
@@ -4818,13 +5199,13 @@ export const openAPISpec = {
 					},
 					operationDate: { type: "string", format: "date" },
 					operationType: {
-						$ref: "#/components/schemas/TransactionOperationType",
+						$ref: "#/components/schemas/ActivityCode",
 					},
 					branchPostalCode: {
 						type: "string",
 						pattern: "^\\d{4,10}$",
 					},
-					vehicleType: { $ref: "#/components/schemas/TransactionVehicleType" },
+					vehicleType: { $ref: "#/components/schemas/VehicleType" },
 					brand: {
 						type: "string",
 						minLength: 1,
@@ -4911,7 +5292,7 @@ export const openAPISpec = {
 					},
 				},
 			},
-			TransactionCreateRequest: {
+			OperationCreateRequest: {
 				type: "object",
 				required: [
 					"clientId",
@@ -4933,13 +5314,13 @@ export const openAPISpec = {
 					},
 					operationDate: { type: "string", format: "date" },
 					operationType: {
-						$ref: "#/components/schemas/TransactionOperationType",
+						$ref: "#/components/schemas/ActivityCode",
 					},
 					branchPostalCode: {
 						type: "string",
 						pattern: "^\\d{4,10}$",
 					},
-					vehicleType: { $ref: "#/components/schemas/TransactionVehicleType" },
+					vehicleType: { $ref: "#/components/schemas/VehicleType" },
 					brand: {
 						type: "string",
 						minLength: 1,
@@ -4985,7 +5366,7 @@ export const openAPISpec = {
 					},
 				},
 			},
-			TransactionUpdateRequest: {
+			OperationUpdateRequest: {
 				type: "object",
 				required: [
 					"operationDate",
@@ -5002,13 +5383,13 @@ export const openAPISpec = {
 				properties: {
 					operationDate: { type: "string", format: "date" },
 					operationType: {
-						$ref: "#/components/schemas/TransactionOperationType",
+						$ref: "#/components/schemas/ActivityCode",
 					},
 					branchPostalCode: {
 						type: "string",
 						pattern: "^\\d{4,10}$",
 					},
-					vehicleType: { $ref: "#/components/schemas/TransactionVehicleType" },
+					vehicleType: { $ref: "#/components/schemas/VehicleType" },
 					brand: {
 						type: "string",
 						minLength: 1,
@@ -5054,7 +5435,7 @@ export const openAPISpec = {
 					},
 				},
 			},
-			TransactionPagination: {
+			OperationPagination: {
 				type: "object",
 				required: ["page", "limit", "total", "totalPages"],
 				properties: {
@@ -5064,7 +5445,7 @@ export const openAPISpec = {
 					totalPages: { type: "integer", minimum: 0 },
 				},
 			},
-			TransactionListResponse: {
+			OperationListResponse: {
 				type: "object",
 				required: ["data", "pagination"],
 				properties: {
@@ -5072,7 +5453,7 @@ export const openAPISpec = {
 						type: "array",
 						items: { $ref: "#/components/schemas/Transaction" },
 					},
-					pagination: { $ref: "#/components/schemas/TransactionPagination" },
+					pagination: { $ref: "#/components/schemas/OperationPagination" },
 				},
 			},
 			Pagination: {
@@ -5115,7 +5496,7 @@ export const openAPISpec = {
 					},
 				},
 			},
-			TransactionStats: {
+			OperationStats: {
 				type: "object",
 				required: [
 					"transactionsToday",
@@ -6732,7 +7113,7 @@ export const openAPISpec = {
 					overdueCount: { type: "integer" },
 				},
 			},
-			TransactionAggregation: {
+			OperationAggregation: {
 				type: "object",
 				required: [
 					"total",
@@ -6863,7 +7244,7 @@ export const openAPISpec = {
 				required: ["alerts", "transactions", "clients", "riskIndicators"],
 				properties: {
 					alerts: { $ref: "#/components/schemas/AlertAggregation" },
-					transactions: { $ref: "#/components/schemas/TransactionAggregation" },
+					operations: { $ref: "#/components/schemas/OperationAggregation" },
 					clients: { $ref: "#/components/schemas/ClientAggregation" },
 					comparison: { $ref: "#/components/schemas/ComparisonMetrics" },
 					riskIndicators: { $ref: "#/components/schemas/RiskIndicators" },
@@ -7022,6 +7403,244 @@ export const openAPISpec = {
 						},
 					},
 				],
+			},
+			Invoice: {
+				type: "object",
+				required: [
+					"id",
+					"organizationId",
+					"version",
+					"issuerRfc",
+					"issuerName",
+					"issuerTaxRegimeCode",
+					"receiverRfc",
+					"receiverName",
+					"subtotal",
+					"total",
+					"currencyCode",
+					"voucherTypeCode",
+					"issueDate",
+					"items",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: { type: "string", format: "uuid" },
+					organizationId: { type: "string", format: "uuid" },
+					uuid: {
+						type: "string",
+						format: "uuid",
+						nullable: true,
+						description: "CFDI UUID",
+					},
+					version: { type: "string", description: "CFDI version (e.g., 4.0)" },
+					series: { type: "string", nullable: true },
+					folio: { type: "string", nullable: true },
+					issuerRfc: { type: "string", description: "Issuer RFC" },
+					issuerName: { type: "string", description: "Issuer name" },
+					issuerTaxRegimeCode: {
+						type: "string",
+						description: "Issuer tax regime code",
+					},
+					receiverRfc: { type: "string", description: "Receiver RFC" },
+					receiverName: { type: "string", description: "Receiver name" },
+					receiverUsageCode: { type: "string", nullable: true },
+					receiverTaxRegimeCode: { type: "string", nullable: true },
+					receiverPostalCode: { type: "string", nullable: true },
+					subtotal: { type: "string", description: "Subtotal amount" },
+					discount: { type: "string", nullable: true },
+					total: { type: "string", description: "Total amount" },
+					currencyCode: {
+						type: "string",
+						description: "Currency code (e.g., MXN)",
+					},
+					exchangeRate: { type: "string", nullable: true },
+					paymentFormCode: { type: "string", nullable: true },
+					paymentMethodCode: { type: "string", nullable: true },
+					voucherTypeCode: { type: "string", description: "Voucher type code" },
+					issueDate: {
+						type: "string",
+						format: "date",
+						description: "Issue date (YYYY-MM-DD)",
+					},
+					certificationDate: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+					},
+					exportCode: { type: "string", nullable: true },
+					tfdUuid: {
+						type: "string",
+						format: "uuid",
+						nullable: true,
+						description: "Timbre Fiscal Digital UUID",
+					},
+					tfdSatCertificate: { type: "string", nullable: true },
+					tfdSignature: { type: "string", nullable: true },
+					tfdStampDate: { type: "string", format: "date-time", nullable: true },
+					xmlContent: {
+						type: "string",
+						nullable: true,
+						description: "Original XML content",
+					},
+					notes: { type: "string", nullable: true, maxLength: 2000 },
+					items: {
+						type: "array",
+						items: { $ref: "#/components/schemas/InvoiceItem" },
+						description: "Invoice line items",
+					},
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+					deletedAt: { type: "string", format: "date-time", nullable: true },
+				},
+			},
+			InvoiceItem: {
+				type: "object",
+				required: [
+					"id",
+					"invoiceId",
+					"productServiceCode",
+					"quantity",
+					"unitCode",
+					"description",
+					"unitPrice",
+					"amount",
+					"taxObjectCode",
+					"createdAt",
+					"updatedAt",
+				],
+				properties: {
+					id: { type: "string", format: "uuid" },
+					invoiceId: { type: "string", format: "uuid" },
+					productServiceCode: {
+						type: "string",
+						description: "SAT product/service code",
+					},
+					productServiceId: { type: "string", nullable: true },
+					quantity: {
+						type: "string",
+						description: "Quantity as string for precision",
+					},
+					unitCode: { type: "string", description: "SAT unit code" },
+					unitName: { type: "string", nullable: true },
+					description: { type: "string", description: "Item description" },
+					unitPrice: { type: "string", description: "Unit price" },
+					amount: { type: "string", description: "Line total amount" },
+					discount: { type: "string", nullable: true },
+					taxObjectCode: { type: "string", description: "Tax object code" },
+					transferredTaxAmount: { type: "string", nullable: true },
+					withheldTaxAmount: { type: "string", nullable: true },
+					metadata: { type: "object", nullable: true },
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			InvoiceCreateRequest: {
+				type: "object",
+				required: [
+					"issuerRfc",
+					"issuerName",
+					"issuerTaxRegimeCode",
+					"receiverRfc",
+					"receiverName",
+					"subtotal",
+					"total",
+					"issueDate",
+					"items",
+				],
+				properties: {
+					uuid: { type: "string", format: "uuid", nullable: true },
+					version: { type: "string", default: "4.0" },
+					series: { type: "string", maxLength: 25, nullable: true },
+					folio: { type: "string", maxLength: 40, nullable: true },
+					issuerRfc: { type: "string" },
+					issuerName: { type: "string", maxLength: 300 },
+					issuerTaxRegimeCode: { type: "string", maxLength: 3 },
+					receiverRfc: { type: "string" },
+					receiverName: { type: "string", maxLength: 300 },
+					receiverUsageCode: { type: "string", maxLength: 4, nullable: true },
+					receiverTaxRegimeCode: {
+						type: "string",
+						maxLength: 3,
+						nullable: true,
+					},
+					receiverPostalCode: { type: "string", maxLength: 10, nullable: true },
+					subtotal: { type: "string" },
+					discount: { type: "string", nullable: true },
+					total: { type: "string" },
+					currencyCode: { type: "string", default: "MXN" },
+					exchangeRate: { type: "string", nullable: true },
+					paymentFormCode: { type: "string", maxLength: 3, nullable: true },
+					paymentMethodCode: { type: "string", maxLength: 3, nullable: true },
+					voucherTypeCode: { type: "string", maxLength: 2, default: "I" },
+					issueDate: { type: "string", format: "date" },
+					certificationDate: {
+						type: "string",
+						format: "date-time",
+						nullable: true,
+					},
+					exportCode: {
+						type: "string",
+						maxLength: 2,
+						default: "01",
+						nullable: true,
+					},
+					notes: { type: "string", maxLength: 2000, nullable: true },
+					items: {
+						type: "array",
+						minItems: 1,
+						items: {
+							type: "object",
+							required: [
+								"productServiceCode",
+								"quantity",
+								"unitCode",
+								"description",
+								"unitPrice",
+								"amount",
+							],
+							properties: {
+								productServiceCode: { type: "string", maxLength: 10 },
+								productServiceId: {
+									type: "string",
+									maxLength: 100,
+									nullable: true,
+								},
+								quantity: { type: "string" },
+								unitCode: { type: "string", maxLength: 10 },
+								unitName: { type: "string", maxLength: 100, nullable: true },
+								description: { type: "string", maxLength: 1000 },
+								unitPrice: { type: "string" },
+								amount: { type: "string" },
+								discount: { type: "string", nullable: true },
+								taxObjectCode: { type: "string", maxLength: 3, default: "02" },
+								transferredTaxAmount: { type: "string", nullable: true },
+								withheldTaxAmount: { type: "string", nullable: true },
+								metadata: { type: "object", nullable: true },
+							},
+						},
+					},
+				},
+			},
+			InvoiceListResponse: {
+				type: "object",
+				required: ["data", "pagination"],
+				properties: {
+					data: {
+						type: "array",
+						items: { $ref: "#/components/schemas/Invoice" },
+					},
+					pagination: {
+						type: "object",
+						required: ["page", "limit", "total", "totalPages"],
+						properties: {
+							page: { type: "integer" },
+							limit: { type: "integer" },
+							total: { type: "integer" },
+							totalPages: { type: "integer" },
+						},
+					},
+				},
 			},
 		},
 	},

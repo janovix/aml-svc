@@ -82,7 +82,7 @@ function generateSql(catalogId, items) {
 	// Insert catalog if it doesn't exist
 	sql.push(`
 		INSERT OR IGNORE INTO catalogs (id, key, name, active, created_at, updated_at)
-		VALUES ('${catalogId}', '${CATALOG_KEY}', 'Tipos de Operación', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+		VALUES ('${catalogId}', '${CATALOG_KEY}', 'Operation Types', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 	`);
 
 	// Insert or replace catalog items using deterministic IDs

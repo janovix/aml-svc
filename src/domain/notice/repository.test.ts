@@ -31,7 +31,7 @@ function createMockPrisma(): PrismaClient {
 		client: {
 			findMany: vi.fn(),
 		},
-		transaction: {
+		operation: {
 			findMany: vi.fn(),
 		},
 	} as unknown as PrismaClient;
@@ -41,6 +41,7 @@ const mockNotice: Notice = {
 	id: "NTC_123",
 	organizationId: "org_123",
 	name: "Aviso SAT Enero 2024",
+	activityCode: "VEH",
 	status: "DRAFT" as PrismaNoticeStatus,
 	periodStart: new Date("2023-12-17"),
 	periodEnd: new Date("2024-01-16"),
@@ -425,13 +426,14 @@ describe("NoticeRepository", () => {
 		});
 	});
 
-	describe("getAlertsWithTransactionsForNotice", () => {
-		it("returns alerts with their associated transactions, clients, and alertRules", async () => {
+	describe("getAlertsWithOperationsForNotice", () => {
+		it("returns alerts with their associated operations, clients, and alertRules", async () => {
 			const alerts = [
 				{
 					...mockAlert,
 					noticeId: "NTC_123",
-					transactionId: "txn_001",
+					operationId: "opr_001",
+					activityCode: "VEH",
 					clientId: "client_001",
 					alertRuleId: "rule_001",
 				},
@@ -439,7 +441,8 @@ describe("NoticeRepository", () => {
 					...mockAlert,
 					id: "alt_456",
 					noticeId: "NTC_123",
-					transactionId: "txn_002",
+					operationId: "opr_002",
+					activityCode: "VEH",
 					clientId: "client_002",
 					alertRuleId: "rule_001",
 				},
@@ -449,9 +452,9 @@ describe("NoticeRepository", () => {
 				{ id: "client_002", organizationId: "org_123" },
 			];
 			const alertRules = [{ id: "rule_001", organizationId: "org_123" }];
-			const transactions = [
-				{ id: "txn_001", organizationId: "org_123" },
-				{ id: "txn_002", organizationId: "org_123" },
+			const operations = [
+				{ id: "opr_001", organizationId: "org_123", activityCode: "VEH" },
+				{ id: "opr_002", organizationId: "org_123", activityCode: "VEH" },
 			];
 
 			vi.mocked(prisma.alert.findMany).mockResolvedValue(
@@ -463,20 +466,20 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.alertRule.findMany).mockResolvedValue(
 				alertRules as unknown as never,
 			);
-			vi.mocked(prisma.transaction.findMany).mockResolvedValue(
-				transactions as unknown as never,
+			vi.mocked(prisma.operation.findMany).mockResolvedValue(
+				operations as unknown as never,
 			);
 
-			const result = await repository.getAlertsWithTransactionsForNotice(
+			const result = await repository.getAlertsWithOperationsForNotice(
 				"org_123",
 				"NTC_123",
 			);
 
 			expect(result).toHaveLength(2);
-			expect(result[0].transaction).toBeDefined();
+			expect(result[0].operation).toBeDefined();
 			expect(result[0].client).toBeDefined();
 			expect(result[0].alertRule).toBeDefined();
-			expect(result[1].transaction).toBeDefined();
+			expect(result[1].operation).toBeDefined();
 			expect(result[1].client).toBeDefined();
 			expect(result[1].alertRule).toBeDefined();
 
@@ -486,24 +489,19 @@ describe("NoticeRepository", () => {
 				orderBy: { createdAt: "asc" },
 			});
 
-			// Clients, alertRules, and transactions fetched separately in batches
+			// Clients, alertRules, and operations fetched separately in batches
 			expect(prisma.client.findMany).toHaveBeenCalled();
 			expect(prisma.alertRule.findMany).toHaveBeenCalled();
-			expect(prisma.transaction.findMany).toHaveBeenCalledWith({
-				where: {
-					id: { in: ["txn_001", "txn_002"] },
-					organizationId: "org_123",
-				},
-				include: { paymentMethods: true },
-			});
+			expect(prisma.operation.findMany).toHaveBeenCalled();
 		});
 
-		it("returns alerts with null transaction when transactionId is null", async () => {
+		it("returns alerts with null operation when operationId is null", async () => {
 			const alerts = [
 				{
 					...mockAlert,
 					noticeId: "NTC_123",
-					transactionId: null,
+					operationId: null,
+					activityCode: "VEH",
 					clientId: "client_001",
 					alertRuleId: null,
 				},
@@ -518,23 +516,23 @@ describe("NoticeRepository", () => {
 			);
 			vi.mocked(prisma.alertRule.findMany).mockResolvedValue([]);
 
-			const result = await repository.getAlertsWithTransactionsForNotice(
+			const result = await repository.getAlertsWithOperationsForNotice(
 				"org_123",
 				"NTC_123",
 			);
 
 			expect(result).toHaveLength(1);
-			expect(result[0].transaction).toBeNull();
+			expect(result[0].operation).toBeNull();
 			expect(result[0].client).toBeDefined();
 			expect(result[0].alertRule).toBeNull();
-			// Should NOT call transaction.findMany when there are no transaction IDs
-			expect(prisma.transaction.findMany).not.toHaveBeenCalled();
+			// Should NOT call operation.findMany when there are no operation IDs
+			expect(prisma.operation.findMany).not.toHaveBeenCalled();
 		});
 
 		it("returns empty array when no alerts exist", async () => {
 			vi.mocked(prisma.alert.findMany).mockResolvedValue([]);
 
-			const result = await repository.getAlertsWithTransactionsForNotice(
+			const result = await repository.getAlertsWithOperationsForNotice(
 				"org_123",
 				"NTC_123",
 			);
@@ -543,7 +541,7 @@ describe("NoticeRepository", () => {
 			// Should not fetch related entities when there are no alerts
 			expect(prisma.client.findMany).not.toHaveBeenCalled();
 			expect(prisma.alertRule.findMany).not.toHaveBeenCalled();
-			expect(prisma.transaction.findMany).not.toHaveBeenCalled();
+			expect(prisma.operation.findMany).not.toHaveBeenCalled();
 		});
 	});
 

@@ -14,13 +14,14 @@ import {
 	importEventsRouter,
 	importInternalRouter,
 } from "./imports";
+import { invoicesRouter, invoicesInternalRouter } from "./invoices";
 import { noticesRouter } from "./notices";
+import { operationsRouter, operationsInternalRouter } from "./operations";
 import { organizationSettingsRouter } from "./organization-settings";
 import { reportsRouter } from "./reports";
-import { transactionsRouter, transactionsInternalRouter } from "./transactions";
+// Transaction domain deprecated - use operations instead
 import { umaValuesRouter } from "./uma-values";
 import { ubosRouter, ubosInternalRouter } from "./ubos";
-import { filesRouter } from "./files";
 
 export function createRouter() {
 	const router = new Hono<{
@@ -36,19 +37,21 @@ export function createRouter() {
 	// Internal routes for worker-to-service communication (no auth, service binding only)
 	router.route("/internal/imports", importInternalRouter);
 	router.route("/internal/clients", clientsInternalRouter);
-	router.route("/internal/transactions", transactionsInternalRouter);
+	// Transaction internal routes deprecated - use operations
+	router.route("/internal/operations", operationsInternalRouter);
+	router.route("/internal/invoices", invoicesInternalRouter);
 	router.route("/internal/ubos", ubosInternalRouter);
 
 	// Apply auth middleware with organization requirement for tenant-scoped routes
 	// These routes require an active organization to be selected
 	router.use("/clients/*", authMiddleware({ requireOrganization: true }));
-	router.use("/transactions/*", authMiddleware({ requireOrganization: true }));
+	router.use("/operations/*", authMiddleware({ requireOrganization: true }));
+	router.use("/invoices/*", authMiddleware({ requireOrganization: true }));
 	router.use("/alert-rules/*", authMiddleware({ requireOrganization: true }));
 	router.use("/alerts/*", authMiddleware({ requireOrganization: true }));
 	router.use("/notices/*", authMiddleware({ requireOrganization: true }));
 	router.use("/reports/*", authMiddleware({ requireOrganization: true }));
 	router.use("/imports/*", authMiddleware({ requireOrganization: true }));
-	router.use("/files/*", authMiddleware({ requireOrganization: true }));
 
 	// Organization settings requires auth and organization context
 	router.use(
@@ -67,7 +70,8 @@ export function createRouter() {
 	router.route("/catalogs", catalogsRouter);
 	router.route("/clients", clientsRouter);
 	router.route("/clients", ubosRouter); // UBO routes nested under clients (/:clientId/ubos/*)
-	router.route("/transactions", transactionsRouter);
+	router.route("/operations", operationsRouter);
+	router.route("/invoices", invoicesRouter);
 	router.route("/alert-rules", alertRulesRouter);
 	router.route("/alerts", alertsRouter);
 	router.route("/notices", noticesRouter);
@@ -75,7 +79,6 @@ export function createRouter() {
 	router.route("/uma-values", umaValuesRouter);
 	router.route("/organization-settings", organizationSettingsRouter);
 	router.route("/imports", importsRouter);
-	router.route("/files", filesRouter);
 
 	return router;
 }

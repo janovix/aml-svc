@@ -78,9 +78,9 @@ describe("Import Mappers", () => {
 			expect(toPrismaEntityType("client")).toBe("CLIENT");
 		});
 
-		it("should convert TRANSACTION to Prisma enum", () => {
-			expect(toPrismaEntityType("TRANSACTION")).toBe("TRANSACTION");
-			expect(toPrismaEntityType("transaction")).toBe("TRANSACTION");
+		it("should convert OPERATION to Prisma enum", () => {
+			expect(toPrismaEntityType("OPERATION")).toBe("OPERATION");
+			expect(toPrismaEntityType("operation")).toBe("OPERATION");
 		});
 
 		it("should throw for invalid entity type", () => {

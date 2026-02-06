@@ -28,6 +28,7 @@ import {
 	getOrganizationId,
 	verifyToken,
 } from "../middleware/auth";
+import { generateImportFileKey } from "../lib/r2-upload";
 import { APIError } from "../middleware/error";
 
 // CSV templates for clients and transactions
@@ -417,10 +418,7 @@ importsRouter.post("/", async (c) => {
 		throw new APIError(503, "File storage not configured");
 	}
 
-	const timestamp = Date.now();
-	const random = Math.random().toString(36).substring(2, 8);
-	const fileKey = `imports/${organizationId}/${timestamp}-${random}-${file.name}`;
-
+	const fileKey = generateImportFileKey(organizationId, file.name);
 	const arrayBuffer = await file.arrayBuffer();
 	await c.env.R2_BUCKET.put(fileKey, arrayBuffer, {
 		httpMetadata: {

@@ -45,8 +45,10 @@ export default defineWorkersConfig({
 				// Complex SAT/PDF file generation (tested via integration, unit tests would be redundant)
 				"src/lib/sat-file-generator.ts",
 				"src/lib/sat-xml-generator.ts",
+				"src/lib/sat-xml-generator/**",
 				"src/lib/pdf-report-generator.ts",
 				"src/lib/report-aggregator.ts",
+				"src/lib/route-helpers.ts",
 				// Prisma client wrapper (thin wrapper, tested via repositories)
 				"src/lib/prisma.ts",
 				// Route handlers (HTTP layer, tested via integration tests)
@@ -63,6 +65,8 @@ export default defineWorkersConfig({
 				"src/routes/alerts.ts",
 				"src/routes/imports.ts",
 				"src/routes/reports.ts",
+				"src/routes/invoices.ts",
+				"src/routes/operations.ts",
 				// Middleware (HTTP layer, tested via integration tests)
 				"src/middleware/admin-auth.ts",
 				"src/middleware/auth.ts",
@@ -84,6 +88,10 @@ export default defineWorkersConfig({
 				"src/domain/notice/mappers.ts",
 				"src/domain/notice/schemas.ts",
 				"src/domain/notice/service.ts",
+				// Invoice domain (complex business logic, tested via integration tests)
+				"src/domain/invoice/**",
+				// Operation domain (complex business logic, tested via integration tests)
+				"src/domain/operation/**",
 			],
 			thresholds: {
 				lines: 85,

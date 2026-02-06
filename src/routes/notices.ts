@@ -14,8 +14,6 @@ import {
 	NoticeAcknowledgeSchema,
 } from "../domain/notice";
 import { mapPrismaClient } from "../domain/client/mappers";
-import { mapPrismaTransaction } from "../domain/transaction/mappers";
-import { mapPrismaAlert, mapPrismaAlertRule } from "../domain/alert/mappers";
 import {
 	OrganizationSettingsRepository,
 	OrganizationSettingsService,
@@ -25,10 +23,13 @@ import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import {
-	generateMonthlyReportXml,
-	mapToSatVehicleNoticeData,
-	type SatMonthlyReportData,
-} from "../lib/sat-xml-generator";
+	generateSatMonthlyReportXml,
+	type SatXmlConfig,
+} from "../lib/sat-xml-generator/index";
+import { mapOperationToEntity } from "../domain/operation/mappers";
+import type { OperationEntity, ActivityCode } from "../domain/operation/types";
+import type { ClientEntity } from "../domain/client/types";
+import { generateNoticeFileKey } from "../lib/r2-upload";
 import { createSubscriptionClient } from "../lib/subscription-client";
 
 export const noticesRouter = new Hono<{
@@ -201,11 +202,13 @@ noticesRouter.post("/:id/generate", async (c) => {
 		throw new APIError(400, "Notice has already been generated");
 	}
 
-	// Get alerts with transactions for XML generation
-	const alertsWithTransactions =
-		await service.getAlertsWithTransactionsForNotice(organizationId, params.id);
+	// Get alerts with transactions/operations for XML generation
+	const alertsData = await service.getAlertsWithOperationsForNotice(
+		organizationId,
+		params.id,
+	);
 
-	if (alertsWithTransactions.length === 0) {
+	if (alertsData.length === 0) {
 		throw new APIError(400, "Notice has no alerts to include");
 	}
 
@@ -223,62 +226,84 @@ noticesRouter.post("/:id/generate", async (c) => {
 		);
 	}
 
-	// Build SAT monthly report data
-	const avisos = alertsWithTransactions
-		.filter((alert) => alert.transaction && alert.client)
-		.map((alert) => {
-			// Non-null assertions are safe here because of the filter above
-			const clientEntity = mapPrismaClient(alert.client!);
-			const transactionEntity = mapPrismaTransaction(alert.transaction!);
-			const alertEntity = {
-				...mapPrismaAlert(alert),
-				alertRule: alert.alertRule
-					? mapPrismaAlertRule(alert.alertRule)
-					: undefined,
-			};
+	// Filter alerts that have operations with client data
+	const operationAlerts = alertsData.filter(
+		(alert) => alert.operation && alert.client,
+	);
 
-			return mapToSatVehicleNoticeData(
-				alertEntity,
-				clientEntity,
-				transactionEntity,
-				{
-					obligatedSubjectKey: orgSettings.obligatedSubjectKey,
-					activityKey: orgSettings.activityKey,
-					noticeReference: alert.id,
-					priority: "1",
-					alertType: alert.alertRule?.id ?? "803",
-					operationType: transactionEntity.operationTypeCode ?? "802",
-					currency: transactionEntity.currencyCode ?? "3",
-					vehicleType:
-						transactionEntity.vehicleType === "land"
-							? "terrestre"
-							: transactionEntity.vehicleType === "marine"
-								? "maritimo"
-								: "aereo",
-					brand: transactionEntity.brand,
-					nationalityCountry:
-						clientEntity.countryCode ?? clientEntity.nationality ?? undefined,
-					economicActivity: clientEntity.economicActivityCode ?? undefined,
-				},
-			);
-		});
-
-	if (avisos.length === 0) {
+	if (operationAlerts.length === 0) {
 		throw new APIError(
 			400,
-			"No valid alerts with transactions found for XML generation",
+			"No valid alerts with operations found for XML generation",
 		);
 	}
 
-	// Generate the XML
-	const reportData: SatMonthlyReportData = {
-		reportedMonth: notice.reportedMonth,
-		obligatedSubjectKey: orgSettings.obligatedSubjectKey,
-		activityKey: orgSettings.activityKey,
-		avisos,
-	};
+	// Group operations by activity code (each activity has its own XSD)
+	const operationsByActivity = new Map<
+		ActivityCode,
+		Array<{
+			operation: OperationEntity;
+			client: ClientEntity;
+			alert: (typeof alertsData)[0];
+		}>
+	>();
 
-	const xmlContent = generateMonthlyReportXml(reportData);
+	for (const alert of operationAlerts) {
+		if (!alert.operation || !alert.client) continue;
+
+		// Map Prisma operation to OperationEntity
+		const operationEntity = mapOperationToEntity(
+			alert.operation as Parameters<typeof mapOperationToEntity>[0],
+		);
+		const clientEntity = mapPrismaClient(alert.client);
+
+		const activityCode = operationEntity.activityCode;
+		if (!operationsByActivity.has(activityCode)) {
+			operationsByActivity.set(activityCode, []);
+		}
+		operationsByActivity.get(activityCode)!.push({
+			operation: operationEntity,
+			client: clientEntity,
+			alert,
+		});
+	}
+
+	// For now, generate XML for the primary activity (organization's configured activity)
+	// In the future, we may need to generate separate files for different activities
+	const primaryActivityCode = orgSettings.activityKey as ActivityCode;
+	const primaryOperations = operationsByActivity.get(primaryActivityCode);
+
+	let xmlContent: string;
+	let alertCount = 0;
+
+	if (primaryOperations && primaryOperations.length > 0) {
+		// Build client map for the XML generator
+		const clientMap = new Map<string, ClientEntity>();
+		for (const { operation, client } of primaryOperations) {
+			clientMap.set(operation.clientId, client);
+		}
+
+		// Use the new multi-activity XML generator
+		const config: SatXmlConfig = {
+			obligatedSubjectKey: orgSettings.obligatedSubjectKey,
+		};
+
+		xmlContent = generateSatMonthlyReportXml(
+			primaryActivityCode,
+			notice.reportedMonth,
+			orgSettings.obligatedSubjectKey,
+			primaryOperations.map((op) => op.operation),
+			clientMap,
+			config,
+		);
+		alertCount = primaryOperations.length;
+	} else {
+		throw new APIError(
+			400,
+			`No operations found for activity ${primaryActivityCode}. Operations exist for: ${Array.from(operationsByActivity.keys()).join(", ")}`,
+		);
+	}
+
 	const xmlBytes = new TextEncoder().encode(xmlContent);
 	const fileSize = xmlBytes.length;
 
@@ -286,7 +311,11 @@ noticesRouter.post("/:id/generate", async (c) => {
 	let xmlFileUrl: string | null = null;
 
 	if (c.env.R2_BUCKET) {
-		const fileName = `notices/${organizationId}/${notice.id}_${notice.reportedMonth}.xml`;
+		const fileName = generateNoticeFileKey(
+			organizationId,
+			notice.id,
+			notice.reportedMonth,
+		);
 		await c.env.R2_BUCKET.put(fileName, xmlBytes, {
 			httpMetadata: {
 				contentType: "application/xml",
@@ -298,7 +327,6 @@ noticesRouter.post("/:id/generate", async (c) => {
 				generatedAt: new Date().toISOString(),
 			},
 		});
-		// Construct the R2 public URL or use a signed URL in production
 		xmlFileUrl = fileName;
 	}
 
@@ -311,7 +339,7 @@ noticesRouter.post("/:id/generate", async (c) => {
 	return c.json({
 		message: "XML generation complete",
 		noticeId: notice.id,
-		alertCount: avisos.length,
+		alertCount,
 		fileSize,
 		xmlFileUrl,
 	});

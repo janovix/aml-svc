@@ -55,10 +55,10 @@ describe("ImportRepository", () => {
 			expect(result.id).toBeTruthy();
 		});
 
-		it("should create import for TRANSACTION entity type", async () => {
+		it("should create import for OPERATION entity type", async () => {
 			const input: ImportCreateInput = {
-				entityType: "TRANSACTION",
-				fileName: "transactions.xlsx",
+				entityType: "OPERATION",
+				fileName: "operations.xlsx",
 				fileSize: 2048,
 			};
 
@@ -66,10 +66,10 @@ describe("ImportRepository", () => {
 				organizationId,
 				createdBy,
 				input,
-				"https://example.com/transactions.xlsx",
+				"https://example.com/operations.xlsx",
 			);
 
-			expect(result.entityType).toBe("TRANSACTION");
+			expect(result.entityType).toBe("OPERATION");
 		});
 	});
 
@@ -90,8 +90,8 @@ describe("ImportRepository", () => {
 				organizationId,
 				createdBy,
 				{
-					entityType: "TRANSACTION",
-					fileName: "transactions.csv",
+					entityType: "OPERATION",
+					fileName: "operations.csv",
 					fileSize: 2048,
 				},
 				"https://example.com/file2.csv",

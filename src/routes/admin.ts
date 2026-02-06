@@ -31,7 +31,7 @@ adminRouter.get("/stats", async (c) => {
 
 	const [
 		totalClients,
-		totalTransactions,
+		totalOperations,
 		totalAlerts,
 		totalNotices,
 		alertsByStatus,
@@ -39,7 +39,7 @@ adminRouter.get("/stats", async (c) => {
 		recentAlerts,
 	] = await Promise.all([
 		prisma.client.count({ where: { deletedAt: null } }),
-		prisma.transaction.count({ where: { deletedAt: null } }),
+		prisma.operation.count({ where: { deletedAt: null } }),
 		prisma.alert.count(),
 		prisma.notice.count(),
 		prisma.alert.groupBy({
@@ -88,7 +88,7 @@ adminRouter.get("/stats", async (c) => {
 		data: {
 			totals: {
 				clients: totalClients,
-				transactions: totalTransactions,
+				operations: totalOperations,
 				alerts: totalAlerts,
 				notices: totalNotices,
 			},
@@ -267,12 +267,12 @@ adminRouter.get("/organizations", async (c) => {
 	// Get stats for each organization
 	const orgStats = await Promise.all(
 		paginatedOrgIds.map(async (orgId) => {
-			const [clientCount, transactionCount, alertCount, noticeCount, settings] =
+			const [clientCount, operationCount, alertCount, noticeCount, settings] =
 				await Promise.all([
 					prisma.client.count({
 						where: { organizationId: orgId, deletedAt: null },
 					}),
-					prisma.transaction.count({
+					prisma.operation.count({
 						where: { organizationId: orgId, deletedAt: null },
 					}),
 					prisma.alert.count({
@@ -290,7 +290,7 @@ adminRouter.get("/organizations", async (c) => {
 				organizationId: orgId,
 				stats: {
 					clients: clientCount,
-					transactions: transactionCount,
+					operations: operationCount,
 					alerts: alertCount,
 					notices: noticeCount,
 				},
@@ -326,7 +326,7 @@ adminRouter.get("/organizations/:id", async (c) => {
 
 	const [
 		clientCount,
-		transactionCount,
+		operationCount,
 		alertsByStatus,
 		noticesByStatus,
 		settings,
@@ -336,7 +336,7 @@ adminRouter.get("/organizations/:id", async (c) => {
 		prisma.client.count({
 			where: { organizationId: orgId, deletedAt: null },
 		}),
-		prisma.transaction.count({
+		prisma.operation.count({
 			where: { organizationId: orgId, deletedAt: null },
 		}),
 		prisma.alert.groupBy({
@@ -389,7 +389,7 @@ adminRouter.get("/organizations/:id", async (c) => {
 			organizationId: orgId,
 			stats: {
 				clients: clientCount,
-				transactions: transactionCount,
+				operations: operationCount,
 				alerts: {
 					total: Object.values(alertStatusCounts).reduce((a, b) => a + b, 0),
 					byStatus: alertStatusCounts,

@@ -24,6 +24,8 @@ export interface CatalogListQuery {
 	page: number;
 	pageSize: number;
 	active?: boolean | undefined;
+	vaCode?: string | undefined; // Filter by va_code in metadata
+	excludeAutomatable?: boolean | undefined; // Exclude automatable items
 }
 
 export interface CatalogPagination {

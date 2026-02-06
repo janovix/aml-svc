@@ -1,0 +1,243 @@
+{
+	"catalogs": [
+		{
+			"key": "pld-payment-forms",
+			"displayName": "PLD Payment Forms",
+			"filename": "pld-payment-forms.csv",
+			"items": 5,
+			"sources": [
+				"ari-payment-forms.csv",
+				"inm-payment-forms.csv",
+				"mjr-payment-forms.csv",
+				"oba-payment-forms.csv",
+				"veh-payment-forms.csv"
+			]
+		},
+		{
+			"key": "pld-property-types",
+			"displayName": "PLD Property Types",
+			"filename": "pld-property-types.csv",
+			"items": 19,
+			"sources": [
+				"jys-property-types.csv",
+				"ari-property-types.csv",
+				"spr-property-types.csv",
+				"bli-property-types.csv"
+			]
+		},
+		{
+			"key": "pld-incorporation-reasons",
+			"displayName": "PLD Incorporation Reasons",
+			"filename": "pld-incorporation-reasons.csv",
+			"items": 3,
+			"sources": [
+				"fep-incorporation-reasons.csv",
+				"spr-incorporation-reasons.csv",
+				"fes-incorporation-reasons.csv"
+			]
+		},
+		{
+			"key": "pld-shareholder-positions",
+			"displayName": "PLD Shareholder Positions",
+			"filename": "pld-shareholder-positions.csv",
+			"items": 5,
+			"sources": [
+				"fep-shareholder-positions.csv",
+				"spr-shareholder-positions.csv",
+				"fes-shareholder-positions.csv"
+			]
+		},
+		{
+			"key": "pld-merger-types",
+			"displayName": "PLD Merger Types",
+			"filename": "pld-merger-types.csv",
+			"items": 2,
+			"sources": ["fep-merger-types.csv", "spr-merger-types.csv"]
+		},
+		{
+			"key": "pld-granting-types",
+			"displayName": "PLD Granting Types",
+			"filename": "pld-granting-types.csv",
+			"items": 2,
+			"sources": ["fep-granting-types.csv", "fes-granting-types.csv"]
+		},
+		{
+			"key": "pld-patrimony-modification-types",
+			"displayName": "PLD Patrimony Modification Types",
+			"filename": "pld-patrimony-modification-types.csv",
+			"items": 3,
+			"sources": [
+				"fep-patrimony-modification-types.csv",
+				"fes-patrimony-modification-types.csv"
+			]
+		},
+		{
+			"key": "pld-power-of-attorney-types",
+			"displayName": "PLD Power of Attorney Types",
+			"filename": "pld-power-of-attorney-types.csv",
+			"items": 3,
+			"sources": [
+				"fep-power-of-attorney-types.csv",
+				"fes-power-of-attorney-types.csv"
+			]
+		},
+		{
+			"key": "pld-guarantee-types",
+			"displayName": "PLD Guarantee Types",
+			"filename": "pld-guarantee-types.csv",
+			"items": 14,
+			"sources": [
+				"mpc-guarantee-types.csv",
+				"fep-guarantee-types.csv",
+				"fes-guarantee-types.csv"
+			]
+		},
+		{
+			"key": "pld-monetary-instruments",
+			"displayName": "PLD Monetary Instruments",
+			"filename": "pld-monetary-instruments.csv",
+			"items": 17,
+			"sources": [
+				"jys-monetary-instruments.csv",
+				"ari-monetary-instruments.csv"
+			]
+		},
+		{
+			"key": "pld-armor-levels",
+			"displayName": "PLD Armor Levels",
+			"filename": "pld-armor-levels.csv",
+			"items": 8,
+			"sources": ["bli-armor-levels.csv", "veh-armor-levels.csv"]
+		},
+		{
+			"key": "pld-financial-institution-types",
+			"displayName": "PLD Financial Institution Types",
+			"filename": "pld-financial-institution-types.csv",
+			"items": 40,
+			"sources": [
+				"din-institution-types.csv",
+				"spr-financial-institution-types.csv"
+			]
+		},
+		{
+			"key": "pld-appraisal-item-types",
+			"displayName": "PLD Appraisal Item Types",
+			"filename": "pld-appraisal-item-types.csv",
+			"items": 9,
+			"sources": ["fep-item-types.csv", "fes-item-types.csv"]
+		},
+		{
+			"key": "pld-liquidation-item-types",
+			"displayName": "PLD Liquidation Item Types",
+			"filename": "pld-liquidation-item-types.csv",
+			"items": 9,
+			"sources": ["jys-item-types.csv", "don-item-types.csv"]
+		},
+		{
+			"key": "pld-alert-types",
+			"displayName": "PLD Alert Types",
+			"filename": "pld-alert-types.csv",
+			"items": 395,
+			"format": "va_code,code,name",
+			"sources": [
+				"ari-alert-types.csv",
+				"avi-alert-types.csv",
+				"bli-alert-types.csv",
+				"chv-alert-types.csv",
+				"din-alert-types.csv",
+				"don-alert-types.csv",
+				"fep-alert-types.csv",
+				"fes-alert-types.csv",
+				"inm-alert-types.csv",
+				"jys-alert-types.csv",
+				"mjr-alert-types.csv",
+				"mpc-alert-types.csv",
+				"oba-alert-types.csv",
+				"spr-alert-types.csv",
+				"tcv-alert-types.csv",
+				"tdr-alert-types.csv",
+				"tpp-alert-types.csv",
+				"tsc-alert-types.csv",
+				"veh-alert-types.csv"
+			],
+			"vaStats": {
+				"ARI": 26,
+				"AVI": 24,
+				"BLI": 19,
+				"CHV": 19,
+				"DIN": 15,
+				"DON": 17,
+				"FEP": 19,
+				"FES": 22,
+				"INM": 22,
+				"JYS": 29,
+				"MJR": 27,
+				"MPC": 16,
+				"OBA": 21,
+				"SPR": 27,
+				"TCV": 20,
+				"TDR": 14,
+				"TPP": 17,
+				"TSC": 18,
+				"VEH": 23
+			}
+		}
+	],
+	"consolidationMap": {
+		"ari-payment-forms": "pld-payment-forms",
+		"inm-payment-forms": "pld-payment-forms",
+		"mjr-payment-forms": "pld-payment-forms",
+		"oba-payment-forms": "pld-payment-forms",
+		"veh-payment-forms": "pld-payment-forms",
+		"jys-property-types": "pld-property-types",
+		"ari-property-types": "pld-property-types",
+		"spr-property-types": "pld-property-types",
+		"bli-property-types": "pld-property-types",
+		"fep-incorporation-reasons": "pld-incorporation-reasons",
+		"spr-incorporation-reasons": "pld-incorporation-reasons",
+		"fes-incorporation-reasons": "pld-incorporation-reasons",
+		"fep-shareholder-positions": "pld-shareholder-positions",
+		"spr-shareholder-positions": "pld-shareholder-positions",
+		"fes-shareholder-positions": "pld-shareholder-positions",
+		"fep-merger-types": "pld-merger-types",
+		"spr-merger-types": "pld-merger-types",
+		"fep-granting-types": "pld-granting-types",
+		"fes-granting-types": "pld-granting-types",
+		"fep-patrimony-modification-types": "pld-patrimony-modification-types",
+		"fes-patrimony-modification-types": "pld-patrimony-modification-types",
+		"fep-power-of-attorney-types": "pld-power-of-attorney-types",
+		"fes-power-of-attorney-types": "pld-power-of-attorney-types",
+		"mpc-guarantee-types": "pld-guarantee-types",
+		"fep-guarantee-types": "pld-guarantee-types",
+		"fes-guarantee-types": "pld-guarantee-types",
+		"jys-monetary-instruments": "pld-monetary-instruments",
+		"ari-monetary-instruments": "pld-monetary-instruments",
+		"bli-armor-levels": "pld-armor-levels",
+		"veh-armor-levels": "pld-armor-levels",
+		"din-institution-types": "pld-financial-institution-types",
+		"spr-financial-institution-types": "pld-financial-institution-types",
+		"fep-item-types": "pld-appraisal-item-types",
+		"fes-item-types": "pld-appraisal-item-types",
+		"jys-item-types": "pld-liquidation-item-types",
+		"don-item-types": "pld-liquidation-item-types",
+		"ari-alert-types": "pld-alert-types",
+		"avi-alert-types": "pld-alert-types",
+		"bli-alert-types": "pld-alert-types",
+		"chv-alert-types": "pld-alert-types",
+		"din-alert-types": "pld-alert-types",
+		"don-alert-types": "pld-alert-types",
+		"fep-alert-types": "pld-alert-types",
+		"fes-alert-types": "pld-alert-types",
+		"inm-alert-types": "pld-alert-types",
+		"jys-alert-types": "pld-alert-types",
+		"mjr-alert-types": "pld-alert-types",
+		"mpc-alert-types": "pld-alert-types",
+		"oba-alert-types": "pld-alert-types",
+		"spr-alert-types": "pld-alert-types",
+		"tcv-alert-types": "pld-alert-types",
+		"tdr-alert-types": "pld-alert-types",
+		"tpp-alert-types": "pld-alert-types",
+		"tsc-alert-types": "pld-alert-types",
+		"veh-alert-types": "pld-alert-types"
+	}
+}

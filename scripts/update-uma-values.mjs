@@ -14,6 +14,37 @@
 const API_BASE_URL = process.env.API_URL || "http://localhost:8787";
 const API_TOKEN = process.env.API_TOKEN || "";
 
+/**
+ * Determines if a UMA value is currently active based on effective dates.
+ * If endDate is missing or invalid, the UMA is treated as valid indefinitely.
+ */
+function isCurrentlyActive(umaData) {
+	const now = new Date();
+	const effectiveDate = new Date(umaData.effectiveDate);
+
+	// Check if effectiveDate is valid
+	if (isNaN(effectiveDate.getTime())) {
+		return false;
+	}
+
+	// Check if we're past the effective date
+	if (now < effectiveDate) {
+		return false;
+	}
+
+	// If endDate is missing or invalid, treat as valid indefinitely
+	if (!umaData.endDate) {
+		return true;
+	}
+
+	const endDate = new Date(umaData.endDate);
+	if (isNaN(endDate.getTime())) {
+		return true; // Invalid endDate means no end (valid indefinitely)
+	}
+
+	return now <= endDate;
+}
+
 // UMA values from INEGI
 // Source: https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2025/uma/uma2025.pdf
 // IMPORTANT: 2026 UMA kicks in on February 1st, not January 1st
@@ -26,11 +57,10 @@ const UMA_VALUES = {
 			"UMA value for 2025 - Source: INEGI. Verified against official PDF: https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2025/uma/uma2025.pdf. Note: 2026 UMA starts February 1st.",
 	},
 	2026: {
-		dailyValue: 0, // PLACEHOLDER - Update with exact value when available
+		dailyValue: 117.31,
 		effectiveDate: "2026-02-01T00:00:00Z", // Starts February 1st, not January 1st
 		endDate: "2026-12-31T23:59:59Z",
-		notes:
-			"UMA value for 2026 - Starts February 1st, 2026. Update dailyValue when official value is published.",
+		notes: "UMA value for 2026 - Source: INEGI. Starts February 1st, 2026.",
 	},
 	2024: {
 		dailyValue: 108.57,
@@ -61,7 +91,7 @@ async function createUmaValue(year, umaData, approvedBy = null) {
 		endDate: umaData.endDate,
 		approvedBy,
 		notes: umaData.notes,
-		active: year === 2025, // Set 2025 as active by default
+		active: isCurrentlyActive(umaData), // Set active based on current date
 	};
 
 	const response = await fetch(url, {
@@ -110,11 +140,9 @@ async function main() {
 
 	console.log("Creating/updating UMA values from INEGI data...\n");
 	console.log(
-		"⚠️  IMPORTANT: Verify 2025 UMA value against official INEGI PDF:\n",
+		"⚠️  IMPORTANT: Verify UMA values against official INEGI PDFs:\n",
 	);
-	console.log(
-		"   https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2025/uma/uma2025.pdf\n",
-	);
+	console.log("   https://www.inegi.org.mx/temas/uma/\n");
 
 	for (const [yearStr, umaData] of Object.entries(UMA_VALUES)) {
 		const year = parseInt(yearStr, 10);
@@ -134,8 +162,8 @@ async function main() {
 				`✓ Created/updated UMA value for ${year}: ${created.dailyValue}\n`,
 			);
 
-			// Activate 2025 if it's the current year (or if it's the most recent valid UMA)
-			if (year === 2025) {
+			// Activate if this UMA is currently effective
+			if (isCurrentlyActive(umaData)) {
 				console.log(`Activating UMA value for ${year}...`);
 				await activateUmaValue(created.id);
 				console.log(`✓ Activated UMA value for ${year}\n`);
@@ -151,7 +179,7 @@ async function main() {
 
 	console.log("Done!");
 	console.log(
-		"\n⚠️  REMINDER: Verify and update 2025 UMA value with exact data from INEGI PDF",
+		"\n⚠️  REMINDER: Verify UMA values against official INEGI data at https://www.inegi.org.mx/temas/uma/",
 	);
 }
 

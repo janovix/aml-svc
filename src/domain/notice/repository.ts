@@ -289,16 +289,16 @@ export class NoticeRepository {
 	}
 
 	/**
-	 * Get all alerts for a notice with their transactions (for XML generation)
-	 * Fetches alerts with client, alertRule, and their linked transactions
+	 * Get all alerts for a notice with their transactions/operations (for XML generation)
+	 * Fetches alerts with client, alertRule, and their linked transactions or operations
 	 *
 	 * Uses batch fetching to avoid D1/SQLite's ~999 variable limit in IN clauses.
 	 * Instead of using Prisma includes (which generate large IN queries), we:
 	 * 1. Fetch alerts without includes
-	 * 2. Batch fetch related entities (clients, alertRules, transactions) separately
+	 * 2. Batch fetch related entities (clients, alertRules, transactions/operations) separately
 	 * 3. Manually join the data
 	 */
-	async getAlertsWithTransactionsForNotice(
+	async getAlertsWithOperationsForNotice(
 		organizationId: string,
 		noticeId: string,
 	) {
@@ -324,8 +324,8 @@ export class NoticeRepository {
 					.filter((id): id is string => id != null),
 			),
 		];
-		const transactionIds = alerts
-			.map((a) => a.transactionId)
+		const operationIds = alerts
+			.map((a) => a.operationId)
 			.filter((id): id is string => id != null);
 
 		// Batch fetch clients
@@ -352,24 +352,43 @@ export class NoticeRepository {
 		}
 		const alertRuleMap = new Map(alertRules.map((r) => [r.id, r]));
 
-		// Batch fetch transactions with payment methods
-		const transactions: Awaited<
-			ReturnType<typeof this.prisma.transaction.findMany>
+		// Batch fetch operations with payments and activity-specific extensions
+		const operations: Awaited<
+			ReturnType<typeof this.prisma.operation.findMany>
 		> = [];
-		for (let i = 0; i < transactionIds.length; i += BATCH_SIZE) {
-			const batchIds = transactionIds.slice(i, i + BATCH_SIZE);
-			const batchTransactions = await this.prisma.transaction.findMany({
+		for (let i = 0; i < operationIds.length; i += BATCH_SIZE) {
+			const batchIds = operationIds.slice(i, i + BATCH_SIZE);
+			const batchOperations = await this.prisma.operation.findMany({
 				where: {
 					id: { in: batchIds },
 					organizationId,
 				},
 				include: {
-					paymentMethods: true,
+					payments: true,
+					vehicle: true,
+					realEstate: true,
+					jewelry: true,
+					virtualAsset: true,
+					gambling: true,
+					rental: true,
+					armoring: true,
+					donation: true,
+					loan: true,
+					official: true,
+					notary: true,
+					professional: true,
+					travelerCheck: true,
+					card: true,
+					prepaid: true,
+					reward: true,
+					valuable: true,
+					art: true,
+					development: true,
 				},
 			});
-			transactions.push(...batchTransactions);
+			operations.push(...batchOperations);
 		}
-		const transactionMap = new Map(transactions.map((t) => [t.id, t]));
+		const operationMap = new Map(operations.map((o) => [o.id, o]));
 
 		// Manually join all the data
 		return alerts.map((alert) => ({
@@ -378,8 +397,8 @@ export class NoticeRepository {
 			alertRule: alert.alertRuleId
 				? (alertRuleMap.get(alert.alertRuleId) ?? null)
 				: null,
-			transaction: alert.transactionId
-				? (transactionMap.get(alert.transactionId) ?? null)
+			operation: alert.operationId
+				? (operationMap.get(alert.operationId) ?? null)
 				: null,
 		}));
 	}

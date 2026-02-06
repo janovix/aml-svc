@@ -9,7 +9,7 @@
 
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { writeFileSync, unlinkSync } from "node:fs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -134,11 +134,11 @@ async function seedUmaValue() {
 			writeFileSync(sqlFile, sql);
 
 			// Execute SQL
-			const wranglerCmd =
+			const wranglerCmdExec =
 				process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
 			const command = isRemote
-				? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
-				: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
+				? `${wranglerCmdExec} d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
+				: `${wranglerCmdExec} d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
 
 			execSync(command, { stdio: "inherit" });
 
@@ -163,7 +163,12 @@ async function seedUmaValue() {
 export { seedUmaValue };
 
 // If run directly, execute seed
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Compare normalized paths for cross-platform compatibility
+const isDirectRun =
+	process.argv[1] &&
+	resolve(__filename).toLowerCase() === resolve(process.argv[1]).toLowerCase();
+
+if (isDirectRun) {
 	seedUmaValue().catch((error) => {
 		console.error("Fatal error:", error);
 		process.exit(1);

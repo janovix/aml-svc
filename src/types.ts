@@ -40,6 +40,11 @@ export type Bindings = Omit<
 	SAT_CLAVE_ENTIDAD_COLEGIADA?: string;
 	/** API version override (defaults to package.json version) */
 	API_VERSION?: string;
+	/**
+	 * Cloudflare Worker version metadata.
+	 * Used for Sentry release tracking.
+	 */
+	CF_VERSION_METADATA?: WorkerVersionMetadata;
 };
 
 export type AppContext = Context<{ Bindings: Bindings }>;

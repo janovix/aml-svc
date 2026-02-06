@@ -79,7 +79,7 @@ describe("Reports API", () => {
 		await prisma.alert.deleteMany({});
 		await prisma.report.deleteMany({});
 		await prisma.alertRule.deleteMany({});
-		await prisma.transaction.deleteMany({});
+		await prisma.operation.deleteMany({});
 		await prisma.client.deleteMany({});
 	});
 
