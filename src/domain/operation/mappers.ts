@@ -21,6 +21,17 @@ import type {
 	OperationArt,
 	OperationDevelopment,
 } from "@prisma/client";
+
+/**
+ * Safely parses JSON, returning null on parse errors instead of throwing.
+ */
+function safeJsonParse<T>(json: string): T | null {
+	try {
+		return JSON.parse(json);
+	} catch {
+		return null;
+	}
+}
 import type {
 	OperationEntity,
 	OperationPaymentEntity,
@@ -477,13 +488,15 @@ export function mapOperationToEntity(
 		alertDescription: op.alertDescription,
 		watchlistStatus: op.watchlistStatus as WatchlistStatus | null,
 		watchlistCheckedAt: op.watchlistCheckedAt?.toISOString() ?? null,
-		watchlistResult: op.watchlistResult ? JSON.parse(op.watchlistResult) : null,
+		watchlistResult: op.watchlistResult
+			? safeJsonParse(op.watchlistResult)
+			: null,
 		watchlistFlags: op.watchlistFlags,
 		priorityCode: op.priorityCode,
 		dataSource: (op.dataSource ?? "MANUAL") as OperationEntity["dataSource"],
 		completenessStatus: (op.completenessStatus ??
 			"COMPLETE") as OperationEntity["completenessStatus"],
-		missingFields: op.missingFields ? JSON.parse(op.missingFields) : null,
+		missingFields: op.missingFields ? safeJsonParse(op.missingFields) : null,
 		referenceNumber: op.referenceNumber,
 		notes: op.notes,
 		createdAt: op.createdAt.toISOString(),

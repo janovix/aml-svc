@@ -49,10 +49,15 @@ export const notaryHandler: ActivityHandler = {
 			}
 		}
 
+		const subject =
+			n && (n.notaryNumber || n.actTypeCode)
+				? `Notary ${[n.notaryNumber, n.actTypeCode]
+						.filter(Boolean)
+						.join(" - ")}`
+				: "Notarial Act";
+
 		return {
-			subject: n
-				? `Notary ${n.notaryNumber ?? ""} - ${n.actTypeCode ?? ""}`.trim()
-				: "Notarial Act",
+			subject,
 			attributes: {
 				actType: n?.actTypeCode ?? null,
 				notaryNumber: n?.notaryNumber ?? null,

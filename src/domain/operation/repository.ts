@@ -115,7 +115,10 @@ export class OperationRepository {
 			include: operationInclude,
 		});
 
-		return mapOperationToEntity(result!);
+		if (!result) {
+			throw new Error(`Operation ${operation.id} not found after creation`);
+		}
+		return mapOperationToEntity(result);
 	}
 
 	private async createActivityExtension(
@@ -537,9 +540,277 @@ export class OperationRepository {
 					});
 				}
 				break;
-			// Add other activity types as needed - pattern is similar
-			// For brevity, I'm showing the pattern for VEH and INM
-			// The full implementation would include all 20 activities
+			case "MJR":
+				if (input.jewelry) {
+					await tx.operationJewelry.upsert({
+						where: { operationId },
+						create: { id: crypto.randomUUID(), operationId, ...input.jewelry },
+						update: input.jewelry,
+					});
+				}
+				break;
+			case "AVI":
+				if (input.virtualAsset) {
+					await tx.operationVirtualAsset.upsert({
+						where: { operationId },
+						create: {
+							id: crypto.randomUUID(),
+							operationId,
+							...input.virtualAsset,
+						},
+						update: input.virtualAsset,
+					});
+				}
+				break;
+			case "JYS":
+				if (input.gambling) {
+					await tx.operationGambling.upsert({
+						where: { operationId },
+						create: {
+							id: crypto.randomUUID(),
+							operationId,
+							...input.gambling,
+							eventDate: input.gambling.eventDate
+								? new Date(input.gambling.eventDate)
+								: null,
+						},
+						update: {
+							...input.gambling,
+							eventDate: input.gambling.eventDate
+								? new Date(input.gambling.eventDate)
+								: null,
+						},
+					});
+				}
+				break;
+			case "ARI":
+				if (input.rental) {
+					await tx.operationRental.upsert({
+						where: { operationId },
+						create: {
+							id: crypto.randomUUID(),
+							operationId,
+							...input.rental,
+							contractStartDate: input.rental.contractStartDate
+								? new Date(input.rental.contractStartDate)
+								: null,
+							contractEndDate: input.rental.contractEndDate
+								? new Date(input.rental.contractEndDate)
+								: null,
+						},
+						update: {
+							...input.rental,
+							contractStartDate: input.rental.contractStartDate
+								? new Date(input.rental.contractStartDate)
+								: null,
+							contractEndDate: input.rental.contractEndDate
+								? new Date(input.rental.contractEndDate)
+								: null,
+						},
+					});
+				}
+				break;
+			case "BLI":
+				if (input.armoring) {
+					await tx.operationArmoring.upsert({
+						where: { operationId },
+						create: { id: crypto.randomUUID(), operationId, ...input.armoring },
+						update: input.armoring,
+					});
+				}
+				break;
+			case "DON":
+				if (input.donation) {
+					await tx.operationDonation.upsert({
+						where: { operationId },
+						create: { id: crypto.randomUUID(), operationId, ...input.donation },
+						update: input.donation,
+					});
+				}
+				break;
+			case "MPC":
+				if (input.loan) {
+					await tx.operationLoan.upsert({
+						where: { operationId },
+						create: {
+							id: crypto.randomUUID(),
+							operationId,
+							...input.loan,
+							disbursementDate: input.loan.disbursementDate
+								? new Date(input.loan.disbursementDate)
+								: null,
+							maturityDate: input.loan.maturityDate
+								? new Date(input.loan.maturityDate)
+								: null,
+						},
+						update: {
+							...input.loan,
+							disbursementDate: input.loan.disbursementDate
+								? new Date(input.loan.disbursementDate)
+								: null,
+							maturityDate: input.loan.maturityDate
+								? new Date(input.loan.maturityDate)
+								: null,
+						},
+					});
+				}
+				break;
+			case "FEP":
+				if (input.official) {
+					await tx.operationOfficial.upsert({
+						where: { operationId },
+						create: {
+							id: crypto.randomUUID(),
+							operationId,
+							...input.official,
+							instrumentDate: input.official.instrumentDate
+								? new Date(input.official.instrumentDate)
+								: null,
+						},
+						update: {
+							...input.official,
+							instrumentDate: input.official.instrumentDate
+								? new Date(input.official.instrumentDate)
+								: null,
+						},
+					});
+				}
+				break;
+			case "FES":
+				if (input.notary) {
+					await tx.operationNotary.upsert({
+						where: { operationId },
+						create: {
+							id: crypto.randomUUID(),
+							operationId,
+							...input.notary,
+							instrumentDate: input.notary.instrumentDate
+								? new Date(input.notary.instrumentDate)
+								: null,
+						},
+						update: {
+							...input.notary,
+							instrumentDate: input.notary.instrumentDate
+								? new Date(input.notary.instrumentDate)
+								: null,
+						},
+					});
+				}
+				break;
+			case "SPR":
+				if (input.professional) {
+					await tx.operationProfessional.upsert({
+						where: { operationId },
+						create: {
+							id: crypto.randomUUID(),
+							operationId,
+							...input.professional,
+						},
+						update: input.professional,
+					});
+				}
+				break;
+			case "CHV":
+				if (input.travelerCheck) {
+					await tx.operationTravelerCheck.upsert({
+						where: { operationId },
+						create: {
+							id: crypto.randomUUID(),
+							operationId,
+							...input.travelerCheck,
+						},
+						update: input.travelerCheck,
+					});
+				}
+				break;
+			case "TSC":
+				if (input.card) {
+					await tx.operationCard.upsert({
+						where: { operationId },
+						create: { id: crypto.randomUUID(), operationId, ...input.card },
+						update: input.card,
+					});
+				}
+				break;
+			case "TPP":
+				if (input.prepaid) {
+					await tx.operationPrepaid.upsert({
+						where: { operationId },
+						create: { id: crypto.randomUUID(), operationId, ...input.prepaid },
+						update: input.prepaid,
+					});
+				}
+				break;
+			case "TDR":
+				if (input.reward) {
+					await tx.operationReward.upsert({
+						where: { operationId },
+						create: {
+							id: crypto.randomUUID(),
+							operationId,
+							...input.reward,
+							pointsExpiryDate: input.reward.pointsExpiryDate
+								? new Date(input.reward.pointsExpiryDate)
+								: null,
+						},
+						update: {
+							...input.reward,
+							pointsExpiryDate: input.reward.pointsExpiryDate
+								? new Date(input.reward.pointsExpiryDate)
+								: null,
+						},
+					});
+				}
+				break;
+			case "TCV":
+				if (input.valuable) {
+					await tx.operationValuable.upsert({
+						where: { operationId },
+						create: {
+							id: crypto.randomUUID(),
+							operationId,
+							...input.valuable,
+							custodyStartDate: input.valuable.custodyStartDate
+								? new Date(input.valuable.custodyStartDate)
+								: null,
+							custodyEndDate: input.valuable.custodyEndDate
+								? new Date(input.valuable.custodyEndDate)
+								: null,
+						},
+						update: {
+							...input.valuable,
+							custodyStartDate: input.valuable.custodyStartDate
+								? new Date(input.valuable.custodyStartDate)
+								: null,
+							custodyEndDate: input.valuable.custodyEndDate
+								? new Date(input.valuable.custodyEndDate)
+								: null,
+						},
+					});
+				}
+				break;
+			case "OBA":
+				if (input.art) {
+					await tx.operationArt.upsert({
+						where: { operationId },
+						create: { id: crypto.randomUUID(), operationId, ...input.art },
+						update: input.art,
+					});
+				}
+				break;
+			case "DIN":
+				if (input.development) {
+					await tx.operationDevelopment.upsert({
+						where: { operationId },
+						create: {
+							id: crypto.randomUUID(),
+							operationId,
+							...input.development,
+						},
+						update: input.development,
+					});
+				}
+				break;
 		}
 	}
 

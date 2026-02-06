@@ -33,9 +33,9 @@ export const rentalHandler: ActivityHandler = {
 				riskFactors.push("high_monthly_rent");
 			}
 
-			// Check for high deposit
+			// Check for high deposit (only if monthlyRent is present and > 0)
 			const deposit = r.depositAmount ? parseFloat(r.depositAmount) : 0;
-			if (deposit > monthlyRent * 3) {
+			if (monthlyRent > 0 && deposit > monthlyRent * 3) {
 				riskFactors.push("high_deposit");
 			}
 		}

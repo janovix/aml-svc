@@ -22,12 +22,10 @@ export const armoringHandler: ActivityHandler = {
 		const riskFactors: string[] = [];
 
 		if (a) {
-			// Check for high protection levels
-			const highLevels = ["V", "VI", "VII", "B6", "B7"];
-			if (
-				a.armorLevelCode &&
-				highLevels.some((l) => a.armorLevelCode?.toUpperCase().includes(l))
-			) {
+			// Check for high protection levels using exact match
+			const armorLevel = a.armorLevelCode?.toUpperCase().replace(/\s+/g, "");
+			const highLevels = new Set(["V", "VI", "VII", "B6", "B7"]);
+			if (armorLevel && highLevels.has(armorLevel)) {
 				riskFactors.push("high_protection_level");
 			}
 

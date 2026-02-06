@@ -1,6 +1,17 @@
 import type { Invoice, InvoiceItem } from "@prisma/client";
 import type { InvoiceEntity, InvoiceItemEntity } from "./types";
 
+/**
+ * Safely parses JSON, returning null on parse errors instead of throwing.
+ */
+function safeJsonParse(json: string): Record<string, unknown> | null {
+	try {
+		return JSON.parse(json);
+	} catch {
+		return null;
+	}
+}
+
 export function mapInvoiceItemToEntity(item: InvoiceItem): InvoiceItemEntity {
 	return {
 		id: item.id,
@@ -17,7 +28,7 @@ export function mapInvoiceItemToEntity(item: InvoiceItem): InvoiceItemEntity {
 		taxObjectCode: item.taxObjectCode,
 		transferredTaxAmount: item.transferredTaxAmount?.toString() ?? null,
 		withheldTaxAmount: item.withheldTaxAmount?.toString() ?? null,
-		metadata: item.metadata ? JSON.parse(item.metadata) : null,
+		metadata: item.metadata ? safeJsonParse(item.metadata) : null,
 		createdAt: item.createdAt.toISOString(),
 		updatedAt: item.updatedAt.toISOString(),
 	};

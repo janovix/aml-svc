@@ -268,21 +268,22 @@ export class InvoiceRepository {
 		id: string,
 		notes: string | null,
 	): Promise<InvoiceEntity | null> {
-		const existing = await this.prisma.invoice.findFirst({
+		// Use updateMany to atomically update only if conditions match
+		const result = await this.prisma.invoice.updateMany({
 			where: { id, organizationId, deletedAt: null },
+			data: { notes },
 		});
 
-		if (!existing) {
+		if (result.count === 0) {
 			return null;
 		}
 
-		const invoice = await this.prisma.invoice.update({
+		const invoice = await this.prisma.invoice.findFirst({
 			where: { id },
-			data: { notes },
 			include: { items: true },
 		});
 
-		return mapInvoiceToEntity(invoice);
+		return invoice ? mapInvoiceToEntity(invoice) : null;
 	}
 
 	async softDelete(organizationId: string, id: string): Promise<boolean> {
