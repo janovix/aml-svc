@@ -7,6 +7,12 @@ import {
 	type AdminAuthVariables,
 } from "../middleware/admin-auth";
 import { getPrismaClient } from "../lib/prisma";
+import {
+	OrganizationSettingsRepository,
+	OrganizationSettingsService,
+	organizationSettingsCreateSchema,
+	organizationSettingsUpdateSchema,
+} from "../domain/organization-settings";
 
 export const adminRouter = new Hono<{
 	Bindings: Bindings;
@@ -415,4 +421,114 @@ adminRouter.get("/organizations/:id", async (c) => {
 			})),
 		},
 	});
+});
+
+// =============================================================================
+// Organization Settings (Admin) - Replaces auth-svc proxy
+// =============================================================================
+
+/**
+ * GET /api/v1/admin/organization-settings/:orgId
+ * Get AML compliance settings for a specific organization (admin only)
+ *
+ * Previously proxied through auth-svc via service binding.
+ * Now directly accessible by admin panel with JWT admin auth.
+ */
+adminRouter.get("/organization-settings/:orgId", async (c) => {
+	const prisma = getPrismaClient(c.env.DB);
+	const orgId = c.req.param("orgId");
+	const repository = new OrganizationSettingsRepository(prisma);
+	const service = new OrganizationSettingsService(repository);
+
+	const settings = await service.getByOrganizationId(orgId);
+
+	if (!settings) {
+		return c.json({ success: true, data: null }, 404);
+	}
+
+	return c.json({ success: true, data: settings });
+});
+
+/**
+ * PUT /api/v1/admin/organization-settings/:orgId
+ * Create or update AML compliance settings (admin only)
+ *
+ * Previously proxied through auth-svc via service binding.
+ */
+adminRouter.put("/organization-settings/:orgId", async (c) => {
+	const prisma = getPrismaClient(c.env.DB);
+	const orgId = c.req.param("orgId");
+	const repository = new OrganizationSettingsRepository(prisma);
+	const service = new OrganizationSettingsService(repository);
+
+	const body = await c.req.json();
+	const parseResult = organizationSettingsCreateSchema.safeParse(body);
+
+	if (!parseResult.success) {
+		return c.json(
+			{
+				success: false,
+				error: "Validation Error",
+				details: parseResult.error.format(),
+			},
+			400,
+		);
+	}
+
+	const settings = await service.createOrUpdate(orgId, parseResult.data);
+	return c.json({ success: true, data: settings });
+});
+
+/**
+ * PATCH /api/v1/admin/organization-settings/:orgId
+ * Partial update AML compliance settings (admin only)
+ *
+ * Previously proxied through auth-svc via service binding.
+ */
+adminRouter.patch("/organization-settings/:orgId", async (c) => {
+	const prisma = getPrismaClient(c.env.DB);
+	const orgId = c.req.param("orgId");
+	const repository = new OrganizationSettingsRepository(prisma);
+	const service = new OrganizationSettingsService(repository);
+
+	// Check if settings exist first
+	const existing = await service.getByOrganizationId(orgId);
+	if (!existing) {
+		return c.json(
+			{
+				success: false,
+				error: "Not Found",
+				message: "Organization settings not found for this organization",
+			},
+			404,
+		);
+	}
+
+	const body = await c.req.json();
+	const parseResult = organizationSettingsUpdateSchema.safeParse(body);
+
+	if (!parseResult.success) {
+		return c.json(
+			{
+				success: false,
+				error: "Validation Error",
+				details: parseResult.error.format(),
+			},
+			400,
+		);
+	}
+
+	if (Object.keys(parseResult.data).length === 0) {
+		return c.json(
+			{
+				success: false,
+				error: "Validation Error",
+				message: "Payload is empty",
+			},
+			400,
+		);
+	}
+
+	const settings = await service.update(orgId, parseResult.data);
+	return c.json({ success: true, data: settings });
 });
