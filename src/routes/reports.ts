@@ -162,15 +162,15 @@ reportsRouter.get("/aggregate/alerts", async (c) => {
 	return c.json(result);
 });
 
-// GET /reports/aggregate/transactions - Get transaction metrics aggregation
-reportsRouter.get("/aggregate/transactions", async (c) => {
+// GET /reports/aggregate/operations - Get operation metrics aggregation
+reportsRouter.get("/aggregate/operations", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = Object.fromEntries(url.searchParams.entries());
 	const query = parseWithZod(ReportAggregationQuerySchema, queryObject);
 
 	const aggregator = getAggregator(c);
-	const result = await aggregator.aggregateTransactions(
+	const result = await aggregator.aggregateOperations(
 		organizationId,
 		new Date(query.periodStart),
 		new Date(query.periodEnd),

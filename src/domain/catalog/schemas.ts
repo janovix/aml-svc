@@ -50,6 +50,9 @@ export const CatalogListQuerySchema = z.object({
 	page: z.coerce.number().int().min(1).default(1),
 	pageSize: z.coerce.number().int().min(1).max(100).default(10),
 	active: booleanFromQuery.optional(),
+	// Metadata filters for specialized queries
+	vaCode: z.string().max(10).optional(), // Filter by va_code in metadata (for alert types)
+	excludeAutomatable: booleanFromQuery.optional(), // Exclude automatable items (for alert types)
 });
 
 export const CatalogItemCreateSchema = z.object({

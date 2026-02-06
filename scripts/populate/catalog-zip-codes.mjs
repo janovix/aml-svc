@@ -26,7 +26,7 @@ const __dirname = dirname(__filename);
 
 const CSV_URL = "https://catalogs.janovix.com/zip-codes.csv";
 const CATALOG_KEY = "zip-codes";
-const CATALOG_NAME = "Códigos Postales (México)";
+const CATALOG_NAME = "Zip Codes (Mexico)";
 
 // Batch size for SQL execution - kept small to avoid wrangler/workerd memory issues
 // The workerd runtime has hash table issues with large batches

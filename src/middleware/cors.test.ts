@@ -65,7 +65,7 @@ describe("CORS Middleware", () => {
 			it("should match subdomain with hyphens", () => {
 				const patterns = ["*.janovix.workers.dev"];
 				expect(
-					isOriginAllowed("https://rs-scan-aml.janovix.workers.dev", patterns),
+					isOriginAllowed("https://aml.janovix.workers.dev", patterns),
 				).toBe(true);
 				expect(
 					isOriginAllowed("https://my-app-test.janovix.workers.dev", patterns),

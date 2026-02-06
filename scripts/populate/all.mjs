@@ -1,8 +1,19 @@
 #!/usr/bin/env node
 /**
- * Populate All Catalogs
+ * Populate All Reference Data
  *
- * Master script that runs all catalog population scripts.
+ * Master script that populates ALL reference data needed for the application:
+ * - Core catalogs (countries, states, currencies, etc.)
+ * - CFDI catalogs (SAT codes)
+ * - PLD catalogs (consolidated across VAs)
+ * - Activity-specific catalogs (all 19 vulnerable activities)
+ * - UMA values (economic reference data)
+ *
+ * NOTE: Large catalogs (zip-codes, cfdi-units, cfdi-product-services) are
+ * excluded by default. Run them separately if needed.
+ *
+ * This is for REFERENCE DATA only (catalogs, constants).
+ * For SYNTHETIC TEST DATA, use the seed scripts instead.
  */
 
 import { execSync } from "node:child_process";
@@ -44,33 +55,61 @@ function getConfigFile() {
 }
 
 async function populateAll() {
-	console.log("🚀 Starting catalog population...\n");
+	console.log("╔════════════════════════════════════════════════════════════╗");
+	console.log("║        Reference Data Population (All Catalogs)            ║");
+	console.log(
+		"╚════════════════════════════════════════════════════════════╝\n",
+	);
 
 	const configFile = getConfigFile();
 	const env = { ...process.env };
 	if (configFile) {
 		env.WRANGLER_CONFIG = configFile;
+		console.log(`📝 Using config: ${configFile}`);
 	}
 
+	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
+	console.log(`📦 Mode: ${isRemote ? "remote" : "local"}\n`);
+
 	try {
-		// Populate catalogs first
+		// Step 1: Populate catalogs (core + essential)
+		console.log("═══════════════════════════════════════════════════════════");
+		console.log("Step 1/2: Populating catalogs...");
+		console.log(
+			"═══════════════════════════════════════════════════════════\n",
+		);
 		execSync(`node "${join(__dirname, "all-catalogs.mjs")}"`, {
 			stdio: "inherit",
 			env,
 		});
 
-		// Populate UMA values (essential reference data)
-		console.log("\n");
+		// Step 2: Populate UMA values (essential reference data)
+		console.log(
+			"\n═══════════════════════════════════════════════════════════",
+		);
+		console.log("Step 2/2: Populating UMA values...");
+		console.log(
+			"═══════════════════════════════════════════════════════════\n",
+		);
 		execSync(`node "${join(__dirname, "uma-values.mjs")}"`, {
 			stdio: "inherit",
 			env,
 		});
 	} catch (error) {
-		console.error("Failed to populate:", error);
+		console.error("\n❌ Failed to populate reference data:", error);
 		process.exit(1);
 	}
 
-	console.log("\n✅ All catalogs and reference data populated successfully!");
+	console.log(
+		"\n╔════════════════════════════════════════════════════════════╗",
+	);
+	console.log("║                 Population Complete!                       ║");
+	console.log(
+		"╚════════════════════════════════════════════════════════════╝\n",
+	);
+	console.log("✅ All reference data populated successfully!");
+	console.log("\n💡 Optional: Populate large catalogs separately:");
+	console.log("   pnpm populate:catalogs:large");
 }
 
 populateAll().catch((error) => {

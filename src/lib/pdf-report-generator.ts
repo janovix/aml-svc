@@ -17,7 +17,7 @@ import type { ReportEntity, ReportTemplate } from "../domain/report/types";
 import type {
 	ReportAggregation,
 	AlertAggregation,
-	TransactionAggregation,
+	OperationAggregation,
 	ClientAggregation,
 	ComparisonMetrics,
 } from "./report-aggregator";
@@ -249,9 +249,9 @@ function generateChartsSection(aggregation: ReportAggregation): string {
 		`);
 	}
 
-	// Transaction volume by month (Line)
-	if (aggregation.transactions.byMonth.length > 1) {
-		const txnData: TimeSeriesData[] = aggregation.transactions.byMonth.map(
+	// Operations volume by month (Line)
+	if (aggregation.operations.byMonth.length > 1) {
+		const opsData: TimeSeriesData[] = aggregation.operations.byMonth.map(
 			(m) => ({
 				date: m.month,
 				value: m.count,
@@ -259,7 +259,7 @@ function generateChartsSection(aggregation: ReportAggregation): string {
 		);
 		charts.push(`
 			<div class="chart-container wide">
-				${generateLineChart(txnData, { title: "Volumen de Transacciones", width: 400, height: 220 })}
+				${generateLineChart(opsData, { title: "Volumen de Operaciones", width: 400, height: 220 })}
 			</div>
 		`);
 	}
@@ -285,7 +285,7 @@ function generateExecutiveSummary(
 	aggregation: ReportAggregation,
 	comparison?: ComparisonMetrics,
 ): string {
-	const { alerts, transactions, riskIndicators } = aggregation;
+	const { alerts, operations, riskIndicators } = aggregation;
 
 	const comparisonHtml = comparison
 		? `
@@ -297,8 +297,8 @@ function generateExecutiveSummary(
 					${formatChangeIndicator(comparison.alertsChange)}
 				</div>
 				<div class="comparison-item">
-					<span class="comparison-label">Transacciones</span>
-					${formatChangeIndicator(comparison.transactionsChange)}
+					<span class="comparison-label">Operaciones</span>
+					${formatChangeIndicator(comparison.operationsChange)}
 				</div>
 				<div class="comparison-item">
 					<span class="comparison-label">Monto</span>
@@ -326,12 +326,12 @@ function generateExecutiveSummary(
 					<p>${riskIndicators.complianceScore}</p>
 				</div>
 				<div class="summary-card secondary">
-					<h3>Transacciones</h3>
-					<p>${formatNumber(transactions.total)}</p>
+					<h3>Operaciones</h3>
+					<p>${formatNumber(operations.total)}</p>
 				</div>
 				<div class="summary-card secondary">
 					<h3>Monto Total</h3>
-					<p style="font-size: 16px;">${formatCurrency(transactions.totalAmount)}</p>
+					<p style="font-size: 16px;">${formatCurrency(operations.totalAmount)}</p>
 				</div>
 			</div>
 
@@ -442,20 +442,18 @@ function generateBreakdownSection(alerts: AlertAggregation): string {
 }
 
 /**
- * Generate transaction summary section
+ * Generate operation summary section
  */
-function generateTransactionSection(
-	transactions: TransactionAggregation,
-): string {
-	if (transactions.total === 0) {
+function generateOperationSection(operations: OperationAggregation): string {
+	if (operations.total === 0) {
 		return "";
 	}
 
-	const opTypeRows = Object.entries(transactions.byOperationType)
+	const opTypeRows = Object.entries(operations.byOperationType)
 		.map(
-			([type, data]) => `
+			([type, data]: [string, { count: number; amount: number }]) => `
 			<tr>
-				<td>${type === "PURCHASE" ? "Compra" : "Venta"}</td>
+				<td>${type === "PURCHASE" ? "Compra" : type === "SALE" ? "Venta" : type}</td>
 				<td style="text-align: right;">${data.count}</td>
 				<td style="text-align: right;">${formatCurrency(data.amount)}</td>
 			</tr>
@@ -463,16 +461,32 @@ function generateTransactionSection(
 		)
 		.join("");
 
-	const vehicleTypeRows = Object.entries(transactions.byVehicleType)
-		.map(([type, data]) => {
-			const typeLabel: Record<string, string> = {
-				LAND: "Terrestre",
-				MARINE: "Marítimo",
-				AIR: "Aéreo",
+	const activityCodeRows = Object.entries(operations.byActivityCode)
+		.map(([code, data]: [string, { count: number; amount: number }]) => {
+			const activityLabels: Record<string, string> = {
+				VEH: "Vehículos",
+				INM: "Inmuebles",
+				MJR: "Joyería y Metales",
+				AVI: "Activos Virtuales",
+				JYS: "Juegos y Sorteos",
+				ARI: "Arrendamiento",
+				BLI: "Blindaje",
+				DON: "Donatarias",
+				MPC: "Préstamos Mercantiles",
+				FEP: "Fe Pública",
+				FES: "Fe Social",
+				SPR: "Servicios Profesionales",
+				CHV: "Cheques de Viajero",
+				TSC: "Tarjetas de Crédito",
+				TPP: "Tarjetas Prepagadas",
+				TDR: "Tarjetas de Recompensas",
+				TCV: "Custodia de Valores",
+				OBA: "Obras de Arte",
+				DIN: "Desarrollo Inmobiliario",
 			};
 			return `
 				<tr>
-					<td>${typeLabel[type] || type}</td>
+					<td>${activityLabels[code] || code}</td>
 					<td style="text-align: right;">${data.count}</td>
 					<td style="text-align: right;">${formatCurrency(data.amount)}</td>
 				</tr>
@@ -480,7 +494,7 @@ function generateTransactionSection(
 		})
 		.join("");
 
-	const topClientsRows = transactions.topClients
+	const topClientsRows = operations.topClients
 		.slice(0, 5)
 		.map(
 			(client) => `
@@ -495,19 +509,19 @@ function generateTransactionSection(
 
 	return `
 		<div class="section">
-			<h3 class="section-title">Resumen de Transacciones</h3>
+			<h3 class="section-title">Resumen de Operaciones</h3>
 			<div class="txn-summary-grid">
 				<div class="txn-stat">
-					<h4>Total Transacciones</h4>
-					<p class="stat-value">${formatNumber(transactions.total)}</p>
+					<h4>Total Operaciones</h4>
+					<p class="stat-value">${formatNumber(operations.total)}</p>
 				</div>
 				<div class="txn-stat">
 					<h4>Monto Total</h4>
-					<p class="stat-value">${formatCurrency(transactions.totalAmount)}</p>
+					<p class="stat-value">${formatCurrency(operations.totalAmount)}</p>
 				</div>
 				<div class="txn-stat">
-					<h4>Promedio por Transacción</h4>
-					<p class="stat-value">${formatCurrency(transactions.avgAmount)}</p>
+					<h4>Promedio por Operación</h4>
+					<p class="stat-value">${formatCurrency(operations.avgAmount)}</p>
 				</div>
 			</div>
 
@@ -520,10 +534,10 @@ function generateTransactionSection(
 					</table>
 				</div>
 				<div class="breakdown-table">
-					<h4>Por Tipo de Vehículo</h4>
+					<h4>Por Actividad Vulnerable</h4>
 					<table>
-						<thead><tr><th>Tipo</th><th>Cantidad</th><th>Monto</th></tr></thead>
-						<tbody>${vehicleTypeRows || '<tr><td colspan="3">Sin datos</td></tr>'}</tbody>
+						<thead><tr><th>Actividad</th><th>Cantidad</th><th>Monto</th></tr></thead>
+						<tbody>${activityCodeRows || '<tr><td colspan="3">Sin datos</td></tr>'}</tbody>
 					</table>
 				</div>
 				<div class="breakdown-table">
@@ -967,7 +981,7 @@ export function generatePdfReportHtml(data: PdfReportData): string {
 	${generateExecutiveSummary(aggregation, aggregation.comparison)}
 	${generateChartsSection(aggregation)}
 	${generateBreakdownSection(aggregation.alerts)}
-	${aggregation.transactions.total > 0 ? generateTransactionSection(aggregation.transactions) : ""}
+	${aggregation.operations.total > 0 ? generateOperationSection(aggregation.operations) : ""}
 	${aggregation.clients.total > 0 ? generateClientSection(aggregation.clients) : ""}
 	${report.includeDetailTables ? generateAlertDetailsSection(alerts) : ""}
 
@@ -1017,12 +1031,12 @@ export function convertLegacyToNewFormat(
 				avgResolutionDays: 0,
 				overdueCount: 0,
 			},
-			transactions: {
+			operations: {
 				total: 0,
 				totalAmount: legacy.summary.totalAmount || 0,
 				avgAmount: 0,
+				byActivityCode: {},
 				byOperationType: {},
-				byVehicleType: {},
 				byCurrency: {},
 				byMonth: [],
 				topClients: [],

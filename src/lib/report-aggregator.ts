@@ -2,7 +2,7 @@
  * Report Aggregator
  *
  * Provides comprehensive data aggregation for analytics reports.
- * Aggregates data from alerts, transactions, and clients.
+ * Aggregates data from alerts, operations, and clients.
  */
 
 import type { PrismaClient, Prisma } from "@prisma/client";
@@ -18,12 +18,12 @@ export interface AlertAggregation {
 	overdueCount: number;
 }
 
-export interface TransactionAggregation {
+export interface OperationAggregation {
 	total: number;
 	totalAmount: number;
 	avgAmount: number;
+	byActivityCode: Record<string, { count: number; amount: number }>;
 	byOperationType: Record<string, { count: number; amount: number }>;
-	byVehicleType: Record<string, { count: number; amount: number }>;
 	byCurrency: Record<string, { count: number; amount: number }>;
 	byMonth: Array<{ month: string; count: number; amount: number }>;
 	topClients: Array<{
@@ -33,6 +33,9 @@ export interface TransactionAggregation {
 		amount: number;
 	}>;
 }
+
+/** @deprecated Use OperationAggregation instead */
+export type TransactionAggregation = OperationAggregation;
 
 export interface ClientAggregation {
 	total: number;
@@ -44,7 +47,7 @@ export interface ClientAggregation {
 
 export interface ComparisonMetrics {
 	alertsChange: number; // percentage
-	transactionsChange: number;
+	operationsChange: number;
 	amountChange: number;
 	clientsChange: number;
 }
@@ -58,7 +61,7 @@ export interface RiskIndicators {
 
 export interface ReportAggregation {
 	alerts: AlertAggregation;
-	transactions: TransactionAggregation;
+	operations: OperationAggregation;
 	clients: ClientAggregation;
 	comparison?: ComparisonMetrics;
 	riskIndicators: RiskIndicators;
@@ -94,7 +97,7 @@ export class ReportAggregator {
 		} = options;
 
 		// Aggregate each data source in parallel
-		const [alerts, transactions, clients] = await Promise.all([
+		const [alerts, operations, clients] = await Promise.all([
 			dataSources.includes("ALERTS")
 				? this.aggregateAlerts(
 						organizationId,
@@ -104,15 +107,15 @@ export class ReportAggregator {
 						clientId,
 					)
 				: this.emptyAlertAggregation(),
-			dataSources.includes("TRANSACTIONS")
-				? this.aggregateTransactions(
+			dataSources.includes("TRANSACTIONS") || dataSources.includes("OPERATIONS")
+				? this.aggregateOperations(
 						organizationId,
 						periodStart,
 						periodEnd,
 						filters,
 						clientId,
 					)
-				: this.emptyTransactionAggregation(),
+				: this.emptyOperationAggregation(),
 			dataSources.includes("CLIENTS")
 				? this.aggregateClients(
 						organizationId,
@@ -146,7 +149,7 @@ export class ReportAggregator {
 
 		return {
 			alerts,
-			transactions,
+			operations,
 			clients,
 			comparison,
 			riskIndicators,
@@ -266,16 +269,16 @@ export class ReportAggregator {
 	}
 
 	/**
-	 * Aggregate transaction data
+	 * Aggregate operation data
 	 */
-	async aggregateTransactions(
+	async aggregateOperations(
 		organizationId: string,
 		periodStart: Date,
 		periodEnd: Date,
 		filters?: ReportFilters,
 		clientId?: string,
-	): Promise<TransactionAggregation> {
-		const where: Prisma.TransactionWhereInput = {
+	): Promise<OperationAggregation> {
+		const where: Prisma.OperationWhereInput = {
 			organizationId,
 			operationDate: {
 				gte: periodStart,
@@ -290,10 +293,8 @@ export class ReportAggregator {
 		} else if (filters?.clientIds && filters.clientIds.length > 0) {
 			where.clientId = { in: filters.clientIds };
 		}
-		if (filters?.transactionTypes && filters.transactionTypes.length > 0) {
-			where.operationType = {
-				in: filters.transactionTypes as ("PURCHASE" | "SALE")[],
-			};
+		if (filters?.activityCodes && filters.activityCodes.length > 0) {
+			where.activityCode = { in: filters.activityCodes };
 		}
 		if (filters?.minAmount !== undefined) {
 			where.amount = { ...(where.amount as object), gte: filters.minAmount };
@@ -302,15 +303,16 @@ export class ReportAggregator {
 			where.amount = { ...(where.amount as object), lte: filters.maxAmount };
 		}
 
-		const transactions = await this.prisma.transaction.findMany({
+		const operations = await this.prisma.operation.findMany({
 			where,
 			include: { client: true },
 		});
 
 		// Aggregate
+		const byActivityCode: Record<string, { count: number; amount: number }> =
+			{};
 		const byOperationType: Record<string, { count: number; amount: number }> =
 			{};
-		const byVehicleType: Record<string, { count: number; amount: number }> = {};
 		const byCurrency: Record<string, { count: number; amount: number }> = {};
 		const byMonthMap: Map<string, { count: number; amount: number }> =
 			new Map();
@@ -321,50 +323,51 @@ export class ReportAggregator {
 
 		let totalAmount = 0;
 
-		for (const txn of transactions) {
-			const amount = Number(txn.amount);
+		for (const op of operations) {
+			const amount = Number(op.amount);
 			totalAmount += amount;
 
-			// By operation type
-			if (!byOperationType[txn.operationType]) {
-				byOperationType[txn.operationType] = { count: 0, amount: 0 };
+			// By activity code
+			if (!byActivityCode[op.activityCode]) {
+				byActivityCode[op.activityCode] = { count: 0, amount: 0 };
 			}
-			byOperationType[txn.operationType].count++;
-			byOperationType[txn.operationType].amount += amount;
+			byActivityCode[op.activityCode].count++;
+			byActivityCode[op.activityCode].amount += amount;
 
-			// By vehicle type
-			if (!byVehicleType[txn.vehicleType]) {
-				byVehicleType[txn.vehicleType] = { count: 0, amount: 0 };
+			// By operation type
+			const opType = op.operationTypeCode || "UNKNOWN";
+			if (!byOperationType[opType]) {
+				byOperationType[opType] = { count: 0, amount: 0 };
 			}
-			byVehicleType[txn.vehicleType].count++;
-			byVehicleType[txn.vehicleType].amount += amount;
+			byOperationType[opType].count++;
+			byOperationType[opType].amount += amount;
 
 			// By currency
-			if (!byCurrency[txn.currency]) {
-				byCurrency[txn.currency] = { count: 0, amount: 0 };
+			if (!byCurrency[op.currencyCode]) {
+				byCurrency[op.currencyCode] = { count: 0, amount: 0 };
 			}
-			byCurrency[txn.currency].count++;
-			byCurrency[txn.currency].amount += amount;
+			byCurrency[op.currencyCode].count++;
+			byCurrency[op.currencyCode].amount += amount;
 
 			// By month
-			const month = txn.operationDate.toISOString().substring(0, 7);
+			const month = op.operationDate.toISOString().substring(0, 7);
 			const monthData = byMonthMap.get(month) || { count: 0, amount: 0 };
 			monthData.count++;
 			monthData.amount += amount;
 			byMonthMap.set(month, monthData);
 
 			// By client
-			const clientData = byClientMap.get(txn.clientId) || {
+			const clientData = byClientMap.get(op.clientId) || {
 				clientName:
-					txn.client?.businessName ||
-					`${txn.client?.firstName || ""} ${txn.client?.lastName || ""}`.trim() ||
-					txn.clientId,
+					op.client?.businessName ||
+					`${op.client?.firstName || ""} ${op.client?.lastName || ""}`.trim() ||
+					op.clientId,
 				count: 0,
 				amount: 0,
 			};
 			clientData.count++;
 			clientData.amount += amount;
-			byClientMap.set(txn.clientId, clientData);
+			byClientMap.set(op.clientId, clientData);
 		}
 
 		const byMonth = Array.from(byMonthMap.entries())
@@ -377,12 +380,11 @@ export class ReportAggregator {
 			.slice(0, 10);
 
 		return {
-			total: transactions.length,
+			total: operations.length,
 			totalAmount,
-			avgAmount:
-				transactions.length > 0 ? totalAmount / transactions.length : 0,
+			avgAmount: operations.length > 0 ? totalAmount / operations.length : 0,
+			byActivityCode,
 			byOperationType,
-			byVehicleType,
 			byCurrency,
 			byMonth,
 			topClients,
@@ -468,16 +470,16 @@ export class ReportAggregator {
 	): Promise<ComparisonMetrics> {
 		// Build common filter conditions
 		const alertFilters: Prisma.AlertWhereInput = {};
-		const txnFilters: Prisma.TransactionWhereInput = {};
+		const opFilters: Prisma.OperationWhereInput = {};
 		const clientFilters: Prisma.ClientWhereInput = {};
 
 		// clientId parameter takes precedence over filters.clientIds
 		if (clientId) {
 			alertFilters.clientId = clientId;
-			txnFilters.clientId = clientId;
+			opFilters.clientId = clientId;
 		} else if (filters?.clientIds && filters.clientIds.length > 0) {
 			alertFilters.clientId = { in: filters.clientIds };
-			txnFilters.clientId = { in: filters.clientIds };
+			opFilters.clientId = { in: filters.clientIds };
 			clientFilters.id = { in: filters.clientIds };
 		}
 
@@ -495,23 +497,21 @@ export class ReportAggregator {
 				)[],
 			};
 		}
-		if (filters?.transactionTypes && filters.transactionTypes.length > 0) {
-			txnFilters.operationType = {
-				in: filters.transactionTypes as ("PURCHASE" | "SALE")[],
-			};
+		if (filters?.activityCodes && filters.activityCodes.length > 0) {
+			opFilters.activityCode = { in: filters.activityCodes };
 		}
 		if (filters?.minAmount !== undefined) {
-			txnFilters.amount = { gte: filters.minAmount };
+			opFilters.amount = { gte: filters.minAmount };
 		}
 		if (filters?.maxAmount !== undefined) {
-			txnFilters.amount = {
-				...(txnFilters.amount as object),
+			opFilters.amount = {
+				...(opFilters.amount as object),
 				lte: filters.maxAmount,
 			};
 		}
 
 		// Get current period counts
-		const [currentAlerts, currentTxns, currentClients] = await Promise.all([
+		const [currentAlerts, currentOps, currentClients] = await Promise.all([
 			this.prisma.alert.count({
 				where: {
 					organizationId,
@@ -519,12 +519,12 @@ export class ReportAggregator {
 					...alertFilters,
 				},
 			}),
-			this.prisma.transaction.aggregate({
+			this.prisma.operation.aggregate({
 				where: {
 					organizationId,
 					operationDate: { gte: currentStart, lte: currentEnd },
 					deletedAt: null,
-					...txnFilters,
+					...opFilters,
 				},
 				_count: true,
 				_sum: { amount: true },
@@ -540,7 +540,7 @@ export class ReportAggregator {
 		]);
 
 		// Get comparison period counts
-		const [compAlerts, compTxns, compClients] = await Promise.all([
+		const [compAlerts, compOps, compClients] = await Promise.all([
 			this.prisma.alert.count({
 				where: {
 					organizationId,
@@ -548,12 +548,12 @@ export class ReportAggregator {
 					...alertFilters,
 				},
 			}),
-			this.prisma.transaction.aggregate({
+			this.prisma.operation.aggregate({
 				where: {
 					organizationId,
 					operationDate: { gte: comparisonStart, lte: comparisonEnd },
 					deletedAt: null,
-					...txnFilters,
+					...opFilters,
 				},
 				_count: true,
 				_sum: { amount: true },
@@ -573,15 +573,12 @@ export class ReportAggregator {
 			return Math.round(((current - comparison) / comparison) * 100 * 10) / 10;
 		};
 
-		const currentAmount = Number(currentTxns._sum.amount || 0);
-		const compAmount = Number(compTxns._sum.amount || 0);
+		const currentAmount = Number(currentOps._sum.amount || 0);
+		const compAmount = Number(compOps._sum.amount || 0);
 
 		return {
 			alertsChange: calcChange(currentAlerts, compAlerts),
-			transactionsChange: calcChange(
-				currentTxns._count || 0,
-				compTxns._count || 0,
-			),
+			operationsChange: calcChange(currentOps._count || 0, compOps._count || 0),
 			amountChange: calcChange(currentAmount, compAmount),
 			clientsChange: calcChange(currentClients, compClients),
 		};
@@ -656,13 +653,13 @@ export class ReportAggregator {
 		};
 	}
 
-	private emptyTransactionAggregation(): TransactionAggregation {
+	private emptyOperationAggregation(): OperationAggregation {
 		return {
 			total: 0,
 			totalAmount: 0,
 			avgAmount: 0,
+			byActivityCode: {},
 			byOperationType: {},
-			byVehicleType: {},
 			byCurrency: {},
 			byMonth: [],
 			topClients: [],

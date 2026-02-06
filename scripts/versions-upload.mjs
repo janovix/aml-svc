@@ -14,9 +14,9 @@ const env = {
 
 execSync("pnpm run predeploy:preview", { stdio: "inherit", env });
 // Populate catalogs (required for all environments)
-execSync("pnpm run populate", { stdio: "inherit", env });
+// execSync("pnpm run populate", { stdio: "inherit", env });
 // Seed synthetic data (only for dev/preview)
-execSync("pnpm run seed", { stdio: "inherit", env });
+//execSync("pnpm run seed", { stdio: "inherit", env });
 execSync("wrangler versions upload --config wrangler.preview.jsonc", {
 	stdio: "inherit",
 });

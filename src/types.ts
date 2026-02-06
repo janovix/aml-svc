@@ -40,8 +40,6 @@ export type Bindings = Omit<
 	SAT_CLAVE_ENTIDAD_COLEGIADA?: string;
 	/** API version override (defaults to package.json version) */
 	API_VERSION?: string;
-	/** Secret for signing presigned file URLs */
-	PRESIGNED_URL_SECRET: string;
 	/**
 	 * Cloudflare Worker version metadata.
 	 * Used for Sentry release tracking.

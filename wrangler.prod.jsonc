@@ -53,7 +53,4 @@
 		"AUTH_JWKS_CACHE_TTL": "3600",
 		"TRUSTED_ORIGINS": "*.janovix.com,https://janovix.com",
 	},
-	// IMPORTANT: PRESIGNED_URL_SECRET must be configured via:
-	// wrangler secret put PRESIGNED_URL_SECRET --config wrangler.prod.jsonc
-	// Do NOT put production secrets in this config file
 }

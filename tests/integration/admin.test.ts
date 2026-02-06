@@ -105,7 +105,7 @@ describe("Admin Routes", () => {
 		const prisma = getPrismaClient(env.DB);
 		await prisma.alert.deleteMany({});
 		await prisma.notice.deleteMany({});
-		await prisma.transaction.deleteMany({});
+		await prisma.operation.deleteMany({});
 		await prisma.client.deleteMany({});
 		await prisma.organizationSettings.deleteMany({});
 
@@ -254,7 +254,7 @@ describe("Admin Routes", () => {
 		data: {
 			totals: {
 				clients: number;
-				transactions: number;
+				operations: number;
 				alerts: number;
 				notices: number;
 			};
@@ -365,7 +365,7 @@ describe("Admin Routes", () => {
 			expect(body.success).toBe(true);
 			expect(body.data.totals).toBeDefined();
 			expect(body.data.totals.clients).toBe(2); // We created 2 clients
-			expect(body.data.totals.transactions).toBe(0); // No transactions created
+			expect(body.data.totals.operations).toBe(0); // No operations created
 			expect(body.data.totals.alerts).toBe(2); // We created 2 alerts
 			expect(body.data.totals.notices).toBe(2); // We created 2 notices
 		});

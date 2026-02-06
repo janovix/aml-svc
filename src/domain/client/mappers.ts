@@ -290,6 +290,19 @@ export function mapPrismaClient(
 				| "COMPLETE"
 				| "EXPIRED") ?? "INCOMPLETE",
 		kycCompletedAt: mapDateTime(record.kycCompletedAt),
+		// Completeness tracking
+		completenessStatus:
+			(record.completenessStatus as "COMPLETE" | "INCOMPLETE" | "MINIMUM") ??
+			"INCOMPLETE",
+		missingFields: record.missingFields
+			? (() => {
+					try {
+						return JSON.parse(record.missingFields as string) as string[];
+					} catch {
+						return null;
+					}
+				})()
+			: null,
 		// PEP status
 		isPEP: Boolean(record.isPEP),
 		pepStatus:

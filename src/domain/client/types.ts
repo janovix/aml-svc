@@ -38,6 +38,9 @@ export interface ClientEntity {
 	// KYC status tracking
 	kycStatus: KYCStatus;
 	kycCompletedAt?: string | null;
+	// Completeness tracking
+	completenessStatus: "COMPLETE" | "INCOMPLETE" | "MINIMUM";
+	missingFields: string[] | null;
 	// PEP status tracking
 	isPEP: boolean;
 	pepStatus: PEPStatus;

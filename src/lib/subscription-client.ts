@@ -15,7 +15,7 @@ export type PlanTier = "none" | "business" | "pro" | "enterprise";
 /**
  * Usage metric types
  */
-export type UsageMetric = "notices" | "alerts" | "transactions";
+export type UsageMetric = "notices" | "alerts" | "transactions" | "operations";
 
 /**
  * Feature names

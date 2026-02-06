@@ -42,10 +42,10 @@ describe("Import Schemas", () => {
 			});
 		});
 
-		it("should validate correct input for TRANSACTION", () => {
+		it("should validate correct input for OPERATION", () => {
 			const result = ImportCreateSchema.safeParse({
-				entityType: "TRANSACTION",
-				fileName: "transactions.xlsx",
+				entityType: "OPERATION",
+				fileName: "operations.xlsx",
 				fileSize: 2048,
 			});
 			expect(result.success).toBe(true);

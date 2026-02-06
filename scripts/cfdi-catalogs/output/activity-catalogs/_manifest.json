@@ -1,0 +1,341 @@
+{
+	"catalogs": [
+		{
+			"activity": "jys",
+			"catalog": "operation-types",
+			"filename": "jys-operation-types.csv",
+			"items": 3,
+			"sheet": "Tipo de Operacion"
+		},
+		{
+			"activity": "jys",
+			"catalog": "business-lines",
+			"filename": "jys-business-lines.csv",
+			"items": 10,
+			"sheet": "Linea de Negocio"
+		},
+		{
+			"activity": "jys",
+			"catalog": "operation-methods",
+			"filename": "jys-operation-methods.csv",
+			"items": 5,
+			"sheet": "Medio empleado para realizar la"
+		},
+		{
+			"activity": "ari",
+			"catalog": "operation-types",
+			"filename": "ari-operation-types.csv",
+			"items": 1,
+			"sheet": "Tipo de Operación"
+		},
+		{
+			"activity": "bli",
+			"catalog": "operation-types",
+			"filename": "bli-operation-types.csv",
+			"items": 1,
+			"sheet": "Tipo de Operación"
+		},
+		{
+			"activity": "bli",
+			"catalog": "armored-item-status",
+			"filename": "bli-armored-item-status.csv",
+			"items": 2,
+			"sheet": "Estado del bien que se blinda"
+		},
+		{
+			"activity": "bli",
+			"catalog": "armored-property-parts",
+			"filename": "bli-armored-property-parts.csv",
+			"items": 8,
+			"sheet": "Parte del inmueble objeto del s"
+		},
+		{
+			"activity": "chv",
+			"catalog": "operation-types",
+			"filename": "chv-operation-types.csv",
+			"items": 2,
+			"sheet": "Tipo de Operación"
+		},
+		{
+			"activity": "chv",
+			"catalog": "currency-denominations",
+			"filename": "chv-currency-denominations.csv",
+			"items": 7,
+			"sheet": "Tipo de moneda o divisa de deno"
+		},
+		{
+			"activity": "tcv",
+			"catalog": "service-types",
+			"filename": "tcv-service-types.csv",
+			"items": 4,
+			"sheet": "Tipo de servicio"
+		},
+		{
+			"activity": "tcv",
+			"catalog": "operation-types",
+			"filename": "tcv-operation-types.csv",
+			"items": 3,
+			"sheet": "Tipo de Operación"
+		},
+		{
+			"activity": "tcv",
+			"catalog": "transferred-value-types",
+			"filename": "tcv-transferred-value-types.csv",
+			"items": 8,
+			"sheet": "Tipo de Valor Trasladado yo Cus"
+		},
+		{
+			"activity": "din",
+			"catalog": "operation-types",
+			"filename": "din-operation-types.csv",
+			"items": 1,
+			"sheet": "Tipo de Operación"
+		},
+		{
+			"activity": "din",
+			"catalog": "development-types",
+			"filename": "din-development-types.csv",
+			"items": 6,
+			"sheet": "Tipos de Desarrollos Inmobiliar"
+		},
+		{
+			"activity": "din",
+			"catalog": "third-party-types",
+			"filename": "din-third-party-types.csv",
+			"items": 3,
+			"sheet": "Tipos de Terceros"
+		},
+		{
+			"activity": "din",
+			"catalog": "credit-types",
+			"filename": "din-credit-types.csv",
+			"items": 3,
+			"sheet": "Tipos de Créditos"
+		},
+		{
+			"activity": "don",
+			"catalog": "operation-types",
+			"filename": "don-operation-types.csv",
+			"items": 1,
+			"sheet": "Tipo de Operación"
+		},
+		{
+			"activity": "inm",
+			"catalog": "operation-types",
+			"filename": "inm-operation-types.csv",
+			"items": 1,
+			"sheet": "Tipo de Operación"
+		},
+		{
+			"activity": "inm",
+			"catalog": "client-figures",
+			"filename": "inm-client-figures.csv",
+			"items": 2,
+			"sheet": "Figura del cliente reportado"
+		},
+		{
+			"activity": "inm",
+			"catalog": "person-figures",
+			"filename": "inm-person-figures.csv",
+			"items": 3,
+			"sheet": "Figura de la persona que realiz"
+		},
+		{
+			"activity": "mjr",
+			"catalog": "operation-types",
+			"filename": "mjr-operation-types.csv",
+			"items": 2,
+			"sheet": "Tipo de Operación"
+		},
+		{
+			"activity": "mjr",
+			"catalog": "item-types",
+			"filename": "mjr-item-types.csv",
+			"items": 12,
+			"sheet": "Tipo de bien"
+		},
+		{
+			"activity": "mjr",
+			"catalog": "trade-units",
+			"filename": "mjr-trade-units.csv",
+			"items": 3,
+			"sheet": "Unidad de comercialización"
+		},
+		{
+			"activity": "tdr",
+			"catalog": "operation-types",
+			"filename": "tdr-operation-types.csv",
+			"items": 3,
+			"sheet": "Tipo de Operación"
+		},
+		{
+			"activity": "mpc",
+			"catalog": "operation-types",
+			"filename": "mpc-operation-types.csv",
+			"items": 2,
+			"sheet": "Tipo de Operación"
+		},
+		{
+			"activity": "fep",
+			"catalog": "operation-types",
+			"filename": "fep-operation-types.csv",
+			"items": 1,
+			"sheet": "Tipo de Operación"
+		},
+		{
+			"activity": "fep",
+			"catalog": "movement-types",
+			"filename": "fep-movement-types.csv",
+			"items": 4,
+			"sheet": "Tipo de Movimiento"
+		},
+		{
+			"activity": "fep",
+			"catalog": "trust-types",
+			"filename": "fep-trust-types.csv",
+			"items": 4,
+			"sheet": "Tipo de Fideicomiso"
+		},
+		{
+			"activity": "fep",
+			"catalog": "trust-movement-types",
+			"filename": "fep-trust-movement-types.csv",
+			"items": 3,
+			"sheet": "Tipo de Mov FideicomitenteFidei"
+		},
+		{
+			"activity": "fep",
+			"catalog": "assignment-types",
+			"filename": "fep-assignment-types.csv",
+			"items": 4,
+			"sheet": "Tipo de cesión"
+		},
+		{
+			"activity": "oba",
+			"catalog": "operation-types",
+			"filename": "oba-operation-types.csv",
+			"items": 3,
+			"sheet": "Tipo de Operación"
+		},
+		{
+			"activity": "oba",
+			"catalog": "traded-object-types",
+			"filename": "oba-traded-object-types.csv",
+			"items": 10,
+			"sheet": "Tipo de objeto comercializado"
+		},
+		{
+			"activity": "spr",
+			"catalog": "occupations",
+			"filename": "spr-occupations.csv",
+			"items": 6,
+			"sheet": "Ocupación"
+		},
+		{
+			"activity": "spr",
+			"catalog": "operation-types",
+			"filename": "spr-operation-types.csv",
+			"items": 2,
+			"sheet": "Tipo de Operación de compravent"
+		},
+		{
+			"activity": "spr",
+			"catalog": "client-figures",
+			"filename": "spr-client-figures.csv",
+			"items": 2,
+			"sheet": "Figura del cliente"
+		},
+		{
+			"activity": "spr",
+			"catalog": "assignment-types",
+			"filename": "spr-assignment-types.csv",
+			"items": 3,
+			"sheet": "Tipo de cesión"
+		},
+		{
+			"activity": "spr",
+			"catalog": "management-status-types",
+			"filename": "spr-management-status-types.csv",
+			"items": 3,
+			"sheet": "Estatus del manejo"
+		},
+		{
+			"activity": "spr",
+			"catalog": "service-areas",
+			"filename": "spr-service-areas.csv",
+			"items": 17,
+			"sheet": "Áreas de servicio"
+		},
+		{
+			"activity": "spr",
+			"catalog": "managed-asset-types",
+			"filename": "spr-managed-asset-types.csv",
+			"items": 24,
+			"sheet": "Tipo de Activo Administrado"
+		},
+		{
+			"activity": "spr",
+			"catalog": "contribution-reasons",
+			"filename": "spr-contribution-reasons.csv",
+			"items": 3,
+			"sheet": "Motivo de la aportación"
+		},
+		{
+			"activity": "spr",
+			"catalog": "operation-types",
+			"filename": "spr-operation-types.csv",
+			"items": 2,
+			"sheet": "Tipo de Operación Compraventa M"
+		},
+		{
+			"activity": "fes",
+			"catalog": "act-types",
+			"filename": "fes-act-types.csv",
+			"items": 4,
+			"sheet": "Tipo de acto realizado"
+		},
+		{
+			"activity": "fes",
+			"catalog": "person-character-types",
+			"filename": "fes-person-character-types.csv",
+			"items": 6,
+			"sheet": "Carácter de la persona que inte"
+		},
+		{
+			"activity": "fes",
+			"catalog": "legal-entity-types",
+			"filename": "fes-legal-entity-types.csv",
+			"items": 4,
+			"sheet": "Tipo de persona moral"
+		},
+		{
+			"activity": "tpp",
+			"catalog": "operation-types",
+			"filename": "tpp-operation-types.csv",
+			"items": 2,
+			"sheet": "Tipo de Operación"
+		},
+		{
+			"activity": "tsc",
+			"catalog": "operation-types",
+			"filename": "tsc-operation-types.csv",
+			"items": 1,
+			"sheet": "Tipo de Operacion"
+		},
+		{
+			"activity": "tsc",
+			"catalog": "card-types",
+			"filename": "tsc-card-types.csv",
+			"items": 2,
+			"sheet": "Tipo de Tarjeta"
+		},
+		{
+			"activity": "veh",
+			"catalog": "operation-types",
+			"filename": "veh-operation-types.csv",
+			"items": 3,
+			"sheet": "Tipo de Operación"
+		}
+	],
+	"errors": []
+}

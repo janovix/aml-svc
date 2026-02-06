@@ -47,6 +47,8 @@ describe("ClientRepository", () => {
 		postalCode: "06000",
 		kycStatus: "INCOMPLETE",
 		kycCompletedAt: null,
+		completenessStatus: "INCOMPLETE",
+		missingFields: null,
 		isPEP: false,
 		pepStatus: "PENDING",
 		pepDetails: null,

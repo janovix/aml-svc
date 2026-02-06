@@ -41,7 +41,8 @@ export interface AlertEntity {
 	idempotencyKey: string;
 	contextHash: string;
 	metadata: Record<string, unknown>; // Renamed from alertData
-	transactionId?: string | null; // Renamed from triggerTransactionId
+	operationId?: string | null; // Primary trigger (Operation entity)
+	activityCode?: string | null; // Activity code for multi-activity support
 	isManual: boolean; // True if manually created
 
 	// SAT Submission tracking

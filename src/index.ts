@@ -86,13 +86,13 @@ app.all("/uma-values/active", async (c) => {
 app.all("/alert-rules/:id/config/:key", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
-app.all("/clients/:id/transactions", async (c) => {
+app.all("/clients/:id/operations", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 app.all("/clients/:id", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
-app.all("/transactions", async (c) => {
+app.all("/operations", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 // Organization settings route for service binding access from auth-svc

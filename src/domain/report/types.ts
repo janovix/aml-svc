@@ -17,7 +17,11 @@ export type ReportTemplate =
 	| "CUSTOM"; // User-defined report
 
 // Data sources that can be included
-export type ReportDataSource = "ALERTS" | "TRANSACTIONS" | "CLIENTS";
+export type ReportDataSource =
+	| "ALERTS"
+	| "OPERATIONS"
+	| "CLIENTS"
+	| "TRANSACTIONS"; // @deprecated Use OPERATIONS
 
 // Chart types available for visualization
 export type ChartType = "PIE" | "BAR" | "LINE" | "DONUT" | "STACKED_BAR";
@@ -36,9 +40,11 @@ export interface ReportFilters {
 	clientIds?: string[]; // Filter by specific clients
 	alertRuleIds?: string[]; // Filter by alert rules
 	alertSeverities?: string[]; // Filter by severity levels
-	transactionTypes?: string[]; // Filter by operation type
-	minAmount?: number; // Minimum transaction amount
-	maxAmount?: number; // Maximum transaction amount
+	activityCodes?: string[]; // Filter by activity code (VEH, INM, etc.)
+	/** @deprecated Use activityCodes instead */
+	transactionTypes?: string[]; // Legacy filter
+	minAmount?: number; // Minimum operation amount
+	maxAmount?: number; // Maximum operation amount
 }
 
 export interface ReportEntity {
@@ -123,7 +129,7 @@ export function getTemplateConfigs(): ReportTemplateConfig[] {
 			template: "EXECUTIVE_SUMMARY",
 			name: "Executive Summary",
 			description: "High-level compliance overview for leadership",
-			dataSources: ["ALERTS", "TRANSACTIONS", "CLIENTS"],
+			dataSources: ["ALERTS", "OPERATIONS", "CLIENTS"],
 			defaultCharts: [
 				{
 					type: "DONUT",
@@ -163,20 +169,20 @@ export function getTemplateConfigs(): ReportTemplateConfig[] {
 		},
 		{
 			template: "TRANSACTION_ANALYSIS",
-			name: "Transaction Analysis",
-			description: "Transaction volume and pattern analysis",
-			dataSources: ["TRANSACTIONS"],
+			name: "Operations Analysis",
+			description: "Operations volume and pattern analysis",
+			dataSources: ["OPERATIONS"],
 			defaultCharts: [
 				{
 					type: "LINE",
-					title: "Transaction Volume",
-					dataKey: "transactionsByMonth",
+					title: "Operations Volume",
+					dataKey: "operationsByMonth",
 					showLegend: false,
 				},
 				{
 					type: "PIE",
-					title: "By Vehicle Type",
-					dataKey: "transactionsByVehicleType",
+					title: "By Activity",
+					dataKey: "operationsByActivity",
 					showLegend: true,
 				},
 			],
@@ -186,7 +192,7 @@ export function getTemplateConfigs(): ReportTemplateConfig[] {
 			template: "CLIENT_RISK_PROFILE",
 			name: "Client Risk Profile",
 			description: "Deep-dive analysis of a specific client",
-			dataSources: ["ALERTS", "TRANSACTIONS", "CLIENTS"],
+			dataSources: ["ALERTS", "OPERATIONS", "CLIENTS"],
 			defaultCharts: [
 				{
 					type: "BAR",
@@ -196,8 +202,8 @@ export function getTemplateConfigs(): ReportTemplateConfig[] {
 				},
 				{
 					type: "LINE",
-					title: "Transaction History",
-					dataKey: "clientTransactionHistory",
+					title: "Operations History",
+					dataKey: "clientOperationHistory",
 					showLegend: false,
 				},
 			],
@@ -228,7 +234,7 @@ export function getTemplateConfigs(): ReportTemplateConfig[] {
 			template: "PERIOD_COMPARISON",
 			name: "Period Comparison",
 			description: "Trend analysis with period-over-period comparison",
-			dataSources: ["ALERTS", "TRANSACTIONS"],
+			dataSources: ["ALERTS", "OPERATIONS"],
 			defaultCharts: [
 				{
 					type: "BAR",
