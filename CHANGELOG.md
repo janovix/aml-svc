@@ -1,3 +1,10 @@
+# [1.5.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.5.0-rc.3...v1.5.0-rc.4) (2026-02-06)
+
+
+### Features
+
+* add organization settings endpoints for admin panel ([6865d1f](https://github.com/janovix/aml-svc/commit/6865d1ff12b133c30402e4163e662ea5590906be))
+
 # [1.5.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.5.0-rc.2...v1.5.0-rc.3) (2026-01-28)
 
 
