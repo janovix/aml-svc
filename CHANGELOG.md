@@ -1,3 +1,10 @@
+# [1.6.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.1...v1.6.0-rc.2) (2026-02-07)
+
+
+### Features
+
+* add exchange rate functionality using CurrencyLayer API ([4f0da1c](https://github.com/janovix/aml-svc/commit/4f0da1c37bad3ec7dd0a88e79ac68a49a919ea98))
+
 # [1.6.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.5.0...v1.6.0-rc.1) (2026-02-07)
 
 
