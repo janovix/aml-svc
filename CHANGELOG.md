@@ -1,3 +1,10 @@
+# [1.5.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.5.0-rc.5...v1.5.0-rc.6) (2026-02-07)
+
+
+### Features
+
+* add comprehensive catalog population documentation and workflows ([aa43981](https://github.com/janovix/aml-svc/commit/aa43981bec5597d3d7f9626ebf4295b2103b6e94))
+
 # [1.5.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.5.0-rc.4...v1.5.0-rc.5) (2026-02-06)
 
 
