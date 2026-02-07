@@ -80,9 +80,36 @@ jobs:
           echo "| Skip Zip Codes | \`${{ github.event.inputs.skip_zip_codes }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Catalogs Populated" >> $GITHUB_STEP_SUMMARY
-          echo "- Terrestrial Vehicle Brands" >> $GITHUB_STEP_SUMMARY
-          echo "- Maritime Vehicle Brands" >> $GITHUB_STEP_SUMMARY
-          echo "- Air Vehicle Brands" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Core Catalogs (14)" >> $GITHUB_STEP_SUMMARY
+          echo "- Countries, States, Currencies" >> $GITHUB_STEP_SUMMARY
+          echo "- Armor Levels, Business Activities" >> $GITHUB_STEP_SUMMARY
+          echo "- Economic Activities, Operation Types" >> $GITHUB_STEP_SUMMARY
+          echo "- Payment Forms, Payment Methods" >> $GITHUB_STEP_SUMMARY
+          echo "- Vulnerable Activities" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Vehicle Catalogs (3)" >> $GITHUB_STEP_SUMMARY
+          echo "- Terrestrial, Maritime, Air Vehicle Brands" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### CFDI Catalogs (12)" >> $GITHUB_STEP_SUMMARY
+          echo "- Payment Forms, Payment Methods" >> $GITHUB_STEP_SUMMARY
+          echo "- Tax Regimes, Usages, Voucher Types" >> $GITHUB_STEP_SUMMARY
+          echo "- Currencies, Countries, Taxes" >> $GITHUB_STEP_SUMMARY
+          echo "- Tax Factors, Tax Objects" >> $GITHUB_STEP_SUMMARY
+          echo "- Relation Types, Export Types" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### CFDI-PLD Integration (1)" >> $GITHUB_STEP_SUMMARY
+          echo "- CFDI-PLD Mappings" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### PLD Consolidated Catalogs (15)" >> $GITHUB_STEP_SUMMARY
+          echo "- Alert Types, Monetary Instruments, Payment Forms" >> $GITHUB_STEP_SUMMARY
+          echo "- Property Types, Incorporation Reasons" >> $GITHUB_STEP_SUMMARY
+          echo "- And more..." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Activity-Specific Catalogs (47)" >> $GITHUB_STEP_SUMMARY
+          echo "- Individual catalogs for each of 19 vulnerable activities" >> $GITHUB_STEP_SUMMARY
           if [ "${{ github.event.inputs.skip_zip_codes }}" != "true" ]; then
-            echo "- Zip Codes" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "#### Large Catalogs" >> $GITHUB_STEP_SUMMARY
+            echo "- Zip Codes (~140K+ items)" >> $GITHUB_STEP_SUMMARY
           fi
