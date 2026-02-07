@@ -1,6 +1,7 @@
-// Prisma schema for AML Core KYC domain
+// Prisma schema for AML Core domain
 // Learn more about it in the docs: https://pris.ly/d/prisma-schema
 // NOTE: All column names use snake_case via @map directives for consistency
+// Supports all 20 SAT vulnerable activities with activity-specific extension models
 
 generator client {
   provider = "prisma-client-js"
@@ -10,6 +11,10 @@ datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
+
+// ============================================================================
+// Enums
+// ============================================================================
 
 enum PersonType {
   PHYSICAL
@@ -39,31 +44,28 @@ enum DocumentType {
   OTHER
 }
 
-// KYC completion status
 enum KYCStatus {
-  INCOMPLETE // Missing required documents or information
-  PENDING_VERIFICATION // Documents uploaded, awaiting verification
-  COMPLETE // All requirements met
-  EXPIRED // Documents have expired, needs renewal
+  INCOMPLETE
+  PENDING_VERIFICATION
+  COMPLETE
+  EXPIRED
 }
 
-// PEP check status
 enum PEPStatus {
-  PENDING // Not yet checked
-  CONFIRMED // Confirmed as PEP
-  NOT_PEP // Confirmed not a PEP
-  ERROR // Check failed, needs retry
+  PENDING
+  CONFIRMED
+  NOT_PEP
+  ERROR
 }
 
-// UBO relationship types
 enum UBORelationshipType {
-  SHAREHOLDER // Direct shareholder with 25%+ ownership
-  DIRECTOR // Board member or director
-  LEGAL_REP // Legal representative
-  TRUSTEE // Trustee (for trusts)
-  SETTLOR // Settlor/Grantor (for trusts)
-  BENEFICIARY // Beneficiary (for trusts)
-  CONTROLLER // Person with effective control
+  SHAREHOLDER
+  DIRECTOR
+  LEGAL_REP
+  TRUSTEE
+  SETTLOR
+  BENEFICIARY
+  CONTROLLER
 }
 
 enum DocumentStatus {
@@ -80,27 +82,106 @@ enum AddressType {
   OTHER
 }
 
-enum TransactionOperationType {
-  PURCHASE
-  SALE
+enum UploadLinkStatus {
+  ACTIVE
+  EXPIRED
+  COMPLETED
 }
 
-enum TransactionVehicleType {
+enum VehicleType {
   LAND
   MARINE
   AIR
 }
 
+enum WatchlistStatus {
+  PENDING
+  QUEUED
+  CHECKING
+  COMPLETED
+  ERROR
+  NOT_AVAILABLE
+}
+
+enum AlertStatus {
+  DETECTED
+  FILE_GENERATED
+  SUBMITTED
+  OVERDUE
+  CANCELLED
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum NoticeStatus {
+  DRAFT
+  GENERATED
+  SUBMITTED
+  ACKNOWLEDGED
+}
+
+enum ReportPeriodType {
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+  CUSTOM
+}
+
+enum ReportTemplate {
+  EXECUTIVE_SUMMARY
+  COMPLIANCE_STATUS
+  TRANSACTION_ANALYSIS
+  CLIENT_RISK_PROFILE
+  ALERT_BREAKDOWN
+  PERIOD_COMPARISON
+  CUSTOM
+}
+
+enum ReportStatus {
+  DRAFT
+  GENERATED
+}
+
+enum ImportStatus {
+  PENDING
+  VALIDATING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ImportEntityType {
+  CLIENT
+  OPERATION
+}
+
+enum ImportRowStatus {
+  PENDING
+  SUCCESS
+  WARNING
+  ERROR
+  SKIPPED
+}
+
+// ============================================================================
+// Client Domain
+// ============================================================================
+
 model Client {
   id                   String     @id
-  rfc                  String // RFC is unique per organization, not globally
-  organizationId       String     @map("organization_id") // Organization this client belongs to (from auth-svc)
+  rfc                  String
+  organizationId       String     @map("organization_id")
   personType           PersonType @map("person_type")
   firstName            String?    @map("first_name")
   lastName             String?    @map("last_name")
   secondLastName       String?    @map("second_last_name")
   birthDate            DateTime?  @map("birth_date")
-  curp                 String? // CURP is unique per organization, not globally
+  curp                 String?
   businessName         String?    @map("business_name")
   incorporationDate    DateTime?  @map("incorporation_date")
   nationality          String?
@@ -117,41 +198,42 @@ model Client {
   postalCode           String     @map("postal_code")
   reference            String?
   notes                String?
-  // Catalog references for XML generation
-  countryCode          String?    @map("country_code") // Reference to countries catalog (metadata.code)
-  economicActivityCode String?    @map("economic_activity_code") // Reference to economic activity catalog (7-digit code)
+  countryCode          String?    @map("country_code")
+  economicActivityCode String?    @map("economic_activity_code")
   // Enhanced KYC fields
-  gender               String? // M, F, OTHER
-  occupation           String? // Occupation or business activity description
-  maritalStatus        String?    @map("marital_status") // SINGLE, MARRIED, DIVORCED, WIDOWED, OTHER
-  sourceOfFunds        String?    @map("source_of_funds") // Description of source of funds
-  sourceOfWealth       String?    @map("source_of_wealth") // Description of source of wealth
+  gender               String?
+  occupation           String?
+  maritalStatus        String?    @map("marital_status")
+  sourceOfFunds        String?    @map("source_of_funds")
+  sourceOfWealth       String?    @map("source_of_wealth")
   // KYC status tracking
   kycStatus            KYCStatus  @default(INCOMPLETE) @map("kyc_status")
   kycCompletedAt       DateTime?  @map("kyc_completed_at")
+  // Data completeness tracking
+  completenessStatus   String     @default("INCOMPLETE") @map("completeness_status") // COMPLETE, INCOMPLETE, MINIMUM
+  missingFields        String?    @map("missing_fields") // JSON array of missing field names
   // PEP status tracking
   isPEP                Boolean    @default(false) @map("is_pep")
   pepStatus            PEPStatus  @default(PENDING) @map("pep_status")
-  pepDetails           String?    @map("pep_details") // Details from watchlist-svc
-  pepMatchConfidence   String?    @map("pep_match_confidence") // exact, possible
-  pepCheckedAt         DateTime?  @map("pep_checked_at") // Last PEP check timestamp
-  pepCheckSource       String?    @map("pep_check_source") // VECTORIZE, GROK
+  pepDetails           String?    @map("pep_details")
+  pepMatchConfidence   String?    @map("pep_match_confidence")
+  pepCheckedAt         DateTime?  @map("pep_checked_at")
+  pepCheckSource       String?    @map("pep_check_source")
   // Timestamps
   createdAt            DateTime   @default(now()) @map("created_at")
   updatedAt            DateTime   @updatedAt @map("updated_at")
   deletedAt            DateTime?  @map("deleted_at")
 
-  documents    ClientDocument[]
-  addresses    ClientAddress[]
-  transactions Transaction[]
-  alerts       Alert[]
-  reports      Report[] // Reports targeting this specific client
-  ubos         UltimateBeneficialOwner[] // UBOs for moral/trust entities
+  documents   ClientDocument[]
+  addresses   ClientAddress[]
+  operations  Operation[]
+  alerts      Alert[]
+  reports     Report[]
+  ubos        UltimateBeneficialOwner[]
+  uploadLinks UploadLink[]
 
-  @@map("clients")
-  @@unique([organizationId, rfc]) // RFC must be unique within each organization
   @@index([organizationId])
-  @@index([rfc]) // Keep index for lookups
+  @@index([rfc])
   @@index([personType])
   @@index([deletedAt])
   @@index([countryCode])
@@ -159,42 +241,63 @@ model Client {
   @@index([kycStatus])
   @@index([pepStatus])
   @@index([pepCheckedAt])
+  @@map("clients")
+}
+
+model UploadLink {
+  id                String           @id
+  organizationId    String           @map("organization_id")
+  clientId          String?          @map("client_id")
+  createdBy         String           @map("created_by")
+  docSvcLinkId      String           @map("doc_svc_link_id")
+  expiresAt         DateTime         @map("expires_at")
+  status            UploadLinkStatus @default(ACTIVE)
+  requiredDocuments String?          @map("required_documents")
+  notes             String?
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  client    Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  documents ClientDocument[]
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([docSvcLinkId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("upload_links")
 }
 
 model ClientDocument {
-  id             String         @id
-  clientId       String         @map("client_id")
-  documentType   DocumentType   @map("document_type")
-  documentNumber String         @map("document_number")
-  issuingCountry String?        @map("issuing_country")
-  issueDate      DateTime?      @map("issue_date")
-  expiryDate     DateTime?      @map("expiry_date")
-  status         DocumentStatus @default(PENDING)
-  fileUrl        String?        @map("file_url")
-  metadata       String?
-  // doc-svc integration fields
-  docSvcDocumentId   String?    @map("doc_svc_document_id") // Reference to doc-svc document
-  docSvcJobId        String?    @map("doc_svc_job_id") // Processing job ID
-  verificationStatus String?    @map("verification_status") // APPROVED, REVIEW, REJECTED
-  verificationScore  Float?     @map("verification_score")
-  extractedData      String?    @map("extracted_data") // JSON from doc-svc extraction
-  verifiedAt         DateTime?  @map("verified_at")
-  // Timestamps
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
+  id               String         @id
+  clientId         String         @map("client_id")
+  documentType     DocumentType   @map("document_type")
+  documentNumber   String         @map("document_number")
+  issuingCountry   String?        @map("issuing_country")
+  issueDate        DateTime?      @map("issue_date")
+  expiryDate       DateTime?      @map("expiry_date")
+  status           DocumentStatus @default(PENDING)
+  fileUrl          String?        @map("file_url")
+  metadata         String?
+  docSvcDocumentId String?        @map("doc_svc_document_id")
+  uploadLinkId     String?        @map("upload_link_id")
+  verifiedAt       DateTime?      @map("verified_at")
+  verifiedBy       String?        @map("verified_by")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
 
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  // Relations for UBO documents
-  uboIdDocuments      UltimateBeneficialOwner[] @relation("UBOIdDocument")
-  uboAddressProofs    UltimateBeneficialOwner[] @relation("UBOAddressProof")
+  client           Client                    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  uploadLink       UploadLink?               @relation(fields: [uploadLinkId], references: [id], onDelete: SetNull)
+  uboIdDocuments   UltimateBeneficialOwner[] @relation("UBOIdDocument")
+  uboAddressProofs UltimateBeneficialOwner[] @relation("UBOAddressProof")
 
-  @@map("client_documents")
   @@index([clientId])
   @@index([documentType])
   @@index([status])
   @@index([expiryDate])
   @@index([docSvcDocumentId])
-  @@index([verificationStatus])
+  @@index([uploadLinkId])
+  @@map("client_documents")
 }
 
 model ClientAddress {
@@ -215,52 +318,42 @@ model ClientAddress {
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  @@map("client_addresses")
   @@index([clientId])
   @@index([addressType])
   @@index([country])
+  @@map("client_addresses")
 }
 
-// Ultimate Beneficial Owner - for MORAL and TRUST entities
-// Required by LFPIORPI for entities where a single person owns 25%+ shares
 model UltimateBeneficialOwner {
   id                  String              @id
   clientId            String              @map("client_id")
-  // Personal information
   firstName           String              @map("first_name")
   lastName            String              @map("last_name")
   secondLastName      String?             @map("second_last_name")
   birthDate           DateTime?           @map("birth_date")
   nationality         String?
-  curp                String? // Mexican CURP if applicable
-  rfc                 String? // Mexican RFC if applicable
-  // Ownership/relationship details
-  ownershipPercentage Decimal?            @map("ownership_percentage") // Percentage of ownership (for shareholders)
+  curp                String?
+  rfc                 String?
+  ownershipPercentage Decimal?            @map("ownership_percentage")
   relationshipType    UBORelationshipType @map("relationship_type")
-  position            String? // Job title or position description
-  // Contact information
+  position            String?
   email               String?
   phone               String?
-  // Address
   country             String?
   stateCode           String?             @map("state_code")
   city                String?
   street              String?
   postalCode          String?             @map("postal_code")
-  // Document references
-  idDocumentId        String?             @map("id_document_id") // FK to ClientDocument
-  addressProofId      String?             @map("address_proof_id") // FK to ClientDocument
-  // PEP status tracking (UBOs also need PEP checking)
+  idDocumentId        String?             @map("id_document_id")
+  addressProofId      String?             @map("address_proof_id")
   isPEP               Boolean             @default(false) @map("is_pep")
   pepStatus           PEPStatus           @default(PENDING) @map("pep_status")
   pepDetails          String?             @map("pep_details")
   pepMatchConfidence  String?             @map("pep_match_confidence")
   pepCheckedAt        DateTime?           @map("pep_checked_at")
-  // Verification
   verifiedAt          DateTime?           @map("verified_at")
   verifiedBy          String?             @map("verified_by")
   notes               String?
-  // Timestamps
   createdAt           DateTime            @default(now()) @map("created_at")
   updatedAt           DateTime            @updatedAt @map("updated_at")
 
@@ -268,26 +361,30 @@ model UltimateBeneficialOwner {
   idDocument   ClientDocument? @relation("UBOIdDocument", fields: [idDocumentId], references: [id], onDelete: SetNull)
   addressProof ClientDocument? @relation("UBOAddressProof", fields: [addressProofId], references: [id], onDelete: SetNull)
 
-  @@map("ultimate_beneficial_owners")
   @@index([clientId])
   @@index([relationshipType])
   @@index([pepStatus])
   @@index([pepCheckedAt])
+  @@map("ultimate_beneficial_owners")
 }
+
+// ============================================================================
+// Catalog Domain
+// ============================================================================
 
 model Catalog {
   id            String        @id
   key           String        @unique
   name          String
   active        Boolean       @default(true)
-  allowNewItems Boolean       @default(false) @map("allow_new_items") // When true, users can add new items to this catalog
+  allowNewItems Boolean       @default(false) @map("allow_new_items")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
   items CatalogItem[]
 
-  @@map("catalogs")
   @@index([active])
+  @@map("catalogs")
 }
 
 model CatalogItem {
@@ -302,317 +399,775 @@ model CatalogItem {
 
   catalog Catalog @relation(fields: [catalogId], references: [id], onDelete: Cascade)
 
-  @@map("catalog_items")
   @@index([catalogId])
   @@index([normalizedName])
   @@index([active])
+  @@map("catalog_items")
 }
 
-model Transaction {
-  id                 String                   @id
-  organizationId     String                   @map("organization_id") // Organization this transaction belongs to (from auth-svc)
-  clientId           String                   @map("client_id")
-  operationDate      DateTime                 @map("operation_date")
-  operationType      TransactionOperationType @map("operation_type")
-  branchPostalCode   String                   @map("branch_postal_code")
-  vehicleType        TransactionVehicleType   @map("vehicle_type")
-  brandId            String                   @map("brand_id")
+// ============================================================================
+// Invoice Domain (CFDI v4.0)
+// ============================================================================
+
+model Invoice {
+  id                    String    @id
+  organizationId        String    @map("organization_id")
+  // CFDI Core
+  uuid                  String?   @unique
+  version               String    @default("4.0")
+  series                String?
+  folio                 String?
+  // Issuer (Emisor)
+  issuerRfc             String    @map("issuer_rfc")
+  issuerName            String    @map("issuer_name")
+  issuerTaxRegimeCode   String    @map("issuer_tax_regime_code")
+  // Receiver (Receptor)
+  receiverRfc           String    @map("receiver_rfc")
+  receiverName          String    @map("receiver_name")
+  receiverUsageCode     String?   @map("receiver_usage_code")
+  receiverTaxRegimeCode String?   @map("receiver_tax_regime_code")
+  receiverPostalCode    String?   @map("receiver_postal_code")
+  // Financial
+  subtotal              Decimal
+  discount              Decimal?  @default(0)
+  total                 Decimal
+  currencyCode          String    @default("MXN") @map("currency_code")
+  exchangeRate          Decimal?  @default(1) @map("exchange_rate")
+  // Payment
+  paymentFormCode       String?   @map("payment_form_code")
+  paymentMethodCode     String?   @map("payment_method_code")
+  // Type and dates
+  voucherTypeCode       String    @default("I") @map("voucher_type_code")
+  issueDate             DateTime  @map("issue_date")
+  certificationDate     DateTime? @map("certification_date")
+  // Export
+  exportCode            String?   @default("01") @map("export_code")
+  // TFD
+  tfdUuid               String?   @map("tfd_uuid")
+  tfdSatCertificate     String?   @map("tfd_sat_certificate")
+  tfdSignature          String?   @map("tfd_signature")
+  tfdStampDate          DateTime? @map("tfd_stamp_date")
+  // XML
+  xmlContent            String?   @map("xml_content")
+  // Metadata
+  notes                 String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  deletedAt             DateTime? @map("deleted_at")
+
+  items      InvoiceItem[]
+  operations Operation[]
+
+  @@index([organizationId])
+  @@index([uuid])
+  @@index([issuerRfc])
+  @@index([receiverRfc])
+  @@index([issueDate])
+  @@index([voucherTypeCode])
+  @@index([deletedAt])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id                   String   @id
+  invoiceId            String   @map("invoice_id")
+  productServiceCode   String   @map("product_service_code")
+  productServiceId     String?  @map("product_service_id")
+  quantity             Decimal
+  unitCode             String   @map("unit_code")
+  unitName             String?  @map("unit_name")
+  description          String
+  unitPrice            Decimal  @map("unit_price")
+  amount               Decimal
+  discount             Decimal? @default(0)
+  taxObjectCode        String   @default("02") @map("tax_object_code")
+  transferredTaxAmount Decimal? @default(0) @map("transferred_tax_amount")
+  withheldTaxAmount    Decimal? @default(0) @map("withheld_tax_amount")
+  metadata             String?
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([productServiceCode])
+  @@map("invoice_items")
+}
+
+// ============================================================================
+// Operation Domain (Core AML Entity)
+// ============================================================================
+
+model Operation {
+  id                 String           @id
+  organizationId     String           @map("organization_id")
+  clientId           String           @map("client_id")
+  invoiceId          String?          @map("invoice_id")
+  // Activity
+  activityCode       String           @map("activity_code")
+  operationTypeCode  String?          @map("operation_type_code")
+  // Core
+  operationDate      DateTime         @map("operation_date")
+  branchPostalCode   String           @map("branch_postal_code")
+  amount             Decimal
+  currencyCode       String           @default("MXN") @map("currency_code")
+  exchangeRate       Decimal?         @default(1) @map("exchange_rate")
+  amountMxn          Decimal?         @map("amount_mxn")
+  // UMA
+  umaValue           Decimal?         @map("uma_value")
+  umaDailyValue      Decimal?         @map("uma_daily_value")
+  // Alert
+  alertTypeCode      String           @default("100") @map("alert_type_code")
+  alertDescription   String?          @map("alert_description")
+  // Watchlist
+  watchlistStatus    WatchlistStatus? @default(PENDING) @map("watchlist_status")
+  watchlistCheckedAt DateTime?        @map("watchlist_checked_at")
+  watchlistResult    String?          @map("watchlist_result")
+  watchlistFlags     String?          @map("watchlist_flags")
+  // Priority
+  priorityCode       String?          @default("2") @map("priority_code")
+  // Data origin & completeness
+  dataSource         String           @default("MANUAL") @map("data_source") // CFDI, MANUAL, IMPORT, ENRICHED
+  completenessStatus String           @default("COMPLETE") @map("completeness_status") // COMPLETE, INCOMPLETE, MINIMUM
+  missingFields      String?          @map("missing_fields") // JSON array of missing field names
+  // Metadata
+  referenceNumber    String?          @map("reference_number")
+  notes              String?
+  // Timestamps
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  deletedAt          DateTime?        @map("deleted_at")
+
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  invoice  Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  payments OperationPayment[]
+  alerts   Alert[]
+
+  // Activity extension relations (one-to-one)
+  vehicle       OperationVehicle?
+  realEstate    OperationRealEstate?
+  jewelry       OperationJewelry?
+  virtualAsset  OperationVirtualAsset?
+  gambling      OperationGambling?
+  rental        OperationRental?
+  armoring      OperationArmoring?
+  donation      OperationDonation?
+  loan          OperationLoan?
+  official      OperationOfficial?
+  notary        OperationNotary?
+  professional  OperationProfessional?
+  travelerCheck OperationTravelerCheck?
+  card          OperationCard?
+  prepaid       OperationPrepaid?
+  reward        OperationReward?
+  valuable      OperationValuable?
+  art           OperationArt?
+  development   OperationDevelopment?
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([invoiceId])
+  @@index([activityCode])
+  @@index([operationTypeCode])
+  @@index([operationDate])
+  @@index([currencyCode])
+  @@index([alertTypeCode])
+  @@index([watchlistStatus])
+  @@index([deletedAt])
+  @@map("operations")
+}
+
+model OperationPayment {
+  id                    String   @id
+  operationId           String   @map("operation_id")
+  paymentDate           DateTime @map("payment_date")
+  paymentFormCode       String   @map("payment_form_code")
+  monetaryInstrumentCode String?  @map("monetary_instrument_code")
+  currencyCode          String   @default("MXN") @map("currency_code")
+  amount                Decimal
+  bankName              String?  @map("bank_name")
+  accountNumberMasked   String?  @map("account_number_masked")
+  checkNumber           String?  @map("check_number")
+  reference             String?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([operationId])
+  @@index([paymentFormCode])
+  @@map("operation_payments")
+}
+
+// ============================================================================
+// Operation Extension Models (Activity-Specific)
+// ============================================================================
+
+// VEH: Vehicles
+model OperationVehicle {
+  id                 String      @id
+  operationId        String      @unique @map("operation_id")
+  vehicleType        VehicleType @map("vehicle_type")
+  brand              String
   model              String
   year               Int
-  armorLevel         String?                  @map("armor_level")
-  engineNumber       String?                  @map("engine_number")
+  vin                String?
+  repuve             String?
   plates             String?
-  registrationNumber String?                  @map("registration_number")
-  flagCountryId      String?                  @map("flag_country_id")
-  amount             Decimal
-  currency           String
-  // Catalog references for XML generation
-  operationTypeCode  String?                  @map("operation_type_code") // Reference to veh-operation-types catalog (metadata.code, e.g., "802")
-  currencyCode       String?                  @map("currency_code") // Reference to currencies catalog (metadata.code, e.g., "3" for MXN)
-  // UMA value calculation (automatically calculated and saved)
-  umaValue           Decimal?                 @map("uma_value") // Calculated: amount / umaDailyValue for the transaction date
-  createdAt          DateTime                 @default(now()) @map("created_at")
-  updatedAt          DateTime                 @updatedAt @map("updated_at")
-  deletedAt          DateTime?                @map("deleted_at")
+  serialNumber       String?     @map("serial_number")
+  flagCountryCode    String?     @map("flag_country_code")
+  registrationNumber String?     @map("registration_number")
+  armorLevelCode     String?     @map("armor_level_code")
+  engineNumber       String?     @map("engine_number")
+  description        String?
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
 
-  client         Client                     @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  paymentMethods TransactionPaymentMethod[]
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
 
-  @@map("transactions")
-  @@index([organizationId])
-  @@index([clientId])
-  @@index([operationDate])
-  @@index([operationType])
   @@index([vehicleType])
-  @@index([operationTypeCode])
-  @@index([currencyCode])
+  @@index([vin])
+  @@map("operation_vehicles")
 }
 
-model TransactionPaymentMethod {
-  id            String   @id
-  transactionId String   @map("transaction_id")
-  method        String
-  amount        Decimal
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+// INM: Real Estate
+model OperationRealEstate {
+  id                   String    @id
+  operationId          String    @unique @map("operation_id")
+  propertyTypeCode     String    @map("property_type_code")
+  street               String?
+  externalNumber       String?   @map("external_number")
+  internalNumber       String?   @map("internal_number")
+  neighborhood         String?
+  postalCode           String?   @map("postal_code")
+  municipality         String?
+  stateCode            String?   @map("state_code")
+  countryCode          String?   @default("MEX") @map("country_code")
+  registryFolio        String?   @map("registry_folio")
+  registryDate         DateTime? @map("registry_date")
+  landAreaM2           Decimal?  @map("land_area_m2")
+  constructionAreaM2   Decimal?  @map("construction_area_m2")
+  clientFigureCode     String?   @map("client_figure_code")
+  personFigureCode     String?   @map("person_figure_code")
+  description          String?
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
-  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
 
-  @@map("transaction_payment_methods")
-  @@index([transactionId])
+  @@index([propertyTypeCode])
+  @@index([postalCode])
+  @@map("operation_real_estate")
 }
 
-enum AlertStatus {
-  DETECTED // Alert detected, awaiting file generation
-  FILE_GENERATED // File generated for SAT submission, ready to submit
-  SUBMITTED // Successfully submitted to SAT with acknowledgment
-  OVERDUE // Submission deadline has passed (worst case - penalties)
-  CANCELLED // Alert was cancelled/dismissed (e.g., false positive)
+// MJR: Jewelry
+model OperationJewelry {
+  id                 String   @id
+  operationId        String   @unique @map("operation_id")
+  itemTypeCode       String   @map("item_type_code")
+  metalType          String?  @map("metal_type")
+  weightGrams        Decimal? @map("weight_grams")
+  purity             String?
+  jewelryDescription String?  @map("jewelry_description")
+  brand              String?
+  serialNumber       String?  @map("serial_number")
+  tradeUnitCode      String?  @map("trade_unit_code")
+  quantity           Decimal? @default(1)
+  unitPrice          Decimal? @map("unit_price")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([itemTypeCode])
+  @@map("operation_jewelry")
 }
 
-enum AlertSeverity {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
+// AVI: Virtual Assets
+model OperationVirtualAsset {
+  id                       String   @id
+  operationId              String   @unique @map("operation_id")
+  assetTypeCode            String   @map("asset_type_code")
+  assetName                String?  @map("asset_name")
+  walletAddressOrigin      String?  @map("wallet_address_origin")
+  walletAddressDestination String?  @map("wallet_address_destination")
+  exchangeName             String?  @map("exchange_name")
+  exchangeCountryCode      String?  @map("exchange_country_code")
+  assetQuantity            Decimal? @map("asset_quantity")
+  assetUnitPrice           Decimal? @map("asset_unit_price")
+  blockchainTxHash         String?  @map("blockchain_tx_hash")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([assetTypeCode])
+  @@map("operation_virtual_assets")
 }
 
-// Notice status for SAT regulatory submissions
-enum NoticeStatus {
-  DRAFT // Created, not yet generated
-  GENERATED // XML file generated
-  SUBMITTED // Sent to SAT
-  ACKNOWLEDGED // SAT acknowledged receipt
+// JYS: Gambling
+model OperationGambling {
+  id                  String    @id
+  operationId         String    @unique @map("operation_id")
+  gameTypeCode        String?   @map("game_type_code")
+  businessLineCode    String?   @map("business_line_code")
+  operationMethodCode String?   @map("operation_method_code")
+  prizeAmount         Decimal?  @map("prize_amount")
+  betAmount           Decimal?  @map("bet_amount")
+  ticketNumber        String?   @map("ticket_number")
+  eventName           String?   @map("event_name")
+  eventDate           DateTime? @map("event_date")
+  propertyTypeCode    String?   @map("property_type_code")
+  propertyDescription String?   @map("property_description")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([gameTypeCode])
+  @@map("operation_gambling")
 }
 
-// Report types for analytics/business intelligence (all use calendar periods)
-enum ReportPeriodType {
-  MONTHLY // Calendar month (1st-last day)
-  QUARTERLY // Calendar quarter
-  ANNUAL // Calendar year
-  CUSTOM // Custom date range
+// ARI: Rentals
+model OperationRental {
+  id                 String    @id
+  operationId        String    @unique @map("operation_id")
+  propertyTypeCode   String    @map("property_type_code")
+  rentalPeriodMonths Int?      @map("rental_period_months")
+  monthlyRent        Decimal?  @map("monthly_rent")
+  depositAmount      Decimal?  @map("deposit_amount")
+  contractStartDate  DateTime? @map("contract_start_date")
+  contractEndDate    DateTime? @map("contract_end_date")
+  street             String?
+  externalNumber     String?   @map("external_number")
+  internalNumber     String?   @map("internal_number")
+  neighborhood       String?
+  postalCode         String?   @map("postal_code")
+  municipality       String?
+  stateCode          String?   @map("state_code")
+  isPrepaid          Boolean?  @default(false) @map("is_prepaid")
+  prepaidMonths      Int?      @map("prepaid_months")
+  description        String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([propertyTypeCode])
+  @@map("operation_rentals")
 }
 
-// Report templates for common use cases
-enum ReportTemplate {
-  EXECUTIVE_SUMMARY // High-level compliance overview
-  COMPLIANCE_STATUS // Audit-ready compliance report
-  TRANSACTION_ANALYSIS // Transaction volume & patterns
-  CLIENT_RISK_PROFILE // Deep-dive on specific client
-  ALERT_BREAKDOWN // Alert management metrics
-  PERIOD_COMPARISON // Trend analysis
-  CUSTOM // User-defined report
+// BLI: Armoring
+model OperationArmoring {
+  id                 String   @id
+  operationId        String   @unique @map("operation_id")
+  itemType           String   @map("item_type")
+  itemStatusCode     String?  @map("item_status_code")
+  armorLevelCode     String   @map("armor_level_code")
+  armoredPartCode    String?  @map("armored_part_code")
+  vehicleType        String?  @map("vehicle_type")
+  vehicleBrand       String?  @map("vehicle_brand")
+  vehicleModel       String?  @map("vehicle_model")
+  vehicleYear        Int?     @map("vehicle_year")
+  vehicleVin         String?  @map("vehicle_vin")
+  vehiclePlates      String?  @map("vehicle_plates")
+  serviceDescription String?  @map("service_description")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([armorLevelCode])
+  @@map("operation_armoring")
 }
 
-// Report status (simplified - no SAT workflow)
-enum ReportStatus {
-  DRAFT // Created, not yet generated
-  GENERATED // PDF generated
+// DON: Donations
+model OperationDonation {
+  id              String   @id
+  operationId     String   @unique @map("operation_id")
+  donationType    String   @map("donation_type")
+  purpose         String?
+  itemTypeCode    String?  @map("item_type_code")
+  itemDescription String?  @map("item_description")
+  itemValue       Decimal? @map("item_value")
+  isAnonymous     Boolean? @default(false) @map("is_anonymous")
+  campaignName    String?  @map("campaign_name")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([donationType])
+  @@map("operation_donations")
 }
 
-model AlertRule {
-  id           String        @id // Alert code (e.g., "2501", "2502", "9999")
-  name         String
-  description  String?
-  active       Boolean       @default(true)
-  severity     AlertSeverity @default(MEDIUM)
-  ruleType     String?       @map("rule_type") // Matches seeker's ruleType (null for manual-only rules)
-  isManualOnly Boolean       @default(false) @map("is_manual_only") // True if only manual triggers
-  activityCode String        @default("VEH") @map("activity_code") // VEH, JYS, INM, JOY, ART
-  metadata     String? // Additional metadata as JSON (legal basis, category, etc.)
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
+// MPC: Loans
+model OperationLoan {
+  id                   String    @id
+  operationId          String    @unique @map("operation_id")
+  loanTypeCode         String?   @map("loan_type_code")
+  guaranteeTypeCode    String?   @map("guarantee_type_code")
+  principalAmount      Decimal   @map("principal_amount")
+  interestRate         Decimal?  @map("interest_rate")
+  termMonths           Int?      @map("term_months")
+  monthlyPayment       Decimal?  @map("monthly_payment")
+  disbursementDate     DateTime? @map("disbursement_date")
+  maturityDate         DateTime? @map("maturity_date")
+  guaranteeDescription String?   @map("guarantee_description")
+  guaranteeValue       Decimal?  @map("guarantee_value")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
-  alerts  Alert[]
-  configs AlertRuleConfig[]
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
 
-  @@map("alert_rules")
-  @@index([active])
-  @@index([severity])
-  @@index([ruleType])
-  @@index([activityCode])
-  @@index([isManualOnly])
+  @@index([loanTypeCode])
+  @@map("operation_loans")
 }
 
-model AlertRuleConfig {
-  id          String   @id
-  alertRuleId String   @map("alert_rule_id")
-  key         String // Config key (e.g., "uma_threshold", "max_cash_amount")
-  value       String // JSON string value
-  isHardcoded Boolean  @default(false) @map("is_hardcoded") // True if should not be updated via API
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+// FEP: Public Officials/Notaries
+model OperationOfficial {
+  id                           String    @id
+  operationId                  String    @unique @map("operation_id")
+  actTypeCode                  String    @map("act_type_code")
+  instrumentNumber             String?   @map("instrument_number")
+  instrumentDate               DateTime? @map("instrument_date")
+  trustTypeCode                String?   @map("trust_type_code")
+  trustIdentifier              String?   @map("trust_identifier")
+  trustPurpose                 String?   @map("trust_purpose")
+  movementTypeCode             String?   @map("movement_type_code")
+  assignmentTypeCode           String?   @map("assignment_type_code")
+  mergerTypeCode               String?   @map("merger_type_code")
+  incorporationReasonCode      String?   @map("incorporation_reason_code")
+  patrimonyModificationTypeCode String?   @map("patrimony_modification_type_code")
+  powerOfAttorneyTypeCode      String?   @map("power_of_attorney_type_code")
+  grantingTypeCode             String?   @map("granting_type_code")
+  shareholderPositionCode      String?   @map("shareholder_position_code")
+  sharePercentage              Decimal?  @map("share_percentage")
+  itemTypeCode                 String?   @map("item_type_code")
+  itemDescription              String?   @map("item_description")
+  itemValue                    Decimal?  @map("item_value")
+  createdAt                    DateTime  @default(now()) @map("created_at")
+  updatedAt                    DateTime  @updatedAt @map("updated_at")
 
-  alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
 
-  @@unique([alertRuleId, key])
-  @@map("alert_rule_config")
-  @@index([alertRuleId])
-  @@index([key])
-  @@index([isHardcoded])
+  @@index([actTypeCode])
+  @@map("operation_officials")
 }
 
-model Alert {
-  id                       String        @id
-  organizationId           String        @map("organization_id") // Organization this alert belongs to (from auth-svc)
-  alertRuleId              String        @map("alert_rule_id")
-  clientId                 String        @map("client_id")
-  reportId                 String?       @map("report_id") // Optional reference to analytics report (PDF)
-  noticeId                 String?       @map("notice_id") // Optional reference to SAT notice (XML)
-  status                   AlertStatus   @default(DETECTED)
-  severity                 AlertSeverity
-  // Idempotency key: hash of (clientId + alertRuleId + contextHash)
-  // This ensures we never create duplicate alerts for the same condition
-  idempotencyKey           String        @unique @map("idempotency_key")
-  // Context hash: hash of the specific data that triggered this alert
-  // Example: hash of transaction IDs, amounts, dates, etc.
-  contextHash              String        @map("context_hash")
-  // Alert details stored as JSON (transaction IDs, amounts, dates, etc.)
-  metadata                 String // JSON string with alert-specific data (renamed from alertData)
-  // Optional reference to the transaction that triggered the alert
-  transactionId            String?       @map("transaction_id") // Renamed from triggerTransactionId
-  isManual                 Boolean       @default(false) @map("is_manual") // True if manually created
-  // SAT Submission tracking (managed via Notice)
-  submissionDeadline       DateTime?     @map("submission_deadline") // Deadline for SAT submission (day 17 of following month for avisos, 24h for suspicion)
-  fileGeneratedAt          DateTime?     @map("file_generated_at") // When the SAT file was generated (via notice)
-  submittedAt              DateTime?     @map("submitted_at") // When submitted to SAT
-  satAcknowledgmentReceipt String?       @map("sat_acknowledgment_receipt") // File URL or reference to SAT acknowledgment (PDF/XML)
-  satFolioNumber           String?       @map("sat_folio_number") // Folio number from SAT acknowledgment
-  isOverdue                Boolean       @default(false) @map("is_overdue") // Computed: true if submissionDeadline has passed and status != SUBMITTED
-  // Review and cancellation
-  notes                    String?
-  reviewedAt               DateTime?     @map("reviewed_at")
-  reviewedBy               String?       @map("reviewed_by")
-  cancelledAt              DateTime?     @map("cancelled_at")
-  cancelledBy              String?       @map("cancelled_by")
-  cancellationReason       String?       @map("cancellation_reason") // Reason for cancellation
-  createdAt                DateTime      @default(now()) @map("created_at")
-  updatedAt                DateTime      @updatedAt @map("updated_at")
+// FES: Notary (Public Servants)
+model OperationNotary {
+  id                            String    @id
+  operationId                   String    @unique @map("operation_id")
+  actTypeCode                   String    @map("act_type_code")
+  notaryNumber                  String?   @map("notary_number")
+  notaryStateCode               String?   @map("notary_state_code")
+  instrumentNumber              String?   @map("instrument_number")
+  instrumentDate                DateTime? @map("instrument_date")
+  legalEntityTypeCode           String?   @map("legal_entity_type_code")
+  personCharacterTypeCode       String?   @map("person_character_type_code")
+  incorporationReasonCode       String?   @map("incorporation_reason_code")
+  patrimonyModificationTypeCode String?   @map("patrimony_modification_type_code")
+  powerOfAttorneyTypeCode       String?   @map("power_of_attorney_type_code")
+  grantingTypeCode              String?   @map("granting_type_code")
+  shareholderPositionCode       String?   @map("shareholder_position_code")
+  sharePercentage               Decimal?  @map("share_percentage")
+  itemTypeCode                  String?   @map("item_type_code")
+  itemDescription               String?   @map("item_description")
+  appraisalValue                Decimal?  @map("appraisal_value")
+  guaranteeTypeCode             String?   @map("guarantee_type_code")
+  createdAt                     DateTime  @default(now()) @map("created_at")
+  updatedAt                     DateTime  @updatedAt @map("updated_at")
 
-  alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Restrict)
-  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  report    Report?   @relation(fields: [reportId], references: [id], onDelete: SetNull)
-  notice    Notice?   @relation(fields: [noticeId], references: [id], onDelete: SetNull)
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
 
-  @@map("alerts")
-  @@index([organizationId])
-  @@index([alertRuleId])
-  @@index([clientId])
-  @@index([reportId])
-  @@index([noticeId])
-  @@index([status])
-  @@index([severity])
-  @@index([createdAt])
-  @@index([idempotencyKey])
-  @@index([submissionDeadline])
-  @@index([isOverdue])
-  @@index([submittedAt])
-  @@index([transactionId])
-  @@index([isManual])
+  @@index([actTypeCode])
+  @@map("operation_notary")
 }
+
+// SPR: Professional Services
+model OperationProfessional {
+  id                          String   @id
+  operationId                 String   @unique @map("operation_id")
+  serviceTypeCode             String   @map("service_type_code")
+  serviceAreaCode             String?  @map("service_area_code")
+  clientFigureCode            String?  @map("client_figure_code")
+  contributionReasonCode      String?  @map("contribution_reason_code")
+  assignmentTypeCode          String?  @map("assignment_type_code")
+  mergerTypeCode              String?  @map("merger_type_code")
+  incorporationReasonCode     String?  @map("incorporation_reason_code")
+  shareholderPositionCode     String?  @map("shareholder_position_code")
+  sharePercentage             Decimal? @map("share_percentage")
+  managedAssetTypeCode        String?  @map("managed_asset_type_code")
+  managementStatusCode        String?  @map("management_status_code")
+  financialInstitutionTypeCode String?  @map("financial_institution_type_code")
+  financialInstitutionName    String?  @map("financial_institution_name")
+  occupationCode              String?  @map("occupation_code")
+  serviceDescription          String?  @map("service_description")
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([serviceTypeCode])
+  @@map("operation_professional")
+}
+
+// CHV: Traveler Checks
+model OperationTravelerCheck {
+  id                String   @id
+  operationId       String   @unique @map("operation_id")
+  denominationCode  String   @map("denomination_code")
+  checkCount        Int      @map("check_count")
+  serialNumbers     String?  @map("serial_numbers")
+  issuerName        String?  @map("issuer_name")
+  issuerCountryCode String?  @map("issuer_country_code")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([denominationCode])
+  @@map("operation_traveler_checks")
+}
+
+// TSC: Credit/Service Cards
+model OperationCard {
+  id               String   @id
+  operationId      String   @unique @map("operation_id")
+  cardTypeCode     String   @map("card_type_code")
+  cardNumberMasked String?  @map("card_number_masked")
+  cardBrand        String?  @map("card_brand")
+  issuerName       String?  @map("issuer_name")
+  creditLimit      Decimal? @map("credit_limit")
+  transactionType  String?  @map("transaction_type")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([cardTypeCode])
+  @@map("operation_cards")
+}
+
+// TPP: Prepaid Cards
+model OperationPrepaid {
+  id               String   @id
+  operationId      String   @unique @map("operation_id")
+  cardType         String   @map("card_type")
+  cardNumberMasked String?  @map("card_number_masked")
+  isInitialLoad    Boolean? @default(true) @map("is_initial_load")
+  reloadAmount     Decimal? @map("reload_amount")
+  currentBalance   Decimal? @map("current_balance")
+  issuerName       String?  @map("issuer_name")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([cardType])
+  @@map("operation_prepaid")
+}
+
+// TDR: Rewards
+model OperationReward {
+  id                    String    @id
+  operationId           String    @unique @map("operation_id")
+  rewardType            String    @map("reward_type")
+  programName           String?   @map("program_name")
+  pointsAmount          Decimal?  @map("points_amount")
+  pointsValue           Decimal?  @map("points_value")
+  pointsExpiryDate      DateTime? @map("points_expiry_date")
+  redemptionType        String?   @map("redemption_type")
+  redemptionDescription String?   @map("redemption_description")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([rewardType])
+  @@map("operation_rewards")
+}
+
+// TCV: Valuables Transport/Custody
+model OperationValuable {
+  id                 String    @id
+  operationId        String    @unique @map("operation_id")
+  valueTypeCode      String    @map("value_type_code")
+  serviceTypeCode    String?   @map("service_type_code")
+  transportMethod    String?   @map("transport_method")
+  originAddress      String?   @map("origin_address")
+  destinationAddress String?   @map("destination_address")
+  custodyStartDate   DateTime? @map("custody_start_date")
+  custodyEndDate     DateTime? @map("custody_end_date")
+  storageLocation    String?   @map("storage_location")
+  declaredValue      Decimal?  @map("declared_value")
+  insuredValue       Decimal?  @map("insured_value")
+  description        String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([valueTypeCode])
+  @@map("operation_valuables")
+}
+
+// OBA: Art and Antiques
+model OperationArt {
+  id                     String   @id
+  operationId            String   @unique @map("operation_id")
+  artworkTypeCode        String   @map("artwork_type_code")
+  title                  String?
+  artist                 String?
+  yearCreated            Int?     @map("year_created")
+  medium                 String?
+  dimensions             String?
+  provenance             String?
+  certificateAuthenticity String?  @map("certificate_authenticity")
+  previousOwner          String?  @map("previous_owner")
+  isAntique              Boolean? @default(false) @map("is_antique")
+  auctionHouse           String?  @map("auction_house")
+  lotNumber              String?  @map("lot_number")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([artworkTypeCode])
+  @@map("operation_art")
+}
+
+// DIN: Real Estate Development
+model OperationDevelopment {
+  id                          String   @id
+  operationId                 String   @unique @map("operation_id")
+  developmentTypeCode         String   @map("development_type_code")
+  creditTypeCode              String?  @map("credit_type_code")
+  projectName                 String?  @map("project_name")
+  projectLocation             String?  @map("project_location")
+  contributionType            String?  @map("contribution_type")
+  contributionAmount          Decimal? @map("contribution_amount")
+  thirdPartyTypeCode          String?  @map("third_party_type_code")
+  thirdPartyName              String?  @map("third_party_name")
+  financialInstitutionTypeCode String?  @map("financial_institution_type_code")
+  financialInstitutionName    String?  @map("financial_institution_name")
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([developmentTypeCode])
+  @@map("operation_development")
+}
+
+// ============================================================================
+// UMA Values Domain
+// ============================================================================
 
 model UmaValue {
   id            String    @id
-  year          Int       @unique // Year this UMA value applies to (e.g., 2025)
-  dailyValue    Decimal   @map("daily_value") // UMA daily value for the year
-  effectiveDate DateTime  @map("effective_date") // Date when this UMA value becomes effective
-  endDate       DateTime? @map("end_date") // Optional: date when this UMA value expires (usually end of year)
-  approvedBy    String?   @map("approved_by") // User who approved/configured this value (Compliance Officer)
-  notes         String? // Optional notes about the UMA value
-  active        Boolean   @default(true) // Whether this is the current active UMA value
+  year          Int       @unique
+  dailyValue    Decimal   @map("daily_value")
+  effectiveDate DateTime  @map("effective_date")
+  endDate       DateTime? @map("end_date")
+  approvedBy    String?   @map("approved_by")
+  notes         String?
+  active        Boolean   @default(true)
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  @@map("uma_values")
   @@index([year])
   @@index([active])
   @@index([effectiveDate])
+  @@map("uma_values")
 }
 
-// Organization Settings - stores RFC and vulnerable activity for the organization
-// Linked 1:1 to organization (from auth-svc better-auth organization plugin)
+// ============================================================================
+// Organization Settings Domain
+// ============================================================================
+
 model OrganizationSettings {
   id                  String   @id
-  organizationId      String   @unique @map("organization_id") // Organization ID from auth-svc
-  obligatedSubjectKey String   @map("obligated_subject_key") // RFC (clave_sujeto_obligado) - 12 characters
-  activityKey         String   @map("activity_key") // Vulnerable activity code (e.g., "VEH") - reference to vulnerable-activities catalog
+  organizationId      String   @unique @map("organization_id")
+  obligatedSubjectKey String   @map("obligated_subject_key")
+  activityKey         String   @map("activity_key")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  @@map("organization_settings")
   @@index([organizationId])
   @@index([obligatedSubjectKey])
   @@index([activityKey])
+  @@map("organization_settings")
 }
 
-// Notice - SAT regulatory submissions (avisos) with 17-17 period handling
+// ============================================================================
+// Notice Domain (SAT Regulatory Submissions)
+// ============================================================================
+
 model Notice {
   id             String       @id
-  organizationId String       @map("organization_id") // Organization this notice belongs to
-  name           String // Display name (e.g., "Aviso Diciembre 2024")
+  organizationId String       @map("organization_id")
+  name           String
+  activityCode   String       @default("VEH") @map("activity_code")
   status         NoticeStatus @default(DRAFT)
-  periodStart    DateTime     @map("period_start") // Day 17 of previous month
-  periodEnd      DateTime     @map("period_end") // Day 16 of current month
-  reportedMonth  String       @map("reported_month") // YYYYMM format for SAT
-  recordCount    Int          @default(0) @map("record_count") // Number of alerts included
-  // XML file output
-  xmlFileUrl     String?      @map("xml_file_url") // R2 URL of SAT XML
-  fileSize       Int?         @map("file_size") // XML file size in bytes
-  generatedAt    DateTime?    @map("generated_at") // When the XML was generated
-  submittedAt    DateTime?    @map("submitted_at") // When submitted to SAT
-  satFolioNumber String?      @map("sat_folio_number") // SAT acknowledgment folio number
-  createdBy      String?      @map("created_by") // User ID who created the notice
-  notes          String? // Optional notes
+  periodStart    DateTime     @map("period_start")
+  periodEnd      DateTime     @map("period_end")
+  reportedMonth  String       @map("reported_month")
+  recordCount    Int          @default(0) @map("record_count")
+  xmlFileUrl     String?      @map("xml_file_url")
+  fileSize       Int?         @map("file_size")
+  generatedAt    DateTime?    @map("generated_at")
+  submittedAt    DateTime?    @map("submitted_at")
+  satFolioNumber String?      @map("sat_folio_number")
+  createdBy      String?      @map("created_by")
+  notes          String?
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  alerts Alert[] // Alerts included in this notice
+  alerts Alert[]
 
-  @@map("notices")
   @@index([organizationId])
+  @@index([activityCode])
   @@index([status])
   @@index([periodStart])
   @@index([periodEnd])
   @@index([reportedMonth])
+  @@map("notices")
 }
 
-// Report - Analytics and business intelligence reports (PDF)
+// ============================================================================
+// Report Domain (Analytics)
+// ============================================================================
+
 model Report {
   id                    String           @id
-  organizationId        String           @map("organization_id") // Organization this report belongs to
-  name                  String // Display name (e.g., "Monthly Report December 2024")
-  // Report configuration
+  organizationId        String           @map("organization_id")
+  name                  String
   template              ReportTemplate   @default(CUSTOM)
   periodType            ReportPeriodType @default(CUSTOM) @map("period_type")
-  periodStart           DateTime         @map("period_start") // Start of reporting period
-  periodEnd             DateTime         @map("period_end") // End of reporting period
-  // Optional comparison period for trend analysis
+  periodStart           DateTime         @map("period_start")
+  periodEnd             DateTime         @map("period_end")
   comparisonPeriodStart DateTime?        @map("comparison_period_start")
   comparisonPeriodEnd   DateTime?        @map("comparison_period_end")
-  // Data sources and filtering (stored as JSON)
-  dataSources           String           @default("[\"ALERTS\"]") @map("data_sources") // JSON array: ["ALERTS", "TRANSACTIONS", "CLIENTS"]
-  filters               String           @default("{}") // JSON object with filter configuration
-  clientId              String?          @map("client_id") // For CLIENT_RISK_PROFILE template
-  // Visualization settings (stored as JSON)
-  charts                String           @default("[]") // JSON array of chart configurations
+  dataSources           String           @default("[\"ALERTS\"]") @map("data_sources")
+  filters               String           @default("{}")
+  clientId              String?          @map("client_id")
+  charts                String           @default("[]")
   includeSummaryCards   Boolean          @default(true) @map("include_summary_cards")
   includeDetailTables   Boolean          @default(true) @map("include_detail_tables")
-  // Report state
   status                ReportStatus     @default(DRAFT)
-  // PDF output
-  pdfFileUrl            String?          @map("pdf_file_url") // R2 URL of PDF report
-  fileSize              Int?             @map("file_size") // PDF file size in bytes
-  generatedAt           DateTime?        @map("generated_at") // When the PDF was generated
-  createdBy             String?          @map("created_by") // User ID who created the report
-  notes                 String? // Optional notes
+  pdfFileUrl            String?          @map("pdf_file_url")
+  fileSize              Int?             @map("file_size")
+  generatedAt           DateTime?        @map("generated_at")
+  createdBy             String?          @map("created_by")
+  notes                 String?
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt             DateTime         @updatedAt @map("updated_at")
 
-  alerts Alert[] // Alerts included in this report (for filtering/aggregation)
+  alerts Alert[]
   client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
-  @@map("reports")
   @@index([organizationId])
   @@index([template])
   @@index([periodType])
@@ -620,39 +1175,120 @@ model Report {
   @@index([periodStart])
   @@index([periodEnd])
   @@index([clientId])
+  @@map("reports")
 }
 
-// Import status for bulk data imports
-enum ImportStatus {
-  PENDING // Uploaded, awaiting processing
-  VALIDATING // Worker is parsing and validating file
-  PROCESSING // Processing rows
-  COMPLETED // All rows processed
-  FAILED // Catastrophic error
+// ============================================================================
+// Alert System Domain
+// ============================================================================
+
+model AlertRule {
+  id           String        @id
+  name         String
+  description  String?
+  active       Boolean       @default(true)
+  severity     AlertSeverity @default(MEDIUM)
+  ruleType     String?       @map("rule_type")
+  isManualOnly Boolean       @default(false) @map("is_manual_only")
+  activityCode String        @default("VEH") @map("activity_code")
+  metadata     String?
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  alerts  Alert[]
+  configs AlertRuleConfig[]
+
+  @@index([active])
+  @@index([severity])
+  @@index([ruleType])
+  @@index([activityCode])
+  @@index([isManualOnly])
+  @@map("alert_rules")
 }
 
-// Entity types that can be imported
-enum ImportEntityType {
-  CLIENT
-  TRANSACTION
+model AlertRuleConfig {
+  id          String   @id
+  alertRuleId String   @map("alert_rule_id")
+  key         String
+  value       String
+  isHardcoded Boolean  @default(false) @map("is_hardcoded")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+
+  @@unique([alertRuleId, key])
+  @@index([alertRuleId])
+  @@index([key])
+  @@index([isHardcoded])
+  @@map("alert_rule_config")
 }
 
-// Status of individual import rows
-enum ImportRowStatus {
-  PENDING
-  SUCCESS
-  WARNING
-  ERROR
-  SKIPPED
+model Alert {
+  id                       String        @id
+  organizationId           String        @map("organization_id")
+  alertRuleId              String        @map("alert_rule_id")
+  clientId                 String        @map("client_id")
+  reportId                 String?       @map("report_id")
+  noticeId                 String?       @map("notice_id")
+  operationId              String?       @map("operation_id")
+  activityCode             String        @default("VEH") @map("activity_code")
+  status                   AlertStatus   @default(DETECTED)
+  severity                 AlertSeverity
+  idempotencyKey           String        @unique @map("idempotency_key")
+  contextHash              String        @map("context_hash")
+  metadata                 String
+  isManual                 Boolean       @default(false) @map("is_manual")
+  submissionDeadline       DateTime?     @map("submission_deadline")
+  fileGeneratedAt          DateTime?     @map("file_generated_at")
+  submittedAt              DateTime?     @map("submitted_at")
+  satAcknowledgmentReceipt String?       @map("sat_acknowledgment_receipt")
+  satFolioNumber           String?       @map("sat_folio_number")
+  isOverdue                Boolean       @default(false) @map("is_overdue")
+  notes                    String?
+  reviewedAt               DateTime?     @map("reviewed_at")
+  reviewedBy               String?       @map("reviewed_by")
+  cancelledAt              DateTime?     @map("cancelled_at")
+  cancelledBy              String?       @map("cancelled_by")
+  cancellationReason       String?       @map("cancellation_reason")
+  createdAt                DateTime      @default(now()) @map("created_at")
+  updatedAt                DateTime      @updatedAt @map("updated_at")
+
+  alertRule AlertRule  @relation(fields: [alertRuleId], references: [id], onDelete: Restrict)
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  report    Report?    @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  notice    Notice?    @relation(fields: [noticeId], references: [id], onDelete: SetNull)
+  operation Operation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([alertRuleId])
+  @@index([clientId])
+  @@index([reportId])
+  @@index([noticeId])
+  @@index([operationId])
+  @@index([activityCode])
+  @@index([status])
+  @@index([severity])
+  @@index([createdAt])
+  @@index([idempotencyKey])
+  @@index([submissionDeadline])
+  @@index([isOverdue])
+  @@index([submittedAt])
+  @@index([isManual])
+  @@map("alerts")
 }
 
-// Import - Bulk data import job tracking
+// ============================================================================
+// Import Domain (Bulk Data Import)
+// ============================================================================
+
 model Import {
   id             String           @id
   organizationId String           @map("organization_id")
   entityType     ImportEntityType @map("entity_type")
   fileName       String           @map("file_name")
-  fileUrl        String           @map("file_url") // R2 key
+  fileUrl        String           @map("file_url")
   fileSize       Int              @map("file_size")
   status         ImportStatus     @default(PENDING)
   totalRows      Int              @default(0) @map("total_rows")
@@ -660,40 +1296,39 @@ model Import {
   successCount   Int              @default(0) @map("success_count")
   warningCount   Int              @default(0) @map("warning_count")
   errorCount     Int              @default(0) @map("error_count")
-  errorMessage   String?          @map("error_message") // Catastrophic error message
-  createdBy      String           @map("created_by") // User ID who initiated the import
-  startedAt      DateTime?        @map("started_at") // When processing started
-  completedAt    DateTime?        @map("completed_at") // When processing completed
+  errorMessage   String?          @map("error_message")
+  createdBy      String           @map("created_by")
+  startedAt      DateTime?        @map("started_at")
+  completedAt    DateTime?        @map("completed_at")
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
   rowResults ImportRowResult[]
 
-  @@map("imports")
   @@index([organizationId])
   @@index([status])
   @@index([entityType])
   @@index([createdAt])
   @@index([createdBy])
+  @@map("imports")
 }
 
-// ImportRowResult - Individual row processing results
 model ImportRowResult {
   id        String          @id
   importId  String          @map("import_id")
   rowNumber Int             @map("row_number")
   status    ImportRowStatus @default(PENDING)
-  rawData   String          @map("raw_data") // JSON of original row data
-  entityId  String?         @map("entity_id") // Created client/transaction ID if successful
-  message   String? // Human-readable status message
-  errors    String? // JSON array of validation errors
+  rawData   String          @map("raw_data")
+  entityId  String?         @map("entity_id")
+  message   String?
+  errors    String?
   createdAt DateTime        @default(now()) @map("created_at")
   updatedAt DateTime        @updatedAt @map("updated_at")
 
   import Import @relation(fields: [importId], references: [id], onDelete: Cascade)
 
-  @@map("import_row_results")
   @@index([importId])
   @@index([status])
   @@index([rowNumber])
+  @@map("import_row_results")
 }

@@ -14,7 +14,7 @@
  * Or using the helper methods defined below.
  */
 
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import { getPrismaClient } from "./prisma";
 import {
 	AlertRuleRepository,
@@ -30,10 +30,7 @@ import { UmaValueRepository } from "../domain/uma";
 import { UmaValueService } from "../domain/uma";
 import { ClientRepository } from "../domain/client";
 import { ClientService } from "../domain/client";
-import { TransactionRepository } from "../domain/transaction";
-import { TransactionService } from "../domain/transaction";
-import { CatalogRepository } from "../domain/catalog/repository";
-import { CatalogEnrichmentService } from "../domain/catalog/enrichment-service";
+import { OperationService } from "../domain/operation";
 import { handleInternalOrganizationSettingsRequest } from "../routes/internal-organization-settings";
 
 /**
@@ -115,10 +112,10 @@ export class AlertServiceBinding {
 	}
 
 	/**
-	 * Get client transactions
-	 * Called via: env.AML_SERVICE.fetch(new Request(`https://internal/clients/${clientId}/transactions`))
+	 * Get client operations
+	 * Called via: env.AML_SERVICE.fetch(new Request(`https://internal/clients/${clientId}/operations`))
 	 */
-	async getClientTransactions(clientId: string) {
+	async getClientOperations(clientId: string) {
 		const prisma = getPrismaClient(this.env.DB);
 
 		// First, fetch the client to get its organizationId
@@ -131,28 +128,13 @@ export class AlertServiceBinding {
 			throw new Error(`Client not found: ${clientId}`);
 		}
 
-		// Now use TransactionService to list transactions for this client
-		const umaRepository = new UmaValueRepository(prisma);
-		const catalogRepository = new CatalogRepository(prisma);
-		const catalogEnrichmentService = new CatalogEnrichmentService(
-			catalogRepository,
-		);
-		const transactionRepository = new TransactionRepository(
-			prisma,
-			umaRepository,
-			catalogEnrichmentService,
-		);
-		const clientRepository = new ClientRepository(prisma);
-		const service = new TransactionService(
-			transactionRepository,
-			clientRepository,
-			umaRepository,
-		);
+		// Now use OperationService to list operations for this client
+		const service = new OperationService(prisma);
 
 		const result = await service.list(clientRecord.organizationId, {
 			clientId,
 			page: 1,
-			limit: 1000, // Get all transactions for the client
+			limit: 1000, // Get all operations for the client
 		});
 
 		return result.data;
@@ -168,8 +150,9 @@ export class AlertServiceBinding {
 		severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 		idempotencyKey: string;
 		contextHash: string;
-		metadata: Record<string, unknown>; // Renamed from alertData
-		transactionId?: string | null; // Renamed from triggerTransactionId
+		metadata: Record<string, unknown>;
+		operationId?: string | null; // Primary trigger (Operation entity)
+		activityCode?: string | null; // Activity code for multi-activity support
 		isManual: boolean;
 		notes?: string | null;
 	}) {
@@ -283,13 +266,13 @@ export async function handleServiceBindingRequest(
 			});
 		}
 
-		// Route: /clients/{clientId}/transactions (must be checked before /clients/{clientId})
+		// Route: /clients/{clientId}/operations (must be checked before /clients/{clientId})
 		if (
 			path.startsWith("/clients/") &&
-			path.endsWith("/transactions") &&
+			path.endsWith("/operations") &&
 			request.method === "GET"
 		) {
-			const clientId = path.split("/clients/")[1].split("/transactions")[0];
+			const clientId = path.split("/clients/")[1].split("/operations")[0];
 
 			if (!clientId) {
 				return new Response(
@@ -300,8 +283,8 @@ export async function handleServiceBindingRequest(
 
 			try {
 				const service = new AlertServiceBinding(env);
-				const transactions = await service.getClientTransactions(clientId);
-				return new Response(JSON.stringify(transactions), {
+				const operations = await service.getClientOperations(clientId);
+				return new Response(JSON.stringify(operations), {
 					headers: { "Content-Type": "application/json" },
 				});
 			} catch (error) {
@@ -318,7 +301,7 @@ export async function handleServiceBindingRequest(
 				}
 				return new Response(
 					JSON.stringify({
-						error: "Failed to fetch transactions",
+						error: "Failed to fetch operations",
 						message: errorMessage,
 					}),
 					{
@@ -373,8 +356,8 @@ export async function handleServiceBindingRequest(
 			}
 		}
 
-		// Route: /transactions?clientId={clientId} (alternative format)
-		if (path === "/transactions" && request.method === "GET") {
+		// Route: /operations?clientId={clientId} (alternative format)
+		if (path === "/operations" && request.method === "GET") {
 			const url = new URL(request.url);
 			const clientId = url.searchParams.get("clientId");
 
@@ -387,8 +370,8 @@ export async function handleServiceBindingRequest(
 
 			try {
 				const service = new AlertServiceBinding(env);
-				const transactions = await service.getClientTransactions(clientId);
-				return new Response(JSON.stringify(transactions), {
+				const operations = await service.getClientOperations(clientId);
+				return new Response(JSON.stringify(operations), {
 					headers: { "Content-Type": "application/json" },
 				});
 			} catch (error) {
@@ -405,7 +388,7 @@ export async function handleServiceBindingRequest(
 				}
 				return new Response(
 					JSON.stringify({
-						error: "Failed to fetch transactions",
+						error: "Failed to fetch operations",
 						message: errorMessage,
 					}),
 					{

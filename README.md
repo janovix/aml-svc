@@ -86,15 +86,17 @@ IDs are designed to be:
    pnpm wrangler d1 migrations apply DB --remote  # For remote
    ```
 
-5. Populate catalogs (optional):
+5. Populate catalogs (includes all CFDI catalogs):
 
    ```bash
-   pnpm run populate
+   pnpm run populate:local
    ```
+
+   See [Catalog Population Guide](CATALOG-POPULATION-GUIDE.md) for details on what gets populated.
 
 6. Seed initial data (optional):
    ```bash
-   pnpm run seed
+   pnpm run seed:local
    ```
 
 ### Development
@@ -238,6 +240,36 @@ The service uses Prisma with SQLite (D1). Key entities:
 - **UmaValue**: UMA values for transaction calculations
 - **OrganizationSettings**: Organization-specific compliance settings
 
+## Catalog Population
+
+The service includes comprehensive catalog data, including all SAT CFDI catalogs:
+
+- **Core Catalogs**: Countries, states, currencies, payment methods, etc.
+- **CFDI Catalogs**: All 12 SAT CFDI catalogs (payment forms, tax regimes, etc.)
+- **PLD Catalogs**: Consolidated catalogs across vulnerable activities
+- **Activity Catalogs**: Individual catalogs for each vulnerable activity
+
+For detailed information on populating catalogs:
+
+- [Catalog Population Guide](CATALOG-POPULATION-GUIDE.md) - Complete guide for local and remote population
+- [Manual Workflows Guide](MANUAL-WORKFLOWS.md) - Quick reference for GitHub Actions
+- [Populate Scripts README](scripts/populate/README.md) - Detailed script documentation
+
+Quick commands:
+
+```bash
+# Local development
+pnpm populate:local              # All catalogs + UMA values
+pnpm populate:catalogs:local     # All catalogs (no UMA)
+pnpm populate:catalogs:large:local  # Large catalogs (zip codes, etc.)
+
+# Remote environments
+pnpm populate:dev                # Dev environment
+pnpm populate:prod               # Production
+```
+
+Or use GitHub Actions: See [Manual Workflows Guide](MANUAL-WORKFLOWS.md)
+
 ## Key Concepts
 
 ### Client Management
@@ -277,15 +309,20 @@ The alert system provides:
 
 Catalogs provide reference data:
 
-- Countries, states, currencies
-- Vehicle brands (by type: terrestrial, maritime, air)
-- Payment methods, operation types
-- Economic activities, vulnerable activities
+- **Core**: Countries, states, currencies, payment methods, operation types
+- **Vehicle**: Terrestrial, maritime, air vehicle brands
+- **CFDI**: All 12 SAT CFDI catalogs (payment forms, tax regimes, usages, etc.)
+- **CFDI-PLD**: Mappings between CFDI codes and PLD monetary instruments
+- **PLD**: Consolidated catalogs across 19 vulnerable activities
+- **Activity**: Individual catalogs for each vulnerable activity
+- **Economic**: UMA values, economic activities, vulnerable activities
 
 Catalogs can be:
 
 - **Closed**: Pre-populated, no user additions
 - **Open**: Users can add new items (e.g., vehicle brands)
+
+See [Catalog Population Guide](CATALOG-POPULATION-GUIDE.md) for complete details.
 
 ## Scripts
 

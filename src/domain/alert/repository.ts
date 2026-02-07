@@ -277,6 +277,8 @@ export class AlertRepository {
 			limit,
 			alertRuleId,
 			clientId,
+			operationId,
+			activityCode,
 			status,
 			severity,
 			isOverdue,
@@ -293,6 +295,14 @@ export class AlertRepository {
 
 		if (clientId) {
 			where.clientId = clientId;
+		}
+
+		if (operationId) {
+			where.operationId = operationId;
+		}
+
+		if (activityCode) {
+			where.activityCode = activityCode;
 		}
 
 		if (status) {

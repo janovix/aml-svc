@@ -104,10 +104,15 @@ export class ClientRepository {
 		input: ClientCreateInput,
 	): Promise<ClientEntity> {
 		const prismaData = mapCreateInputToPrisma(input);
+		const { completenessStatus, missingFields } =
+			this.detectCompleteness(input);
 		const created = await this.prisma.client.create({
 			data: {
 				...prismaData,
 				organizationId,
+				completenessStatus,
+				missingFields:
+					missingFields.length > 0 ? JSON.stringify(missingFields) : null,
 			},
 		});
 		return mapPrismaClient(created);
@@ -120,9 +125,17 @@ export class ClientRepository {
 	): Promise<ClientEntity> {
 		await this.ensureExists(organizationId, id);
 
+		const prismaData = mapUpdateInputToPrisma(input);
+		const { completenessStatus, missingFields } =
+			this.detectCompleteness(input);
 		const updated = await this.prisma.client.update({
 			where: { id },
-			data: mapUpdateInputToPrisma(input),
+			data: {
+				...prismaData,
+				completenessStatus,
+				missingFields:
+					missingFields.length > 0 ? JSON.stringify(missingFields) : null,
+			},
 		});
 
 		return mapPrismaClient(updated);
@@ -136,6 +149,20 @@ export class ClientRepository {
 		await this.ensureExists(organizationId, id);
 
 		const payload = mapPatchInputToPrisma(input) as Prisma.ClientUpdateInput;
+
+		// For patches, re-check completeness by fetching the current record first
+		const current = await this.prisma.client.findFirst({
+			where: { id, deletedAt: null },
+		});
+		if (current) {
+			const merged = { ...current, ...input };
+			const { completenessStatus, missingFields } =
+				this.detectCompleteness(merged);
+			(payload as Record<string, unknown>).completenessStatus =
+				completenessStatus;
+			(payload as Record<string, unknown>).missingFields =
+				missingFields.length > 0 ? JSON.stringify(missingFields) : null;
+		}
 
 		const updated = await this.prisma.client.update({
 			where: { id },
@@ -316,27 +343,115 @@ export class ClientRepository {
 		}
 	}
 
+	/**
+	 * Detect client data completeness based on LFPIORPI requirements.
+	 * Required fields differ by person type (PHYSICAL vs MORAL vs TRUST).
+	 *
+	 * - COMPLETE: All required fields are present
+	 * - INCOMPLETE: Some required fields are missing
+	 * - MINIMUM: Only critical identifier (RFC) is present
+	 */
+	private detectCompleteness(input: Record<string, unknown>): {
+		completenessStatus: "COMPLETE" | "INCOMPLETE" | "MINIMUM";
+		missingFields: string[];
+	} {
+		const missing: string[] = [];
+		const personType = input.personType as string | undefined;
+
+		// Core fields required for all person types (LFPIORPI Art. 17+18)
+		const coreFields = [
+			"rfc",
+			"email",
+			"phone",
+			"country",
+			"stateCode",
+			"city",
+			"postalCode",
+			"street",
+			"externalNumber",
+		];
+
+		// Person-type specific fields
+		const physicalFields = [
+			"firstName",
+			"lastName",
+			"birthDate",
+			"nationality",
+			"gender",
+			"curp",
+		];
+		const moralFields = ["businessName", "incorporationDate", "nationality"];
+
+		for (const field of coreFields) {
+			if (!input[field]) {
+				missing.push(field);
+			}
+		}
+
+		if (personType === "PHYSICAL" || personType === "TRUST") {
+			for (const field of physicalFields) {
+				if (!input[field]) {
+					missing.push(field);
+				}
+			}
+		}
+
+		if (personType === "MORAL") {
+			for (const field of moralFields) {
+				if (!input[field]) {
+					missing.push(field);
+				}
+			}
+		}
+
+		// KYC-relevant fields (important but not blocking)
+		if (!input.economicActivityCode) missing.push("economicActivityCode");
+		if (!input.sourceOfFunds) missing.push("sourceOfFunds");
+
+		// Determine status
+		let completenessStatus: "COMPLETE" | "INCOMPLETE" | "MINIMUM";
+		if (missing.length === 0) {
+			completenessStatus = "COMPLETE";
+		} else {
+			// MINIMUM: only has RFC (the absolute minimum identifier)
+			const hasOnlyRfc =
+				!!input.rfc &&
+				!input.firstName &&
+				!input.lastName &&
+				!input.businessName;
+			completenessStatus = hasOnlyRfc ? "MINIMUM" : "INCOMPLETE";
+		}
+
+		return { completenessStatus, missingFields: missing };
+	}
+
 	async getStats(organizationId: string): Promise<{
 		totalClients: number;
 		physicalClients: number;
 		moralClients: number;
+		trustClients: number;
 	}> {
-		const [totalClients, physicalClients, moralClients] = await Promise.all([
-			this.prisma.client.count({
-				where: { organizationId, deletedAt: null },
-			}),
-			this.prisma.client.count({
-				where: { organizationId, deletedAt: null, personType: "PHYSICAL" },
-			}),
-			this.prisma.client.count({
-				where: { organizationId, deletedAt: null, personType: "MORAL" },
-			}),
-		]);
+		const [totalClients, physicalClients, moralClients, trustClients] =
+			await Promise.all([
+				this.prisma.client.count({
+					where: { organizationId, deletedAt: null },
+				}),
+				this.prisma.client.count({
+					where: { organizationId, deletedAt: null, personType: "PHYSICAL" },
+				}),
+				this.prisma.client.count({
+					where: { organizationId, deletedAt: null, personType: "MORAL" },
+				}),
+				this.prisma.client.count({
+					where: { organizationId, deletedAt: null, personType: "TRUST" },
+				}),
+			]);
 
 		return {
 			totalClients,
 			physicalClients,
 			moralClients,
+			trustClients,
 		};
 	}
 }

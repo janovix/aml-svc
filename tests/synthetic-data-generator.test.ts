@@ -14,7 +14,7 @@ describe("SyntheticDataGenerator", () => {
 				findMany: vi.fn(),
 				findUnique: vi.fn(),
 			},
-			transaction: {
+			operation: {
 				create: vi.fn(),
 			},
 			clientDocument: {
@@ -54,30 +54,31 @@ describe("SyntheticDataGenerator", () => {
 			expect(mockPrisma.client.create).toHaveBeenCalledTimes(2);
 		});
 
-		it("should generate transactions when requested", async () => {
+		it("should generate operations when requested", async () => {
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([
 				{ id: "CLIENT_1", rfc: "RFC1" },
 				{ id: "CLIENT_2", rfc: "RFC2" },
 			] as any);
 
-			vi.mocked(mockPrisma.transaction.create).mockResolvedValue({
-				id: "TRANSACTION_123",
+			vi.mocked(mockPrisma.operation.create).mockResolvedValue({
+				id: "OPERATION_123",
 				clientId: "CLIENT_1",
+				activityCode: "VEH",
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			} as any);
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			const result = await generator.generate({
-				transactions: { count: 3 },
+				operations: { count: 3 },
 			});
 
-			expect(result.transactions.created).toBe(3);
-			expect(result.transactions.transactionIds).toHaveLength(3);
-			expect(mockPrisma.transaction.create).toHaveBeenCalledTimes(3);
+			expect(result.operations.created).toBe(3);
+			expect(result.operations.operationIds).toHaveLength(3);
+			expect(mockPrisma.operation.create).toHaveBeenCalledTimes(3);
 		});
 
-		it("should generate clients and transactions together", async () => {
+		it("should generate clients and operations together", async () => {
 			vi.mocked(mockPrisma.client.create).mockResolvedValue({
 				id: "CLIENT_123",
 				rfc: "ABCD123456EF7",
@@ -91,9 +92,10 @@ describe("SyntheticDataGenerator", () => {
 				{ id: "CLIENT_123", rfc: "ABCD123456EF7" },
 			] as any);
 
-			vi.mocked(mockPrisma.transaction.create).mockResolvedValue({
-				id: "TRANSACTION_123",
+			vi.mocked(mockPrisma.operation.create).mockResolvedValue({
+				id: "OPERATION_123",
 				clientId: "CLIENT_123",
+				activityCode: "VEH",
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			} as any);
@@ -101,11 +103,11 @@ describe("SyntheticDataGenerator", () => {
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			const result = await generator.generate({
 				clients: { count: 1 },
-				transactions: { count: 2 },
+				operations: { count: 2 },
 			});
 
 			expect(result.clients.created).toBe(1);
-			expect(result.transactions.created).toBe(2);
+			expect(result.operations.created).toBe(2);
 		});
 
 		it("should generate documents when includeDocuments is true", async () => {
@@ -184,8 +186,8 @@ describe("SyntheticDataGenerator", () => {
 			expect(result.clients.created).toBeGreaterThanOrEqual(1);
 		});
 
-		it("should throw error when transaction generation fails without clients", async () => {
-			// Mock ensureClientsForTransactions to return empty array
+		it("should throw error when operation generation fails without clients", async () => {
+			// Mock ensureClientsForOperations to return empty array
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([]);
 			// Mock generateClients to return empty rfcList (all clients fail)
 			vi.mocked(mockPrisma.client.create).mockRejectedValue(
@@ -196,31 +198,32 @@ describe("SyntheticDataGenerator", () => {
 
 			await expect(
 				generator.generate({
-					transactions: { count: 1 },
+					operations: { count: 1 },
 				}),
 			).rejects.toThrow();
 		});
 
-		it("should distribute transactions across clients when perClient is specified", async () => {
+		it("should distribute operations across clients when perClient is specified", async () => {
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([
 				{ id: "CLIENT_1", rfc: "RFC1" },
 				{ id: "CLIENT_2", rfc: "RFC2" },
 			] as any);
 
-			vi.mocked(mockPrisma.transaction.create).mockResolvedValue({
-				id: "TRANSACTION_123",
+			vi.mocked(mockPrisma.operation.create).mockResolvedValue({
+				id: "OPERATION_123",
 				clientId: "CLIENT_1",
+				activityCode: "VEH",
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			} as any);
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			const result = await generator.generate({
-				transactions: { count: 4, perClient: 2 },
+				operations: { count: 4, perClient: 2 },
 			});
 
-			expect(result.transactions.created).toBe(4);
-			expect(mockPrisma.transaction.create).toHaveBeenCalledTimes(4);
+			expect(result.operations.created).toBe(4);
+			expect(mockPrisma.operation.create).toHaveBeenCalledTimes(4);
 		});
 
 		it("should generate mix of physical and moral clients", async () => {
@@ -276,27 +279,28 @@ describe("SyntheticDataGenerator", () => {
 			expect(physicalCalls.length).toBeGreaterThan(0);
 		});
 
-		it("should handle transaction creation errors gracefully", async () => {
+		it("should handle operation creation errors gracefully", async () => {
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([
 				{ id: "CLIENT_1", rfc: "RFC1" },
 			] as any);
 
-			vi.mocked(mockPrisma.transaction.create)
-				.mockRejectedValueOnce(new Error("Transaction error"))
+			vi.mocked(mockPrisma.operation.create)
+				.mockRejectedValueOnce(new Error("Operation error"))
 				.mockResolvedValueOnce({
-					id: "TRANSACTION_123",
+					id: "OPERATION_123",
 					clientId: "CLIENT_1",
+					activityCode: "VEH",
 					createdAt: new Date(),
 					updatedAt: new Date(),
 				} as any);
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			const result = await generator.generate({
-				transactions: { count: 2 },
+				operations: { count: 2 },
 			});
 
 			// Should continue after error
-			expect(result.transactions.created).toBeGreaterThanOrEqual(1);
+			expect(result.operations.created).toBeGreaterThanOrEqual(1);
 		});
 	});
 });

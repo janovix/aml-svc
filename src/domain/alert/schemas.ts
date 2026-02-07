@@ -139,7 +139,8 @@ export const AlertCreateSchema = z.object({
 	idempotencyKey: z.string().min(1).max(255),
 	contextHash: z.string().min(1).max(255),
 	metadata: z.record(z.string(), z.any()), // Renamed from alertData
-	transactionId: ResourceIdSchema.optional().nullable(), // Renamed from triggerTransactionId
+	operationId: ResourceIdSchema.optional().nullable(), // Primary trigger (Operation entity)
+	activityCode: z.string().min(2).max(5).optional().nullable(), // Activity code for multi-activity support
 	isManual: z.boolean().default(false), // True if manually created
 	submissionDeadline: isoString.optional().nullable(), // Will be calculated based on alert type
 	notes: z.string().max(1000).optional().nullable(),
@@ -180,6 +181,8 @@ export const AlertPatchSchema = z
 export const AlertFilterSchema = z.object({
 	alertRuleId: ResourceIdSchema.optional(),
 	clientId: z.string().min(1).optional(),
+	operationId: z.string().min(1).optional(), // Filter by operation
+	activityCode: z.string().min(2).max(5).optional(), // Filter by activity code
 	status: AlertStatusSchema.optional(),
 	severity: AlertSeveritySchema.optional(),
 	isOverdue: z.coerce.boolean().optional(), // Filter by overdue status

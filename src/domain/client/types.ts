@@ -1,11 +1,5 @@
 // Import types from schemas.ts (inferred from Zod schemas)
-import type {
-	KYCStatus,
-	PEPStatus,
-	Gender,
-	MaritalStatus,
-	VerificationStatus,
-} from "./schemas";
+import type { KYCStatus, PEPStatus, Gender, MaritalStatus } from "./schemas";
 
 export interface ClientEntity {
 	id: string; // RFC is now the ID
@@ -44,6 +38,9 @@ export interface ClientEntity {
 	// KYC status tracking
 	kycStatus: KYCStatus;
 	kycCompletedAt?: string | null;
+	// Completeness tracking
+	completenessStatus: "COMPLETE" | "INCOMPLETE" | "MINIMUM";
+	missingFields: string[] | null;
 	// PEP status tracking
 	isPEP: boolean;
 	pepStatus: PEPStatus;
@@ -70,13 +67,11 @@ export interface ClientDocumentEntity {
 	status: string;
 	fileUrl?: string | null;
 	metadata?: Record<string, unknown> | null;
-	// doc-svc integration fields
+	// doc-svc integration fields (simplified MVP)
 	docSvcDocumentId?: string | null;
-	docSvcJobId?: string | null;
-	verificationStatus?: VerificationStatus | null;
-	verificationScore?: number | null;
-	extractedData?: Record<string, unknown> | null;
+	uploadLinkId?: string | null;
 	verifiedAt?: string | null;
+	verifiedBy?: string | null;
 	// Timestamps
 	createdAt: string;
 	updatedAt: string;

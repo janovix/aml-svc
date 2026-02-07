@@ -10,7 +10,7 @@ export type ImportStatus =
 	| "COMPLETED"
 	| "FAILED";
 
-export type ImportEntityType = "CLIENT" | "TRANSACTION";
+export type ImportEntityType = "CLIENT" | "OPERATION";
 
 export type ImportRowStatus =
 	| "PENDING"

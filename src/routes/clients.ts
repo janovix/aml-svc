@@ -1,7 +1,5 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { ZodError } from "zod";
-import { Prisma } from "@prisma/client";
 
 import {
 	AddressIdParamSchema,
@@ -21,10 +19,15 @@ import {
 	ClientRepository,
 	ClientPEPStatusUpdateSchema,
 } from "../domain/client";
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import { createAlertQueueService } from "../lib/alert-queue";
 import { createPEPQueueService } from "../lib/pep-queue";
 import { getPrismaClient } from "../lib/prisma";
+import {
+	parseWithZod,
+	handleServiceError,
+	getClientDisplayName,
+} from "../lib/route-helpers";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { APIError } from "../middleware/error";
 
@@ -33,89 +36,12 @@ export const clientsRouter = new Hono<{
 	Variables: AuthVariables;
 }>();
 
-function parseWithZod<T>(
-	schema: { parse: (input: unknown) => T },
-	payload: unknown,
-): T {
-	try {
-		return schema.parse(payload);
-	} catch (error) {
-		if (error instanceof ZodError) {
-			throw new APIError(400, "Validation failed", error.format());
-		}
-		throw error;
-	}
-}
-
 function getService(
 	c: Context<{ Bindings: Bindings; Variables: AuthVariables }>,
 ) {
 	const prisma = getPrismaClient(c.env.DB);
 	const repository = new ClientRepository(prisma);
 	return new ClientService(repository);
-}
-
-function handleServiceError(error: unknown): never {
-	// Handle Prisma unique constraint violations
-	if (error instanceof Prisma.PrismaClientKnownRequestError) {
-		if (error.code === "P2002") {
-			// Unique constraint failed
-			const target = error.meta?.target;
-			// Check if it's the RFC unique constraint
-			if (
-				Array.isArray(target) &&
-				target.includes("organization_id") &&
-				target.includes("rfc")
-			) {
-				throw new APIError(
-					409,
-					"Ya existe un cliente con este RFC en la organización",
-					{
-						code: "DUPLICATE_RFC",
-						field: "rfc",
-					},
-				);
-			}
-			// Generic unique constraint message
-			throw new APIError(409, "A record with this value already exists", {
-				code: "DUPLICATE_VALUE",
-				target,
-			});
-		}
-	}
-
-	if (error instanceof Error) {
-		// Handle UNIQUE constraint failed from D1/SQLite (alternative error format)
-		if (
-			error.message.includes("UNIQUE constraint failed") ||
-			error.message.includes("Unique constraint failed")
-		) {
-			if (error.message.includes("rfc")) {
-				throw new APIError(
-					409,
-					"Ya existe un cliente con este RFC en la organización",
-					{
-						code: "DUPLICATE_RFC",
-						field: "rfc",
-					},
-				);
-			}
-			throw new APIError(409, "A record with this value already exists", {
-				code: "DUPLICATE_VALUE",
-			});
-		}
-
-		if (error.message === "CLIENT_NOT_FOUND") {
-			throw new APIError(404, "Client not found");
-		}
-		if (error.message === "DOCUMENT_NOT_FOUND") {
-			throw new APIError(404, "Document not found");
-		}
-		if (error.message === "ADDRESS_NOT_FOUND") {
-			throw new APIError(404, "Address not found");
-		}
-	}
-	throw error;
 }
 
 clientsRouter.get("/", async (c) => {
@@ -162,16 +88,15 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 		throw new APIError(404, "Client not found");
 	}
 
-	// Get documents for this client using raw query to include new fields
+	// Get documents for this client using raw query
 	const documents = await prisma.$queryRaw<
 		Array<{
 			id: string;
 			document_type: string;
 			status: string;
-			verification_status: string | null;
 		}>
 	>`
-		SELECT id, document_type, status, verification_status
+		SELECT id, document_type, status
 		FROM client_documents
 		WHERE client_id = ${client.id}
 	`;
@@ -205,12 +130,8 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 	const missingDocs = requiredDocs.filter((d) => !uploadedDocTypes.includes(d));
 
 	// Check document verification status
-	const verifiedDocs = documents.filter(
-		(d) => d.status === "VERIFIED" || d.verification_status === "APPROVED",
-	).length;
-	const pendingDocs = documents.filter(
-		(d) => d.status === "PENDING" || d.verification_status === "REVIEW",
-	).length;
+	const verifiedDocs = documents.filter((d) => d.status === "VERIFIED").length;
+	const pendingDocs = documents.filter((d) => d.status === "PENDING").length;
 
 	// UBO requirements for MORAL/TRUST
 	const requiresUBO = ["MORAL", "TRUST"].includes(client.personType);
@@ -302,10 +223,7 @@ clientsRouter.post("/", async (c) => {
 
 	// Queue PEP check for new client (non-blocking)
 	const pepQueue = createPEPQueueService(c.env.PEP_CHECK_QUEUE);
-	const fullName =
-		created.personType === "physical"
-			? `${created.firstName} ${created.lastName} ${created.secondLastName || ""}`.trim()
-			: created.businessName || "";
+	const fullName = getClientDisplayName(created);
 	if (fullName) {
 		await pepQueue.queueClientPEPCheck(created.id, fullName, {
 			organizationId,
@@ -333,10 +251,7 @@ clientsRouter.put("/:id", async (c) => {
 
 	// Queue PEP check for updated client (non-blocking)
 	const pepQueue = createPEPQueueService(c.env.PEP_CHECK_QUEUE);
-	const fullName =
-		updated.personType === "physical"
-			? `${updated.firstName} ${updated.lastName} ${updated.secondLastName || ""}`.trim()
-			: updated.businessName || "";
+	const fullName = getClientDisplayName(updated);
 	if (fullName) {
 		await pepQueue.queueClientPEPCheck(updated.id, fullName, {
 			organizationId,
@@ -375,10 +290,7 @@ clientsRouter.patch("/:id", async (c) => {
 
 	if (nameFieldsChanged) {
 		const pepQueue = createPEPQueueService(c.env.PEP_CHECK_QUEUE);
-		const fullName =
-			updated.personType === "physical"
-				? `${updated.firstName} ${updated.lastName} ${updated.secondLastName || ""}`.trim()
-				: updated.businessName || "";
+		const fullName = getClientDisplayName(updated);
 		if (fullName) {
 			await pepQueue.queueClientPEPCheck(updated.id, fullName, {
 				organizationId,

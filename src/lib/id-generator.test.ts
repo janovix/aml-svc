@@ -94,7 +94,8 @@ describe("ID Generator", () => {
 		});
 
 		it("should return null for invalid IDs", () => {
-			expect(getEntityTypeFromId("INVALID123")).toBe(null);
+			expect(getEntityTypeFromId("ZZZ123456789")).toBe(null); // ZZZ is not a valid prefix
+			expect(getEntityTypeFromId("XYZ123456789")).toBe(null); // XYZ is not a valid prefix
 			expect(getEntityTypeFromId("ABC")).toBe(null);
 			expect(getEntityTypeFromId("")).toBe(null);
 		});

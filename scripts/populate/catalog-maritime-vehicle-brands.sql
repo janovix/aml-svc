@@ -9,7 +9,7 @@ INSERT OR IGNORE INTO catalogs (id, key, name, active, allow_new_items, created_
 VALUES (
     lower(hex(randomblob(16))),
     'maritime-vehicle-brands',
-    'Marcas de Vehículos Marítimos',
+    'Maritime Vehicle Brands',
     1,
     1,
     CURRENT_TIMESTAMP,

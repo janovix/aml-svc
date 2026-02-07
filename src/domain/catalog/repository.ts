@@ -138,7 +138,8 @@ export class CatalogRepository {
 		query: CatalogListQuery,
 		sort: Prisma.CatalogItemOrderByWithRelationInput = { name: "asc" },
 	): Promise<{ data: CatalogItemEntity[]; pagination: CatalogPagination }> {
-		const { page, pageSize, search, active } = query;
+		const { page, pageSize, search, active, vaCode, excludeAutomatable } =
+			query;
 
 		const where: Prisma.CatalogItemWhereInput = {
 			catalogId,
@@ -148,20 +149,65 @@ export class CatalogRepository {
 			where.active = active;
 		}
 
+		// Build AND conditions array for metadata filters
+		const andConditions: Prisma.CatalogItemWhereInput[] = [];
+
+		// Search filter (OR condition for name or normalized name)
 		if (search) {
 			const normalized = normalizeSearchTerm(search);
-			where.OR = [
-				{
-					name: {
-						contains: search,
+			andConditions.push({
+				OR: [
+					{
+						name: {
+							contains: search,
+						},
 					},
-				},
-				{
-					normalizedName: {
-						contains: normalized,
+					{
+						normalizedName: {
+							contains: normalized,
+						},
 					},
+				],
+			});
+		}
+
+		// Filter by va_code in metadata (for alert types)
+		// Since metadata is stored as a JSON string in SQLite, we use string contains
+		if (vaCode) {
+			andConditions.push({
+				metadata: {
+					contains: `"va_code":"${vaCode}"`,
 				},
-			];
+			});
+		}
+
+		// Exclude automatable items (for alert types)
+		// Automatable items have metadata.automatable = true
+		// We want to include items where automatable is false or not present
+		if (excludeAutomatable) {
+			andConditions.push({
+				OR: [
+					{
+						// Items with automatable: false
+						metadata: {
+							contains: '"automatable":false',
+						},
+					},
+					{
+						// Items without automatable field (doesn't contain "automatable")
+						NOT: {
+							metadata: {
+								contains: '"automatable"',
+							},
+						},
+					},
+				],
+			});
+		}
+
+		// Apply AND conditions if any
+		if (andConditions.length > 0) {
+			where.AND = andConditions;
 		}
 
 		const [total, records] = await Promise.all([

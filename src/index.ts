@@ -1,50 +1,15 @@
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { prettyJSON } from "hono/pretty-json";
 import * as Sentry from "@sentry/cloudflare";
 import pkg from "../package.json";
 import { getScalarHtml, type AppMeta } from "./app-meta";
 import { errorHandler } from "./middleware/error";
+import { corsMiddleware } from "./middleware/cors";
 import { openAPISpec } from "./openapi";
 import { createRouter } from "./routes";
 import { handleServiceBindingRequest } from "./lib/alert-service-binding";
-import type { AlertJob } from "./lib/alert-queue";
-import type { PEPJob } from "./lib/pep-queue";
-
-export type Bindings = {
-	DB: D1Database;
-	CACHE?: KVNamespace;
-	R2_BUCKET?: R2Bucket; // R2 bucket for storing SAT XML files
-	ENVIRONMENT?: string;
-	API_VERSION?: string;
-	AUTH_SERVICE_URL?: string;
-	AUTH_JWKS_CACHE_TTL?: string;
-	SAT_CLAVE_SUJETO_OBLIGADO?: string; // 12-character obligated subject identifier (RFC)
-	SAT_CLAVE_ACTIVIDAD?: string; // Activity code (e.g., "VEH" for vehicle notices)
-	SAT_CLAVE_ENTIDAD_COLEGIADA?: string; // Optional collegiate entity identifier
-	/** Service binding to auth-svc for worker-to-worker communication */
-	AUTH_SERVICE?: Fetcher;
-	/** Queue for alert detection jobs */
-	ALERT_DETECTION_QUEUE?: Queue<AlertJob>;
-	/** Queue for import processing jobs */
-	IMPORT_PROCESSING_QUEUE?: Queue<import("./domain/import").ImportJob>;
-	/** Queue for PEP check jobs */
-	PEP_CHECK_QUEUE?: Queue<PEPJob>;
-	/** Secret token for synthetic data generation HTTP endpoint (local development only) */
-	SYNTHETIC_DATA_SECRET?: string;
-	/**
-	 * Cloudflare Worker version metadata.
-	 * Used for Sentry release tracking.
-	 */
-	CF_VERSION_METADATA?: WorkerVersionMetadata;
-	/**
-	 * Sentry DSN for error tracking.
-	 * If not set, Sentry will be disabled.
-	 * Configured via Cloudflare Dashboard secrets or wrangler vars.
-	 */
-	SENTRY_DSN?: string;
-};
+import type { Bindings } from "./types";
 
 // Start a Hono app
 const app = new Hono<{ Bindings: Bindings }>();
@@ -58,15 +23,7 @@ const appMeta: AppMeta = {
 // Global middleware
 app.use("*", logger());
 app.use("*", prettyJSON());
-app.use(
-	"*",
-	cors({
-		origin: "*",
-		allowHeaders: ["Content-Type", "Authorization"],
-		allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-		credentials: true,
-	}),
-);
+app.use("*", corsMiddleware());
 
 app.get("/", (c) => {
 	if (c.req.header("x-force-error") === "1") {
@@ -103,6 +60,7 @@ app.get("/docsz", (c) => {
 // Service binding routes (internal worker-to-worker communication)
 // Note: When using service bindings with https://internal/..., Cloudflare strips the /internal prefix
 // So we need to handle both /internal/* routes (for direct HTTP calls) and direct paths (for service bindings)
+
 app.all("/internal/*", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
@@ -128,13 +86,13 @@ app.all("/uma-values/active", async (c) => {
 app.all("/alert-rules/:id/config/:key", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
-app.all("/clients/:id/transactions", async (c) => {
+app.all("/clients/:id/operations", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 app.all("/clients/:id", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
-app.all("/transactions", async (c) => {
+app.all("/operations", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 // Organization settings route for service binding access from auth-svc
@@ -295,3 +253,6 @@ export default Sentry.withSentry((env: Bindings) => {
 		sendDefaultPii: true,
 	};
 }, app);
+
+// Re-export types for backward compatibility
+export type { Bindings } from "./types";

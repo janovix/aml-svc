@@ -28,6 +28,31 @@ const EXCLUDED_MODELS = new Set([
 	"ComplianceOrganization", // User-specific configuration set via API, not seeded
 	"Import", // Created via import worker, not seeded
 	"ImportRowResult", // Created via import worker, not seeded
+	// Invoice domain - created via CFDI parsing/import, not seeded
+	"Invoice",
+	"InvoiceItem",
+	// Operation domain - created via imports or API, not seeded
+	"Operation",
+	"OperationPayment",
+	"OperationVehicle",
+	"OperationRealEstate",
+	"OperationJewelry",
+	"OperationVirtualAsset",
+	"OperationGambling",
+	"OperationRental",
+	"OperationArmoring",
+	"OperationDonation",
+	"OperationLoan",
+	"OperationOfficial",
+	"OperationNotary",
+	"OperationProfessional",
+	"OperationTravelerCheck",
+	"OperationCard",
+	"OperationPrepaid",
+	"OperationReward",
+	"OperationValuable",
+	"OperationArt",
+	"OperationDevelopment",
 ]);
 
 // Models that are populated, not seeded

@@ -166,7 +166,11 @@ async function populateUmaValues() {
 export { populateUmaValues };
 
 // If run directly, execute populate
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Compare normalized paths for cross-platform compatibility
+const isDirectRun =
+	process.argv[1] && __filename.toLowerCase() === process.argv[1].toLowerCase();
+
+if (isDirectRun) {
 	populateUmaValues().catch((error) => {
 		console.error("Fatal error:", error);
 		process.exit(1);

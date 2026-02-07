@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { ZodError } from "zod";
 
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { APIError } from "../middleware/error";

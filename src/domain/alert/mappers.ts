@@ -124,7 +124,8 @@ export function mapPrismaAlert(prisma: PrismaAlertModel): AlertEntity {
 		idempotencyKey: prisma.idempotencyKey,
 		contextHash: prisma.contextHash,
 		metadata: parseJson(prisma.metadata) ?? {},
-		transactionId: prisma.transactionId,
+		operationId: prisma.operationId,
+		activityCode: prisma.activityCode,
 		isManual: Boolean(prisma.isManual),
 		submissionDeadline: mapDateTime(prisma.submissionDeadline),
 		fileGeneratedAt: mapDateTime(prisma.fileGeneratedAt),
@@ -262,7 +263,8 @@ export function mapAlertCreateInputToPrisma(
 		idempotencyKey: input.idempotencyKey,
 		contextHash: input.contextHash,
 		metadata: serializeJson(input.metadata) ?? "{}",
-		transactionId: input.transactionId ?? null,
+		operationId: input.operationId ?? null,
+		activityCode: input.activityCode ?? "VEH",
 		isManual: input.isManual ?? false,
 		reportId: null, // Reports are assigned later
 		noticeId: null, // Notices are assigned later
@@ -297,7 +299,6 @@ export function mapAlertUpdateInputToPrisma(
 		| "contextHash"
 		| "metadata"
 		| "severity"
-		| "transactionId"
 		| "isManual"
 	>
 > {
@@ -313,7 +314,6 @@ export function mapAlertUpdateInputToPrisma(
 			| "contextHash"
 			| "metadata"
 			| "severity"
-			| "transactionId"
 			| "isManual"
 		>
 	> = {};
@@ -396,7 +396,6 @@ export function mapAlertPatchInputToPrisma(
 		| "contextHash"
 		| "metadata"
 		| "severity"
-		| "transactionId"
 		| "isManual"
 	>
 > {
@@ -412,7 +411,6 @@ export function mapAlertPatchInputToPrisma(
 			| "contextHash"
 			| "metadata"
 			| "severity"
-			| "transactionId"
 			| "isManual"
 		>
 	> = {};

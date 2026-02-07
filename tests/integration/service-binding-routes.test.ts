@@ -12,7 +12,7 @@ describe("Service Binding Routes (without /internal prefix)", () => {
 		// Clean up test data before each test
 		const prisma = getPrismaClient(env.DB);
 		await prisma.alert.deleteMany({});
-		await prisma.transaction.deleteMany({});
+		await prisma.operation.deleteMany({});
 		await prisma.client.deleteMany({});
 		await prisma.alertRuleConfig.deleteMany({});
 		await prisma.alertRule.deleteMany({});
@@ -23,7 +23,7 @@ describe("Service Binding Routes (without /internal prefix)", () => {
 		// Clean up test data after each test
 		const prisma = getPrismaClient(env.DB);
 		await prisma.alert.deleteMany({});
-		await prisma.transaction.deleteMany({});
+		await prisma.operation.deleteMany({});
 		await prisma.client.deleteMany({});
 		await prisma.alertRuleConfig.deleteMany({});
 		await prisma.alertRule.deleteMany({});
@@ -371,8 +371,8 @@ describe("Service Binding Routes (without /internal prefix)", () => {
 		});
 	});
 
-	describe("GET /clients/:id/transactions", () => {
-		it("returns client transactions via Hono route", async () => {
+	describe("GET /clients/:id/operations", () => {
+		it("returns client operations via Hono route", async () => {
 			const prisma = getPrismaClient(env.DB);
 			const client = await prisma.client.create({
 				data: {
@@ -393,53 +393,47 @@ describe("Service Binding Routes (without /internal prefix)", () => {
 				},
 			});
 
-			// Create transactions
-			await prisma.transaction.createMany({
+			// Create operations
+			await prisma.operation.createMany({
 				data: [
 					{
-						id: "tx1",
+						id: "op1",
 						organizationId: "test-org",
 						clientId: client.id,
+						activityCode: "VEH",
 						operationDate: new Date("2025-01-15"),
-						operationType: "SALE",
-						vehicleType: "LAND",
-						brandId: "brand1",
-						model: "Model1",
-						year: 2024,
+						operationTypeCode: "SALE",
 						amount: 100000,
-						currency: "MXN",
+						currencyCode: "MXN",
 						branchPostalCode: "01234",
 					},
 					{
-						id: "tx2",
+						id: "op2",
 						organizationId: "test-org",
 						clientId: client.id,
+						activityCode: "VEH",
 						operationDate: new Date("2025-01-16"),
-						operationType: "PURCHASE",
-						vehicleType: "LAND",
-						brandId: "brand2",
-						model: "Model2",
-						year: 2023,
+						operationTypeCode: "PURCHASE",
 						amount: 50000,
-						currency: "MXN",
+						currencyCode: "MXN",
 						branchPostalCode: "01234",
 					},
 				],
 			});
 
 			const res = await SELF.fetch(
-				`http://local.test/clients/${client.id}/transactions`,
+				`http://local.test/clients/${client.id}/operations`,
 				{ method: "GET" },
 			);
 
 			expect(res.status).toBe(200);
 			const body = (await res.json()) as Array<{ id: string }>;
 			expect(body).toHaveLength(2);
-			expect(body.map((t) => t.id)).toContain("tx1");
-			expect(body.map((t) => t.id)).toContain("tx2");
+			expect(body.map((t) => t.id)).toContain("op1");
+			expect(body.map((t) => t.id)).toContain("op2");
 		});
 
-		it("returns empty array when client has no transactions", async () => {
+		it("returns empty array when client has no operations", async () => {
 			const prisma = getPrismaClient(env.DB);
 			const client = await prisma.client.create({
 				data: {
@@ -461,7 +455,7 @@ describe("Service Binding Routes (without /internal prefix)", () => {
 			});
 
 			const res = await SELF.fetch(
-				`http://local.test/clients/${client.id}/transactions`,
+				`http://local.test/clients/${client.id}/operations`,
 				{ method: "GET" },
 			);
 
@@ -472,7 +466,7 @@ describe("Service Binding Routes (without /internal prefix)", () => {
 
 		it("returns 404 when client not found", async () => {
 			const res = await SELF.fetch(
-				"http://local.test/clients/non-existent/transactions",
+				"http://local.test/clients/non-existent/operations",
 				{ method: "GET" },
 			);
 
@@ -482,8 +476,8 @@ describe("Service Binding Routes (without /internal prefix)", () => {
 		});
 	});
 
-	describe("GET /transactions?clientId=:id", () => {
-		it("returns client transactions via query parameter", async () => {
+	describe("GET /operations?clientId=:id", () => {
+		it("returns client operations via query parameter", async () => {
 			const prisma = getPrismaClient(env.DB);
 			const client = await prisma.client.create({
 				data: {
@@ -504,39 +498,36 @@ describe("Service Binding Routes (without /internal prefix)", () => {
 				},
 			});
 
-			// Create transactions
-			await prisma.transaction.createMany({
+			// Create operations
+			await prisma.operation.createMany({
 				data: [
 					{
-						id: "tx1",
+						id: "op1",
 						organizationId: "test-org",
 						clientId: client.id,
+						activityCode: "VEH",
 						operationDate: new Date("2025-01-15"),
-						operationType: "SALE",
-						vehicleType: "LAND",
-						brandId: "brand1",
-						model: "Model1",
-						year: 2024,
+						operationTypeCode: "SALE",
 						amount: 100000,
-						currency: "MXN",
+						currencyCode: "MXN",
 						branchPostalCode: "01234",
 					},
 				],
 			});
 
 			const res = await SELF.fetch(
-				`http://local.test/transactions?clientId=${client.id}`,
+				`http://local.test/operations?clientId=${client.id}`,
 				{ method: "GET" },
 			);
 
 			expect(res.status).toBe(200);
 			const body = (await res.json()) as Array<{ id: string }>;
 			expect(body).toHaveLength(1);
-			expect(body[0].id).toBe("tx1");
+			expect(body[0].id).toBe("op1");
 		});
 
 		it("returns 400 when clientId query parameter is missing", async () => {
-			const res = await SELF.fetch("http://local.test/transactions", {
+			const res = await SELF.fetch("http://local.test/operations", {
 				method: "GET",
 			});
 
@@ -549,7 +540,7 @@ describe("Service Binding Routes (without /internal prefix)", () => {
 
 		it("returns 404 when client not found", async () => {
 			const res = await SELF.fetch(
-				"http://local.test/transactions?clientId=non-existent",
+				"http://local.test/operations?clientId=non-existent",
 				{ method: "GET" },
 			);
 

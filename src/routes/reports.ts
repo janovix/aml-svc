@@ -17,7 +17,7 @@ import {
 	OrganizationSettingsService,
 	OrganizationSettingsRepository,
 } from "../domain/organization-settings";
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
@@ -26,6 +26,7 @@ import {
 	generatePdfReportHtml,
 	type AlertSummaryForPdf,
 } from "../lib/pdf-report-generator";
+import { generateReportFileKey } from "../lib/r2-upload";
 
 export const reportsRouter = new Hono<{
 	Bindings: Bindings;
@@ -161,15 +162,15 @@ reportsRouter.get("/aggregate/alerts", async (c) => {
 	return c.json(result);
 });
 
-// GET /reports/aggregate/transactions - Get transaction metrics aggregation
-reportsRouter.get("/aggregate/transactions", async (c) => {
+// GET /reports/aggregate/operations - Get operation metrics aggregation
+reportsRouter.get("/aggregate/operations", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = Object.fromEntries(url.searchParams.entries());
 	const query = parseWithZod(ReportAggregationQuerySchema, queryObject);
 
 	const aggregator = getAggregator(c);
-	const result = await aggregator.aggregateTransactions(
+	const result = await aggregator.aggregateOperations(
 		organizationId,
 		new Date(query.periodStart),
 		new Date(query.periodEnd),
@@ -348,7 +349,12 @@ reportsRouter.post("/:id/generate", async (c) => {
 	const fileSize = new TextEncoder().encode(htmlContent).length;
 
 	if (c.env.R2_BUCKET) {
-		const filename = `reports/${organizationId}/${report.id}_${report.periodStart.substring(0, 10)}_${report.periodEnd.substring(0, 10)}.html`;
+		const filename = generateReportFileKey(
+			organizationId,
+			report.id,
+			report.periodStart,
+			report.periodEnd,
+		);
 		await c.env.R2_BUCKET.put(filename, htmlContent, {
 			httpMetadata: {
 				contentType: "text/html; charset=utf-8",

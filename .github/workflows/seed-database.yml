@@ -1,0 +1,78 @@
+name: Seed Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - preview
+        default: dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seed-database-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HUSKY: 0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Determine wrangler config
+        id: config
+        run: |
+          case "${{ github.event.inputs.environment }}" in
+            preview)
+              echo "config=wrangler.preview.jsonc" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "config=wrangler.jsonc" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Seed database
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REMOTE: "true"
+          WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
+        run: node scripts/seed/all.mjs
+
+      - name: Summary
+        run: |
+          echo "## Database Seeding Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | \`${{ github.event.inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Config | \`${{ steps.config.outputs.config }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Seeded Data" >> $GITHUB_STEP_SUMMARY
+          echo "- Organizations" >> $GITHUB_STEP_SUMMARY
+          echo "- Users" >> $GITHUB_STEP_SUMMARY
+          echo "- Alert Rules" >> $GITHUB_STEP_SUMMARY
+          echo "- UMA Values" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **Note:** Seeding is only available for dev and preview environments." >> $GITHUB_STEP_SUMMARY
+          echo "> Production seeding is intentionally disabled for safety." >> $GITHUB_STEP_SUMMARY

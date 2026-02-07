@@ -289,57 +289,116 @@ export class NoticeRepository {
 	}
 
 	/**
-	 * Get all alerts for a notice with their transactions (for XML generation)
-	 * Fetches alerts with client, alertRule, and their linked transactions
+	 * Get all alerts for a notice with their transactions/operations (for XML generation)
+	 * Fetches alerts with client, alertRule, and their linked transactions or operations
+	 *
+	 * Uses batch fetching to avoid D1/SQLite's ~999 variable limit in IN clauses.
+	 * Instead of using Prisma includes (which generate large IN queries), we:
+	 * 1. Fetch alerts without includes
+	 * 2. Batch fetch related entities (clients, alertRules, transactions/operations) separately
+	 * 3. Manually join the data
 	 */
-	async getAlertsWithTransactionsForNotice(
+	async getAlertsWithOperationsForNotice(
 		organizationId: string,
 		noticeId: string,
 	) {
-		// Get alerts with client and alertRule
+		// D1/SQLite limit is ~999 variables, use a safe batch size
+		const BATCH_SIZE = 500;
+
+		// Get alerts without includes to avoid Prisma generating large IN queries
 		const alerts = await this.prisma.alert.findMany({
 			where: { noticeId, organizationId },
-			include: {
-				alertRule: true,
-				client: true,
-			},
 			orderBy: { createdAt: "asc" },
 		});
 
-		// Get transaction IDs from alerts (filter out null/undefined)
-		const transactionIds = alerts
-			.map((a) => a.transactionId)
+		if (alerts.length === 0) {
+			return [];
+		}
+
+		// Collect unique IDs for batch fetching
+		const clientIds = [...new Set(alerts.map((a) => a.clientId))];
+		const alertRuleIds = [
+			...new Set(
+				alerts
+					.map((a) => a.alertRuleId)
+					.filter((id): id is string => id != null),
+			),
+		];
+		const operationIds = alerts
+			.map((a) => a.operationId)
 			.filter((id): id is string => id != null);
 
-		// Fetch transactions in batches to avoid SQLite's ~999 variable limit
-		// D1/SQLite throws "too many SQL variables" when using large IN clauses
-		const BATCH_SIZE = 500;
-		const transactions: Awaited<
-			ReturnType<typeof this.prisma.transaction.findMany>
-		> = [];
+		// Batch fetch clients
+		const clients: Awaited<ReturnType<typeof this.prisma.client.findMany>> = [];
+		for (let i = 0; i < clientIds.length; i += BATCH_SIZE) {
+			const batchIds = clientIds.slice(i, i + BATCH_SIZE);
+			const batchClients = await this.prisma.client.findMany({
+				where: { id: { in: batchIds }, organizationId },
+			});
+			clients.push(...batchClients);
+		}
+		const clientMap = new Map(clients.map((c) => [c.id, c]));
 
-		for (let i = 0; i < transactionIds.length; i += BATCH_SIZE) {
-			const batchIds = transactionIds.slice(i, i + BATCH_SIZE);
-			const batchTransactions = await this.prisma.transaction.findMany({
+		// Batch fetch alert rules (alert rules are global, not per-organization)
+		const alertRules: Awaited<
+			ReturnType<typeof this.prisma.alertRule.findMany>
+		> = [];
+		for (let i = 0; i < alertRuleIds.length; i += BATCH_SIZE) {
+			const batchIds = alertRuleIds.slice(i, i + BATCH_SIZE);
+			const batchRules = await this.prisma.alertRule.findMany({
+				where: { id: { in: batchIds } },
+			});
+			alertRules.push(...batchRules);
+		}
+		const alertRuleMap = new Map(alertRules.map((r) => [r.id, r]));
+
+		// Batch fetch operations with payments and activity-specific extensions
+		const operations: Awaited<
+			ReturnType<typeof this.prisma.operation.findMany>
+		> = [];
+		for (let i = 0; i < operationIds.length; i += BATCH_SIZE) {
+			const batchIds = operationIds.slice(i, i + BATCH_SIZE);
+			const batchOperations = await this.prisma.operation.findMany({
 				where: {
 					id: { in: batchIds },
 					organizationId,
 				},
 				include: {
-					paymentMethods: true,
+					payments: true,
+					vehicle: true,
+					realEstate: true,
+					jewelry: true,
+					virtualAsset: true,
+					gambling: true,
+					rental: true,
+					armoring: true,
+					donation: true,
+					loan: true,
+					official: true,
+					notary: true,
+					professional: true,
+					travelerCheck: true,
+					card: true,
+					prepaid: true,
+					reward: true,
+					valuable: true,
+					art: true,
+					development: true,
 				},
 			});
-			transactions.push(...batchTransactions);
+			operations.push(...batchOperations);
 		}
+		const operationMap = new Map(operations.map((o) => [o.id, o]));
 
-		// Create a map for quick lookup
-		const transactionMap = new Map(transactions.map((t) => [t.id, t]));
-
-		// Attach transactions to alerts
+		// Manually join all the data
 		return alerts.map((alert) => ({
 			...alert,
-			transaction: alert.transactionId
-				? (transactionMap.get(alert.transactionId) ?? null)
+			client: clientMap.get(alert.clientId) ?? null,
+			alertRule: alert.alertRuleId
+				? (alertRuleMap.get(alert.alertRuleId) ?? null)
+				: null,
+			operation: alert.operationId
+				? (operationMap.get(alert.operationId) ?? null)
 				: null,
 		}));
 	}

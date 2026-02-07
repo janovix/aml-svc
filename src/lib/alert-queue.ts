@@ -7,12 +7,14 @@
 export type AlertJobType =
 	| "client.created"
 	| "client.updated"
-	| "transaction.created";
+	| "transaction.created"
+	| "operation.created";
 
 export interface AlertJob {
 	type: AlertJobType;
 	clientId: string;
 	transactionId?: string;
+	operationId?: string;
 	timestamp: string;
 }
 
@@ -53,6 +55,7 @@ export class AlertQueueService {
 
 	/**
 	 * Queues a transaction.created job
+	 * @deprecated Use queueOperationCreated instead
 	 */
 	async queueTransactionCreated(
 		clientId: string,
@@ -62,6 +65,21 @@ export class AlertQueueService {
 			type: "transaction.created",
 			clientId,
 			transactionId,
+			timestamp: new Date().toISOString(),
+		});
+	}
+
+	/**
+	 * Queues an operation.created job
+	 */
+	async queueOperationCreated(
+		clientId: string,
+		operationId: string,
+	): Promise<void> {
+		await this.sendJob({
+			type: "operation.created",
+			clientId,
+			operationId,
 			timestamp: new Date().toISOString(),
 		});
 	}

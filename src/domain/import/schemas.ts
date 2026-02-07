@@ -17,7 +17,7 @@ export const IMPORT_STATUS_VALUES = [
 	"FAILED",
 ] as const;
 
-export const IMPORT_ENTITY_TYPE_VALUES = ["CLIENT", "TRANSACTION"] as const;
+export const IMPORT_ENTITY_TYPE_VALUES = ["CLIENT", "OPERATION"] as const;
 
 export const IMPORT_ROW_STATUS_VALUES = [
 	"PENDING",

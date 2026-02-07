@@ -6,7 +6,7 @@ import {
 	type UsageCheckResult,
 	type FeatureCheckResult,
 } from "./subscription-client";
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 
 describe("SubscriptionClient", () => {
 	let client: SubscriptionClient;

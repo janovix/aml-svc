@@ -122,3 +122,39 @@ jobs:
           if [ "${{ github.event.inputs.operation }}" != "seed" ] && [ "${{ github.event.inputs.operation }}" != "populate-zip-codes" ]; then
             echo "| Skip Zip Codes | \`${{ github.event.inputs.skip_zip_codes }}\` |" >> $GITHUB_STEP_SUMMARY
           fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Catalogs Included" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event.inputs.operation }}" == "populate-all" ] || [ "${{ github.event.inputs.operation }}" == "populate-catalogs" ]; then
+            echo "#### Core Catalogs (14)" >> $GITHUB_STEP_SUMMARY
+            echo "- Countries, States, Currencies" >> $GITHUB_STEP_SUMMARY
+            echo "- Armor Levels, Business Activities" >> $GITHUB_STEP_SUMMARY
+            echo "- Economic Activities, Operation Types" >> $GITHUB_STEP_SUMMARY
+            echo "- Payment Forms, Payment Methods" >> $GITHUB_STEP_SUMMARY
+            echo "- Vulnerable Activities" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "#### Vehicle Catalogs (3)" >> $GITHUB_STEP_SUMMARY
+            echo "- Terrestrial, Maritime, Air Vehicle Brands" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "#### CFDI Catalogs (12)" >> $GITHUB_STEP_SUMMARY
+            echo "- Payment Forms, Payment Methods" >> $GITHUB_STEP_SUMMARY
+            echo "- Tax Regimes, Usages, Voucher Types" >> $GITHUB_STEP_SUMMARY
+            echo "- Currencies, Countries, Taxes" >> $GITHUB_STEP_SUMMARY
+            echo "- Tax Factors, Tax Objects" >> $GITHUB_STEP_SUMMARY
+            echo "- Relation Types, Export Types" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "#### CFDI-PLD Integration (1)" >> $GITHUB_STEP_SUMMARY
+            echo "- CFDI-PLD Mappings" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "#### PLD Consolidated Catalogs (15)" >> $GITHUB_STEP_SUMMARY
+            echo "- Alert Types, Monetary Instruments, Payment Forms" >> $GITHUB_STEP_SUMMARY
+            echo "- Property Types, Incorporation Reasons" >> $GITHUB_STEP_SUMMARY
+            echo "- And more..." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "#### Activity-Specific Catalogs (47)" >> $GITHUB_STEP_SUMMARY
+            echo "- Individual catalogs for each of 19 vulnerable activities" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ github.event.inputs.operation }}" == "populate-all" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "#### UMA Values" >> $GITHUB_STEP_SUMMARY
+            echo "- Economic reference data" >> $GITHUB_STEP_SUMMARY
+          fi

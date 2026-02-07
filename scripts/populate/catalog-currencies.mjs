@@ -96,7 +96,7 @@ function generateSql(catalogId, items) {
 	// Insert catalog if it doesn't exist
 	sql.push(`
 		INSERT OR IGNORE INTO catalogs (id, key, name, active, created_at, updated_at)
-		VALUES ('${catalogId}', '${CATALOG_KEY}', 'Monedas', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+		VALUES ('${catalogId}', '${CATALOG_KEY}', 'Currencies', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 	`);
 
 	// Delete precious metal coins that were previously imported

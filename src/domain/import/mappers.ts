@@ -65,12 +65,10 @@ export function mapPrismaImportRowResult(
 /**
  * Maps ImportEntityType string to Prisma enum value
  */
-export function toPrismaEntityType(
-	entityType: string,
-): "CLIENT" | "TRANSACTION" {
+export function toPrismaEntityType(entityType: string): "CLIENT" | "OPERATION" {
 	const upper = entityType.toUpperCase();
-	if (upper === "CLIENT" || upper === "TRANSACTION") {
-		return upper;
+	if (upper === "CLIENT" || upper === "OPERATION") {
+		return upper as "CLIENT" | "OPERATION";
 	}
 	throw new Error(`Invalid entity type: ${entityType}`);
 }

@@ -5,7 +5,7 @@
  * reporting usage, and verifying features via auth-svc service binding.
  */
 
-import type { Bindings } from "../index";
+import type { Bindings } from "../types";
 
 /**
  * Plan tiers
@@ -15,7 +15,7 @@ export type PlanTier = "none" | "business" | "pro" | "enterprise";
 /**
  * Usage metric types
  */
-export type UsageMetric = "notices" | "alerts" | "transactions";
+export type UsageMetric = "notices" | "alerts" | "transactions" | "operations";
 
 /**
  * Feature names

@@ -33,6 +33,8 @@ describe("ClientService", () => {
 		externalNumber: "123",
 		postalCode: "06000",
 		kycStatus: "INCOMPLETE",
+		completenessStatus: "INCOMPLETE",
+		missingFields: null,
 		isPEP: false,
 		pepStatus: "PENDING",
 		createdAt: "2024-01-01T00:00:00Z",
@@ -495,6 +497,7 @@ describe("ClientService", () => {
 				totalClients: 100,
 				physicalClients: 70,
 				moralClients: 30,
+				trustClients: 0,
 			};
 
 			vi.mocked(mockRepository.getStats).mockResolvedValue(stats);

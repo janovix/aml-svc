@@ -8,7 +8,28 @@
 import type { PrismaClient, DocumentType, AddressType } from "@prisma/client";
 import { generateId } from "./id-generator";
 import type { ClientCreateInput } from "../domain/client/schemas";
-import type { TransactionCreateInput } from "../domain/transaction/schemas";
+
+/**
+ * Synthetic operation data for VEH activity
+ */
+export interface SyntheticVehicleOperationInput {
+	clientId: string;
+	operationDate: string;
+	operationType: "purchase" | "sale";
+	branchPostalCode: string;
+	vehicleType: "land" | "marine" | "air";
+	brand: string;
+	model: string;
+	year: number;
+	armorLevel?: string | null;
+	engineNumber?: string | null;
+	plates?: string | null;
+	registrationNumber?: string | null;
+	flagCountryId?: string | null;
+	amount: string;
+	currency: string;
+	paymentMethods: Array<{ method: string; amount: string }>;
+}
 
 export interface SyntheticDataOptions {
 	clients?: {
@@ -16,9 +37,15 @@ export interface SyntheticDataOptions {
 		includeDocuments?: boolean;
 		includeAddresses?: boolean;
 	};
+	operations?: {
+		count: number;
+		perClient?: number; // Number of operations per client
+		activityCode?: string; // Activity code (VEH, INM, etc.) - defaults to VEH
+	};
+	/** @deprecated Use operations instead */
 	transactions?: {
 		count: number;
-		perClient?: number; // Number of transactions per client
+		perClient?: number;
 	};
 }
 
@@ -27,6 +54,11 @@ export interface SyntheticDataResult {
 		created: number;
 		rfcList: string[];
 	};
+	operations: {
+		created: number;
+		operationIds: string[];
+	};
+	/** @deprecated Use operations instead */
 	transactions: {
 		created: number;
 		transactionIds: string[];
@@ -385,12 +417,12 @@ function generateMoralClient(index: number): ClientCreateInput {
 }
 
 /**
- * Generates a synthetic transaction
+ * Generates a synthetic VEH (Vehicle) operation
  */
-function generateTransaction(
+function generateVehicleOperation(
 	clientId: string,
 	_index: number,
-): TransactionCreateInput {
+): SyntheticVehicleOperationInput {
 	const operationYear = 2020 + Math.floor(Math.random() * 5);
 	const operationMonth = Math.floor(Math.random() * 12) + 1;
 	const operationDay = Math.floor(Math.random() * 28) + 1;
@@ -427,7 +459,7 @@ function generateTransaction(
 		});
 	}
 
-	// Build transaction based on vehicle type with required fields
+	// Build operation based on vehicle type with required fields
 	if (vehicleType === "land") {
 		const engineNumber = Array.from({ length: 17 }, () => {
 			const chars = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789";
@@ -439,7 +471,7 @@ function generateTransaction(
 			operationDate,
 			operationType,
 			branchPostalCode: String(Math.floor(Math.random() * 90000) + 10000),
-			vehicleType: "land" as const,
+			vehicleType: "land",
 			brand,
 			model,
 			year,
@@ -452,7 +484,7 @@ function generateTransaction(
 			amount: amount.toString(),
 			currency,
 			paymentMethods,
-		} as TransactionCreateInput;
+		};
 	}
 
 	if (vehicleType === "marine") {
@@ -461,7 +493,7 @@ function generateTransaction(
 			operationDate,
 			operationType,
 			branchPostalCode: String(Math.floor(Math.random() * 90000) + 10000),
-			vehicleType: "marine" as const,
+			vehicleType: "marine",
 			brand,
 			model,
 			year,
@@ -470,7 +502,7 @@ function generateTransaction(
 			amount: amount.toString(),
 			currency,
 			paymentMethods,
-		} as TransactionCreateInput;
+		};
 	}
 
 	// air vehicle
@@ -479,7 +511,7 @@ function generateTransaction(
 		operationDate,
 		operationType,
 		branchPostalCode: String(Math.floor(Math.random() * 90000) + 10000),
-		vehicleType: "air" as const,
+		vehicleType: "air",
 		brand,
 		model,
 		year,
@@ -488,7 +520,7 @@ function generateTransaction(
 		amount: amount.toString(),
 		currency,
 		paymentMethods,
-	} as TransactionCreateInput;
+	};
 }
 
 /**
@@ -513,6 +545,10 @@ export class SyntheticDataGenerator {
 				created: 0,
 				rfcList: [],
 			},
+			operations: {
+				created: 0,
+				operationIds: [],
+			},
 			transactions: {
 				created: 0,
 				transactionIds: [],
@@ -529,22 +565,32 @@ export class SyntheticDataGenerator {
 			result.clients = clientResult;
 		}
 
-		// Generate transactions if requested
-		if (options.transactions && options.transactions.count > 0) {
+		// Generate operations if requested (or use legacy transactions option)
+		const operationsConfig = options.operations || options.transactions;
+		if (operationsConfig && operationsConfig.count > 0) {
 			// If we have clients, use them; otherwise generate new ones
 			const clientRfcs =
 				result.clients.rfcList.length > 0
 					? result.clients.rfcList
-					: await this.ensureClientsForTransactions(
-							options.transactions.perClient || 1,
+					: await this.ensureClientsForOperations(
+							operationsConfig.perClient || 1,
 						);
 
-			const transactionResult = await this.generateTransactions(
-				options.transactions.count,
+			// Get activity code - default to VEH if using legacy transactions option
+			const activityCode: string = options.operations?.activityCode ?? "VEH";
+
+			const operationResult = await this.generateOperations(
+				operationsConfig.count,
 				clientRfcs,
-				options.transactions.perClient,
+				activityCode,
+				operationsConfig.perClient,
 			);
-			result.transactions = transactionResult;
+			result.operations = operationResult;
+			// For backwards compatibility
+			result.transactions = {
+				created: operationResult.created,
+				transactionIds: operationResult.operationIds,
+			};
 		}
 
 		return result;
@@ -637,18 +683,20 @@ export class SyntheticDataGenerator {
 	}
 
 	/**
-	 * Generates synthetic transactions
+	 * Generates synthetic operations
+	 * Currently supports VEH (Vehicle) activity. Other activities can be added.
 	 */
-	private async generateTransactions(
+	private async generateOperations(
 		count: number,
 		clientRfcs: string[],
+		activityCode: string,
 		perClient?: number,
-	): Promise<{ created: number; transactionIds: string[] }> {
-		const transactionIds: string[] = [];
+	): Promise<{ created: number; operationIds: string[] }> {
+		const operationIds: string[] = [];
 		let created = 0;
 
 		if (clientRfcs.length === 0) {
-			throw new Error("No clients available for transaction generation");
+			throw new Error("No clients available for operation generation");
 		}
 
 		// Look up client IDs from RFCs
@@ -662,7 +710,7 @@ export class SyntheticDataGenerator {
 
 		const clientIdMap = new Map(clients.map((c) => [c.rfc, c.id]));
 
-		const transactionsPerClient =
+		const operationsPerClient =
 			perClient || Math.ceil(count / clientRfcs.length);
 
 		for (const clientRfc of clientRfcs) {
@@ -672,64 +720,57 @@ export class SyntheticDataGenerator {
 				continue;
 			}
 
-			const clientTransactions = Math.min(
-				transactionsPerClient,
-				count - created,
-			);
+			const clientOperations = Math.min(operationsPerClient, count - created);
 
-			for (let i = 0; i < clientTransactions && created < count; i++) {
+			for (let i = 0; i < clientOperations && created < count; i++) {
 				try {
-					const transactionData = generateTransaction(clientId, created);
+					// Currently only VEH activity is supported for synthetic data
+					if (activityCode !== "VEH") {
+						console.warn(
+							`Activity ${activityCode} not yet supported for synthetic data, using VEH`,
+						);
+					}
 
-					// Create transaction using Prisma directly
-					// Note: UMA value is left null for synthetic data (can be calculated later if needed)
-					const transaction = await this.prisma.transaction.create({
+					const operationData = generateVehicleOperation(clientId, created);
+
+					// Create operation using Prisma directly
+					const operation = await this.prisma.operation.create({
 						data: {
-							id: generateId("TRANSACTION"),
+							id: generateId("OPERATION"),
 							organizationId: this.organizationId,
-							clientId: transactionData.clientId,
-							operationDate: new Date(transactionData.operationDate),
-							operationType: transactionData.operationType.toUpperCase() as
-								| "PURCHASE"
-								| "SALE",
-							branchPostalCode: transactionData.branchPostalCode,
-							vehicleType: transactionData.vehicleType.toUpperCase() as
-								| "LAND"
-								| "MARINE"
-								| "AIR",
-							brandId: transactionData.brand, // brandId is the Prisma field name
-							model: transactionData.model,
-							year: transactionData.year,
-							armorLevel: transactionData.armorLevel ?? null,
-							engineNumber:
-								"engineNumber" in transactionData
-									? (transactionData.engineNumber ?? null)
-									: "vin" in transactionData
-										? (transactionData.vin ?? null)
-										: null,
-							plates: transactionData.plates ?? null,
-							registrationNumber: transactionData.registrationNumber ?? null,
-							flagCountryId: transactionData.flagCountryId ?? null,
-							amount: transactionData.amount,
-							currency: transactionData.currency,
-							operationTypeCode: transactionData.operationTypeCode ?? null,
-							currencyCode: transactionData.currencyCode ?? null,
-							umaValue: null, // UMA value can be calculated later if needed
-							paymentMethods: {
-								create: transactionData.paymentMethods.map((pm) => ({
-									id: generateId("TRANSACTION_PAYMENT_METHOD"),
-									method: pm.method,
-									amount: pm.amount,
-								})),
+							clientId: operationData.clientId,
+							activityCode: "VEH",
+							operationDate: new Date(operationData.operationDate),
+							amount: operationData.amount,
+							currencyCode: operationData.currency,
+							operationTypeCode: operationData.operationType.toUpperCase(),
+							branchPostalCode: operationData.branchPostalCode,
+							// Create the VEH extension
+							vehicle: {
+								create: {
+									id: generateId("OPERATION_VEH"),
+									vehicleType: operationData.vehicleType.toUpperCase() as
+										| "LAND"
+										| "MARINE"
+										| "AIR",
+									brand: operationData.brand,
+									model: operationData.model,
+									year: operationData.year,
+									armorLevelCode: operationData.armorLevel ?? null,
+									engineNumber: operationData.engineNumber ?? null,
+									plates: operationData.plates ?? null,
+									registrationNumber: operationData.registrationNumber ?? null,
+									flagCountryCode: operationData.flagCountryId ?? null,
+								},
 							},
 						},
 					});
 
-					transactionIds.push(transaction.id);
+					operationIds.push(operation.id);
 					created++;
 				} catch (error) {
 					// Log error but continue
-					console.error(`Error creating transaction: ${error}`);
+					console.error(`Error creating operation: ${error}`);
 				}
 			}
 
@@ -738,14 +779,14 @@ export class SyntheticDataGenerator {
 			}
 		}
 
-		return { created, transactionIds };
+		return { created, operationIds };
 	}
 
 	/**
-	 * Ensures we have clients available for transaction generation
+	 * Ensures we have clients available for operation generation
 	 */
-	private async ensureClientsForTransactions(
-		transactionsPerClient: number,
+	private async ensureClientsForOperations(
+		operationsPerClient: number,
 	): Promise<string[]> {
 		// Get existing clients
 		const existingClients = await this.prisma.client.findMany({
@@ -760,7 +801,7 @@ export class SyntheticDataGenerator {
 
 		// Generate a few clients if none exist
 		const result = await this.generateClients(
-			Math.max(5, Math.ceil(transactionsPerClient)),
+			Math.max(5, Math.ceil(operationsPerClient)),
 			false,
 			false,
 		);
