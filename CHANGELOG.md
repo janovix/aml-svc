@@ -1,3 +1,22 @@
+# [1.6.0](https://github.com/janovix/aml-svc/compare/v1.5.0...v1.6.0) (2026-02-07)
+
+
+### Bug Fixes
+
+* address additional CodeRabbit review items ([405f2de](https://github.com/janovix/aml-svc/commit/405f2def8aa3cb2c17654987464091dab295a4ac))
+* address CodeRabbit review items for PR [#42](https://github.com/janovix/aml-svc/issues/42) ([5e56482](https://github.com/janovix/aml-svc/commit/5e5648211ff2ba973a0f7f03a9d653fb8d08d889))
+* address CodeRabbit review items from PR [#42](https://github.com/janovix/aml-svc/issues/42) ([0b3383d](https://github.com/janovix/aml-svc/commit/0b3383d625f1cc9fb82b2c7f13d2ae5baef2a295))
+
+
+### Features
+
+* add comprehensive catalog population documentation and workflows ([aa43981](https://github.com/janovix/aml-svc/commit/aa43981bec5597d3d7f9626ebf4295b2103b6e94))
+* add organization settings endpoints for admin panel ([6865d1f](https://github.com/janovix/aml-svc/commit/6865d1ff12b133c30402e4163e662ea5590906be))
+* add trust clients count to client statistics endpoint ([c89c017](https://github.com/janovix/aml-svc/commit/c89c0176993f3168ac42699c5ff0c757a7cf43f7))
+* add TRUSTED_ORIGINS configuration to environment files and implement CORS middleware ([3683d30](https://github.com/janovix/aml-svc/commit/3683d30e02646fcf3a49732ae4f84ac559efea6f))
+* implement presigned URL generation and document viewer components ([cf85652](https://github.com/janovix/aml-svc/commit/cf8565217a681ac445121e8bc2bd510e0b77816d))
+* update CORS middleware to support wildcard patterns for TRUSTED_ORIGINS ([193e5a4](https://github.com/janovix/aml-svc/commit/193e5a46247d9a421e73f44bbe0bf3c9592ba4de))
+
 # [1.6.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.5.0...v1.6.0-rc.1) (2026-02-07)
 
 
