@@ -44,6 +44,8 @@ export const OperationPaymentSchema = z.object({
 	monetaryInstrumentCode: z.string().max(3).optional().nullable(),
 	currencyCode: CurrencyCodeSchema.default("MXN"),
 	amount: AmountSchema,
+	/** Per-payment exchange rate (payment currency → operation currency) */
+	exchangeRate: AmountSchema.optional().nullable(),
 	bankName: z.string().max(200).optional().nullable(),
 	accountNumberMasked: z.string().max(20).optional().nullable(),
 	checkNumber: z.string().max(50).optional().nullable(),

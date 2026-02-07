@@ -60,6 +60,8 @@ export interface OperationPaymentEntity {
 	monetaryInstrumentCode: string | null;
 	currencyCode: string;
 	amount: string;
+	/** Per-payment exchange rate (payment currency → operation currency) */
+	exchangeRate: string | null;
 	bankName: string | null;
 	accountNumberMasked: string | null;
 	checkNumber: string | null;

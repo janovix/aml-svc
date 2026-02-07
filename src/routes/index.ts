@@ -22,6 +22,7 @@ import { reportsRouter } from "./reports";
 // Transaction domain deprecated - use operations instead
 import { umaValuesRouter } from "./uma-values";
 import { ubosRouter, ubosInternalRouter } from "./ubos";
+import { exchangeRatesRouter } from "./exchange-rates";
 
 export function createRouter() {
 	const router = new Hono<{
@@ -59,6 +60,9 @@ export function createRouter() {
 		authMiddleware({ requireOrganization: true }),
 	);
 
+	// Exchange rates are global utility - auth required but no org
+	router.use("/exchange-rates/*", authMiddleware());
+
 	// UMA values are global (regulatory standard) - auth required but no org
 	router.use("/uma-values/*", authMiddleware());
 
@@ -76,6 +80,7 @@ export function createRouter() {
 	router.route("/alerts", alertsRouter);
 	router.route("/notices", noticesRouter);
 	router.route("/reports", reportsRouter);
+	router.route("/exchange-rates", exchangeRatesRouter);
 	router.route("/uma-values", umaValuesRouter);
 	router.route("/organization-settings", organizationSettingsRouter);
 	router.route("/imports", importsRouter);

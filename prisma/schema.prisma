@@ -585,6 +585,7 @@ model OperationPayment {
   monetaryInstrumentCode String?  @map("monetary_instrument_code")
   currencyCode          String   @default("MXN") @map("currency_code")
   amount                Decimal
+  exchangeRate          Decimal? @map("exchange_rate")
   bankName              String?  @map("bank_name")
   accountNumberMasked   String?  @map("account_number_masked")
   checkNumber           String?  @map("check_number")

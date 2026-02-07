@@ -70,6 +70,7 @@ export function mapPaymentToEntity(
 		monetaryInstrumentCode: payment.monetaryInstrumentCode,
 		currencyCode: payment.currencyCode,
 		amount: payment.amount.toString(),
+		exchangeRate: payment.exchangeRate?.toString() ?? null,
 		bankName: payment.bankName,
 		accountNumberMasked: payment.accountNumberMasked,
 		checkNumber: payment.checkNumber,

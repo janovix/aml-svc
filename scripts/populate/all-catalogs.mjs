@@ -25,6 +25,7 @@ const __dirname = dirname(__filename);
 const CORE_CATALOGS = [
 	// Legacy/Essential catalogs
 	"catalog-armor-levels.mjs",
+	"catalog-banks.mjs",
 	"catalog-business-activities.mjs",
 	"catalog-countries.mjs",
 	"catalog-currencies.mjs",

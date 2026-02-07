@@ -38,6 +38,11 @@ export type Bindings = Omit<
 	SAT_CLAVE_ACTIVIDAD?: string;
 	/** Optional collegiate entity identifier */
 	SAT_CLAVE_ENTIDAD_COLEGIADA?: string;
+	/**
+	 * CurrencyLayer API key for real-time exchange rates.
+	 * Get your key at: https://currencylayer.com/
+	 */
+	CURRENCYLAYER_API_KEY?: string;
 	/** API version override (defaults to package.json version) */
 	API_VERSION?: string;
 	/**

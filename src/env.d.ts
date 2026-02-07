@@ -35,6 +35,11 @@ declare namespace Cloudflare {
 		 */
 		SENTRY_DSN?: string;
 		/**
+		 * CurrencyLayer API key for real-time exchange rates.
+		 * Get your key at: https://currencylayer.com/
+		 */
+		CURRENCYLAYER_API_KEY?: string;
+		/**
 		 * Service binding to doc-svc for document processing
 		 */
 		DOC_SERVICE?: Fetcher;
