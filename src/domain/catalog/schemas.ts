@@ -43,7 +43,7 @@ const optionalSearchString = z.preprocess((val) => {
 		return trimmed === "" ? undefined : trimmed;
 	}
 	return val;
-}, z.string().min(2, "search must be at least 2 characters long").max(100, "search must be at most 100 characters long").optional());
+}, z.string().min(1, "search must be at least 1 character long").max(100, "search must be at most 100 characters long").optional());
 
 export const CatalogListQuerySchema = z.object({
 	search: optionalSearchString,
