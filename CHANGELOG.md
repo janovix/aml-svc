@@ -1,3 +1,10 @@
+# [1.6.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.2...v1.6.0-rc.3) (2026-02-08)
+
+
+### Bug Fixes
+
+* update CatalogListQuerySchema to accept single character search and adjust validation for search string length ([66f96ec](https://github.com/janovix/aml-svc/commit/66f96eca03a57e38420192bae3f9e40d28bfcea3))
+
 # [1.6.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.1...v1.6.0-rc.2) (2026-02-07)
 
 
