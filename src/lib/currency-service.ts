@@ -72,7 +72,18 @@ export class CurrencyService {
 		}
 
 		try {
-			const url = `http://api.currencylayer.com/live?access_key=${this.apiKey}&currencies=${from},${to}&format=1`;
+			// Special case: USD is the base currency in CurrencyLayer
+			// When converting FROM USD, we only need to fetch the target currency
+			// When converting TO USD, we only need to fetch the source currency
+			let url: string;
+			if (from === "USD") {
+				url = `http://api.currencylayer.com/live?access_key=${this.apiKey}&currencies=${to}&format=1`;
+			} else if (to === "USD") {
+				url = `http://api.currencylayer.com/live?access_key=${this.apiKey}&currencies=${from}&format=1`;
+			} else {
+				// Cross-rate: need both currencies to calculate via USD
+				url = `http://api.currencylayer.com/live?access_key=${this.apiKey}&currencies=${from},${to}&format=1`;
+			}
 
 			const response = await fetch(url);
 			const data: CurrencyLayerResponse = await response.json();
@@ -82,18 +93,38 @@ export class CurrencyService {
 				return null;
 			}
 
-			// Calculate rate from→to via USD
-			const usdToFrom = data.quotes[`USD${from}`];
-			const usdToTo = data.quotes[`USD${to}`];
+			// Calculate rate based on the conversion type
+			let rate: number;
 
-			if (!usdToFrom || !usdToTo) {
-				console.error(
-					`Missing currency quotes: USD${from}=${usdToFrom}, USD${to}=${usdToTo}`,
-				);
-				return null;
+			if (from === "USD") {
+				// USD → X: rate is directly USDX
+				const usdToTo = data.quotes[`USD${to}`];
+				if (!usdToTo) {
+					console.error(`Missing currency quote: USD${to}=${usdToTo}`);
+					return null;
+				}
+				rate = usdToTo;
+			} else if (to === "USD") {
+				// X → USD: rate is 1 / USDX
+				const usdToFrom = data.quotes[`USD${from}`];
+				if (!usdToFrom) {
+					console.error(`Missing currency quote: USD${from}=${usdToFrom}`);
+					return null;
+				}
+				rate = 1 / usdToFrom;
+			} else {
+				// X → Y: cross-rate via USD
+				const usdToFrom = data.quotes[`USD${from}`];
+				const usdToTo = data.quotes[`USD${to}`];
+
+				if (!usdToFrom || !usdToTo) {
+					console.error(
+						`Missing currency quotes: USD${from}=${usdToFrom}, USD${to}=${usdToTo}`,
+					);
+					return null;
+				}
+				rate = usdToTo / usdToFrom;
 			}
-
-			const rate = usdToTo / usdToFrom;
 
 			const result: ExchangeRate = {
 				from,
