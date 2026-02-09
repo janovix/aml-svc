@@ -1,3 +1,10 @@
+# [1.6.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.3...v1.6.0-rc.4) (2026-02-09)
+
+
+### Features
+
+* add currency population script and CSV data for catalog currencies ([a491199](https://github.com/janovix/aml-svc/commit/a4911998a9b817ddb13f214f93dd762ed8d89423))
+
 # [1.6.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.2...v1.6.0-rc.3) (2026-02-08)
 
 
