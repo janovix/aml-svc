@@ -1,3 +1,10 @@
+# [1.6.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.4...v1.6.0-rc.5) (2026-02-09)
+
+
+### Bug Fixes
+
+* update pageSize maximum limit in openAPI and CatalogListQuerySchema to 200 ([87ed31d](https://github.com/janovix/aml-svc/commit/87ed31d4204d62162910e50ce62f527d9591a485))
+
 # [1.6.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.3...v1.6.0-rc.4) (2026-02-09)
 
 
