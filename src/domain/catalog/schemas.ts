@@ -48,7 +48,7 @@ const optionalSearchString = z.preprocess((val) => {
 export const CatalogListQuerySchema = z.object({
 	search: optionalSearchString,
 	page: z.coerce.number().int().min(1).default(1),
-	pageSize: z.coerce.number().int().min(1).max(100).default(10),
+	pageSize: z.coerce.number().int().min(1).max(200).default(10),
 	active: booleanFromQuery.optional(),
 	// Metadata filters for specialized queries
 	vaCode: z.string().max(10).optional(), // Filter by va_code in metadata (for alert types)

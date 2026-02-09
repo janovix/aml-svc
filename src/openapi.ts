@@ -726,7 +726,7 @@ export const openAPISpec = {
 					{
 						name: "pageSize",
 						in: "query",
-						schema: { type: "integer", minimum: 1, maximum: 100, default: 10 },
+						schema: { type: "integer", minimum: 1, maximum: 200, default: 10 },
 						description: "Number of records per page.",
 					},
 					{
@@ -5094,7 +5094,7 @@ export const openAPISpec = {
 				required: ["page", "pageSize", "total", "totalPages"],
 				properties: {
 					page: { type: "integer", minimum: 1 },
-					pageSize: { type: "integer", minimum: 1, maximum: 100 },
+					pageSize: { type: "integer", minimum: 1, maximum: 200 },
 					total: { type: "integer", minimum: 0 },
 					totalPages: { type: "integer", minimum: 0 },
 				},
