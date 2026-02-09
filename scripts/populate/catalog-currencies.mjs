@@ -34,11 +34,61 @@ function shouldExcludeEntry(name) {
 	return EXCLUDED_KEYWORDS.some((keyword) => upperName.includes(keyword));
 }
 
+/**
+ * Get the number of decimal places for a currency based on its ISO code
+ * @param {string} currencyCode - ISO 4217 currency code (e.g., "USD", "JPY", "KWD")
+ * @returns {number} - Number of decimal places (0, 2, or 3)
+ */
+function getDecimalPlaces(currencyCode) {
+	// Currencies with 0 decimal places (no minor units)
+	const zeroDecimalCurrencies = [
+		"BIF", // Burundian Franc
+		"CLP", // Chilean Peso
+		"DJF", // Djiboutian Franc
+		"GNF", // Guinean Franc
+		"ISK", // Icelandic Króna
+		"JPY", // Japanese Yen
+		"KMF", // Comorian Franc
+		"KRW", // South Korean Won
+		"PYG", // Paraguayan Guaraní
+		"RWF", // Rwandan Franc
+		"UGX", // Ugandan Shilling
+		"VND", // Vietnamese Đồng
+		"VUV", // Vanuatu Vatu
+		"XAF", // Central African CFA Franc
+		"XOF", // West African CFA Franc
+		"XPF", // CFP Franc
+	];
+
+	// Currencies with 3 decimal places
+	const threeDecimalCurrencies = [
+		"BHD", // Bahraini Dinar
+		"IQD", // Iraqi Dinar
+		"JOD", // Jordanian Dinar
+		"KWD", // Kuwaiti Dinar
+		"LYD", // Libyan Dinar
+		"OMR", // Omani Rial
+		"TND", // Tunisian Dinar
+	];
+
+	if (zeroDecimalCurrencies.includes(currencyCode)) {
+		return 0;
+	}
+
+	if (threeDecimalCurrencies.includes(currencyCode)) {
+		return 3;
+	}
+
+	// Default: 2 decimal places (most currencies)
+	return 2;
+}
+
 function parseCsv(csvText) {
 	const lines = csvText.trim().split("\n");
 	const data = [];
 
-	for (let i = 1; i < lines.length; i++) {
+	// Skip first 2 lines (header rows: "key,short_name,name,country" and ",decimal_places")
+	for (let i = 2; i < lines.length; i++) {
 		const line = lines[i].trim();
 		if (!line) continue;
 
@@ -67,10 +117,11 @@ function parseCsv(csvText) {
 				continue;
 			}
 			data.push({
-				key: values[0], // e.g., "1"
+				key: values[1], // Use currency code (e.g., "MXN") as key instead of sequential number
 				shortName: values[1], // e.g., "MXN"
 				name: name, // e.g., "Peso mexicano"
 				country: values[3] || "", // e.g., "México"
+				decimalPlaces: values[4] ? parseInt(values[4], 10) : undefined, // e.g., 2, 0, or 3
 			});
 		}
 	}
@@ -127,6 +178,8 @@ function generateSql(catalogId, items) {
 			code: item.key, // e.g., "1", "2", "3" - used in XML
 			shortName: item.shortName, // e.g., "MXN", "USD"
 			country: item.country,
+			// Use decimalPlaces from CSV if available, otherwise fallback to function
+			decimalPlaces: item.decimalPlaces ?? getDecimalPlaces(item.shortName),
 		}).replace(/'/g, "''"); // Escape single quotes
 		const itemId = generateDeterministicId(catalogId, normalizedName);
 
