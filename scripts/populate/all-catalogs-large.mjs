@@ -44,7 +44,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const BASE_URL = "https://catalogs.janovix.com";
-const BATCH_SIZE = 500; // Process in batches to avoid huge SQL files
+
+// Batch sizes optimized per catalog
+// (larger catalogs with special chars need smaller batches to avoid 502 errors)
+const BATCH_SIZES = {
+	"zip-codes": 500,
+	"cfdi-product-services": 200, // Smaller due to special characters and accents
+};
 
 // Chunk configuration for large files
 const CHUNK_CONFIG = {
@@ -63,6 +69,7 @@ const CHUNK_CONFIG = {
  */
 function populateCatalogBatched(catalogKey, catalogName, items) {
 	const catalogId = generateCatalogId(catalogKey);
+	const batchSize = BATCH_SIZES[catalogKey] || 500;
 
 	// Insert catalog first (only once)
 	const catalogSql = `
@@ -72,8 +79,8 @@ function populateCatalogBatched(catalogKey, catalogName, items) {
 	executeSql(catalogSql, `${catalogKey}-catalog`);
 
 	// Process items in batches
-	for (let i = 0; i < items.length; i += BATCH_SIZE) {
-		const batch = items.slice(i, i + BATCH_SIZE);
+	for (let i = 0; i < items.length; i += batchSize) {
+		const batch = items.slice(i, i + batchSize);
 		const batchSql = [];
 
 		for (const item of batch) {
@@ -97,7 +104,7 @@ function populateCatalogBatched(catalogKey, catalogName, items) {
 			`);
 		}
 
-		const progress = Math.min(i + BATCH_SIZE, items.length);
+		const progress = Math.min(i + batchSize, items.length);
 		console.log(`   Processing batch: ${progress}/${items.length} items...`);
 		executeSql(batchSql.join("\n"), `${catalogKey}-batch-${i}`);
 	}
