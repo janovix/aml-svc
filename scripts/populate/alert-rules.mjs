@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 /**
- * Seed Alert Rules
+ * Populate Alert Rules
  *
  * Populates VEH (Vehículos) alert rules for all environments.
  * Alert rules are global and based on LFPIORPI legal requirements.
  * These are the official SAT alert codes for vulnerable activities.
+ *
+ * This is REFERENCE DATA (not synthetic data) and runs in all environments.
  */
 
-import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { dirname } from "node:path";
+import { getWranglerConfig, executeSql } from "./lib/shared.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -523,69 +524,39 @@ ON CONFLICT(id) DO UPDATE SET
 	return sql.join("\n");
 }
 
-async function seedAlertRules() {
-	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
-	// Use WRANGLER_CONFIG if set, otherwise detect preview environment
-	let configFile = process.env.WRANGLER_CONFIG;
-	if (!configFile) {
-		if (
-			process.env.CF_PAGES_BRANCH ||
-			(process.env.WORKERS_CI_BRANCH &&
-				process.env.WORKERS_CI_BRANCH !== "main") ||
-			process.env.PREVIEW === "true"
-		) {
-			configFile = "wrangler.preview.jsonc";
-		}
-	}
-	const configFlag = configFile ? `--config ${configFile}` : "";
+async function populateAlertRules() {
+	const { isRemote } = getWranglerConfig();
 
 	try {
-		console.log(`🌱 Seeding alert rules (${isRemote ? "remote" : "local"})...`);
+		console.log(
+			`📦 Populating alert rules (${isRemote ? "remote" : "local"})...`,
+		);
 		console.log(`Creating ${alertRules.length} alert rule(s)...`);
 
 		// Generate SQL
 		const sql = generateSql();
-		const sqlFile = join(__dirname, `temp-alert-rules-${Date.now()}.sql`);
 
-		try {
-			writeFileSync(sqlFile, sql);
+		// Execute SQL using shared utility
+		executeSql(sql, "alert-rules");
 
-			// Execute SQL
-			const wranglerCmd =
-				process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
-			const command = isRemote
-				? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
-				: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
-
-			execSync(command, { stdio: "inherit" });
-
-			console.log(
-				`✅ Alert rule seeding completed: ${alertRules.length} rule(s) created`,
-			);
-		} finally {
-			// Clean up temp file
-			try {
-				unlinkSync(sqlFile);
-			} catch {
-				// Ignore cleanup errors
-			}
-		}
+		console.log(
+			`✅ Alert rules populated: ${alertRules.length} rule(s) created`,
+		);
 	} catch (error) {
-		console.error("❌ Error seeding alert rules:", error);
+		console.error("❌ Error populating alert rules:", error);
 		throw error;
 	}
 }
 
 // Export for use in all.mjs
-export { seedAlertRules };
+export { populateAlertRules };
 
-// If run directly, execute seed
-// Compare normalized paths for cross-platform compatibility
+// If run directly, execute populate
 const isDirectRun =
 	process.argv[1] && __filename.toLowerCase() === process.argv[1].toLowerCase();
 
 if (isDirectRun) {
-	seedAlertRules().catch((error) => {
+	populateAlertRules().catch((error) => {
 		console.error("Fatal error:", error);
 		process.exit(1);
 	});

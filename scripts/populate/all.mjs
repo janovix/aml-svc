@@ -3,14 +3,14 @@
  * Populate All Reference Data
  *
  * Master script that populates ALL reference data needed for the application:
- * - Core catalogs (countries, states, currencies, etc.)
- * - CFDI catalogs (SAT codes)
- * - PLD catalogs (consolidated across VAs)
- * - Activity-specific catalogs (all 19 vulnerable activities)
- * - UMA values (economic reference data)
+ * - Catalogs (countries, currencies, CFDI, PLD, activity-specific, vehicle brands)
+ * - CFDI-PLD mappings
+ * - Alert rules
+ * - Alert rule configs
+ * - UMA values
  *
- * NOTE: Large catalogs (zip-codes, cfdi-units, cfdi-product-services) are
- * excluded by default. Run them separately if needed.
+ * NOTE: Large catalogs (zip-codes, cfdi-product-services) are excluded.
+ * Run them separately if needed via: pnpm populate:catalogs:large
  *
  * This is for REFERENCE DATA only (catalogs, constants).
  * For SYNTHETIC TEST DATA, use the seed scripts instead.
@@ -24,10 +24,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Determine config file based on environment
-// Setup:
-// - aml-svc (dev worker): dev branch = production → wrangler.jsonc
-// - aml-svc-prod (prod worker): main branch = production → wrangler.prod.jsonc
-// - aml-svc (preview): other branches = preview → wrangler.preview.jsonc
 function getConfigFile() {
 	// Check if config is explicitly set
 	if (process.env.WRANGLER_CONFIG) {
@@ -35,17 +31,17 @@ function getConfigFile() {
 	}
 	const branch = process.env.CF_PAGES_BRANCH || process.env.WORKERS_CI_BRANCH;
 
-	// Main branch → use prod config (aml-svc-prod worker)
+	// Main branch -> use prod config (aml-svc-prod worker)
 	if (branch === "main") {
 		return "wrangler.prod.jsonc";
 	}
 
-	// Dev branch → use dev config (aml-svc worker production)
+	// Dev branch -> use dev config (aml-svc worker production)
 	if (branch === "dev") {
 		return "wrangler.jsonc";
 	}
 
-	// Preview branches or explicit preview flag → use preview config
+	// Preview branches or explicit preview flag -> use preview config
 	if (branch || process.env.PREVIEW === "true") {
 		return "wrangler.preview.jsonc";
 	}
@@ -56,7 +52,7 @@ function getConfigFile() {
 
 async function populateAll() {
 	console.log("╔════════════════════════════════════════════════════════════╗");
-	console.log("║        Reference Data Population (All Catalogs)            ║");
+	console.log("║        Reference Data Population (All Data)                ║");
 	console.log(
 		"╚════════════════════════════════════════════════════════════╝\n",
 	);
@@ -72,22 +68,61 @@ async function populateAll() {
 	console.log(`📦 Mode: ${isRemote ? "remote" : "local"}\n`);
 
 	try {
-		// Step 1: Populate catalogs (core + essential)
+		// Step 1: Populate catalogs (~85 catalogs)
 		console.log("═══════════════════════════════════════════════════════════");
-		console.log("Step 1/2: Populating catalogs...");
+		console.log("Step 1/5: Populating catalogs...");
 		console.log(
 			"═══════════════════════════════════════════════════════════\n",
 		);
-		execSync(`node "${join(__dirname, "all-catalogs.mjs")}"`, {
+		execSync(`node "${join(__dirname, "catalogs.mjs")}"`, {
 			stdio: "inherit",
 			env,
 		});
 
-		// Step 2: Populate UMA values (essential reference data)
+		// Step 2: Populate CFDI-PLD mappings
 		console.log(
 			"\n═══════════════════════════════════════════════════════════",
 		);
-		console.log("Step 2/2: Populating UMA values...");
+		console.log("Step 2/5: Populating CFDI-PLD mappings...");
+		console.log(
+			"═══════════════════════════════════════════════════════════\n",
+		);
+		execSync(`node "${join(__dirname, "catalog-cfdi-pld-mappings.mjs")}"`, {
+			stdio: "inherit",
+			env,
+		});
+
+		// Step 3: Populate alert rules
+		console.log(
+			"\n═══════════════════════════════════════════════════════════",
+		);
+		console.log("Step 3/5: Populating alert rules...");
+		console.log(
+			"═══════════════════════════════════════════════════════════\n",
+		);
+		execSync(`node "${join(__dirname, "alert-rules.mjs")}"`, {
+			stdio: "inherit",
+			env,
+		});
+
+		// Step 4: Populate alert rule configs
+		console.log(
+			"\n═══════════════════════════════════════════════════════════",
+		);
+		console.log("Step 4/5: Populating alert rule configs...");
+		console.log(
+			"═══════════════════════════════════════════════════════════\n",
+		);
+		execSync(`node "${join(__dirname, "alert-rule-configs.mjs")}"`, {
+			stdio: "inherit",
+			env,
+		});
+
+		// Step 5: Populate UMA values
+		console.log(
+			"\n═══════════════════════════════════════════════════════════",
+		);
+		console.log("Step 5/5: Populating UMA values...");
 		console.log(
 			"═══════════════════════════════════════════════════════════\n",
 		);

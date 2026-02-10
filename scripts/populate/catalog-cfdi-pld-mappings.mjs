@@ -8,11 +8,9 @@
  * These mappings are used when extracting PLD-relevant data from CFDI invoices.
  */
 
-import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-import { writeFileSync, unlinkSync } from "node:fs";
-import { getWranglerConfig, escapeSql } from "./lib/cfdi-catalog-base.mjs";
+import { dirname } from "node:path";
+import { getWranglerConfig, escapeSql, executeSql } from "./lib/shared.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -59,8 +57,9 @@ const PAYMENT_FORM_MAPPINGS = [
 ];
 
 /**
- * CFDI Currencies (c_Moneda) to PLD Currencies mapping
- * Most are direct mappings (same ISO code)
+ * CFDI Currencies (c_Moneda) to consolidated Currencies mapping
+ * Note: We now have a single "currencies" catalog (not separate cfdi-currencies).
+ * Most mappings are direct (same ISO code).
  */
 const CURRENCY_MAPPINGS = [
 	{ cfdiCode: "MXN", pldCode: "MXN", notes: "Peso Mexicano" },
@@ -79,14 +78,16 @@ const CURRENCY_MAPPINGS = [
 ];
 
 /**
- * CFDI Countries (c_Pais) to PLD Countries mapping
- * Direct mappings using ISO 3166-1 alpha-3
+ * CFDI Countries (c_Pais) to consolidated Countries mapping
+ * Note: We now have a single "countries" catalog with both iso2 and iso3.
+ * CFDI uses ISO 3166-1 alpha-3 (MEX, USA), PLD uses alpha-2 (MX, US).
+ * The mapping is from CFDI's iso3 to the country's iso2.
  */
 const COUNTRY_MAPPINGS = [
-	{ cfdiCode: "MEX", pldCode: "MEX", notes: "México" },
-	{ cfdiCode: "USA", pldCode: "USA", notes: "Estados Unidos" },
-	{ cfdiCode: "CAN", pldCode: "CAN", notes: "Canadá" },
-	// Add more as needed - most are direct mappings
+	{ cfdiCode: "MEX", pldCode: "MX", notes: "México" },
+	{ cfdiCode: "USA", pldCode: "US", notes: "Estados Unidos" },
+	{ cfdiCode: "CAN", pldCode: "CA", notes: "Canadá" },
+	// Add more as needed
 ];
 
 function generateId(cfdiCatalog, cfdiCode, pldCatalog) {
@@ -101,7 +102,7 @@ function generateId(cfdiCatalog, cfdiCode, pldCatalog) {
 }
 
 async function populate() {
-	const { isRemote, configFile } = getWranglerConfig();
+	const { isRemote, _configFile } = getWranglerConfig();
 
 	try {
 		console.log(
@@ -143,7 +144,7 @@ async function populate() {
 					'${mapping.cfdiCode}',
 					'monetary-instruments',
 					'${mapping.pldCode}',
-					'${escapeSql(mapping.notes)}',
+					${escapeSql(mapping.notes)},
 					CURRENT_TIMESTAMP
 				);
 			`);
@@ -152,16 +153,16 @@ async function populate() {
 		// Currency mappings
 		console.log(`   Adding ${CURRENCY_MAPPINGS.length} currency mappings...`);
 		for (const mapping of CURRENCY_MAPPINGS) {
-			const id = generateId("cfdi-currencies", mapping.cfdiCode, "currencies");
+			const id = generateId("currencies", mapping.cfdiCode, "currencies");
 			sql.push(`
 				INSERT OR REPLACE INTO catalog_mappings (id, cfdi_catalog, cfdi_code, pld_catalog, pld_code, notes, updated_at)
 				VALUES (
 					'${id}',
-					'cfdi-currencies',
+					'currencies',
 					'${mapping.cfdiCode}',
 					'currencies',
 					'${mapping.pldCode}',
-					'${escapeSql(mapping.notes)}',
+					${escapeSql(mapping.notes)},
 					CURRENT_TIMESTAMP
 				);
 			`);
@@ -170,41 +171,23 @@ async function populate() {
 		// Country mappings
 		console.log(`   Adding ${COUNTRY_MAPPINGS.length} country mappings...`);
 		for (const mapping of COUNTRY_MAPPINGS) {
-			const id = generateId("cfdi-countries", mapping.cfdiCode, "countries");
+			const id = generateId("countries", mapping.cfdiCode, "countries");
 			sql.push(`
 				INSERT OR REPLACE INTO catalog_mappings (id, cfdi_catalog, cfdi_code, pld_catalog, pld_code, notes, updated_at)
 				VALUES (
 					'${id}',
-					'cfdi-countries',
+					'countries',
 					'${mapping.cfdiCode}',
 					'countries',
 					'${mapping.pldCode}',
-					'${escapeSql(mapping.notes)}',
+					${escapeSql(mapping.notes)},
 					CURRENT_TIMESTAMP
 				);
 			`);
 		}
 
-		// Execute SQL
-		const configFlag = configFile ? `--config ${configFile}` : "";
-		const wranglerCmd = "pnpm wrangler";
-		const sqlFile = join(__dirname, `temp-cfdi-pld-mappings-${Date.now()}.sql`);
-
-		try {
-			writeFileSync(sqlFile, sql.join("\n"));
-
-			const command = isRemote
-				? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
-				: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
-
-			execSync(command, { stdio: "inherit" });
-		} finally {
-			try {
-				unlinkSync(sqlFile);
-			} catch {
-				// Ignore cleanup errors
-			}
-		}
+		// Execute SQL using shared utility
+		executeSql(sql.join("\n"), "cfdi-pld-mappings");
 
 		const totalMappings =
 			PAYMENT_FORM_MAPPINGS.length +

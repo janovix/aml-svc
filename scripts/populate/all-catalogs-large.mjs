@@ -2,13 +2,15 @@
 /**
  * Populate Large Catalogs
  *
- * Runs only the large catalog population scripts that take significant time.
+ * Runs only the VERY large catalog population scripts that take significant time.
  * These are separated from the main catalog population for flexibility.
  *
  * Large catalogs:
- * - catalog-zip-codes.mjs          (~140K+ items)
- * - catalog-cfdi-units.mjs         (~1K items, batched)
- * - catalog-cfdi-product-services.mjs (~52K items, batched)
+ * - zip-codes          (~140K+ items) - from catalogs.janovix.com
+ * - cfdi-product-services (~52K items) - from catalogs.janovix.com
+ *
+ * Both catalogs are now fetched from remote CSVs at catalogs.janovix.com
+ * and processed in batches for optimal performance.
  *
  * Usage:
  *   pnpm populate:catalogs:large        # Local (default DB)
@@ -17,66 +19,208 @@
  *   pnpm populate:catalogs:large:prod   # Remote prod
  */
 
-import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
+import {
+	getWranglerConfig,
+	fetchCsv,
+	parseCsv,
+	_populateCatalog,
+	generateCatalogId,
+	generateItemId,
+	normalizeText,
+	escapeSql,
+	executeSql,
+} from "./lib/shared.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const largeCatalogScripts = [
-	"catalog-zip-codes.mjs", // ~140K+ items
-	"catalog-cfdi-units.mjs", // ~1K items (batched)
-	"catalog-cfdi-product-services.mjs", // ~52K items (batched)
-];
+const BASE_URL = "https://catalogs.janovix.com";
+const BATCH_SIZE = 1000; // Process in batches to avoid huge SQL files
+
+// Chunk configuration for large files
+const CHUNK_CONFIG = {
+	"zip-codes": {
+		totalChunks: 8,
+		prefix: "zip-codes-chunk-",
+	},
+	"cfdi-product-services": {
+		totalChunks: 6,
+		prefix: "cfdi-product-services-chunk-",
+	},
+};
+
+/**
+ * Populate catalog with batching
+ */
+function populateCatalogBatched(catalogKey, catalogName, items) {
+	const catalogId = generateCatalogId(catalogKey);
+	const sql = [];
+
+	// Insert catalog
+	sql.push(`
+		INSERT OR IGNORE INTO catalogs (id, key, name, active, created_at, updated_at)
+		VALUES ('${catalogId}', '${catalogKey}', ${escapeSql(catalogName)}, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+	`);
+
+	// Process items in batches
+	for (let i = 0; i < items.length; i += BATCH_SIZE) {
+		const batch = items.slice(i, i + BATCH_SIZE);
+		const batchSql = [...sql]; // Include catalog insert in each batch
+
+		for (const item of batch) {
+			const name = escapeSql(item.name);
+			const normalizedName = escapeSql(normalizeText(item.name));
+			const metadata = escapeSql(JSON.stringify(item.metadata || {}));
+			const itemId = generateItemId(catalogId, item.id || normalizedName);
+
+			batchSql.push(`
+				INSERT OR REPLACE INTO catalog_items (id, catalog_id, name, normalized_name, active, metadata, created_at, updated_at)
+				VALUES (
+					'${itemId}',
+					'${catalogId}',
+					'${name}',
+					'${normalizedName}',
+					1,
+					'${metadata}',
+					COALESCE((SELECT created_at FROM catalog_items WHERE id = '${itemId}'), CURRENT_TIMESTAMP),
+					CURRENT_TIMESTAMP
+				);
+			`);
+		}
+
+		const progress = Math.min(i + BATCH_SIZE, items.length);
+		console.log(`   Processing batch: ${progress}/${items.length} items...`);
+		executeSql(batchSql.join("\n"), `${catalogKey}-batch-${i}`);
+	}
+}
+
+/**
+ * Populate catalog from chunked CSV files
+ */
+async function populateCatalogFromChunks(
+	catalogKey,
+	catalogName,
+	config,
+	mapRowToItem,
+) {
+	console.log(
+		`\n📦 Populating ${catalogKey} from ${config.totalChunks} chunks...`,
+	);
+
+	let totalItems = 0;
+
+	for (let chunkNum = 1; chunkNum <= config.totalChunks; chunkNum++) {
+		const chunkNumber = String(chunkNum).padStart(3, "0");
+		const chunkFilename = `${config.prefix}${chunkNumber}.csv`;
+		const chunkUrl = `${BASE_URL}/chunks/${chunkFilename}`;
+
+		console.log(
+			`   [${chunkNum}/${config.totalChunks}] Fetching ${chunkFilename}...`,
+		);
+
+		try {
+			const chunkCsv = await fetchCsv(chunkUrl);
+			const chunkData = parseCsv(chunkCsv);
+
+			const items = chunkData.map(mapRowToItem);
+
+			console.log(`   Processing ${items.length.toLocaleString()} items...`);
+			populateCatalogBatched(catalogKey, catalogName, items);
+
+			totalItems += items.length;
+			console.log(
+				`   ✅ Chunk ${chunkNum} complete (${items.length.toLocaleString()} items)\n`,
+			);
+		} catch (error) {
+			console.error(
+				`   ❌ Failed to process chunk ${chunkNum}:`,
+				error.message,
+			);
+			throw error;
+		}
+	}
+
+	return totalItems;
+}
 
 async function populateLargeCatalogs() {
+	const { isRemote } = getWranglerConfig();
+
 	console.log("╔════════════════════════════════════════════════════════════╗");
-	console.log("║           Large Catalog Population                         ║");
+	console.log("║           Large Catalog Population (Chunked)              ║");
 	console.log(
 		"╚════════════════════════════════════════════════════════════╝\n",
 	);
-
-	const env = { ...process.env };
-	// Inherit WRANGLER_CONFIG if set
-	if (process.env.WRANGLER_CONFIG) {
-		env.WRANGLER_CONFIG = process.env.WRANGLER_CONFIG;
-	}
-
-	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
 	console.log(`📦 Mode: ${isRemote ? "remote" : "local"}`);
-	console.log(`📋 Large catalogs to populate: ${largeCatalogScripts.length}`);
 	console.log(`⚠️  This may take several minutes...\n`);
+	console.log(`📝 Loading from chunked CSV files for better performance`);
 
-	let completed = 0;
-	for (const script of largeCatalogScripts) {
-		const scriptPath = join(__dirname, script);
-		completed++;
-		console.log(
-			`[${completed}/${largeCatalogScripts.length}] Running ${script}...`,
+	try {
+		// ========================================================================
+		// 1. ZIP CODES (~157K items from 8 chunks)
+		// ========================================================================
+		console.log("\n[1/2] ZIP CODES");
+		console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+		const zipCodesTotal = await populateCatalogFromChunks(
+			"zip-codes",
+			"Zip Codes",
+			CHUNK_CONFIG["zip-codes"],
+			(row) => ({
+				name: `${row.zip_code} - ${row.settlement}`,
+				id: `${row.zip_code}-${normalizeText(row.settlement)}`,
+				metadata: {
+					code: row.zip_code,
+					settlement: row.settlement,
+					settlementType: row.settlement_type,
+					municipality: row.municipality,
+					state: row.state,
+					city: row.city,
+					stateCode: row.state_code,
+					zone: row.zone,
+				},
+			}),
 		);
-		try {
-			execSync(`node "${scriptPath}"`, {
-				stdio: "inherit",
-				env,
-			});
-			console.log(`✅ ${script} completed\n`);
-		} catch (error) {
-			console.error(`❌ Failed to run ${script}:`, error);
-			process.exit(1);
-		}
+
+		console.log(
+			`✅ Populated ${zipCodesTotal.toLocaleString()} zip codes total\n`,
+		);
+
+		// ========================================================================
+		// 2. CFDI PRODUCT SERVICES (~52K items from 6 chunks)
+		// ========================================================================
+		console.log("\n[2/2] CFDI PRODUCT SERVICES");
+		console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+		const productServicesTotal = await populateCatalogFromChunks(
+			"cfdi-product-services",
+			"CFDI Product/Services",
+			CHUNK_CONFIG["cfdi-product-services"],
+			(row) => ({
+				name: row.name,
+				id: normalizeText(row.name),
+				metadata: { code: row.code },
+			}),
+		);
+
+		console.log(
+			`✅ Populated ${productServicesTotal.toLocaleString()} product/services total\n`,
+		);
+	} catch (error) {
+		console.error("\n❌ Failed to populate large catalogs:", error);
+		process.exit(1);
 	}
 
 	console.log(
 		"\n╔════════════════════════════════════════════════════════════╗",
 	);
-	console.log("║                    Summary                                 ║");
+	console.log("║                 Large Catalogs Complete!                   ║");
 	console.log(
 		"╚════════════════════════════════════════════════════════════╝\n",
 	);
-	console.log(
-		`✅ ${largeCatalogScripts.length} large catalog scripts completed successfully!`,
-	);
+	console.log("✅ All large catalogs populated successfully!");
 }
 
 populateLargeCatalogs().catch((error) => {

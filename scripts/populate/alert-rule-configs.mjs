@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 /**
- * Seed Alert Rule Config
+ * Populate Alert Rule Configs
  *
  * Populates configurable values for alert seekers.
  * Some values are hardcoded (cannot be changed via API), others are configurable.
+ *
+ * This is REFERENCE DATA (not synthetic data) and runs in all environments.
  */
 
-import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, join, resolve } from "node:path";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { dirname } from "node:path";
+import { getWranglerConfig, executeSql } from "./lib/shared.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -128,19 +129,19 @@ function generateId() {
 function generateSql() {
 	const sql = [];
 
-	// Get unique set of alert rule IDs we're seeding configs for
+	// Get unique set of alert rule IDs we're populating configs for
 	const alertRuleIds = [
 		...new Set(alertRuleConfigs.map((config) => config.alertRuleId)),
 	];
 
-	// Delete existing configs only for the alert rules we're seeding
+	// Delete existing configs only for the alert rules we're populating
 	// This preserves configs for other alert rules that might exist
 	if (alertRuleIds.length > 0) {
 		const alertRuleIdsList = alertRuleIds
 			.map((id) => escapeSqlString(id))
 			.join(", ");
 		sql.push(`
--- Clear existing configs for alert rules we're seeding (preserves other configs)
+-- Clear existing configs for alert rules we're populating (preserves other configs)
 DELETE FROM alert_rule_config
 WHERE alert_rule_id IN (${alertRuleIdsList});
 `);
@@ -175,72 +176,39 @@ VALUES (
 	return sql.join("\n");
 }
 
-async function seedAlertRuleConfig() {
-	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
-	// Check if config is explicitly set (this takes precedence)
-	let configFile = process.env.WRANGLER_CONFIG;
-	// If not explicitly set, check if we're in preview environment
-	if (!configFile) {
-		if (
-			process.env.CF_PAGES_BRANCH ||
-			(process.env.WORKERS_CI_BRANCH &&
-				process.env.WORKERS_CI_BRANCH !== "main") ||
-			process.env.PREVIEW === "true"
-		) {
-			configFile = "wrangler.preview.jsonc";
-		}
-	}
-	const configFlag = configFile ? `--config ${configFile}` : "";
+async function populateAlertRuleConfigs() {
+	const { isRemote } = getWranglerConfig();
 
 	try {
 		console.log(
-			`🌱 Seeding alert rule configs (${isRemote ? "remote" : "local"})...`,
+			`📦 Populating alert rule configs (${isRemote ? "remote" : "local"})...`,
 		);
 		console.log(`Creating ${alertRuleConfigs.length} config(s)...`);
 
 		// Generate SQL
 		const sql = generateSql();
-		const sqlFile = join(__dirname, `temp-alert-rule-config-${Date.now()}.sql`);
 
-		try {
-			writeFileSync(sqlFile, sql);
+		// Execute SQL using shared utility
+		executeSql(sql, "alert-rule-configs");
 
-			// Execute SQL
-			const wranglerCmd =
-				process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
-			const command = isRemote
-				? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${sqlFile}"`
-				: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${sqlFile}"`;
-
-			execSync(command, { stdio: "inherit" });
-
-			console.log(
-				`✅ Alert rule config seeding completed: ${alertRuleConfigs.length} config(s) created`,
-			);
-		} finally {
-			try {
-				unlinkSync(sqlFile);
-			} catch {
-				// Ignore cleanup errors
-			}
-		}
+		console.log(
+			`✅ Alert rule configs populated: ${alertRuleConfigs.length} config(s) created`,
+		);
 	} catch (error) {
-		console.error("❌ Error seeding alert rule configs:", error);
+		console.error("❌ Error populating alert rule configs:", error);
 		throw error;
 	}
 }
 
 // Export for use in all.mjs
-export { seedAlertRuleConfig };
+export { populateAlertRuleConfigs };
 
-// If run directly, execute seed
-// Compare normalized paths for cross-platform compatibility
+// If run directly, execute populate
 const isDirectRun =
-	process.argv[1] &&
-	resolve(__filename).toLowerCase() === resolve(process.argv[1]).toLowerCase();
+	process.argv[1] && __filename.toLowerCase() === process.argv[1].toLowerCase();
 
 if (isDirectRun) {
-	seedAlertRuleConfig().catch((error) => {
+	populateAlertRuleConfigs().catch((error) => {
 		console.error("Fatal error:", error);
 		process.exit(1);
 	});
