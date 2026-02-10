@@ -161,7 +161,13 @@ async function populateCatalogFromChunks(
 
 async function populateLargeCatalogs() {
 	const { isRemote } = getWranglerConfig();
-	const mode = process.env.LARGE_CATALOG_MODE || "all";
+	const mode = process.env.LARGE_CATALOG_MODE || "none";
+
+	// Skip if mode is "none"
+	if (mode === "none") {
+		console.log("ℹ️  Large catalogs skipped (mode: none)");
+		return;
+	}
 
 	console.log("╔════════════════════════════════════════════════════════════╗");
 	console.log("║           Large Catalog Population (Chunked)              ║");
