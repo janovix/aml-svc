@@ -1,6 +1,11 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { DonationExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	itemTypeCode: { catalog: "pld-item-types", strategy: "BY_CODE" },
+};
 
 export const donationHandler: ActivityHandler = {
 	code: "DON",

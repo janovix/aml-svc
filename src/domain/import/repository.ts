@@ -140,6 +140,7 @@ export class ImportRepository {
 				id,
 				organizationId,
 				entityType: toPrismaEntityType(input.entityType),
+				activityCode: input.activityCode ?? null,
 				fileName: input.fileName,
 				fileUrl,
 				fileSize: input.fileSize,

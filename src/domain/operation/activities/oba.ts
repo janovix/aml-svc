@@ -1,6 +1,11 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { ArtExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	artworkTypeCode: { catalog: "pld-artwork-types", strategy: "BY_CODE" },
+};
 
 export const artHandler: ActivityHandler = {
 	code: "OBA",

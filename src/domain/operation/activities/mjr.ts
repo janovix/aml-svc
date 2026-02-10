@@ -1,6 +1,13 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { JewelryExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	itemTypeCode: { catalog: "pld-item-types", strategy: "BY_CODE" },
+	tradeUnitCode: { catalog: "cfdi-units", strategy: "BY_CODE" },
+	brand: { catalog: "jewelry-brands", strategy: "BY_ID" },
+};
 
 export const jewelryHandler: ActivityHandler = {
 	code: "MJR",

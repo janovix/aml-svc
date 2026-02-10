@@ -1,6 +1,15 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { RealEstateExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	propertyTypeCode: { catalog: "pld-property-types", strategy: "BY_CODE" },
+	stateCode: { catalog: "states", strategy: "BY_CODE" },
+	countryCode: { catalog: "countries", strategy: "BY_CODE" },
+	clientFigureCode: { catalog: "pld-client-figures", strategy: "BY_CODE" },
+	personFigureCode: { catalog: "pld-person-figures", strategy: "BY_CODE" },
+};
 
 export const realEstateHandler: ActivityHandler = {
 	code: "INM",

@@ -55,15 +55,30 @@ export const ImportRowIdParamSchema = z.object({
 		),
 });
 
-export const ImportCreateSchema = z.object({
-	entityType: ImportEntityTypeSchema,
-	fileName: z.string().min(1).max(255),
-	fileSize: z
-		.number()
-		.int()
-		.positive()
-		.max(50 * 1024 * 1024), // Max 50MB
-});
+export const ImportCreateSchema = z
+	.object({
+		entityType: ImportEntityTypeSchema,
+		activityCode: z.string().optional(),
+		fileName: z.string().min(1).max(255),
+		fileSize: z
+			.number()
+			.int()
+			.positive()
+			.max(50 * 1024 * 1024), // Max 50MB
+	})
+	.refine(
+		(data) => {
+			// If entityType is OPERATION, activityCode is required
+			if (data.entityType === "OPERATION") {
+				return !!data.activityCode;
+			}
+			return true;
+		},
+		{
+			message: "activityCode is required when entityType is OPERATION",
+			path: ["activityCode"],
+		},
+	);
 
 export const ImportFilterSchema = z.object({
 	status: ImportStatusSchema.optional(),

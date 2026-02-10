@@ -18,10 +18,12 @@ import type {
 	ClientAddressUpdateInput,
 	ClientAddressPatchInput,
 } from "./schemas";
+import type { CatalogNameResolver } from "../catalog/name-resolver";
 
 describe("ClientRepository", () => {
 	let repository: ClientRepository;
 	let mockPrisma: PrismaClient;
+	let mockCatalogResolver: CatalogNameResolver;
 
 	const mockClient: Client = {
 		id: "CLT123456789",
@@ -66,6 +68,7 @@ describe("ClientRepository", () => {
 		sourceOfFunds: null,
 		sourceOfWealth: null,
 		incorporationDate: null,
+		resolvedNames: null,
 		createdAt: new Date("2024-01-01"),
 		updatedAt: new Date("2024-01-01"),
 		deletedAt: null,
@@ -132,7 +135,12 @@ describe("ClientRepository", () => {
 			},
 		} as unknown as PrismaClient;
 
-		repository = new ClientRepository(mockPrisma);
+		// Mock catalog resolver to avoid catalog database calls
+		mockCatalogResolver = {
+			resolveNames: vi.fn().mockResolvedValue({}),
+		} as unknown as CatalogNameResolver;
+
+		repository = new ClientRepository(mockPrisma, mockCatalogResolver);
 	});
 
 	describe("list", () => {

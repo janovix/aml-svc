@@ -1,6 +1,12 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { LoanExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	loanTypeCode: { catalog: "pld-loan-types", strategy: "BY_CODE" },
+	guaranteeTypeCode: { catalog: "pld-guarantee-types", strategy: "BY_CODE" },
+};
 
 export const loanHandler: ActivityHandler = {
 	code: "MPC",

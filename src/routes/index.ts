@@ -52,7 +52,10 @@ export function createRouter() {
 	router.use("/alerts/*", authMiddleware({ requireOrganization: true }));
 	router.use("/notices/*", authMiddleware({ requireOrganization: true }));
 	router.use("/reports/*", authMiddleware({ requireOrganization: true }));
-	router.use("/imports/*", authMiddleware({ requireOrganization: true }));
+	// Note: /imports/templates and /imports/:id/events are public, handled separately above
+	router.use("/imports", authMiddleware({ requireOrganization: true }));
+	router.use("/imports/:id", authMiddleware({ requireOrganization: true }));
+	router.use("/imports/:id/*", authMiddleware({ requireOrganization: true }));
 
 	// Organization settings requires auth and organization context
 	router.use(

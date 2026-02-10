@@ -1,6 +1,13 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { VehicleExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	brand: { catalog: "terrestrial-vehicle-brands", strategy: "BY_ID" },
+	armorLevelCode: { catalog: "armor-levels", strategy: "BY_CODE" },
+	flagCountryCode: { catalog: "countries", strategy: "BY_CODE" },
+};
 
 export const vehicleHandler: ActivityHandler = {
 	code: "VEH",

@@ -48,6 +48,8 @@ export interface ClientEntity {
 	pepMatchConfidence?: string | null;
 	pepCheckedAt?: string | null;
 	pepCheckSource?: string | null;
+	// Resolved catalog names for *Code fields
+	resolvedNames?: Record<string, string> | null;
 	// Timestamps
 	createdAt: string;
 	updatedAt: string;

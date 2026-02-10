@@ -10,6 +10,28 @@ import type {
 	OperationUpdateInput,
 } from "./schemas";
 import { mapOperationToEntity } from "./mappers";
+import { CatalogNameResolver } from "../catalog/name-resolver";
+import type { CatalogFieldsConfig } from "../catalog/name-resolver";
+import { CatalogRepository } from "../catalog/repository";
+import { CATALOG_FIELDS as VEH_CATALOG_FIELDS } from "./activities/veh";
+import { CATALOG_FIELDS as INM_CATALOG_FIELDS } from "./activities/inm";
+import { CATALOG_FIELDS as MJR_CATALOG_FIELDS } from "./activities/mjr";
+import { CATALOG_FIELDS as AVI_CATALOG_FIELDS } from "./activities/avi";
+import { CATALOG_FIELDS as JYS_CATALOG_FIELDS } from "./activities/jys";
+import { CATALOG_FIELDS as ARI_CATALOG_FIELDS } from "./activities/ari";
+import { CATALOG_FIELDS as BLI_CATALOG_FIELDS } from "./activities/bli";
+import { CATALOG_FIELDS as DON_CATALOG_FIELDS } from "./activities/don";
+import { CATALOG_FIELDS as MPC_CATALOG_FIELDS } from "./activities/mpc";
+import { CATALOG_FIELDS as FEP_CATALOG_FIELDS } from "./activities/fep";
+import { CATALOG_FIELDS as FES_CATALOG_FIELDS } from "./activities/fes";
+import { CATALOG_FIELDS as SPR_CATALOG_FIELDS } from "./activities/spr";
+import { CATALOG_FIELDS as CHV_CATALOG_FIELDS } from "./activities/chv";
+import { CATALOG_FIELDS as TSC_CATALOG_FIELDS } from "./activities/tsc";
+import { CATALOG_FIELDS as TPP_CATALOG_FIELDS } from "./activities/tpp";
+import { CATALOG_FIELDS as TDR_CATALOG_FIELDS } from "./activities/tdr";
+import { CATALOG_FIELDS as TCV_CATALOG_FIELDS } from "./activities/tcv";
+import { CATALOG_FIELDS as OBA_CATALOG_FIELDS } from "./activities/oba";
+import { CATALOG_FIELDS as DIN_CATALOG_FIELDS } from "./activities/din";
 
 // Include clause for all activity extensions
 const operationInclude = {
@@ -36,7 +58,66 @@ const operationInclude = {
 } as const;
 
 export class OperationRepository {
-	constructor(private prisma: PrismaClient) {}
+	private catalogResolver: CatalogNameResolver;
+
+	constructor(
+		private prisma: PrismaClient,
+		catalogResolver?: CatalogNameResolver,
+	) {
+		// Create catalog resolver if not provided (for backward compatibility)
+		this.catalogResolver =
+			catalogResolver ?? new CatalogNameResolver(new CatalogRepository(prisma));
+	}
+
+	/**
+	 * Get catalog fields config for an activity code
+	 */
+	private getCatalogFieldsConfig(
+		activityCode: ActivityCode,
+	): CatalogFieldsConfig {
+		switch (activityCode) {
+			case "VEH":
+				return VEH_CATALOG_FIELDS;
+			case "INM":
+				return INM_CATALOG_FIELDS;
+			case "MJR":
+				return MJR_CATALOG_FIELDS;
+			case "AVI":
+				return AVI_CATALOG_FIELDS;
+			case "JYS":
+				return JYS_CATALOG_FIELDS;
+			case "ARI":
+				return ARI_CATALOG_FIELDS;
+			case "BLI":
+				return BLI_CATALOG_FIELDS;
+			case "DON":
+				return DON_CATALOG_FIELDS;
+			case "MPC":
+				return MPC_CATALOG_FIELDS;
+			case "FEP":
+				return FEP_CATALOG_FIELDS;
+			case "FES":
+				return FES_CATALOG_FIELDS;
+			case "SPR":
+				return SPR_CATALOG_FIELDS;
+			case "CHV":
+				return CHV_CATALOG_FIELDS;
+			case "TSC":
+				return TSC_CATALOG_FIELDS;
+			case "TPP":
+				return TPP_CATALOG_FIELDS;
+			case "TDR":
+				return TDR_CATALOG_FIELDS;
+			case "TCV":
+				return TCV_CATALOG_FIELDS;
+			case "OBA":
+				return OBA_CATALOG_FIELDS;
+			case "DIN":
+				return DIN_CATALOG_FIELDS;
+			default:
+				return {};
+		}
+	}
 
 	async create(
 		organizationId: string,
@@ -58,6 +139,12 @@ export class OperationRepository {
 					missingFields: input.missingFields ?? null,
 				}
 			: this.detectCompleteness(input);
+
+		// Resolve catalog names for extension fields
+		const resolvedExtension = await this.resolveExtensionCatalogNames(
+			input.activityCode as ActivityCode,
+			input,
+		);
 
 		// Create operation with activity extension in batch transaction (D1 compatible)
 		const operationCreateQuery = this.prisma.operation.create({
@@ -105,7 +192,11 @@ export class OperationRepository {
 		const queries: Prisma.PrismaPromise<unknown>[] = [operationCreateQuery];
 
 		// Add activity extension query based on activity code
-		const extensionQuery = this.getActivityExtensionQuery(operationId, input);
+		const extensionQuery = this.getActivityExtensionQuery(
+			operationId,
+			input,
+			resolvedExtension,
+		);
 		if (extensionQuery) {
 			queries.push(extensionQuery);
 		}
@@ -125,12 +216,121 @@ export class OperationRepository {
 	}
 
 	/**
+	 * Resolve catalog names for extension fields
+	 * Returns the extension data with resolved names and brandName
+	 */
+	private async resolveExtensionCatalogNames(
+		activityCode: ActivityCode,
+		input: OperationCreateInput,
+	): Promise<{
+		resolvedNames: string | null;
+		brandName: string | null;
+	}> {
+		// Get the extension data based on activity code
+		let extensionData: Record<string, unknown> | null = null;
+		switch (activityCode) {
+			case "VEH":
+				extensionData = input.vehicle ?? null;
+				break;
+			case "INM":
+				extensionData = input.realEstate ?? null;
+				break;
+			case "MJR":
+				extensionData = input.jewelry ?? null;
+				break;
+			case "AVI":
+				extensionData = input.virtualAsset ?? null;
+				break;
+			case "JYS":
+				extensionData = input.gambling ?? null;
+				break;
+			case "ARI":
+				extensionData = input.rental ?? null;
+				break;
+			case "BLI":
+				extensionData = input.armoring ?? null;
+				break;
+			case "DON":
+				extensionData = input.donation ?? null;
+				break;
+			case "MPC":
+				extensionData = input.loan ?? null;
+				break;
+			case "FEP":
+				extensionData = input.official ?? null;
+				break;
+			case "FES":
+				extensionData = input.notary ?? null;
+				break;
+			case "SPR":
+				extensionData = input.professional ?? null;
+				break;
+			case "CHV":
+				extensionData = input.travelerCheck ?? null;
+				break;
+			case "TSC":
+				extensionData = input.card ?? null;
+				break;
+			case "TPP":
+				extensionData = input.prepaid ?? null;
+				break;
+			case "TDR":
+				extensionData = input.reward ?? null;
+				break;
+			case "TCV":
+				extensionData = input.valuable ?? null;
+				break;
+			case "OBA":
+				extensionData = input.art ?? null;
+				break;
+			case "DIN":
+				extensionData = input.development ?? null;
+				break;
+			default:
+				return { resolvedNames: null, brandName: null };
+		}
+
+		if (!extensionData) {
+			return { resolvedNames: null, brandName: null };
+		}
+
+		// Get catalog fields config for this activity
+		const catalogFieldsConfig = this.getCatalogFieldsConfig(activityCode);
+
+		// Resolve all catalog names
+		const resolvedNamesMap = await this.catalogResolver.resolveNames(
+			extensionData,
+			catalogFieldsConfig,
+		);
+
+		// Extract brandName if present (for open catalogs like vehicle brands, jewelry brands)
+		const brandName = resolvedNamesMap.brand ?? null;
+
+		// Remove brand from resolvedNames since it has its own column
+		if (brandName) {
+			delete resolvedNamesMap.brand;
+		}
+
+		// Serialize resolved names to JSON
+		const resolvedNames =
+			Object.keys(resolvedNamesMap).length > 0
+				? JSON.stringify(resolvedNamesMap)
+				: null;
+
+		return { resolvedNames, brandName };
+	}
+
+	/**
 	 * Get activity extension query for batch transaction (D1 compatible)
 	 * Returns a Prisma query that can be added to a batch transaction
 	 */
 	private getActivityExtensionQuery(
 		operationId: string,
 		input: OperationCreateInput,
+		resolvedExtension: {
+			resolvedNames: string | null;
+			brandName: string | null;
+		},
 	): Prisma.PrismaPromise<unknown> | null {
 		const extensionId = crypto.randomUUID();
 
@@ -138,7 +338,13 @@ export class OperationRepository {
 			case "VEH":
 				if (input.vehicle) {
 					return this.prisma.operationVehicle.create({
-						data: { id: extensionId, operationId, ...input.vehicle },
+						data: {
+							id: extensionId,
+							operationId,
+							...input.vehicle,
+							brandName: resolvedExtension.brandName,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
@@ -152,6 +358,7 @@ export class OperationRepository {
 							registryDate: input.realEstate.registryDate
 								? new Date(input.realEstate.registryDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
@@ -159,14 +366,25 @@ export class OperationRepository {
 			case "MJR":
 				if (input.jewelry) {
 					return this.prisma.operationJewelry.create({
-						data: { id: extensionId, operationId, ...input.jewelry },
+						data: {
+							id: extensionId,
+							operationId,
+							...input.jewelry,
+							brandName: resolvedExtension.brandName,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "AVI":
 				if (input.virtualAsset) {
 					return this.prisma.operationVirtualAsset.create({
-						data: { id: extensionId, operationId, ...input.virtualAsset },
+						data: {
+							id: extensionId,
+							operationId,
+							...input.virtualAsset,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
@@ -180,6 +398,7 @@ export class OperationRepository {
 							eventDate: input.gambling.eventDate
 								? new Date(input.gambling.eventDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
@@ -197,6 +416,7 @@ export class OperationRepository {
 							contractEndDate: input.rental.contractEndDate
 								? new Date(input.rental.contractEndDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
@@ -204,14 +424,24 @@ export class OperationRepository {
 			case "BLI":
 				if (input.armoring) {
 					return this.prisma.operationArmoring.create({
-						data: { id: extensionId, operationId, ...input.armoring },
+						data: {
+							id: extensionId,
+							operationId,
+							...input.armoring,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "DON":
 				if (input.donation) {
 					return this.prisma.operationDonation.create({
-						data: { id: extensionId, operationId, ...input.donation },
+						data: {
+							id: extensionId,
+							operationId,
+							...input.donation,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
@@ -228,6 +458,7 @@ export class OperationRepository {
 							maturityDate: input.loan.maturityDate
 								? new Date(input.loan.maturityDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
@@ -242,6 +473,7 @@ export class OperationRepository {
 							instrumentDate: input.official.instrumentDate
 								? new Date(input.official.instrumentDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
@@ -256,6 +488,7 @@ export class OperationRepository {
 							instrumentDate: input.notary.instrumentDate
 								? new Date(input.notary.instrumentDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
@@ -263,28 +496,48 @@ export class OperationRepository {
 			case "SPR":
 				if (input.professional) {
 					return this.prisma.operationProfessional.create({
-						data: { id: extensionId, operationId, ...input.professional },
+						data: {
+							id: extensionId,
+							operationId,
+							...input.professional,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "CHV":
 				if (input.travelerCheck) {
 					return this.prisma.operationTravelerCheck.create({
-						data: { id: extensionId, operationId, ...input.travelerCheck },
+						data: {
+							id: extensionId,
+							operationId,
+							...input.travelerCheck,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "TSC":
 				if (input.card) {
 					return this.prisma.operationCard.create({
-						data: { id: extensionId, operationId, ...input.card },
+						data: {
+							id: extensionId,
+							operationId,
+							...input.card,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "TPP":
 				if (input.prepaid) {
 					return this.prisma.operationPrepaid.create({
-						data: { id: extensionId, operationId, ...input.prepaid },
+						data: {
+							id: extensionId,
+							operationId,
+							...input.prepaid,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
@@ -298,6 +551,7 @@ export class OperationRepository {
 							pointsExpiryDate: input.reward.pointsExpiryDate
 								? new Date(input.reward.pointsExpiryDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
@@ -315,6 +569,7 @@ export class OperationRepository {
 							custodyEndDate: input.valuable.custodyEndDate
 								? new Date(input.valuable.custodyEndDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
@@ -322,14 +577,24 @@ export class OperationRepository {
 			case "OBA":
 				if (input.art) {
 					return this.prisma.operationArt.create({
-						data: { id: extensionId, operationId, ...input.art },
+						data: {
+							id: extensionId,
+							operationId,
+							...input.art,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "DIN":
 				if (input.development) {
 					return this.prisma.operationDevelopment.create({
-						data: { id: extensionId, operationId, ...input.development },
+						data: {
+							id: extensionId,
+							operationId,
+							...input.development,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
@@ -350,7 +615,9 @@ export class OperationRepository {
 			include: operationInclude,
 		});
 
-		return operation ? mapOperationToEntity(operation) : null;
+		if (!operation) return null;
+
+		return mapOperationToEntity(operation);
 	}
 
 	async list(
@@ -422,7 +689,7 @@ export class OperationRepository {
 		]);
 
 		return {
-			data: operations.map(mapOperationToEntity),
+			data: operations.map((op) => mapOperationToEntity(op)),
 			pagination: {
 				page: filters.page,
 				limit: filters.limit,
@@ -878,7 +1145,7 @@ export class OperationRepository {
 			orderBy: { operationDate: "desc" },
 		});
 
-		return operations.map(mapOperationToEntity);
+		return operations.map((op) => mapOperationToEntity(op));
 	}
 
 	/**

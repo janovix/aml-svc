@@ -27,6 +27,7 @@ describe("ImportService", () => {
 		id: "import_123",
 		organizationId,
 		entityType: "CLIENT",
+		activityCode: null,
 		fileName: "test.csv",
 		fileUrl: "https://example.com/test.csv",
 		fileSize: 1024,

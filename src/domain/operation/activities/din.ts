@@ -1,6 +1,20 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { DevelopmentExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	developmentTypeCode: {
+		catalog: "pld-development-types",
+		strategy: "BY_CODE",
+	},
+	creditTypeCode: { catalog: "pld-credit-types", strategy: "BY_CODE" },
+	thirdPartyTypeCode: { catalog: "pld-third-party-types", strategy: "BY_CODE" },
+	financialInstitutionTypeCode: {
+		catalog: "pld-financial-institution-types",
+		strategy: "BY_CODE",
+	},
+};
 
 export const developmentHandler: ActivityHandler = {
 	code: "DIN",

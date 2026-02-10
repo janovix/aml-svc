@@ -83,6 +83,7 @@ export class ImportService {
 			importId: importRecord.id,
 			organizationId,
 			entityType: importRecord.entityType,
+			activityCode: importRecord.activityCode ?? undefined,
 			fileUrl: importRecord.fileUrl,
 			createdBy,
 		};

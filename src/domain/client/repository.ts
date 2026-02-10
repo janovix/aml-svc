@@ -33,9 +33,35 @@ import type {
 	ClientEntity,
 	ListResult,
 } from "./types";
+import {
+	CatalogNameResolver,
+	type CatalogFieldsConfig,
+} from "../catalog/name-resolver";
+import { CatalogRepository } from "../catalog/repository";
+
+/**
+ * Catalog fields configuration for clients.
+ * Maps client field names to their catalog keys and resolution strategies.
+ */
+const CLIENT_CATALOG_FIELDS: CatalogFieldsConfig = {
+	stateCode: { catalog: "cfdi-states", strategy: "BY_CODE" },
+	countryCode: { catalog: "cfdi-countries", strategy: "BY_CODE" },
+	economicActivityCode: {
+		catalog: "economic-activities",
+		strategy: "BY_CODE",
+	},
+};
 
 export class ClientRepository {
-	constructor(private readonly prisma: PrismaClient) {}
+	private catalogResolver: CatalogNameResolver;
+
+	constructor(
+		private readonly prisma: PrismaClient,
+		catalogResolver?: CatalogNameResolver,
+	) {
+		this.catalogResolver =
+			catalogResolver || new CatalogNameResolver(new CatalogRepository(prisma));
+	}
 
 	async list(
 		organizationId: string,
@@ -106,6 +132,13 @@ export class ClientRepository {
 		const prismaData = mapCreateInputToPrisma(input);
 		const { completenessStatus, missingFields } =
 			this.detectCompleteness(input);
+
+		// Resolve catalog names for *Code fields
+		const resolvedNames = await this.catalogResolver.resolveNames(
+			input,
+			CLIENT_CATALOG_FIELDS,
+		);
+
 		const created = await this.prisma.client.create({
 			data: {
 				...prismaData,
@@ -113,6 +146,10 @@ export class ClientRepository {
 				completenessStatus,
 				missingFields:
 					missingFields.length > 0 ? JSON.stringify(missingFields) : null,
+				resolvedNames:
+					Object.keys(resolvedNames).length > 0
+						? JSON.stringify(resolvedNames)
+						: null,
 			},
 		});
 		return mapPrismaClient(created);

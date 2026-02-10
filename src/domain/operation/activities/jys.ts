@@ -1,6 +1,17 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { GamblingExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	gameTypeCode: { catalog: "pld-game-types", strategy: "BY_CODE" },
+	businessLineCode: { catalog: "pld-business-lines", strategy: "BY_CODE" },
+	operationMethodCode: {
+		catalog: "pld-operation-methods",
+		strategy: "BY_CODE",
+	},
+	propertyTypeCode: { catalog: "pld-property-types", strategy: "BY_CODE" },
+};
 
 export const gamblingHandler: ActivityHandler = {
 	code: "JYS",

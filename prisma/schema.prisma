@@ -219,6 +219,8 @@ model Client {
   pepMatchConfidence   String?    @map("pep_match_confidence")
   pepCheckedAt         DateTime?  @map("pep_checked_at")
   pepCheckSource       String?    @map("pep_check_source")
+  // Catalog name resolution
+  resolvedNames        String?    @map("resolved_names")
   // Timestamps
   createdAt            DateTime   @default(now()) @map("created_at")
   updatedAt            DateTime   @updatedAt @map("updated_at")
@@ -610,6 +612,7 @@ model OperationVehicle {
   operationId        String      @unique @map("operation_id")
   vehicleType        VehicleType @map("vehicle_type")
   brand              String
+  brandName          String?     @map("brand_name")
   model              String
   year               Int
   vin                String?
@@ -621,6 +624,7 @@ model OperationVehicle {
   armorLevelCode     String?     @map("armor_level_code")
   engineNumber       String?     @map("engine_number")
   description        String?
+  resolvedNames      String?     @map("resolved_names")
   createdAt          DateTime    @default(now()) @map("created_at")
   updatedAt          DateTime    @updatedAt @map("updated_at")
 
@@ -651,6 +655,7 @@ model OperationRealEstate {
   clientFigureCode     String?   @map("client_figure_code")
   personFigureCode     String?   @map("person_figure_code")
   description          String?
+  resolvedNames        String?   @map("resolved_names")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
@@ -675,6 +680,8 @@ model OperationJewelry {
   tradeUnitCode      String?  @map("trade_unit_code")
   quantity           Decimal? @default(1)
   unitPrice          Decimal? @map("unit_price")
+  brandName          String?  @map("brand_name")
+  resolvedNames      String?  @map("resolved_names")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
@@ -697,6 +704,7 @@ model OperationVirtualAsset {
   assetQuantity            Decimal? @map("asset_quantity")
   assetUnitPrice           Decimal? @map("asset_unit_price")
   blockchainTxHash         String?  @map("blockchain_tx_hash")
+  resolvedNames            String?  @map("resolved_names")
   createdAt                DateTime @default(now()) @map("created_at")
   updatedAt                DateTime @updatedAt @map("updated_at")
 
@@ -720,6 +728,7 @@ model OperationGambling {
   eventDate           DateTime? @map("event_date")
   propertyTypeCode    String?   @map("property_type_code")
   propertyDescription String?   @map("property_description")
+  resolvedNames       String?   @map("resolved_names")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
@@ -749,6 +758,7 @@ model OperationRental {
   isPrepaid          Boolean?  @default(false) @map("is_prepaid")
   prepaidMonths      Int?      @map("prepaid_months")
   description        String?
+  resolvedNames      String?   @map("resolved_names")
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
@@ -773,6 +783,7 @@ model OperationArmoring {
   vehicleVin         String?  @map("vehicle_vin")
   vehiclePlates      String?  @map("vehicle_plates")
   serviceDescription String?  @map("service_description")
+  resolvedNames      String?  @map("resolved_names")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
@@ -793,6 +804,7 @@ model OperationDonation {
   itemValue       Decimal? @map("item_value")
   isAnonymous     Boolean? @default(false) @map("is_anonymous")
   campaignName    String?  @map("campaign_name")
+  resolvedNames   String?  @map("resolved_names")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -816,6 +828,7 @@ model OperationLoan {
   maturityDate         DateTime? @map("maturity_date")
   guaranteeDescription String?   @map("guarantee_description")
   guaranteeValue       Decimal?  @map("guarantee_value")
+  resolvedNames        String?   @map("resolved_names")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
@@ -847,6 +860,7 @@ model OperationOfficial {
   itemTypeCode                 String?   @map("item_type_code")
   itemDescription              String?   @map("item_description")
   itemValue                    Decimal?  @map("item_value")
+  resolvedNames                String?   @map("resolved_names")
   createdAt                    DateTime  @default(now()) @map("created_at")
   updatedAt                    DateTime  @updatedAt @map("updated_at")
 
@@ -877,6 +891,7 @@ model OperationNotary {
   itemDescription               String?   @map("item_description")
   appraisalValue                Decimal?  @map("appraisal_value")
   guaranteeTypeCode             String?   @map("guarantee_type_code")
+  resolvedNames                 String?   @map("resolved_names")
   createdAt                     DateTime  @default(now()) @map("created_at")
   updatedAt                     DateTime  @updatedAt @map("updated_at")
 
@@ -905,6 +920,7 @@ model OperationProfessional {
   financialInstitutionName    String?  @map("financial_institution_name")
   occupationCode              String?  @map("occupation_code")
   serviceDescription          String?  @map("service_description")
+  resolvedNames               String?  @map("resolved_names")
   createdAt                   DateTime @default(now()) @map("created_at")
   updatedAt                   DateTime @updatedAt @map("updated_at")
 
@@ -923,6 +939,7 @@ model OperationTravelerCheck {
   serialNumbers     String?  @map("serial_numbers")
   issuerName        String?  @map("issuer_name")
   issuerCountryCode String?  @map("issuer_country_code")
+  resolvedNames     String?  @map("resolved_names")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
@@ -942,6 +959,7 @@ model OperationCard {
   issuerName       String?  @map("issuer_name")
   creditLimit      Decimal? @map("credit_limit")
   transactionType  String?  @map("transaction_type")
+  resolvedNames    String?  @map("resolved_names")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -961,6 +979,7 @@ model OperationPrepaid {
   reloadAmount     Decimal? @map("reload_amount")
   currentBalance   Decimal? @map("current_balance")
   issuerName       String?  @map("issuer_name")
+  resolvedNames    String?  @map("resolved_names")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -981,6 +1000,7 @@ model OperationReward {
   pointsExpiryDate      DateTime? @map("points_expiry_date")
   redemptionType        String?   @map("redemption_type")
   redemptionDescription String?   @map("redemption_description")
+  resolvedNames         String?   @map("resolved_names")
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
 
@@ -1005,6 +1025,7 @@ model OperationValuable {
   declaredValue      Decimal?  @map("declared_value")
   insuredValue       Decimal?  @map("insured_value")
   description        String?
+  resolvedNames      String?   @map("resolved_names")
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
@@ -1030,6 +1051,7 @@ model OperationArt {
   isAntique              Boolean? @default(false) @map("is_antique")
   auctionHouse           String?  @map("auction_house")
   lotNumber              String?  @map("lot_number")
+  resolvedNames          String?  @map("resolved_names")
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
 
@@ -1053,6 +1075,7 @@ model OperationDevelopment {
   thirdPartyName              String?  @map("third_party_name")
   financialInstitutionTypeCode String?  @map("financial_institution_type_code")
   financialInstitutionName    String?  @map("financial_institution_name")
+  resolvedNames               String?  @map("resolved_names")
   createdAt                   DateTime @default(now()) @map("created_at")
   updatedAt                   DateTime @updatedAt @map("updated_at")
 
@@ -1288,6 +1311,7 @@ model Import {
   id             String           @id
   organizationId String           @map("organization_id")
   entityType     ImportEntityType @map("entity_type")
+  activityCode   String?          @map("activity_code")
   fileName       String           @map("file_name")
   fileUrl        String           @map("file_url")
   fileSize       Int              @map("file_size")

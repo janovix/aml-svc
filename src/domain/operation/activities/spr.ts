@@ -1,6 +1,40 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { ProfessionalExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	serviceTypeCode: { catalog: "pld-service-types", strategy: "BY_CODE" },
+	serviceAreaCode: { catalog: "pld-service-areas", strategy: "BY_CODE" },
+	clientFigureCode: { catalog: "pld-client-figures", strategy: "BY_CODE" },
+	contributionReasonCode: {
+		catalog: "pld-contribution-reasons",
+		strategy: "BY_CODE",
+	},
+	assignmentTypeCode: { catalog: "pld-assignment-types", strategy: "BY_CODE" },
+	mergerTypeCode: { catalog: "pld-merger-types", strategy: "BY_CODE" },
+	incorporationReasonCode: {
+		catalog: "pld-incorporation-reasons",
+		strategy: "BY_CODE",
+	},
+	shareholderPositionCode: {
+		catalog: "pld-shareholder-positions",
+		strategy: "BY_CODE",
+	},
+	managedAssetTypeCode: {
+		catalog: "pld-managed-asset-types",
+		strategy: "BY_CODE",
+	},
+	managementStatusCode: {
+		catalog: "pld-management-statuses",
+		strategy: "BY_CODE",
+	},
+	financialInstitutionTypeCode: {
+		catalog: "pld-financial-institution-types",
+		strategy: "BY_CODE",
+	},
+	occupationCode: { catalog: "pld-occupations", strategy: "BY_CODE" },
+};
 
 export const professionalHandler: ActivityHandler = {
 	code: "SPR",

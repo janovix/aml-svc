@@ -98,15 +98,15 @@ describe("Imports API", () => {
 			expect(body).toContain("last_name");
 		});
 
-		it("downloads TRANSACTION template without authentication", async () => {
+		it("downloads OPERATION template without authentication", async () => {
 			const res = await SELF.fetch(
-				"http://local.test/api/v1/imports/templates/TRANSACTION",
+				"http://local.test/api/v1/imports/templates/OPERATION/VEH",
 			);
 
 			expect(res.status).toBe(200);
 			expect(res.headers.get("Content-Type")).toBe("text/csv; charset=utf-8");
 			expect(res.headers.get("Content-Disposition")).toBe(
-				'attachment; filename="transactions_template.csv"',
+				'attachment; filename="operations_veh_template.csv"',
 			);
 
 			const body = await res.text();
@@ -132,12 +132,14 @@ describe("Imports API", () => {
 			expect(mixed.status).toBe(200);
 		});
 
-		it("returns 400 for invalid entity type", async () => {
+		it("returns 400 for invalid activity code", async () => {
 			const res = await SELF.fetch(
-				"http://local.test/api/v1/imports/templates/INVALID",
+				"http://local.test/api/v1/imports/templates/OPERATION/INVALID",
 			);
 
 			expect(res.status).toBe(400);
+			const body = (await res.json()) as { message: string };
+			expect(body.message).toContain("Invalid activity code");
 		});
 	});
 

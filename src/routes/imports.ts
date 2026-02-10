@@ -30,15 +30,16 @@ import {
 } from "../middleware/auth";
 import { generateImportFileKey } from "../lib/r2-upload";
 import { APIError } from "../middleware/error";
+import {
+	getActivityColumns,
+	ACTIVITY_EXTENSION_COLUMNS,
+	type ActivityCode,
+} from "../domain/import/template-columns";
 
-// CSV templates for clients and transactions
-const CLIENT_TEMPLATE = `person_type,rfc,first_name,last_name,second_last_name,birth_date,curp,business_name,incorporation_date,nationality,email,phone,country,state_code,city,municipality,neighborhood,street,external_number,internal_number,postal_code,reference,notes
-physical,ABCD123456EF1,Juan,Pérez,García,1990-05-15,PEGJ900515HDFRRL09,,,,MX,juan@example.com,+525512345678,MX,CMX,Ciudad de México,Cuauhtémoc,Centro,Reforma,123,,06000,Near the monument,Example client
-moral,ABC123456EF1,,,,,,,Empresa SA de CV,2020-01-01,,empresa@example.com,+525598765432,MX,CMX,Ciudad de México,Miguel Hidalgo,Polanco,Masaryk,456,Suite 100,11560,Corporate building,Business client`;
-
-const TRANSACTION_TEMPLATE = `client_rfc,operation_date,operation_type,branch_postal_code,vehicle_type,brand,model,year,engine_number,plates,registration_number,flag_country_id,armor_level,amount,currency,payment_method_1,payment_amount_1,payment_method_2,payment_amount_2
-ABCD123456EF1,2025-01-15,purchase,06000,land,Toyota,Camry,2024,ENG123456,ABC1234,,,Level III-A,450000,MXN,cash,200000,transfer,250000
-ABC123456EF1,2025-01-20,sale,11560,land,BMW,X5,2023,ENG789012,XYZ5678,,,,750000,MXN,transfer,750000,,`;
+// CSV templates for clients
+const CLIENT_TEMPLATE = `person_type,rfc,first_name,last_name,second_last_name,birth_date,curp,business_name,incorporation_date,nationality,email,phone,country,state_code,city,municipality,neighborhood,street,external_number,internal_number,postal_code,reference,notes,country_code,economic_activity_code,gender,occupation,marital_status,source_of_funds,source_of_wealth
+physical,ABCD123456EF1,Juan,Pérez,García,1990-05-15,PEGJ900515HDFRRL09,,,,MX,juan@example.com,+525512345678,MX,CMX,Ciudad de México,Cuauhtémoc,Centro,Reforma,123,,06000,Near the monument,Example client,MEX,4651101,M,Ingeniero de Software,MARRIED,Salario mensual,Ahorros personales
+moral,ABC123456EF1,,,,,,,Empresa SA de CV,2020-01-01,,empresa@example.com,+525598765432,MX,CMX,Ciudad de México,Miguel Hidalgo,Polanco,Masaryk,456,Suite 100,11560,Corporate building,Business client,MEX,5221101,,,,,`;
 
 /**
  * Public templates router (no auth required)
@@ -49,38 +50,70 @@ export const importTemplatesRouter = new Hono<{
 }>();
 
 /**
- * GET /:entityType
- * Download CSV template for the specified entity type
+ * GET /:entityType or /:entityType/:activityCode
+ * Download CSV template for CLIENT or OPERATION
  * This endpoint is public (no auth required)
+ * Case-insensitive: accepts CLIENT, client, Client, etc.
  */
-importTemplatesRouter.get("/:entityType", async (c) => {
-	const entityType = c.req.param("entityType")?.toUpperCase();
+importTemplatesRouter.get("/:entityType/:activityCode?", async (_c) => {
+	const entityType = _c.req.param("entityType")?.toUpperCase();
+	const activityCode = _c.req.param("activityCode")?.toUpperCase() as
+		| ActivityCode
+		| undefined;
 
-	if (entityType !== "CLIENT" && entityType !== "TRANSACTION") {
-		return c.json(
-			{
-				success: false,
-				error: "Bad Request",
-				message: "Invalid entity type. Must be CLIENT or TRANSACTION",
+	// Handle CLIENT template
+	if (entityType === "CLIENT" && !activityCode) {
+		return new Response(CLIENT_TEMPLATE, {
+			status: 200,
+			headers: {
+				"Content-Type": "text/csv; charset=utf-8",
+				"Content-Disposition": 'attachment; filename="clients_template.csv"',
 			},
-			400,
-		);
+		});
 	}
 
-	const template =
-		entityType === "CLIENT" ? CLIENT_TEMPLATE : TRANSACTION_TEMPLATE;
-	const filename =
-		entityType === "CLIENT"
-			? "clients_template.csv"
-			: "transactions_template.csv";
+	// Handle OPERATION template
+	if (entityType === "OPERATION" && activityCode) {
+		// Validate activity code
+		if (!ACTIVITY_EXTENSION_COLUMNS[activityCode]) {
+			return _c.json(
+				{
+					success: false,
+					error: "Bad Request",
+					message: `Invalid activity code: ${activityCode}`,
+				},
+				400,
+			);
+		}
 
-	return new Response(template, {
-		status: 200,
-		headers: {
-			"Content-Type": "text/csv; charset=utf-8",
-			"Content-Disposition": `attachment; filename="${filename}"`,
+		// Generate CSV template for this activity
+		const columns = getActivityColumns(activityCode);
+		const header = columns.join(",");
+
+		// Generate example row with empty values
+		const exampleRow = columns.map(() => "").join(",");
+
+		const template = `${header}\n${exampleRow}`;
+		const filename = `operations_${activityCode.toLowerCase()}_template.csv`;
+
+		return new Response(template, {
+			status: 200,
+			headers: {
+				"Content-Type": "text/csv; charset=utf-8",
+				"Content-Disposition": `attachment; filename="${filename}"`,
+			},
+		});
+	}
+
+	// Unknown entity type or missing activity code for OPERATION
+	return _c.json(
+		{
+			success: false,
+			error: "Bad Request",
+			message: `Invalid entity type or missing activity code: ${entityType}`,
 		},
-	});
+		400,
+	);
 });
 
 /**
@@ -371,6 +404,7 @@ importsRouter.post("/", async (c) => {
 	const formData = await c.req.formData();
 	const file = formData.get("file");
 	const entityType = formData.get("entityType");
+	const activityCode = formData.get("activityCode");
 
 	if (!file || !(file instanceof File)) {
 		throw new APIError(400, "No file provided");
@@ -406,9 +440,13 @@ importsRouter.post("/", async (c) => {
 		throw new APIError(400, `File too large. Maximum size is 50MB`);
 	}
 
-	// Validate entity type
+	// Validate entity type and activity code
 	const input = parseWithZod(ImportCreateSchema, {
 		entityType: entityType.toUpperCase(),
+		activityCode:
+			activityCode && typeof activityCode === "string"
+				? activityCode.toUpperCase()
+				: undefined,
 		fileName: file.name,
 		fileSize: file.size,
 	});

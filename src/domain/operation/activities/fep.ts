@@ -1,6 +1,33 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { OfficialExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	actTypeCode: { catalog: "pld-act-types", strategy: "BY_CODE" },
+	trustTypeCode: { catalog: "pld-trust-types", strategy: "BY_CODE" },
+	movementTypeCode: { catalog: "pld-movement-types", strategy: "BY_CODE" },
+	assignmentTypeCode: { catalog: "pld-assignment-types", strategy: "BY_CODE" },
+	mergerTypeCode: { catalog: "pld-merger-types", strategy: "BY_CODE" },
+	incorporationReasonCode: {
+		catalog: "pld-incorporation-reasons",
+		strategy: "BY_CODE",
+	},
+	patrimonyModificationTypeCode: {
+		catalog: "pld-patrimony-modification-types",
+		strategy: "BY_CODE",
+	},
+	powerOfAttorneyTypeCode: {
+		catalog: "pld-power-of-attorney-types",
+		strategy: "BY_CODE",
+	},
+	grantingTypeCode: { catalog: "pld-granting-types", strategy: "BY_CODE" },
+	shareholderPositionCode: {
+		catalog: "pld-shareholder-positions",
+		strategy: "BY_CODE",
+	},
+	itemTypeCode: { catalog: "pld-item-types", strategy: "BY_CODE" },
+};
 
 export const officialHandler: ActivityHandler = {
 	code: "FEP",

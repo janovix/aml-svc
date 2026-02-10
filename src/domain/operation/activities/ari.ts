@@ -1,6 +1,12 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { RentalExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	propertyTypeCode: { catalog: "pld-property-types", strategy: "BY_CODE" },
+	stateCode: { catalog: "states", strategy: "BY_CODE" },
+};
 
 export const rentalHandler: ActivityHandler = {
 	code: "ARI",

@@ -1,6 +1,39 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { NotaryExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	actTypeCode: { catalog: "pld-act-types", strategy: "BY_CODE" },
+	notaryStateCode: { catalog: "states", strategy: "BY_CODE" },
+	legalEntityTypeCode: {
+		catalog: "pld-legal-entity-types",
+		strategy: "BY_CODE",
+	},
+	personCharacterTypeCode: {
+		catalog: "pld-person-character-types",
+		strategy: "BY_CODE",
+	},
+	incorporationReasonCode: {
+		catalog: "pld-incorporation-reasons",
+		strategy: "BY_CODE",
+	},
+	patrimonyModificationTypeCode: {
+		catalog: "pld-patrimony-modification-types",
+		strategy: "BY_CODE",
+	},
+	powerOfAttorneyTypeCode: {
+		catalog: "pld-power-of-attorney-types",
+		strategy: "BY_CODE",
+	},
+	grantingTypeCode: { catalog: "pld-granting-types", strategy: "BY_CODE" },
+	shareholderPositionCode: {
+		catalog: "pld-shareholder-positions",
+		strategy: "BY_CODE",
+	},
+	itemTypeCode: { catalog: "pld-item-types", strategy: "BY_CODE" },
+	guaranteeTypeCode: { catalog: "pld-guarantee-types", strategy: "BY_CODE" },
+};
 
 export const notaryHandler: ActivityHandler = {
 	code: "FES",

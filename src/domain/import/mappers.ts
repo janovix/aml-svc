@@ -24,6 +24,7 @@ export function mapPrismaImport(prisma: PrismaImport): ImportEntity {
 		id: prisma.id,
 		organizationId: prisma.organizationId,
 		entityType: prisma.entityType as ImportEntityType,
+		activityCode: prisma.activityCode,
 		fileName: prisma.fileName,
 		fileUrl: prisma.fileUrl,
 		fileSize: prisma.fileSize,

@@ -23,6 +23,7 @@ export interface ImportEntity {
 	id: string;
 	organizationId: string;
 	entityType: ImportEntityType;
+	activityCode: string | null; // Activity code for OPERATION imports
 	fileName: string;
 	fileUrl: string;
 	fileSize: number;
@@ -88,6 +89,7 @@ export interface ImportJob {
 	importId: string;
 	organizationId: string;
 	entityType: ImportEntityType;
+	activityCode?: string; // Required when entityType is OPERATION
 	fileUrl: string;
 	createdBy: string;
 }

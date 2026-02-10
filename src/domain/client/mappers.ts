@@ -6,6 +6,17 @@ import type {
 } from "@prisma/client";
 
 import { generateId } from "../../lib/id-generator";
+
+/**
+ * Safely parses JSON, returning null on parse errors instead of throwing.
+ */
+function safeJsonParse<T>(json: string): T | null {
+	try {
+		return JSON.parse(json);
+	} catch {
+		return null;
+	}
+}
 import type {
 	ClientAddressCreateInput,
 	ClientAddressPatchInput,
@@ -312,6 +323,10 @@ export function mapPrismaClient(
 		pepMatchConfidence: record.pepMatchConfidence ?? null,
 		pepCheckedAt: mapDateTime(record.pepCheckedAt),
 		pepCheckSource: record.pepCheckSource ?? null,
+		// Resolved catalog names
+		resolvedNames: record.resolvedNames
+			? safeJsonParse<Record<string, string>>(record.resolvedNames)
+			: null,
 		// Timestamps
 		createdAt: mapDateTime(record.createdAt) ?? new Date().toISOString(),
 		updatedAt: mapDateTime(record.updatedAt) ?? new Date().toISOString(),

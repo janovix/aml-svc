@@ -1,6 +1,12 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { ValuableExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	valueTypeCode: { catalog: "pld-value-types", strategy: "BY_CODE" },
+	serviceTypeCode: { catalog: "pld-service-types", strategy: "BY_CODE" },
+};
 
 export const valuableHandler: ActivityHandler = {
 	code: "TCV",
