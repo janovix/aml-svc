@@ -25,7 +25,6 @@ import {
 	getWranglerConfig,
 	fetchCsv,
 	parseCsv,
-	_populateCatalog,
 	generateCatalogId,
 	generateItemId,
 	normalizeText,
@@ -37,7 +36,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const BASE_URL = "https://catalogs.janovix.com";
-const BATCH_SIZE = 1000; // Process in batches to avoid huge SQL files
+const BATCH_SIZE = 500; // Process in batches to avoid huge SQL files
 
 // Chunk configuration for large files
 const CHUNK_CONFIG = {
@@ -56,18 +55,18 @@ const CHUNK_CONFIG = {
  */
 function populateCatalogBatched(catalogKey, catalogName, items) {
 	const catalogId = generateCatalogId(catalogKey);
-	const sql = [];
 
-	// Insert catalog
-	sql.push(`
+	// Insert catalog first (only once)
+	const catalogSql = `
 		INSERT OR IGNORE INTO catalogs (id, key, name, active, created_at, updated_at)
 		VALUES ('${catalogId}', '${catalogKey}', ${escapeSql(catalogName)}, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-	`);
+	`;
+	executeSql(catalogSql, `${catalogKey}-catalog`);
 
 	// Process items in batches
 	for (let i = 0; i < items.length; i += BATCH_SIZE) {
 		const batch = items.slice(i, i + BATCH_SIZE);
-		const batchSql = [...sql]; // Include catalog insert in each batch
+		const batchSql = [];
 
 		for (const item of batch) {
 			const name = escapeSql(item.name);
@@ -80,10 +79,10 @@ function populateCatalogBatched(catalogKey, catalogName, items) {
 				VALUES (
 					'${itemId}',
 					'${catalogId}',
-					'${name}',
-					'${normalizedName}',
+					${name},
+					${normalizedName},
 					1,
-					'${metadata}',
+					${metadata},
 					COALESCE((SELECT created_at FROM catalog_items WHERE id = '${itemId}'), CURRENT_TIMESTAMP),
 					CURRENT_TIMESTAMP
 				);
