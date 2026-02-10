@@ -1,3 +1,10 @@
+# [1.6.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.5...v1.6.0-rc.6) (2026-02-10)
+
+
+### Features
+
+* add activity_code to imports and catalog name resolution columns ([d76eacb](https://github.com/janovix/aml-svc/commit/d76eacb088474d3664084fe73e7dd888097e1c42))
+
 # [1.6.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.4...v1.6.0-rc.5) (2026-02-09)
 
 
