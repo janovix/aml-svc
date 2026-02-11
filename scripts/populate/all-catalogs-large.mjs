@@ -37,7 +37,7 @@ import {
 	generateItemId,
 	normalizeText,
 	escapeSql,
-	executeSql,
+	executeSqlWithRetry,
 } from "./lib/shared.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -48,8 +48,8 @@ const BASE_URL = "https://catalogs.janovix.com";
 // Batch sizes optimized per catalog
 // (larger catalogs with special chars need smaller batches to avoid 502 errors)
 const BATCH_SIZES = {
-	"zip-codes": 500,
-	"cfdi-product-services": 200, // Smaller due to special characters and accents
+	"zip-codes": 100, // Reduced from 500 to stay under D1's 100KB per-statement limit
+	"cfdi-product-services": 50, // Reduced from 200 (special chars + JSON metadata)
 };
 
 // Chunk configuration for large files
@@ -76,7 +76,7 @@ function populateCatalogBatched(catalogKey, catalogName, items) {
 		INSERT OR IGNORE INTO catalogs (id, key, name, active, created_at, updated_at)
 		VALUES ('${catalogId}', '${catalogKey}', ${escapeSql(catalogName)}, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 	`;
-	executeSql(catalogSql, `${catalogKey}-catalog`);
+	executeSqlWithRetry(catalogSql, `${catalogKey}-catalog`);
 
 	// Process items in batches
 	for (let i = 0; i < items.length; i += batchSize) {
@@ -98,15 +98,18 @@ function populateCatalogBatched(catalogKey, catalogName, items) {
 					${normalizedName},
 					1,
 					${metadata},
-					COALESCE((SELECT created_at FROM catalog_items WHERE id = '${itemId}'), CURRENT_TIMESTAMP),
+					CURRENT_TIMESTAMP,
 					CURRENT_TIMESTAMP
 				);
 			`);
 		}
 
 		const progress = Math.min(i + batchSize, items.length);
-		console.log(`   Processing batch: ${progress}/${items.length} items...`);
-		executeSql(batchSql.join("\n"), `${catalogKey}-batch-${i}`);
+		const percentage = ((progress / items.length) * 100).toFixed(1);
+		console.log(
+			`   Processing batch: ${progress}/${items.length} items (${percentage}%)...`,
+		);
+		executeSqlWithRetry(batchSql.join("\n"), `${catalogKey}-batch-${i}`);
 	}
 }
 

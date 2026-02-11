@@ -63,6 +63,54 @@ export function executeSql(sql, label = "populate") {
 }
 
 /**
+ * Check if an error is retryable (transient D1 API errors)
+ */
+function isRetryableError(error) {
+	const errorStr = error.toString().toLowerCase();
+	return (
+		errorStr.includes("502") ||
+		errorStr.includes("503") ||
+		errorStr.includes("504") ||
+		errorStr.includes("internal error") ||
+		errorStr.includes("timeout") ||
+		errorStr.includes("7500")
+	);
+}
+
+/**
+ * Execute SQL with retry logic for transient D1 API errors
+ */
+export function executeSqlWithRetry(sql, label = "populate", maxRetries = 3) {
+	let lastError;
+
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			return executeSql(sql, label);
+		} catch (error) {
+			lastError = error;
+
+			// Check if error is retryable (500, 502, 503, 504, rate limits)
+			if (attempt < maxRetries && isRetryableError(error)) {
+				const delayMs = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+				console.log(
+					`   ⚠️  Attempt ${attempt} failed, retrying in ${delayMs / 1000}s...`,
+				);
+				// Sleep using a busy-wait approach (Node.js doesn't have sleep in sync context)
+				const start = Date.now();
+				while (Date.now() - start < delayMs) {
+					// Busy wait
+				}
+				continue;
+			}
+
+			throw error;
+		}
+	}
+
+	throw lastError;
+}
+
+/**
  * Execute an existing SQL file
  */
 export function executeSqlFile(filePath, _label = "sql-file") {
