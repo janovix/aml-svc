@@ -79,9 +79,8 @@ jobs:
     name: Populate Zip Codes
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    if: ${{ github.event.inputs.large_catalog_mode == 'all' || github.event.inputs.large_catalog_mode == 'zip-codes' }}
-    # Only wait for populate-regular if it's running (mode == 'all')
-    needs: ${{ github.event.inputs.large_catalog_mode == 'all' && fromJSON('["populate-regular"]') || fromJSON('[]') }}
+    if: ${{ always() && (github.event.inputs.large_catalog_mode == 'all' || github.event.inputs.large_catalog_mode == 'zip-codes') }}
+    needs: [populate-regular]
     env:
       HUSKY: 0
     steps:
@@ -126,9 +125,8 @@ jobs:
     name: Populate CFDI Product/Services
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    if: ${{ github.event.inputs.large_catalog_mode == 'all' || github.event.inputs.large_catalog_mode == 'cfdi-product-services' }}
-    # Only wait for populate-regular if it's running (mode == 'all')
-    needs: ${{ github.event.inputs.large_catalog_mode == 'all' && fromJSON('["populate-regular"]') || fromJSON('[]') }}
+    if: ${{ always() && (github.event.inputs.large_catalog_mode == 'all' || github.event.inputs.large_catalog_mode == 'cfdi-product-services') }}
+    needs: [populate-regular]
     env:
       HUSKY: 0
     steps:
