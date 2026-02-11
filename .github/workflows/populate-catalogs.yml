@@ -31,9 +31,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  populate:
+  populate-regular:
+    name: Populate Regular Catalogs
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.large_catalog_mode == 'none' || github.event.inputs.large_catalog_mode == 'all' }}
     env:
       HUSKY: 0
     steps:
@@ -66,7 +68,6 @@ jobs:
           esac
 
       - name: Populate reference data (catalogs, mappings, rules, UMA)
-        if: ${{ github.event.inputs.large_catalog_mode == 'none' || github.event.inputs.large_catalog_mode == 'all' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -74,92 +75,134 @@ jobs:
           WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
         run: node scripts/populate/all.mjs
 
-      - name: Populate large catalogs (if selected)
-        if: ${{ github.event.inputs.large_catalog_mode != 'none' }}
+  populate-zip-codes:
+    name: Populate Zip Codes
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    if: ${{ github.event.inputs.large_catalog_mode == 'all' || github.event.inputs.large_catalog_mode == 'zip-codes' }}
+    # Only wait for populate-regular if it's running (mode == 'all')
+    needs: ${{ github.event.inputs.large_catalog_mode == 'all' && fromJSON('["populate-regular"]') || fromJSON('[]') }}
+    env:
+      HUSKY: 0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Determine wrangler config
+        id: config
+        run: |
+          case "${{ github.event.inputs.environment }}" in
+            prod)
+              echo "config=wrangler.prod.jsonc" >> $GITHUB_OUTPUT
+              ;;
+            preview)
+              echo "config=wrangler.preview.jsonc" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "config=wrangler.jsonc" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Populate zip-codes catalog
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           REMOTE: "true"
           WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
-          LARGE_CATALOG_MODE: ${{ github.event.inputs.large_catalog_mode }}
+          LARGE_CATALOG_MODE: zip-codes
         run: node scripts/populate/all-catalogs-large.mjs
 
-      - name: Summary
+  populate-cfdi:
+    name: Populate CFDI Product/Services
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    if: ${{ github.event.inputs.large_catalog_mode == 'all' || github.event.inputs.large_catalog_mode == 'cfdi-product-services' }}
+    # Only wait for populate-regular if it's running (mode == 'all')
+    needs: ${{ github.event.inputs.large_catalog_mode == 'all' && fromJSON('["populate-regular"]') || fromJSON('[]') }}
+    env:
+      HUSKY: 0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Determine wrangler config
+        id: config
+        run: |
+          case "${{ github.event.inputs.environment }}" in
+            prod)
+              echo "config=wrangler.prod.jsonc" >> $GITHUB_OUTPUT
+              ;;
+            preview)
+              echo "config=wrangler.preview.jsonc" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "config=wrangler.jsonc" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Populate cfdi-product-services catalog
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REMOTE: "true"
+          WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
+          LARGE_CATALOG_MODE: cfdi-product-services
+        run: node scripts/populate/all-catalogs-large.mjs
+
+  summary:
+    name: Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [populate-regular, populate-zip-codes, populate-cfdi]
+    steps:
+      - name: Generate Summary
         run: |
           echo "## Reference Data Population Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Environment | \`${{ github.event.inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Config | \`${{ steps.config.outputs.config }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Large Catalog Mode | \`${{ github.event.inputs.large_catalog_mode }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Data Populated" >> $GITHUB_STEP_SUMMARY
+          echo "### Jobs Executed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event.inputs.large_catalog_mode }}" = "zip-codes" ] || [ "${{ github.event.inputs.large_catalog_mode }}" = "cfdi-product-services" ]; then
-            echo "ℹ️ **Regular catalogs skipped** - Only populating selected large catalog" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.populate-regular.result }}" != "skipped" ]; then
+            echo "- **Regular Catalogs:** ${{ needs.populate-regular.result }}" >> $GITHUB_STEP_SUMMARY
           fi
-          if [ "${{ github.event.inputs.large_catalog_mode }}" = "none" ] || [ "${{ github.event.inputs.large_catalog_mode }}" = "all" ]; then
-            echo "#### 1. Catalogs (87 catalogs)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Core Catalogs (10):**" >> $GITHUB_STEP_SUMMARY
-          echo "- Countries (name, iso2, iso3)" >> $GITHUB_STEP_SUMMARY
-          echo "- Currencies (code, short_name, decimal_places)" >> $GITHUB_STEP_SUMMARY
-          echo "- CFDI Units (2,420 items, batched)" >> $GITHUB_STEP_SUMMARY
-          echo "- States, Banks, Armor Levels" >> $GITHUB_STEP_SUMMARY
-          echo "- Business Activities, Economic Activities" >> $GITHUB_STEP_SUMMARY
-          echo "- Payment Forms, Payment Methods" >> $GITHUB_STEP_SUMMARY
-          echo "- Vulnerable Activities (4-column)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Vehicle Brands (3):**" >> $GITHUB_STEP_SUMMARY
-          echo "- Terrestrial (58 brands), Maritime (25 brands), Air (20 brands)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**CFDI Catalogs (11):**" >> $GITHUB_STEP_SUMMARY
-          echo "- Payment Forms, Payment Methods, Tax Regimes" >> $GITHUB_STEP_SUMMARY
-          echo "- Usages, Voucher Types, Taxes" >> $GITHUB_STEP_SUMMARY
-          echo "- Tax Factors, Tax Objects, Relation Types, Export Types" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**PLD Catalogs (15):**" >> $GITHUB_STEP_SUMMARY
-          echo "- Alert Types (395 items, 3-column with va_code)" >> $GITHUB_STEP_SUMMARY
-          echo "- Monetary Instruments, Payment Forms, Property Types" >> $GITHUB_STEP_SUMMARY
-          echo "- Incorporation Reasons, Shareholder Positions, Merger Types" >> $GITHUB_STEP_SUMMARY
-          echo "- And 8 more..." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Activity-Specific Catalogs (47):**" >> $GITHUB_STEP_SUMMARY
-          echo "- Catalogs for 19 vulnerable activities (ARI, BLI, CHV, DIN, DON, FEP, FES, INM, JYS, MJR, MPC, OBA, SPR, TCV, TDR, TPP, TSC, VEH)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### 2. CFDI-PLD Mappings (33 mappings)" >> $GITHUB_STEP_SUMMARY
-          echo "- 22 Payment Form mappings" >> $GITHUB_STEP_SUMMARY
-          echo "- 8 Currency mappings" >> $GITHUB_STEP_SUMMARY
-          echo "- 3 Country mappings" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### 3. Alert Rules & Configs" >> $GITHUB_STEP_SUMMARY
-          echo "- Alert rules for automated detection" >> $GITHUB_STEP_SUMMARY
-          echo "- Alert rule configurations" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### 4. UMA Values" >> $GITHUB_STEP_SUMMARY
-          echo "- Historical UMA (Unidad de Medida y Actualización) values" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.populate-zip-codes.result }}" != "skipped" ]; then
+            echo "- **Zip Codes:** ${{ needs.populate-zip-codes.result }}" >> $GITHUB_STEP_SUMMARY
           fi
-          if [ "${{ github.event.inputs.large_catalog_mode }}" != "none" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            if [ "${{ github.event.inputs.large_catalog_mode }}" = "zip-codes" ] || [ "${{ github.event.inputs.large_catalog_mode }}" = "cfdi-product-services" ]; then
-              echo "#### Large Catalog (Chunked)" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "#### 5. Large Catalogs (Chunked)" >> $GITHUB_STEP_SUMMARY
-            fi
-            if [ "${{ github.event.inputs.large_catalog_mode }}" = "all" ]; then
-              echo "- **Zip Codes:** ~157K items (8 chunks of 20K each)" >> $GITHUB_STEP_SUMMARY
-              echo "- **CFDI Product/Services:** ~52K items (6 chunks of 10K each)" >> $GITHUB_STEP_SUMMARY
-            elif [ "${{ github.event.inputs.large_catalog_mode }}" = "zip-codes" ]; then
-              echo "- **Zip Codes:** ~157K items (8 chunks of 20K each)" >> $GITHUB_STEP_SUMMARY
-            elif [ "${{ github.event.inputs.large_catalog_mode }}" = "cfdi-product-services" ]; then
-              echo "- **CFDI Product/Services:** ~52K items (6 chunks of 10K each)" >> $GITHUB_STEP_SUMMARY
-            fi
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ Large catalogs processed from chunked CSV files for performance" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "ℹ️ Large catalogs (zip-codes, cfdi-product-services) were **not** populated." >> $GITHUB_STEP_SUMMARY
-            echo "Select a large catalog mode (all, zip-codes, or cfdi-product-services) to populate them." >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.populate-cfdi.result }}" != "skipped" ]; then
+            echo "- **CFDI Product/Services:** ${{ needs.populate-cfdi.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ github.event.inputs.large_catalog_mode }}" = "all" ]; then
+            echo "✅ **Parallel Execution:** Zip codes and CFDI populated simultaneously" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ github.event.inputs.large_catalog_mode }}" = "zip-codes" ] || [ "${{ github.event.inputs.large_catalog_mode }}" = "cfdi-product-services" ]; then
+            echo "ℹ️ **Regular catalogs skipped** - Only populated selected large catalog" >> $GITHUB_STEP_SUMMARY
           fi

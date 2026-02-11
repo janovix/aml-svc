@@ -52,6 +52,10 @@ const BATCH_SIZES = {
 	"cfdi-product-services": 50, // Reduced from 200 (special chars + JSON metadata)
 };
 
+// Concurrent chunk processing configuration
+// Process multiple chunks in parallel for faster population
+const CONCURRENT_CHUNKS = 3; // Process 3 chunks simultaneously
+
 // Chunk configuration for large files
 const CHUNK_CONFIG = {
 	"zip-codes": {
@@ -114,7 +118,41 @@ function populateCatalogBatched(catalogKey, catalogName, items) {
 }
 
 /**
- * Populate catalog from chunked CSV files
+ * Process a single chunk (fetch, parse, populate)
+ */
+async function processChunk(
+	chunkNum,
+	config,
+	catalogKey,
+	catalogName,
+	mapRowToItem,
+) {
+	const chunkNumber = String(chunkNum).padStart(3, "0");
+	const chunkFilename = `${config.prefix}${chunkNumber}.csv`;
+	const chunkUrl = `${BASE_URL}/chunks/${chunkFilename}`;
+
+	console.log(
+		`   [${chunkNum}/${config.totalChunks}] Fetching ${chunkFilename}...`,
+	);
+
+	const chunkCsv = await fetchCsv(chunkUrl);
+	const chunkData = parseCsv(chunkCsv);
+	const items = chunkData.map(mapRowToItem);
+
+	console.log(
+		`   [${chunkNum}/${config.totalChunks}] Processing ${items.length.toLocaleString()} items...`,
+	);
+	populateCatalogBatched(catalogKey, catalogName, items);
+
+	console.log(
+		`   ✅ Chunk ${chunkNum} complete (${items.length.toLocaleString()} items)`,
+	);
+
+	return items.length;
+}
+
+/**
+ * Populate catalog from chunked CSV files with concurrent processing
  */
 async function populateCatalogFromChunks(
 	catalogKey,
@@ -125,36 +163,37 @@ async function populateCatalogFromChunks(
 	console.log(
 		`\n📦 Populating ${catalogKey} from ${config.totalChunks} chunks...`,
 	);
+	console.log(`   🚀 Processing ${CONCURRENT_CHUNKS} chunks concurrently\n`);
 
 	let totalItems = 0;
+	const chunkNumbers = Array.from(
+		{ length: config.totalChunks },
+		(_, i) => i + 1,
+	);
 
-	for (let chunkNum = 1; chunkNum <= config.totalChunks; chunkNum++) {
-		const chunkNumber = String(chunkNum).padStart(3, "0");
-		const chunkFilename = `${config.prefix}${chunkNumber}.csv`;
-		const chunkUrl = `${BASE_URL}/chunks/${chunkFilename}`;
-
-		console.log(
-			`   [${chunkNum}/${config.totalChunks}] Fetching ${chunkFilename}...`,
-		);
+	// Process chunks in batches of CONCURRENT_CHUNKS
+	for (let i = 0; i < chunkNumbers.length; i += CONCURRENT_CHUNKS) {
+		const batchChunks = chunkNumbers.slice(i, i + CONCURRENT_CHUNKS);
 
 		try {
-			const chunkCsv = await fetchCsv(chunkUrl);
-			const chunkData = parseCsv(chunkCsv);
+			// Process this batch of chunks concurrently
+			const results = await Promise.all(
+				batchChunks.map((chunkNum) =>
+					processChunk(chunkNum, config, catalogKey, catalogName, mapRowToItem),
+				),
+			);
 
-			const items = chunkData.map(mapRowToItem);
+			// Sum up items from this batch
+			const batchTotal = results.reduce((sum, count) => sum + count, 0);
+			totalItems += batchTotal;
 
-			console.log(`   Processing ${items.length.toLocaleString()} items...`);
-			populateCatalogBatched(catalogKey, catalogName, items);
-
-			totalItems += items.length;
+			const progress = Math.min(i + CONCURRENT_CHUNKS, config.totalChunks);
+			const percentage = ((progress / config.totalChunks) * 100).toFixed(1);
 			console.log(
-				`   ✅ Chunk ${chunkNum} complete (${items.length.toLocaleString()} items)\n`,
+				`\n   📊 Progress: ${progress}/${config.totalChunks} chunks (${percentage}%) - ${totalItems.toLocaleString()} items total\n`,
 			);
 		} catch (error) {
-			console.error(
-				`   ❌ Failed to process chunk ${chunkNum}:`,
-				error.message,
-			);
+			console.error(`   ❌ Failed to process chunk batch:`, error.message);
 			throw error;
 		}
 	}
