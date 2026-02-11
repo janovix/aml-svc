@@ -148,20 +148,6 @@ function isRetryableFetchError(error) {
  * Fetch CSV from remote URL with retry logic
  */
 export async function fetchCsv(url, maxRetries = 5) {
-	// #region agent log
-	fetch("http://127.0.0.1:7244/ingest/bf26bb78-9b10-4561-bb87-bb814cf22854", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			location: "lib/shared.mjs:93",
-			message: "fetchCsv called",
-			data: { url },
-			timestamp: Date.now(),
-			hypothesisId: "H5",
-		}),
-	}).catch(() => {});
-	// #endregion
-
 	let lastError;
 
 	for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -171,10 +157,6 @@ export async function fetchCsv(url, maxRetries = 5) {
 				? `${url}&_t=${Date.now()}`
 				: `${url}?_t=${Date.now()}`;
 
-			// #region agent log
-			console.log("[DEBUG] fetchCsv cache-busted URL:", cacheBustedUrl);
-			// #endregion
-
 			const response = await fetch(cacheBustedUrl, {
 				cache: "no-store",
 				headers: {
@@ -183,27 +165,6 @@ export async function fetchCsv(url, maxRetries = 5) {
 				},
 			});
 
-			// #region agent log
-			fetch(
-				"http://127.0.0.1:7244/ingest/bf26bb78-9b10-4561-bb87-bb814cf22854",
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						location: "lib/shared.mjs:97",
-						message: "fetchCsv response",
-						data: {
-							ok: response.ok,
-							status: response.status,
-							statusText: response.statusText,
-						},
-						timestamp: Date.now(),
-						hypothesisId: "H5",
-					}),
-				},
-			).catch(() => {});
-			// #endregion
-
 			if (!response.ok) {
 				throw new Error(
 					`Failed to download CSV from ${url}: ${response.statusText}`,
@@ -211,14 +172,6 @@ export async function fetchCsv(url, maxRetries = 5) {
 			}
 
 			const text = await response.text();
-
-			// #region agent log
-			console.log("[DEBUG] fetchCsv text:", {
-				length: text.length,
-				preview: text.substring(0, 300),
-			});
-			// #endregion
-
 			return text;
 		} catch (error) {
 			lastError = error;
@@ -254,19 +207,6 @@ export function parseCsv(csvText) {
 
 	// Parse header to get column names
 	const header = lines[0].trim();
-	// #region agent log
-	fetch("http://127.0.0.1:7244/ingest/bf26bb78-9b10-4561-bb87-bb814cf22854", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			location: "lib/shared.mjs:117",
-			message: "parseCsv header",
-			data: { header, firstLine: lines[0] },
-			timestamp: Date.now(),
-			hypothesisId: "H2",
-		}),
-	}).catch(() => {});
-	// #endregion
 	const columnNames = [];
 	let current = "";
 	let inQuotes = false;
@@ -283,9 +223,6 @@ export function parseCsv(csvText) {
 		}
 	}
 	columnNames.push(current.trim());
-	// #region agent log
-	console.log("[DEBUG] parseCsv columnNames:", columnNames);
-	// #endregion
 
 	// Parse data rows
 	const items = [];
@@ -319,12 +256,6 @@ export function parseCsv(csvText) {
 			items.push(item);
 		}
 	}
-	// #region agent log
-	console.log("[DEBUG] parseCsv result:", {
-		count: items.length,
-		first3: items.slice(0, 3),
-	});
-	// #endregion
 
 	return items;
 }

@@ -70,6 +70,7 @@
 		"caddy:local": "caddy run --config Caddyfile",
 		"format": "prettier . --write",
 		"format:check": "prettier . --check",
+		"generate:large-catalog-sql": "node ./scripts/populate/generate-large-catalog-sql.mjs",
 		"lint": "eslint .",
 		"versions:upload": "node ./scripts/versions-upload.mjs",
 		"postinstall": "prisma generate",

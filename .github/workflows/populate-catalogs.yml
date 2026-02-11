@@ -78,7 +78,7 @@ jobs:
   populate-zip-codes:
     name: Populate Zip Codes
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 15
     if: ${{ always() && (github.event.inputs.large_catalog_mode == 'all' || github.event.inputs.large_catalog_mode == 'zip-codes') }}
     needs: [populate-regular]
     env:
@@ -112,6 +112,9 @@ jobs:
               ;;
           esac
 
+      - name: Generate SQL dump for zip-codes
+        run: pnpm generate:large-catalog-sql -- zip-codes
+
       - name: Populate zip-codes catalog
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -124,7 +127,7 @@ jobs:
   populate-cfdi:
     name: Populate CFDI Product/Services
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 15
     if: ${{ always() && (github.event.inputs.large_catalog_mode == 'all' || github.event.inputs.large_catalog_mode == 'cfdi-product-services') }}
     needs: [populate-regular]
     env:
@@ -157,6 +160,9 @@ jobs:
               echo "config=wrangler.jsonc" >> $GITHUB_OUTPUT
               ;;
           esac
+
+      - name: Generate SQL dump for cfdi-product-services
+        run: pnpm generate:large-catalog-sql -- cfdi-product-services
 
       - name: Populate cfdi-product-services catalog
         env:
