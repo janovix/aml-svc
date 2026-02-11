@@ -52,9 +52,10 @@ const BATCH_SIZES = {
 	"cfdi-product-services": 50, // Reduced from 200 (special chars + JSON metadata)
 };
 
-// Concurrent chunk processing configuration
-// Process multiple chunks in parallel for faster population
-const CONCURRENT_CHUNKS = 3; // Process 3 chunks simultaneously
+// Concurrent processing disabled due to network socket errors
+// Fetching large CSV chunks concurrently causes connection terminations
+// Strategy: Fetch sequentially, but use smaller batches and retry logic for reliability
+const CONCURRENT_CHUNKS = 1; // Process 1 chunk at a time (sequential)
 
 // Chunk configuration for large files
 const CHUNK_CONFIG = {
@@ -163,7 +164,9 @@ async function populateCatalogFromChunks(
 	console.log(
 		`\n📦 Populating ${catalogKey} from ${config.totalChunks} chunks...`,
 	);
-	console.log(`   🚀 Processing ${CONCURRENT_CHUNKS} chunks concurrently\n`);
+	if (CONCURRENT_CHUNKS > 1) {
+		console.log(`   🚀 Processing ${CONCURRENT_CHUNKS} chunks concurrently\n`);
+	}
 
 	let totalItems = 0;
 	const chunkNumbers = Array.from(
@@ -175,8 +178,15 @@ async function populateCatalogFromChunks(
 	for (let i = 0; i < chunkNumbers.length; i += CONCURRENT_CHUNKS) {
 		const batchChunks = chunkNumbers.slice(i, i + CONCURRENT_CHUNKS);
 
+		// Add small delay between chunks to avoid overwhelming D1 API
+		if (i > 0 && CONCURRENT_CHUNKS > 1) {
+			const delayMs = 2000; // 2 second delay between concurrent batches
+			console.log(`   ⏳ Waiting ${delayMs / 1000}s before next batch...\n`);
+			await new Promise((resolve) => setTimeout(resolve, delayMs));
+		}
+
 		try {
-			// Process this batch of chunks concurrently
+			// Process this batch of chunks (concurrently if CONCURRENT_CHUNKS > 1)
 			const results = await Promise.all(
 				batchChunks.map((chunkNum) =>
 					processChunk(chunkNum, config, catalogKey, catalogName, mapRowToItem),

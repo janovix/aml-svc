@@ -68,10 +68,12 @@ export function executeSql(sql, label = "populate") {
 function isRetryableError(error) {
 	const errorStr = error.toString().toLowerCase();
 	return (
+		errorStr.includes("500") ||
 		errorStr.includes("502") ||
 		errorStr.includes("503") ||
 		errorStr.includes("504") ||
 		errorStr.includes("internal error") ||
+		errorStr.includes("internal server error") ||
 		errorStr.includes("timeout") ||
 		errorStr.includes("7500")
 	);
