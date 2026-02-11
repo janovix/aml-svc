@@ -178,10 +178,10 @@ async function populateCatalogFromChunks(
 	for (let i = 0; i < chunkNumbers.length; i += CONCURRENT_CHUNKS) {
 		const batchChunks = chunkNumbers.slice(i, i + CONCURRENT_CHUNKS);
 
-		// Add small delay between chunks to avoid overwhelming D1 API
-		if (i > 0 && CONCURRENT_CHUNKS > 1) {
-			const delayMs = 2000; // 2 second delay between concurrent batches
-			console.log(`   ⏳ Waiting ${delayMs / 1000}s before next batch...\n`);
+		// Add delay between chunks to avoid overwhelming network and D1 API
+		if (i > 0) {
+			const delayMs = 3000; // 3 second delay between chunks for network stability
+			console.log(`   ⏳ Waiting ${delayMs / 1000}s before next chunk...\n`);
 			await new Promise((resolve) => setTimeout(resolve, delayMs));
 		}
 

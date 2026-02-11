@@ -75,6 +75,7 @@ function isRetryableError(error) {
 		errorStr.includes("internal error") ||
 		errorStr.includes("internal server error") ||
 		errorStr.includes("timeout") ||
+		errorStr.includes("terminated") ||
 		errorStr.includes("7500")
 	);
 }
@@ -128,9 +129,25 @@ export function executeSqlFile(filePath, _label = "sql-file") {
 }
 
 /**
- * Fetch CSV from remote URL
+ * Check if a fetch error is retryable (network errors, timeouts)
  */
-export async function fetchCsv(url) {
+function isRetryableFetchError(error) {
+	const errorStr = error.toString().toLowerCase();
+	return (
+		errorStr.includes("terminated") ||
+		errorStr.includes("timeout") ||
+		errorStr.includes("network") ||
+		errorStr.includes("socket") ||
+		errorStr.includes("econnreset") ||
+		errorStr.includes("econnrefused") ||
+		errorStr.includes("etimedout")
+	);
+}
+
+/**
+ * Fetch CSV from remote URL with retry logic
+ */
+export async function fetchCsv(url, maxRetries = 5) {
 	// #region agent log
 	fetch("http://127.0.0.1:7244/ingest/bf26bb78-9b10-4561-bb87-bb814cf22854", {
 		method: "POST",
@@ -144,50 +161,85 @@ export async function fetchCsv(url) {
 		}),
 	}).catch(() => {});
 	// #endregion
-	// Add cache-busting to ensure we get the latest version
-	const cacheBustedUrl = url.includes("?")
-		? `${url}&_t=${Date.now()}`
-		: `${url}?_t=${Date.now()}`;
-	// #region agent log
-	console.log("[DEBUG] fetchCsv cache-busted URL:", cacheBustedUrl);
-	// #endregion
-	const response = await fetch(cacheBustedUrl, {
-		cache: "no-store",
-		headers: {
-			"Cache-Control": "no-cache",
-			Pragma: "no-cache",
-		},
-	});
-	// #region agent log
-	fetch("http://127.0.0.1:7244/ingest/bf26bb78-9b10-4561-bb87-bb814cf22854", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			location: "lib/shared.mjs:97",
-			message: "fetchCsv response",
-			data: {
-				ok: response.ok,
-				status: response.status,
-				statusText: response.statusText,
-			},
-			timestamp: Date.now(),
-			hypothesisId: "H5",
-		}),
-	}).catch(() => {});
-	// #endregion
-	if (!response.ok) {
-		throw new Error(
-			`Failed to download CSV from ${url}: ${response.statusText}`,
-		);
+
+	let lastError;
+
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			// Add cache-busting to ensure we get the latest version
+			const cacheBustedUrl = url.includes("?")
+				? `${url}&_t=${Date.now()}`
+				: `${url}?_t=${Date.now()}`;
+
+			// #region agent log
+			console.log("[DEBUG] fetchCsv cache-busted URL:", cacheBustedUrl);
+			// #endregion
+
+			const response = await fetch(cacheBustedUrl, {
+				cache: "no-store",
+				headers: {
+					"Cache-Control": "no-cache",
+					Pragma: "no-cache",
+				},
+			});
+
+			// #region agent log
+			fetch(
+				"http://127.0.0.1:7244/ingest/bf26bb78-9b10-4561-bb87-bb814cf22854",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						location: "lib/shared.mjs:97",
+						message: "fetchCsv response",
+						data: {
+							ok: response.ok,
+							status: response.status,
+							statusText: response.statusText,
+						},
+						timestamp: Date.now(),
+						hypothesisId: "H5",
+					}),
+				},
+			).catch(() => {});
+			// #endregion
+
+			if (!response.ok) {
+				throw new Error(
+					`Failed to download CSV from ${url}: ${response.statusText}`,
+				);
+			}
+
+			const text = await response.text();
+
+			// #region agent log
+			console.log("[DEBUG] fetchCsv text:", {
+				length: text.length,
+				preview: text.substring(0, 300),
+			});
+			// #endregion
+
+			return text;
+		} catch (error) {
+			lastError = error;
+
+			// Check if error is retryable (network errors, socket closures)
+			if (attempt < maxRetries && isRetryableFetchError(error)) {
+				const delayMs = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s, 16s, 32s
+				console.log(
+					`   ⚠️  Fetch attempt ${attempt}/${maxRetries} failed: ${error.message}`,
+				);
+				console.log(`   ⏳ Retrying in ${delayMs / 1000}s...`);
+				await new Promise((resolve) => setTimeout(resolve, delayMs));
+				continue;
+			}
+
+			// Non-retryable error or max retries reached
+			throw error;
+		}
 	}
-	const text = await response.text();
-	// #region agent log
-	console.log("[DEBUG] fetchCsv text:", {
-		length: text.length,
-		preview: text.substring(0, 300),
-	});
-	// #endregion
-	return text;
+
+	throw lastError;
 }
 
 /**
