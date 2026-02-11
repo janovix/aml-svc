@@ -66,6 +66,7 @@ jobs:
           esac
 
       - name: Populate reference data (catalogs, mappings, rules, UMA)
+        if: ${{ github.event.inputs.large_catalog_mode == 'none' || github.event.inputs.large_catalog_mode == 'all' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -95,7 +96,12 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Data Populated" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### 1. Catalogs (87 catalogs)" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event.inputs.large_catalog_mode }}" = "zip-codes" ] || [ "${{ github.event.inputs.large_catalog_mode }}" = "cfdi-product-services" ]; then
+            echo "ℹ️ **Regular catalogs skipped** - Only populating selected large catalog" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ github.event.inputs.large_catalog_mode }}" = "none" ] || [ "${{ github.event.inputs.large_catalog_mode }}" = "all" ]; then
+            echo "#### 1. Catalogs (87 catalogs)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Core Catalogs (10):**" >> $GITHUB_STEP_SUMMARY
           echo "- Countries (name, iso2, iso3)" >> $GITHUB_STEP_SUMMARY
@@ -134,9 +140,14 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### 4. UMA Values" >> $GITHUB_STEP_SUMMARY
           echo "- Historical UMA (Unidad de Medida y Actualización) values" >> $GITHUB_STEP_SUMMARY
+          fi
           if [ "${{ github.event.inputs.large_catalog_mode }}" != "none" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "#### 5. Large Catalogs (Chunked)" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ github.event.inputs.large_catalog_mode }}" = "zip-codes" ] || [ "${{ github.event.inputs.large_catalog_mode }}" = "cfdi-product-services" ]; then
+              echo "#### Large Catalog (Chunked)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "#### 5. Large Catalogs (Chunked)" >> $GITHUB_STEP_SUMMARY
+            fi
             if [ "${{ github.event.inputs.large_catalog_mode }}" = "all" ]; then
               echo "- **Zip Codes:** ~157K items (8 chunks of 20K each)" >> $GITHUB_STEP_SUMMARY
               echo "- **CFDI Product/Services:** ~52K items (6 chunks of 10K each)" >> $GITHUB_STEP_SUMMARY
