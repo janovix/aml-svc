@@ -1,3 +1,10 @@
+# [1.6.0-rc.9](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.8...v1.6.0-rc.9) (2026-02-12)
+
+
+### Features
+
+* add script for importing remaining catalogs from a specified index ([52b3bde](https://github.com/janovix/aml-svc/commit/52b3bde46b0719949131248b74fb6e9450a8b9e6))
+
 # [1.6.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.7...v1.6.0-rc.8) (2026-02-12)
 
 
