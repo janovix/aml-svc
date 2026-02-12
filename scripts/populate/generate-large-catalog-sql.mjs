@@ -186,7 +186,9 @@ async function generateSqlDump(catalogKey, config) {
  */
 async function main() {
 	// Check if a specific catalog was requested
-	const catalogArg = process.argv[2];
+	// Filter out pnpm's `--` separator that gets passed as a literal argument
+	const args = process.argv.slice(2).filter(arg => arg !== '--');
+	const catalogArg = args[0];
 	const catalogsToGenerate = catalogArg
 		? { [catalogArg]: CATALOGS[catalogArg] }
 		: CATALOGS;
