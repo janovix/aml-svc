@@ -145,19 +145,23 @@ importEventsRouter.get("/:id/events", async (c) => {
 	}
 
 	// Verify the token manually
-	const authServiceUrl =
-		c.env.AUTH_SERVICE_URL ?? "https://auth-svc.janovix.workers.dev";
+	const authServiceBinding = c.env.AUTH_SERVICE;
+	if (!authServiceBinding) {
+		return c.json(
+			{
+				success: false,
+				error: "Configuration Error",
+				message: "Authentication service not configured",
+			},
+			500,
+		);
+	}
+
 	const cacheTtl = 3600;
 	let payload: AuthTokenPayload;
 
 	try {
-		payload = await verifyToken(
-			token,
-			authServiceUrl,
-			cacheTtl,
-			c.env.AUTH_SERVICE,
-			c.env.ENVIRONMENT,
-		);
+		payload = await verifyToken(token, cacheTtl, authServiceBinding);
 	} catch (error) {
 		console.error("Token verification failed:", error);
 		return c.json(

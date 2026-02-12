@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { generateKeyPair, exportJWK, SignJWT, type JSONWebKeySet } from "jose";
 import { adminRouter } from "../../src/routes/admin";
@@ -54,7 +54,7 @@ async function createTestJWT(
 describe("Admin Routes", () => {
 	let testKeyPair: KeyPairResult;
 	let testJWKS: JSONWebKeySet;
-	let fetchMock: ReturnType<typeof vi.fn>;
+	let mockAuthService: Fetcher;
 	let app: Hono<{
 		Bindings: AdminAuthBindings & { DB: D1Database };
 		Variables: AdminAuthVariables;
@@ -69,28 +69,29 @@ describe("Admin Routes", () => {
 		const publicJWK = await publicKeyToJWK(testKeyPair.publicKey);
 		testJWKS = { keys: [publicJWK] };
 
-		// Mock fetch for JWKS endpoint
-		// Note: get-session is no longer called since role is now in JWT payload
-		fetchMock = vi.fn().mockImplementation(async (url: string | Request) => {
-			let urlStr: string;
-			if (typeof url === "string") {
-				urlStr = url;
-			} else if (url instanceof Request) {
-				urlStr = url.url;
-			} else {
-				urlStr = String(url);
-			}
+		// Mock AUTH_SERVICE binding for JWKS endpoint
+		// This simulates the service binding to auth-svc
+		mockAuthService = {
+			fetch: vi.fn().mockImplementation(async (url: string | Request) => {
+				let urlStr: string;
+				if (typeof url === "string") {
+					urlStr = url;
+				} else if (url instanceof Request) {
+					urlStr = url.url;
+				} else {
+					urlStr = String(url);
+				}
 
-			if (urlStr.includes("/api/auth/jwks")) {
-				return new Response(JSON.stringify(testJWKS), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				});
-			}
-			return new Response("Not Found", { status: 404 });
-		});
-
-		vi.stubGlobal("fetch", fetchMock);
+				if (urlStr.includes("/api/auth/jwks")) {
+					return new Response(JSON.stringify(testJWKS), {
+						status: 200,
+						headers: { "Content-Type": "application/json" },
+					});
+				}
+				return new Response("Not Found", { status: 404 });
+			}),
+			connect: vi.fn(),
+		} as unknown as Fetcher;
 
 		// Create test app
 		app = new Hono<{
@@ -239,10 +240,6 @@ describe("Admin Routes", () => {
 		});
 	});
 
-	afterEach(() => {
-		vi.unstubAllGlobals();
-	});
-
 	interface ErrorResponse {
 		success: boolean;
 		error: string;
@@ -304,7 +301,7 @@ describe("Admin Routes", () => {
 	describe("Authentication", () => {
 		it("should return 401 when no Authorization header is provided", async () => {
 			const res = await app.request("/admin/stats", {}, {
-				AUTH_SERVICE_URL: "https://auth-svc.test",
+				AUTH_SERVICE: mockAuthService,
 				DB: env.DB,
 			} as AdminAuthBindings & { DB: D1Database });
 
@@ -330,7 +327,7 @@ describe("Admin Routes", () => {
 					headers: { Authorization: `Bearer ${token}` },
 				},
 				{
-					AUTH_SERVICE_URL: "https://auth-svc.test",
+					AUTH_SERVICE: mockAuthService,
 					DB: env.DB,
 				} as AdminAuthBindings & { DB: D1Database },
 			);
@@ -355,7 +352,7 @@ describe("Admin Routes", () => {
 					headers: { Authorization: `Bearer ${token}` },
 				},
 				{
-					AUTH_SERVICE_URL: "https://auth-svc.test",
+					AUTH_SERVICE: mockAuthService,
 					DB: env.DB,
 				} as AdminAuthBindings & { DB: D1Database },
 			);
@@ -382,7 +379,7 @@ describe("Admin Routes", () => {
 					headers: { Authorization: `Bearer ${token}` },
 				},
 				{
-					AUTH_SERVICE_URL: "https://auth-svc.test",
+					AUTH_SERVICE: mockAuthService,
 					DB: env.DB,
 				} as AdminAuthBindings & { DB: D1Database },
 			);
@@ -408,7 +405,7 @@ describe("Admin Routes", () => {
 					headers: { Authorization: `Bearer ${token}` },
 				},
 				{
-					AUTH_SERVICE_URL: "https://auth-svc.test",
+					AUTH_SERVICE: mockAuthService,
 					DB: env.DB,
 				} as AdminAuthBindings & { DB: D1Database },
 			);
@@ -433,7 +430,7 @@ describe("Admin Routes", () => {
 					headers: { Authorization: `Bearer ${token}` },
 				},
 				{
-					AUTH_SERVICE_URL: "https://auth-svc.test",
+					AUTH_SERVICE: mockAuthService,
 					DB: env.DB,
 				} as AdminAuthBindings & { DB: D1Database },
 			);
@@ -456,7 +453,7 @@ describe("Admin Routes", () => {
 					headers: { Authorization: `Bearer ${token}` },
 				},
 				{
-					AUTH_SERVICE_URL: "https://auth-svc.test",
+					AUTH_SERVICE: mockAuthService,
 					DB: env.DB,
 				} as AdminAuthBindings & { DB: D1Database },
 			);
@@ -484,7 +481,7 @@ describe("Admin Routes", () => {
 					headers: { Authorization: `Bearer ${token}` },
 				},
 				{
-					AUTH_SERVICE_URL: "https://auth-svc.test",
+					AUTH_SERVICE: mockAuthService,
 					DB: env.DB,
 				} as AdminAuthBindings & { DB: D1Database },
 			);
@@ -514,7 +511,7 @@ describe("Admin Routes", () => {
 					headers: { Authorization: `Bearer ${token}` },
 				},
 				{
-					AUTH_SERVICE_URL: "https://auth-svc.test",
+					AUTH_SERVICE: mockAuthService,
 					DB: env.DB,
 				} as AdminAuthBindings & { DB: D1Database },
 			);
@@ -538,7 +535,7 @@ describe("Admin Routes", () => {
 					headers: { Authorization: `Bearer ${token}` },
 				},
 				{
-					AUTH_SERVICE_URL: "https://auth-svc.test",
+					AUTH_SERVICE: mockAuthService,
 					DB: env.DB,
 				} as AdminAuthBindings & { DB: D1Database },
 			);
@@ -568,7 +565,7 @@ describe("Admin Routes", () => {
 					headers: { Authorization: `Bearer ${token}` },
 				},
 				{
-					AUTH_SERVICE_URL: "https://auth-svc.test",
+					AUTH_SERVICE: mockAuthService,
 					DB: env.DB,
 				} as AdminAuthBindings & { DB: D1Database },
 			);
@@ -594,7 +591,7 @@ describe("Admin Routes", () => {
 					headers: { Authorization: `Bearer ${token}` },
 				},
 				{
-					AUTH_SERVICE_URL: "https://auth-svc.test",
+					AUTH_SERVICE: mockAuthService,
 					DB: env.DB,
 				} as AdminAuthBindings & { DB: D1Database },
 			);

@@ -113,6 +113,23 @@ export default defineWorkersConfig({
 					bindings: {
 						MIGRATIONS: migrations,
 					},
+					serviceBindings: {
+						// Mock AUTH_SERVICE for integration tests
+						AUTH_SERVICE: async (request) => {
+							const url = new URL(request.url);
+							// Mock JWKS endpoint using shared test keys
+							if (url.pathname.includes("/api/auth/jwks")) {
+								// Import here to avoid circular dependencies
+								const { getTestJWKS } = await import("./helpers/test-auth.js");
+								const jwks = await getTestJWKS();
+								return new Response(JSON.stringify(jwks), {
+									status: 200,
+									headers: { "Content-Type": "application/json" },
+								});
+							}
+							return new Response("Not Found", { status: 404 });
+						},
+					},
 				},
 			},
 		},

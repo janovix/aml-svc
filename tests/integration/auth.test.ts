@@ -53,7 +53,7 @@ async function createTestJWT(
 describe("Auth Middleware", () => {
 	let testKeyPair: KeyPairResult;
 	let testJWKS: JSONWebKeySet;
-	let fetchMock: ReturnType<typeof vi.fn>;
+	let mockAuthService: Fetcher;
 
 	beforeEach(async () => {
 		// Generate fresh key pair for each test
@@ -64,22 +64,24 @@ describe("Auth Middleware", () => {
 		// Clear JWKS cache before each test
 		clearJWKSCache();
 
-		// Mock fetch for JWKS endpoint
-		fetchMock = vi.fn().mockImplementation(async (url: string) => {
-			if (url.includes("/api/auth/jwks")) {
-				return new Response(JSON.stringify(testJWKS), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				});
-			}
-			return new Response("Not Found", { status: 404 });
-		});
-
-		vi.stubGlobal("fetch", fetchMock);
+		// Mock AUTH_SERVICE binding for JWKS endpoint
+		// This simulates the service binding to auth-svc
+		mockAuthService = {
+			fetch: vi.fn().mockImplementation(async (url: string | Request) => {
+				const urlStr = typeof url === "string" ? url : url.url;
+				if (urlStr.includes("/api/auth/jwks")) {
+					return new Response(JSON.stringify(testJWKS), {
+						status: 200,
+						headers: { "Content-Type": "application/json" },
+					});
+				}
+				return new Response("Not Found", { status: 404 });
+			}),
+			connect: vi.fn(),
+		} as unknown as Fetcher;
 	});
 
 	afterEach(() => {
-		vi.unstubAllGlobals();
 		clearJWKSCache();
 	});
 
@@ -121,7 +123,7 @@ describe("Auth Middleware", () => {
 			const app = createTestApp();
 
 			const res = await app.request("/protected", {}, {
-				AUTH_SERVICE_URL: "https://auth-svc.test",
+				AUTH_SERVICE: mockAuthService,
 			} as AuthBindings);
 
 			expect(res.status).toBe(401);
@@ -138,7 +140,7 @@ describe("Auth Middleware", () => {
 				{
 					headers: { Authorization: "InvalidFormat" },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			expect(res.status).toBe(401);
@@ -152,7 +154,7 @@ describe("Auth Middleware", () => {
 				{
 					headers: { Authorization: "Basic dXNlcjpwYXNz" },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			expect(res.status).toBe(401);
@@ -173,7 +175,7 @@ describe("Auth Middleware", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			expect(res.status).toBe(200);
@@ -198,7 +200,7 @@ describe("Auth Middleware", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			expect(res.status).toBe(401);
@@ -220,7 +222,7 @@ describe("Auth Middleware", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			expect(res.status).toBe(401);
@@ -236,7 +238,7 @@ describe("Auth Middleware", () => {
 				{
 					headers: { Authorization: "Bearer not.a.valid.jwt" },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			expect(res.status).toBe(401);
@@ -253,7 +255,7 @@ describe("Auth Middleware", () => {
 			});
 
 			const res = await app.request("/optional", {}, {
-				AUTH_SERVICE_URL: "https://auth-svc.test",
+				AUTH_SERVICE: mockAuthService,
 			} as AuthBindings);
 
 			expect(res.status).toBe(200);
@@ -273,7 +275,7 @@ describe("Auth Middleware", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			expect(res.status).toBe(200);
@@ -294,13 +296,12 @@ describe("Auth Middleware", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
-			expect(fetchMock).toHaveBeenCalledWith(
-				"https://auth-svc.test/api/auth/jwks",
+			expect(mockAuthService.fetch).toHaveBeenCalledWith(
 				expect.objectContaining({
-					headers: { Accept: "application/json" },
+					url: expect.stringContaining("/api/auth/jwks"),
 				}),
 			);
 		});
@@ -317,7 +318,7 @@ describe("Auth Middleware", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			// Second request - should use cached JWKS
@@ -326,17 +327,20 @@ describe("Auth Middleware", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			// JWKS should only be fetched once due to caching
-			expect(fetchMock).toHaveBeenCalledTimes(1);
+			expect(mockAuthService.fetch).toHaveBeenCalledTimes(1);
 		});
 
 		it("should return 503 when JWKS fetch fails", async () => {
-			fetchMock.mockImplementation(async () => {
-				return new Response("Service Unavailable", { status: 503 });
-			});
+			const failingAuthService = {
+				fetch: vi.fn().mockImplementation(async () => {
+					return new Response("Service Unavailable", { status: 503 });
+				}),
+				connect: vi.fn(),
+			} as unknown as Fetcher;
 
 			const app = createTestApp();
 			const token = await createTestJWT(testKeyPair.privateKey, {
@@ -348,7 +352,7 @@ describe("Auth Middleware", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: failingAuthService } as AuthBindings,
 			);
 
 			expect(res.status).toBe(503);
@@ -358,7 +362,7 @@ describe("Auth Middleware", () => {
 	});
 
 	describe("Configuration", () => {
-		it("should return 500 when AUTH_SERVICE_URL is not configured", async () => {
+		it("should return 500 when AUTH_SERVICE binding is not configured", async () => {
 			const app = createTestApp();
 			const token = await createTestJWT(testKeyPair.privateKey, {
 				sub: "user-123",
@@ -369,7 +373,7 @@ describe("Auth Middleware", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{} as AuthBindings, // No AUTH_SERVICE_URL
+				{} as AuthBindings, // No AUTH_SERVICE
 			);
 
 			expect(res.status).toBe(500);
