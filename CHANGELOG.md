@@ -1,3 +1,10 @@
+# [1.6.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.9...v1.6.0-rc.10) (2026-02-12)
+
+
+### Features
+
+* add script for importing catalog items with proper foreign key handling ([81bbbeb](https://github.com/janovix/aml-svc/commit/81bbbeb5ab3f43d492c369c51030b128938ac258))
+
 # [1.6.0-rc.9](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.8...v1.6.0-rc.9) (2026-02-12)
 
 
