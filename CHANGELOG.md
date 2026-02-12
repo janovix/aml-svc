@@ -1,3 +1,10 @@
+# [1.6.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.7...v1.6.0-rc.8) (2026-02-12)
+
+
+### Features
+
+* add scripts for incremental catalog import and database state check ([ac10933](https://github.com/janovix/aml-svc/commit/ac10933cd901942ca56f92eb252220ae3019a8fa))
+
 # [1.6.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.6...v1.6.0-rc.7) (2026-02-12)
 
 
