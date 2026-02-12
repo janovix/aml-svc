@@ -14,9 +14,9 @@ import {
 } from "../domain/alert";
 import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
+import { createUsageRightsClient } from "../lib/usage-rights-client";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
-import { createSubscriptionClient } from "../lib/subscription-client";
 
 export const alertsRouter = new Hono<{
 	Bindings: Bindings;
@@ -110,6 +110,27 @@ alertsRouter.get("/:id", async (c) => {
 
 alertsRouter.post("/", async (c) => {
 	const organizationId = getOrganizationId(c);
+
+	const usageRights = createUsageRightsClient(c.env);
+	const gateResult = await usageRights.gate(organizationId, "alerts");
+	if (!gateResult.allowed) {
+		return c.json(
+			{
+				success: false,
+				error: gateResult.error ?? "usage_limit_exceeded",
+				code: "USAGE_LIMIT_EXCEEDED",
+				upgradeRequired: true,
+				metric: "alerts",
+				used: gateResult.used,
+				limit: gateResult.limit,
+				entitlementType: gateResult.entitlementType,
+				message:
+					"You have reached the limit for alerts. Please upgrade your plan or contact your administrator.",
+			},
+			403,
+		);
+	}
+
 	const body = await c.req.json();
 	const payload = parseWithZod(AlertCreateSchema, body);
 
@@ -118,13 +139,6 @@ alertsRouter.post("/", async (c) => {
 	const created = await service
 		.create(payload, organizationId)
 		.catch(handleServiceError);
-
-	// Report alert usage to auth-svc for metered billing
-	// Fire-and-forget - don't fail alert creation if billing fails
-	const subscriptionClient = createSubscriptionClient(c.env);
-	subscriptionClient.reportUsage(organizationId, "alerts", 1).catch((err) => {
-		console.error("Failed to report alert usage:", err);
-	});
 
 	return c.json(created, 201);
 });

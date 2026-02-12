@@ -41,16 +41,16 @@ organizationSettingsRouter.get("/", async (c) => {
 	const settings = await service.getByOrganizationId(organizationId);
 
 	if (!settings) {
-		return c.json(
-			{
-				error: "Not Found",
-				message: "Organization settings not found for this organization",
-			},
-			404,
-		);
+		return c.json({
+			configured: false,
+			settings: null,
+		});
 	}
 
-	return c.json(settings);
+	return c.json({
+		configured: true,
+		settings,
+	});
 });
 
 // PUT /api/v1/organization-settings - Create or update organization settings
@@ -68,7 +68,7 @@ organizationSettingsRouter.put("/", async (c) => {
 		activityKey: data.activityKey,
 	});
 
-	return c.json(settings, 200);
+	return c.json({ configured: true, settings }, 200);
 });
 
 // PATCH /api/v1/organization-settings - Partial update
@@ -82,8 +82,10 @@ organizationSettingsRouter.patch("/", async (c) => {
 	if (!existing) {
 		return c.json(
 			{
-				error: "Not Found",
-				message: "Organization settings not found for this organization",
+				configured: false,
+				error: "Not Configured",
+				message:
+					"Organization settings have not been configured yet. Use PUT to create them.",
 			},
 			404,
 		);
@@ -96,5 +98,5 @@ organizationSettingsRouter.patch("/", async (c) => {
 		activityKey: data.activityKey,
 	});
 
-	return c.json(settings);
+	return c.json({ configured: true, settings });
 });
