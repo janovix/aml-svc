@@ -339,7 +339,7 @@ export class ImportRepository {
 		const records = await this.prisma.importRowResult.findMany({
 			where: {
 				importId,
-				updatedAt: { gt: since },
+				updatedAt: { gte: since },
 			},
 			orderBy: { rowNumber: "asc" },
 		});

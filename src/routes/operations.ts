@@ -18,7 +18,7 @@ import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { createAlertQueueService } from "../lib/alert-queue";
-import { createSubscriptionClient } from "../lib/subscription-client";
+import { createUsageRightsClient } from "../lib/usage-rights-client";
 
 export const operationsRouter = new Hono<{
 	Bindings: Bindings;
@@ -409,12 +409,10 @@ operationsRouter.post("/", async (c) => {
 	await alertQueue.queueOperationCreated(created.clientId, created.id);
 
 	// Report operation usage to auth-svc for metered billing
-	const subscriptionClient = createSubscriptionClient(c.env);
-	subscriptionClient
-		.reportUsage(organizationId, "operations", 1)
-		.catch((err) => {
-			console.error("Failed to report operation usage:", err);
-		});
+	const usageRightsClient = createUsageRightsClient(c.env);
+	usageRightsClient.meter(organizationId, "operations", 1).catch((err) => {
+		console.error("Failed to report operation usage:", err);
+	});
 
 	return c.json(created, 201);
 });
@@ -436,7 +434,7 @@ operationsRouter.post("/bulk-import", async (c) => {
 
 	const service = getService(c);
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
-	const subscriptionClient = createSubscriptionClient(c.env);
+	const usageRightsClient = createUsageRightsClient(c.env);
 
 	const results: Array<{
 		index: number;
@@ -523,8 +521,8 @@ operationsRouter.post("/bulk-import", async (c) => {
 
 	// Report usage for all successfully created operations
 	if (successCount + warningCount > 0) {
-		subscriptionClient
-			.reportUsage(organizationId, "operations", successCount + warningCount)
+		usageRightsClient
+			.meter(organizationId, "operations", successCount + warningCount)
 			.catch((err) => {
 				console.error("[BulkImport] Failed to report usage:", err);
 			});
