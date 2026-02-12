@@ -1,4 +1,5 @@
 {
+	"account_id": "37d5ea9be13559a1ea8f5a46068eac99",
 	"compatibility_date": "2025-10-08",
 	"compatibility_flags": ["nodejs_als"],
 	"main": "src/index.ts",
