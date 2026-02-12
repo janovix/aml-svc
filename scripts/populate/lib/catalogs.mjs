@@ -438,13 +438,13 @@ export async function generateAllCatalogsSql() {
 	const zipCodesItems = zipCodesData.map((row) => ({
 		name: `${row.zip_code} - ${row.settlement}, ${row.municipality}, ${row.state}`,
 		metadata: {
-			zip_code: row.zip_code,
+			code: row.zip_code, // Standard catalog pattern, matches frontend
 			settlement: row.settlement,
-			settlement_type: row.settlement_type,
+			settlementType: row.settlement_type, // camelCase, matches frontend
 			municipality: row.municipality,
 			state: row.state,
 			city: row.city,
-			state_code: row.state_code,
+			stateCode: row.state_code, // camelCase, matches frontend
 			zone: row.zone,
 		},
 	}));
