@@ -224,12 +224,7 @@ function generateCatalogSql(catalogKey, catalogName, items) {
 	const catalogId = generateCatalogId(catalogKey);
 	const sql = [];
 
-	// Delete existing items for this catalog (clean slate)
-	sql.push(`-- Clear existing items for ${catalogKey} (${items.length} items)`);
-	sql.push(`DELETE FROM catalog_items WHERE catalog_id = '${catalogId}';`);
-	sql.push("");
-
-	// Insert or ignore catalog
+	// Insert or ignore catalog (must exist before deleting/inserting items due to FK constraint)
 	sql.push(`-- Create catalog: ${catalogKey}`);
 	sql.push(
 		`INSERT OR IGNORE INTO catalogs (id, key, name, active, created_at, updated_at)`,
@@ -237,6 +232,11 @@ function generateCatalogSql(catalogKey, catalogName, items) {
 	sql.push(
 		`VALUES ('${catalogId}', '${catalogKey}', ${escapeSql(catalogName)}, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
 	);
+	sql.push("");
+
+	// Delete existing items for this catalog (clean slate)
+	sql.push(`-- Clear existing items for ${catalogKey} (${items.length} items)`);
+	sql.push(`DELETE FROM catalog_items WHERE catalog_id = '${catalogId}';`);
 	sql.push("");
 
 	// Insert items (batched)

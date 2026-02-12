@@ -31,11 +31,6 @@ import { mapOperationToEntity } from "../domain/operation/mappers";
 import type { OperationEntity, ActivityCode } from "../domain/operation/types";
 import type { ClientEntity } from "../domain/client/types";
 import { generateNoticeFileKey } from "../lib/r2-upload";
-import { createSubscriptionClient } from "../lib/subscription-client";
-	generateMonthlyReportXml,
-	mapToSatVehicleNoticeData,
-	type SatMonthlyReportData,
-} from "../lib/sat-xml-generator";
 
 export const noticesRouter = new Hono<{
 	Bindings: Bindings;
