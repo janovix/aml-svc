@@ -8,11 +8,20 @@ Populate scripts run in **all environments** (local, dev, preview, production).
 
 ### Reference Data (not synthetic)
 
-- **Catalogs** (~85 catalogs): Countries, currencies, CFDI codes, PLD codes, activity-specific codes
+- **ALL Catalogs** (~87 catalogs including large ones): Countries, currencies, CFDI codes, PLD codes, activity-specific codes, zip-codes (~157K items), cfdi-product-services (~52K items)
 - **CFDI-PLD Mappings**: Cross-reference tables between CFDI and PLD catalogs
 - **Alert Rules**: Legal/system rules for AML compliance (based on LFPIORPI)
 - **Alert Rule Configs**: Configuration values for automated alert seekers
 - **UMA Values**: Official UMA (Unidad de Medida y Actualización) values by year
+
+## Architecture
+
+All reference data is now populated using a unified, fast SQL dump approach:
+
+1. **Generate** SQL dump files from CSV data and hardcoded constants
+2. **Import** SQL files via `wrangler d1 execute --file --remote`
+
+Two SQL files, two wrangler calls, everything populated in seconds.
 
 ## Scripts
 
@@ -20,37 +29,33 @@ Populate scripts run in **all environments** (local, dev, preview, production).
 
 - **`all.mjs`** - Master script that populates ALL reference data
 
-  - Runs: catalogs → CFDI-PLD mappings → alert rules → alert rule configs → UMA values
+  - Auto-generates SQL dump files
+  - Imports `sql/catalogs.sql` (all ~87 catalogs)
+  - Imports `sql/reference-data.sql` (rules, configs, mappings, UMA)
   - Usage: `pnpm populate` (local) or `pnpm populate:dev` (remote dev)
 
-- **`catalogs.mjs`** - Populates ~85 small/medium catalogs from `catalogs.janovix.com`
+- **`generate-sql.mjs`** - Generates SQL dump files from CSV + hardcoded data
+  - Fetches all CSVs from `catalogs.janovix.com`
+  - Writes `sql/catalogs.sql` and `sql/reference-data.sql`
+  - Usage: `pnpm generate:sql`
 
-  - Core catalogs (countries, currencies, states, banks)
-  - CFDI catalogs (SAT codes)
-  - PLD consolidated catalogs
-  - Activity-specific catalogs (47 catalogs across 19 vulnerable activities)
-  - Vehicle brands (terrestrial, maritime, air)
-
-- **`all-catalogs-large.mjs`** - Populates large catalogs separately (optional)
-  - Zip codes (~140K items)
-  - CFDI product/services (~52K items)
-  - Usage: `pnpm populate:catalogs:large`
-
-### Individual Scripts
-
-- **`alert-rules.mjs`** - Legal/system alert rules for AML compliance
-- **`alert-rule-configs.mjs`** - Configuration values for alert seekers
-- **`catalog-cfdi-pld-mappings.mjs`** - CFDI ↔ PLD catalog mappings
-- **`uma-values.mjs`** - UMA reference values
-
-### Utilities
+### Library Modules
 
 - **`lib/shared.mjs`** - Shared utilities for all populate scripts
+
   - Wrangler config management
-  - SQL execution
+  - SQL execution (`executeSql`, `executeSqlFile`)
   - CSV fetching/parsing
-  - ID generation
-  - SQL generation helpers
+  - MD5-based ID generation (content-addressable)
+
+- **`lib/catalogs.mjs`** - ALL catalog definitions and SQL generation
+
+  - ~87 catalog definitions (regular + large)
+  - `generateAllCatalogsSql()` - returns SQL string for all catalogs
+
+- **`lib/reference-data.mjs`** - Reference data SQL generation
+  - Alert rules, configs, CFDI-PLD mappings, UMA values
+  - `generateReferenceDataSql()` - returns SQL string
 
 ## Usage
 
@@ -60,11 +65,8 @@ Populate scripts run in **all environments** (local, dev, preview, production).
 # Populate all reference data (local DB)
 pnpm populate
 
-# Populate to a specific local config
+# Or populate to a specific local config
 pnpm populate:local
-
-# Populate large catalogs (optional)
-pnpm populate:catalogs:large
 ```
 
 ### Remote Environments
@@ -80,16 +82,28 @@ pnpm populate:prod
 pnpm populate:preview
 ```
 
-## Architecture
+### Manual SQL Generation (optional)
 
-All catalogs are now fetched from a single remote source: **`https://catalogs.janovix.com`**
+```bash
+# Generate SQL dump files only (without importing)
+pnpm generate:sql
+```
 
-Benefits:
+## Why SQL Dumps?
 
-- Single source of truth for all catalog data
-- Easy updates without code changes
-- Consistent format (CSV with `code,name` or specialized formats)
-- Version control of data separate from code
+The new approach generates SQL dumps instead of fetching CSV at runtime:
+
+**Benefits:**
+
+- **Fast**: ~157K zip code items imported in seconds (vs minutes with old approach)
+- **Idempotent**: Content-addressable MD5 IDs ensure safe re-runs
+- **Unified**: No distinction between "regular" and "large" catalogs
+- **Reliable**: D1 Import API handles large files (up to 5 GB)
+- **Simple**: Two wrangler calls populate everything
+
+**Data Source:**
+
+All catalogs are fetched from **`https://catalogs.janovix.com`** during SQL generation.
 
 ## Populate vs Seed
 
@@ -119,17 +133,18 @@ Previously separate catalogs are now unified:
 
 ## Implementation Details
 
-### ID Generation
+### ID Generation (Content-Addressable)
 
-- Catalog IDs: Deterministic hash from catalog key
-- Item IDs: Deterministic hash from catalog ID + item seed
-- Ensures stable IDs across re-populations
+- **Catalog IDs**: `md5("catalog:" + catalogKey)` - deterministic from catalog key
+- **Item IDs**: `md5(catalogKey + ":" + normalizedName)` - identity-based, metadata-independent
+- Metadata can change without affecting IDs (clean updates via `INSERT OR REPLACE`)
 
 ### SQL Generation
 
-- Uses SQLite upsert syntax: `INSERT OR REPLACE` for items
-- Uses `ON CONFLICT DO UPDATE` for alert rules (preserves FK constraints)
-- Batched execution for large catalogs (1000 items per batch)
+- Multi-row INSERT statements (50 rows per statement) for efficiency
+- Uses `INSERT OR REPLACE` for catalog items (idempotent)
+- Uses `ON CONFLICT DO UPDATE` for alert rules (preserves FK constraints from alerts table)
+- Each catalog deletes its existing items before inserting (`DELETE FROM catalog_items WHERE catalog_id = ...`)
 
 ### Metadata Storage
 
@@ -139,6 +154,7 @@ Catalog items store additional data in JSON `metadata` field:
 - `shortName`: For currencies (backward compatibility)
 - `decimal_places`: For currencies
 - `iso2`, `iso3`: For countries
+- `zip_code`, `settlement`, `municipality`, `state`, etc.: For zip codes
 - `originCountry`, `type`: For vehicle brands
 
 ## Troubleshooting
@@ -167,14 +183,14 @@ UMA values are populated from `uma-values.mjs`. Update the hardcoded values ther
 When adding new catalogs:
 
 1. Add CSV to `https://catalogs.janovix.com/catalog-name.csv`
-2. Add catalog definition to `catalogs.mjs` in the appropriate section
+2. Add catalog definition to `lib/catalogs.mjs` in the appropriate section
 3. Document metadata structure if non-standard
 4. Update this README
 
 When adding new alert rules:
 
-1. Update `alert-rules.mjs` with new rule definitions
-2. Add corresponding configs in `alert-rule-configs.mjs` if needed
+1. Update `lib/reference-data.mjs` with new rule definitions
+2. Add corresponding configs if needed
 3. Document the legal basis in metadata
 
 ## See Also

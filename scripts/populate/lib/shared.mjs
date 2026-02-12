@@ -6,6 +6,7 @@
  */
 
 import { execSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { writeFileSync, unlinkSync } from "node:fs";
@@ -280,64 +281,19 @@ export function normalizeText(text) {
 }
 
 /**
- * Generate deterministic catalog ID from key
+ * Generate deterministic catalog ID from key using MD5
  */
 export function generateCatalogId(catalogKey) {
-	return Array.from(catalogKey)
-		.reduce((acc, char) => acc + char.charCodeAt(0), 0)
-		.toString(16)
-		.padStart(32, "0");
+	return createHash("md5").update(`catalog:${catalogKey}`).digest("hex");
 }
 
 /**
- * Generate deterministic item ID
+ * Generate deterministic item ID from catalog key and normalized name using MD5.
+ * Only the identity (catalog + name) determines the ID, NOT metadata.
+ * This way, metadata can evolve over time and INSERT OR REPLACE
+ * cleanly updates the same row instead of creating a duplicate.
  */
-export function generateItemId(catalogId, seed) {
-	const combined = `${catalogId}-${seed}`;
-	let hash = 0;
-	for (let i = 0; i < combined.length; i++) {
-		const char = combined.charCodeAt(i);
-		hash = (hash << 5) - hash + char;
-		hash = hash & hash;
-	}
-	return Math.abs(hash).toString(16).padStart(32, "0");
-}
-
-/**
- * Populate a catalog with items
- * Generates and executes INSERT SQL for catalog + items
- */
-export function populateCatalog(catalogKey, catalogName, items) {
-	const catalogId = generateCatalogId(catalogKey);
-	const sql = [];
-
-	// Insert catalog
-	sql.push(`
-		INSERT OR IGNORE INTO catalogs (id, key, name, active, created_at, updated_at)
-		VALUES ('${catalogId}', '${catalogKey}', ${escapeSql(catalogName)}, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-	`);
-
-	// Insert items
-	for (const item of items) {
-		const name = escapeSql(item.name);
-		const normalizedName = escapeSql(normalizeText(item.name));
-		const metadata = escapeSql(JSON.stringify(item.metadata || {}));
-		const itemId = generateItemId(catalogId, item.id || normalizedName);
-
-		sql.push(`
-			INSERT OR REPLACE INTO catalog_items (id, catalog_id, name, normalized_name, active, metadata, created_at, updated_at)
-			VALUES (
-				'${itemId}',
-				'${catalogId}',
-				${name},
-				${normalizedName},
-				1,
-				${metadata},
-				COALESCE((SELECT created_at FROM catalog_items WHERE id = '${itemId}'), CURRENT_TIMESTAMP),
-				CURRENT_TIMESTAMP
-			);
-		`);
-	}
-
-	executeSql(sql.join("\n"), catalogKey);
+export function generateItemId(catalogKey, normalizedName) {
+	const content = `${catalogKey}:${normalizedName}`;
+	return createHash("md5").update(content).digest("hex");
 }

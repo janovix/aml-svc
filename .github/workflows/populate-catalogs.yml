@@ -1,4 +1,4 @@
-name: Populate Catalogs
+name: Populate Reference Data
 
 on:
   workflow_dispatch:
@@ -12,30 +12,19 @@ on:
           - prod
           - preview
         default: dev
-      large_catalog_mode:
-        description: "Large catalog population mode"
-        required: false
-        type: choice
-        options:
-          - none
-          - all
-          - zip-codes
-          - cfdi-product-services
-        default: none
 
 permissions:
   contents: read
 
 concurrency:
-  group: populate-catalogs-${{ github.event.inputs.environment }}
+  group: populate-reference-data-${{ github.event.inputs.environment }}
   cancel-in-progress: false
 
 jobs:
-  populate-regular:
-    name: Populate Regular Catalogs
+  populate:
+    name: Populate All Reference Data
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: ${{ github.event.inputs.large_catalog_mode == 'none' || github.event.inputs.large_catalog_mode == 'all' }}
     env:
       HUSKY: 0
     steps:
@@ -67,146 +56,34 @@ jobs:
               ;;
           esac
 
-      - name: Populate reference data (catalogs, mappings, rules, UMA)
+      - name: Generate SQL dump files
+        run: node scripts/populate/generate-sql.mjs
+
+      - name: Import catalogs
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          REMOTE: "true"
-          WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
-        run: node scripts/populate/all.mjs
+        run: pnpm wrangler d1 execute DB --config ${{ steps.config.outputs.config }} --remote --file scripts/populate/sql/catalogs.sql
 
-  populate-zip-codes:
-    name: Populate Zip Codes
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: ${{ always() && (github.event.inputs.large_catalog_mode == 'all' || github.event.inputs.large_catalog_mode == 'zip-codes') }}
-    needs: [populate-regular]
-    env:
-      HUSKY: 0
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Determine wrangler config
-        id: config
-        run: |
-          case "${{ github.event.inputs.environment }}" in
-            prod)
-              echo "config=wrangler.prod.jsonc" >> $GITHUB_OUTPUT
-              ;;
-            preview)
-              echo "config=wrangler.preview.jsonc" >> $GITHUB_OUTPUT
-              ;;
-            *)
-              echo "config=wrangler.jsonc" >> $GITHUB_OUTPUT
-              ;;
-          esac
-
-      - name: Generate SQL dump for zip-codes
-        run: pnpm generate:large-catalog-sql -- zip-codes
-
-      - name: Populate zip-codes catalog
+      - name: Import reference data
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          REMOTE: "true"
-          WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
-          LARGE_CATALOG_MODE: zip-codes
-        run: node scripts/populate/all-catalogs-large.mjs
+        run: pnpm wrangler d1 execute DB --config ${{ steps.config.outputs.config }} --remote --file scripts/populate/sql/reference-data.sql
 
-  populate-cfdi:
-    name: Populate CFDI Product/Services
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: ${{ always() && (github.event.inputs.large_catalog_mode == 'all' || github.event.inputs.large_catalog_mode == 'cfdi-product-services') }}
-    needs: [populate-regular]
-    env:
-      HUSKY: 0
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Determine wrangler config
-        id: config
-        run: |
-          case "${{ github.event.inputs.environment }}" in
-            prod)
-              echo "config=wrangler.prod.jsonc" >> $GITHUB_OUTPUT
-              ;;
-            preview)
-              echo "config=wrangler.preview.jsonc" >> $GITHUB_OUTPUT
-              ;;
-            *)
-              echo "config=wrangler.jsonc" >> $GITHUB_OUTPUT
-              ;;
-          esac
-
-      - name: Generate SQL dump for cfdi-product-services
-        run: pnpm generate:large-catalog-sql -- cfdi-product-services
-
-      - name: Populate cfdi-product-services catalog
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          REMOTE: "true"
-          WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
-          LARGE_CATALOG_MODE: cfdi-product-services
-        run: node scripts/populate/all-catalogs-large.mjs
-
-  summary:
-    name: Summary
-    runs-on: ubuntu-latest
-    if: always()
-    needs: [populate-regular, populate-zip-codes, populate-cfdi]
-    steps:
       - name: Generate Summary
+        if: always()
         run: |
           echo "## Reference Data Population Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Environment | \`${{ github.event.inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Large Catalog Mode | \`${{ github.event.inputs.large_catalog_mode }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Config | \`${{ steps.config.outputs.config }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Jobs Executed" >> $GITHUB_STEP_SUMMARY
+          echo "### Data Populated" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [ "${{ needs.populate-regular.result }}" != "skipped" ]; then
-            echo "- **Regular Catalogs:** ${{ needs.populate-regular.result }}" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [ "${{ needs.populate-zip-codes.result }}" != "skipped" ]; then
-            echo "- **Zip Codes:** ${{ needs.populate-zip-codes.result }}" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [ "${{ needs.populate-cfdi.result }}" != "skipped" ]; then
-            echo "- **CFDI Product/Services:** ${{ needs.populate-cfdi.result }}" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [ "${{ github.event.inputs.large_catalog_mode }}" = "all" ]; then
-            echo "✅ **Parallel Execution:** Zip codes and CFDI populated simultaneously" >> $GITHUB_STEP_SUMMARY
-          elif [ "${{ github.event.inputs.large_catalog_mode }}" = "zip-codes" ] || [ "${{ github.event.inputs.large_catalog_mode }}" = "cfdi-product-services" ]; then
-            echo "ℹ️ **Regular catalogs skipped** - Only populated selected large catalog" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "- **All Catalogs** (including zip-codes + cfdi-product-services)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Alert Rules & Configs**" >> $GITHUB_STEP_SUMMARY
+          echo "- **CFDI-PLD Mappings**" >> $GITHUB_STEP_SUMMARY
+          echo "- **UMA Values**" >> $GITHUB_STEP_SUMMARY
