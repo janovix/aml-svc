@@ -39,12 +39,13 @@ export async function handleInternalOrganizationSettingsRequest(
 			if (!settings) {
 				return new Response(
 					JSON.stringify({
-						success: false,
-						error: "Not Found",
-						message: "Organization settings not found for this organization",
+						success: true,
+						data: {
+							configured: false,
+							settings: null,
+						},
 					}),
 					{
-						status: 404,
 						headers: { "Content-Type": "application/json" },
 					},
 				);
@@ -53,7 +54,10 @@ export async function handleInternalOrganizationSettingsRequest(
 			return new Response(
 				JSON.stringify({
 					success: true,
-					data: settings,
+					data: {
+						configured: true,
+						settings,
+					},
 				}),
 				{
 					headers: { "Content-Type": "application/json" },
@@ -91,7 +95,7 @@ export async function handleInternalOrganizationSettingsRequest(
 			return new Response(
 				JSON.stringify({
 					success: true,
-					data: settings,
+					data: { configured: true, settings },
 				}),
 				{
 					headers: { "Content-Type": "application/json" },
@@ -111,8 +115,10 @@ export async function handleInternalOrganizationSettingsRequest(
 				return new Response(
 					JSON.stringify({
 						success: false,
-						error: "Not Found",
-						message: "Organization settings not found for this organization",
+						configured: false,
+						error: "Not Configured",
+						message:
+							"Organization settings have not been configured yet. Use PUT to create them.",
 					}),
 					{
 						status: 404,
@@ -158,7 +164,7 @@ export async function handleInternalOrganizationSettingsRequest(
 			return new Response(
 				JSON.stringify({
 					success: true,
-					data: settings,
+					data: { configured: true, settings },
 				}),
 				{
 					headers: { "Content-Type": "application/json" },

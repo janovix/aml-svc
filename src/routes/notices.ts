@@ -21,6 +21,7 @@ import {
 import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
+import { createUsageRightsClient } from "../lib/usage-rights-client";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import {
 	generateSatMonthlyReportXml,
@@ -31,6 +32,10 @@ import type { OperationEntity, ActivityCode } from "../domain/operation/types";
 import type { ClientEntity } from "../domain/client/types";
 import { generateNoticeFileKey } from "../lib/r2-upload";
 import { createSubscriptionClient } from "../lib/subscription-client";
+	generateMonthlyReportXml,
+	mapToSatVehicleNoticeData,
+	type SatMonthlyReportData,
+} from "../lib/sat-xml-generator";
 
 export const noticesRouter = new Hono<{
 	Bindings: Bindings;
@@ -138,6 +143,28 @@ noticesRouter.get("/:id", async (c) => {
 // POST /notices - Create a new notice
 noticesRouter.post("/", async (c) => {
 	const organizationId = getOrganizationId(c);
+
+	// Gate check: verify org has quota for notices (meter is incremented atomically)
+	const usageRights = createUsageRightsClient(c.env);
+	const gateResult = await usageRights.gate(organizationId, "notices");
+	if (!gateResult.allowed) {
+		return c.json(
+			{
+				success: false,
+				error: gateResult.error ?? "usage_limit_exceeded",
+				code: "USAGE_LIMIT_EXCEEDED",
+				upgradeRequired: true,
+				metric: "notices",
+				used: gateResult.used,
+				limit: gateResult.limit,
+				entitlementType: gateResult.entitlementType,
+				message:
+					"You have reached the limit for notices. Please upgrade your plan or contact your administrator.",
+			},
+			403,
+		);
+	}
+
 	const user = c.get("user");
 	const userId = user?.id;
 	const body = await c.req.json();
@@ -147,13 +174,6 @@ noticesRouter.post("/", async (c) => {
 	const created = await service
 		.create(payload, organizationId, userId)
 		.catch(handleServiceError);
-
-	// Report notice usage to auth-svc for metered billing
-	// This is fire-and-forget - we don't want to fail notice creation if billing fails
-	const subscriptionClient = createSubscriptionClient(c.env);
-	subscriptionClient.reportUsage(organizationId, "notices", 1).catch((err) => {
-		console.error("Failed to report notice usage:", err);
-	});
 
 	return c.json(created, 201);
 });
