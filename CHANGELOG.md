@@ -1,3 +1,10 @@
+# [1.6.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.6...v1.6.0-rc.7) (2026-02-12)
+
+
+### Features
+
+* implement usage rights client and middleware ([e4f303a](https://github.com/janovix/aml-svc/commit/e4f303a1753fbeb7dd85a80be25cd1642257206b))
+
 # [1.6.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.5...v1.6.0-rc.6) (2026-02-10)
 
 
