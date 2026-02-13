@@ -1,3 +1,10 @@
+# [1.6.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.10...v1.6.0-rc.11) (2026-02-13)
+
+
+### Features
+
+* integrate Sentry for error handling across services ([7ff629a](https://github.com/janovix/aml-svc/commit/7ff629aacaf4d1f92ef94e361db4b78b18a3bdd0))
+
 # [1.6.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.9...v1.6.0-rc.10) (2026-02-12)
 
 
