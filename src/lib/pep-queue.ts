@@ -5,6 +5,8 @@
  * to the pep-check-worker for async processing via watchlist-svc
  */
 
+import * as Sentry from "@sentry/cloudflare";
+
 export type PEPJobType = "client.check" | "ubo.check" | "batch.refresh";
 
 export type PEPEntityType = "client" | "ubo";
@@ -91,19 +93,20 @@ export class PEPQueueService {
 	 */
 	private async sendJob(job: PEPJob): Promise<void> {
 		if (!this.queue) {
-			console.log(
-				`[PEP Queue] Queue not configured, skipping job: ${job.type} for ${job.entityType} ${job.entityId}`,
-			);
 			return;
 		}
 
 		try {
 			await this.queue.send(job);
-			console.log(
-				`[PEP Queue] Queued PEP check job: ${job.type} for ${job.entityType} ${job.entityId} (name: ${job.name})`,
-			);
 		} catch (error) {
-			console.error("[PEP Queue] Failed to queue PEP check job:", error);
+			Sentry.captureException(error, {
+				tags: { context: "pep-queue-failed" },
+				extra: {
+					jobType: job.type,
+					entityType: job.entityType,
+					entityId: job.entityId,
+				},
+			});
 			// Don't throw - PEP checking is not critical path
 		}
 	}

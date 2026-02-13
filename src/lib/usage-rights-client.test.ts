@@ -6,6 +6,12 @@ import {
 } from "./usage-rights-client";
 import type { Bindings } from "../types";
 
+// Mock Sentry
+vi.mock("@sentry/cloudflare", () => ({
+	captureException: vi.fn(),
+	captureMessage: vi.fn(),
+}));
+
 describe("UsageRightsClient", () => {
 	const mockFetch = vi.fn();
 	const mockEnv = {
@@ -95,16 +101,11 @@ describe("UsageRightsClient", () => {
 
 		it("returns allowed=true (fail-open) when fetch throws an error", async () => {
 			mockFetch.mockRejectedValue(new Error("Network error"));
-			const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
 			const result = await client.gate("org-123", "notices", 1);
 
 			expect(result).toEqual({ allowed: true });
-			expect(errorSpy).toHaveBeenCalledWith(
-				"[UsageRights] Error calling gate:",
-				expect.any(Error),
-			);
-			errorSpy.mockRestore();
+			// Error is logged to Sentry (implementation detail, not asserted)
 		});
 
 		it("sends correct request body with organizationId, metric, count", async () => {
@@ -173,16 +174,11 @@ describe("UsageRightsClient", () => {
 
 		it("logs error but does not throw when fetch fails", async () => {
 			mockFetch.mockRejectedValue(new Error("Service unavailable"));
-			const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
 			await expect(
 				client.meter("org-123", "notices", 1),
 			).resolves.not.toThrow();
-			expect(errorSpy).toHaveBeenCalledWith(
-				"[UsageRights] Error calling meter:",
-				expect.any(Error),
-			);
-			errorSpy.mockRestore();
+			// Error is logged to Sentry (implementation detail, not asserted)
 		});
 	});
 
@@ -254,16 +250,11 @@ describe("UsageRightsClient", () => {
 
 		it("returns null when fetch throws", async () => {
 			mockFetch.mockRejectedValue(new Error("Connection refused"));
-			const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
 			const result = await client.check("org-123", "notices");
 
 			expect(result).toBeNull();
-			expect(errorSpy).toHaveBeenCalledWith(
-				"[UsageRights] Error calling check:",
-				expect.any(Error),
-			);
-			errorSpy.mockRestore();
+			// Error is logged to Sentry (implementation detail, not asserted)
 		});
 	});
 

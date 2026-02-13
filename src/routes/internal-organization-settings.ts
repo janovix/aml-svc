@@ -2,6 +2,7 @@
  * Internal organization settings routes for service binding access
  * These endpoints are used by auth-svc via Cloudflare service bindings
  */
+import * as Sentry from "@sentry/cloudflare";
 import { getPrismaClient } from "../lib/prisma";
 import {
 	OrganizationSettingsRepository,
@@ -31,9 +32,6 @@ export async function handleInternalOrganizationSettingsRequest(
 	try {
 		// GET - Fetch organization settings
 		if (request.method === "GET") {
-			console.log(
-				`[InternalOrgSettings] GET organization settings for ${organizationId}`,
-			);
 			const settings = await service.getByOrganizationId(organizationId);
 
 			if (!settings) {
@@ -67,9 +65,6 @@ export async function handleInternalOrganizationSettingsRequest(
 
 		// PUT - Create or update organization settings
 		if (request.method === "PUT") {
-			console.log(
-				`[InternalOrgSettings] PUT organization settings for ${organizationId}`,
-			);
 			const body = await request.json();
 			const parseResult = organizationSettingsCreateSchema.safeParse(body);
 
@@ -105,10 +100,6 @@ export async function handleInternalOrganizationSettingsRequest(
 
 		// PATCH - Partial update organization settings
 		if (request.method === "PATCH") {
-			console.log(
-				`[InternalOrgSettings] PATCH organization settings for ${organizationId}`,
-			);
-
 			// Check if settings exist first
 			const existing = await service.getByOrganizationId(organizationId);
 			if (!existing) {
@@ -185,7 +176,9 @@ export async function handleInternalOrganizationSettingsRequest(
 			},
 		);
 	} catch (error) {
-		console.error("[InternalOrgSettings] Error processing request:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-org-settings-error" },
+		});
 		return new Response(
 			JSON.stringify({
 				success: false,

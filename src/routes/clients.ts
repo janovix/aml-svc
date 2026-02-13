@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import * as Sentry from "@sentry/cloudflare";
 
 import {
 	AddressIdParamSchema,
@@ -532,7 +533,9 @@ clientsInternalRouter.get("/", async (c) => {
 
 		return c.json(result);
 	} catch (error) {
-		console.error("[InternalClients] GET error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-clients-get-error" },
+		});
 		const { message, details } = formatInternalError(error);
 		const status = error instanceof APIError ? error.statusCode : 500;
 		return c.json({ error: "Error", message, details }, status as 400);
@@ -565,7 +568,9 @@ clientsInternalRouter.post("/", async (c) => {
 
 		return c.json(created, 201);
 	} catch (error) {
-		console.error("[InternalClients] POST error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-clients-post-error" },
+		});
 		const { message, details } = formatInternalError(error);
 
 		// Return 409 for duplicate key errors
@@ -614,7 +619,9 @@ clientsInternalRouter.patch("/:id/pep-status", async (c) => {
 
 		return c.json({ success: true });
 	} catch (error) {
-		console.error("[InternalClients] PATCH pep-status error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-clients-patch-pep-status-error" },
+		});
 		if (error instanceof APIError) {
 			return c.json({ error: error.message }, error.statusCode as 400);
 		}
@@ -685,7 +692,9 @@ clientsInternalRouter.get("/stale-pep-checks", async (c) => {
 			})),
 		});
 	} catch (error) {
-		console.error("[InternalClients] GET stale-pep-checks error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-clients-get-stale-pep-checks-error" },
+		});
 		return c.json({ error: "Failed to get stale clients" }, 500);
 	}
 });

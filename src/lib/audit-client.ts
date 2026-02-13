@@ -5,6 +5,7 @@
  * via Cloudflare service binding.
  */
 
+import * as Sentry from "@sentry/cloudflare";
 import type { Bindings } from "../types";
 
 /**
@@ -87,7 +88,6 @@ export class AuditClient {
 	async log(input: AuditLogInput): Promise<AuditLogResult | null> {
 		const authService = this.env.AUTH_SERVICE;
 		if (!authService) {
-			console.warn("AUTH_SERVICE binding not available, skipping audit log");
 			return null;
 		}
 
@@ -107,8 +107,13 @@ export class AuditClient {
 			);
 
 			if (!response.ok) {
-				console.error(
-					`Failed to create audit log: ${response.status} ${response.statusText}`,
+				Sentry.captureMessage(
+					`Failed to create audit log: ${response.status}`,
+					{
+						level: "error",
+						tags: { context: "audit-log-creation-failed" },
+						extra: { status: response.status, statusText: response.statusText },
+					},
 				);
 				return null;
 			}
@@ -120,13 +125,19 @@ export class AuditClient {
 			};
 
 			if (!result.success) {
-				console.error("Audit log creation failed:", result.error);
+				Sentry.captureMessage("Audit log creation failed", {
+					level: "error",
+					tags: { context: "audit-log-result-error" },
+					extra: { error: result.error },
+				});
 				return null;
 			}
 
 			return result.data;
 		} catch (error) {
-			console.error("Error creating audit log:", error);
+			Sentry.captureException(error, {
+				tags: { context: "audit-log-exception" },
+			});
 			return null;
 		}
 	}

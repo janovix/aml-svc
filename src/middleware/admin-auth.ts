@@ -1,5 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 import * as jose from "jose";
+import * as Sentry from "@sentry/cloudflare";
 
 import type { Bindings } from "../types";
 
@@ -177,7 +178,10 @@ export function adminAuthMiddleware(): MiddlewareHandler<{
 
 		const authServiceBinding = c.env.AUTH_SERVICE;
 		if (!authServiceBinding) {
-			console.error("AUTH_SERVICE binding is not configured");
+			Sentry.captureMessage("AUTH_SERVICE binding is not configured", {
+				level: "error",
+				tags: { context: "admin-auth-middleware-missing-binding" },
+			});
 			return c.json(
 				{
 					success: false,
@@ -246,7 +250,9 @@ export function adminAuthMiddleware(): MiddlewareHandler<{
 				);
 			}
 
-			console.error("Admin auth middleware error:", error);
+			Sentry.captureException(error, {
+				tags: { context: "admin-auth-middleware-error" },
+			});
 
 			if (
 				error instanceof Error &&

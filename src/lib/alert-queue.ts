@@ -4,6 +4,8 @@
  * Handles queueing of alert detection jobs to the aml-alert-worker
  */
 
+import * as Sentry from "@sentry/cloudflare";
+
 export type AlertJobType =
 	| "client.created"
 	| "client.updated"
@@ -89,19 +91,16 @@ export class AlertQueueService {
 	 */
 	private async sendJob(job: AlertJob): Promise<void> {
 		if (!this.queue) {
-			console.log(
-				`Alert queue not configured, skipping job: ${job.type} for client ${job.clientId}`,
-			);
 			return;
 		}
 
 		try {
 			await this.queue.send(job);
-			console.log(
-				`Queued alert detection job: ${job.type} for client ${job.clientId}`,
-			);
 		} catch (error) {
-			console.error("Failed to queue alert detection job:", error);
+			Sentry.captureException(error, {
+				tags: { context: "alert-queue-failed" },
+				extra: { jobType: job.type, clientId: job.clientId },
+			});
 			// Don't throw - alert detection is not critical path
 		}
 	}

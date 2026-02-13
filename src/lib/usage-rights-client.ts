@@ -7,6 +7,7 @@
  * Uses Cloudflare service bindings -- no auth headers needed.
  */
 
+import * as Sentry from "@sentry/cloudflare";
 import type { Bindings } from "../types";
 
 /**
@@ -90,7 +91,10 @@ export class UsageRightsClient {
 
 			return { ...data, allowed: true };
 		} catch (error) {
-			console.error("[UsageRights] Error calling gate:", error);
+			Sentry.captureException(error, {
+				tags: { context: "usage-rights-gate-error" },
+				extra: { organizationId: orgId, metric },
+			});
 			return { allowed: true }; // Fail-open
 		}
 	}
@@ -120,7 +124,10 @@ export class UsageRightsClient {
 				}),
 			);
 		} catch (error) {
-			console.error("[UsageRights] Error calling meter:", error);
+			Sentry.captureException(error, {
+				tags: { context: "usage-rights-meter-error" },
+				extra: { organizationId: orgId, metric, count },
+			});
 		}
 	}
 
@@ -147,7 +154,10 @@ export class UsageRightsClient {
 
 			return { ...data, allowed: true };
 		} catch (error) {
-			console.error("[UsageRights] Error calling check:", error);
+			Sentry.captureException(error, {
+				tags: { context: "usage-rights-check-error" },
+				extra: { organizationId: orgId, metric },
+			});
 			return null;
 		}
 	}

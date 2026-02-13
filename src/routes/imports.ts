@@ -7,6 +7,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { ZodError } from "zod";
 import { streamSSE } from "hono/streaming";
+import * as Sentry from "@sentry/cloudflare";
 
 import {
 	ImportService,
@@ -163,7 +164,9 @@ importEventsRouter.get("/:id/events", async (c) => {
 	try {
 		payload = await verifyToken(token, cacheTtl, authServiceBinding);
 	} catch (error) {
-		console.error("Token verification failed:", error);
+		Sentry.captureException(error, {
+			tags: { context: "import-token-verification-failed" },
+		});
 		return c.json(
 			{
 				success: false,
@@ -486,10 +489,6 @@ importsRouter.post("/", async (c) => {
 	// Queue the import job
 	if (c.env.IMPORT_PROCESSING_QUEUE) {
 		await c.env.IMPORT_PROCESSING_QUEUE.send(job);
-	} else {
-		console.warn(
-			"[Import] IMPORT_PROCESSING_QUEUE not configured, job not queued",
-		);
 	}
 
 	return c.json(
@@ -573,7 +572,9 @@ importInternalRouter.post("/:id/status", async (c) => {
 
 		return c.json({ success: true, data: result });
 	} catch (error) {
-		console.error("[InternalImports] POST status error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-imports-post-status-error" },
+		});
 		const { message, details } = formatInternalError(error);
 		const status = error instanceof APIError ? error.statusCode : 500;
 		return c.json({ error: "Error", message, details }, status as 400);
@@ -595,7 +596,9 @@ importInternalRouter.post("/:id/rows", async (c) => {
 
 		return c.json({ success: true });
 	} catch (error) {
-		console.error("[InternalImports] POST rows error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-imports-post-rows-error" },
+		});
 		const { message, details } = formatInternalError(error);
 		const status = error instanceof APIError ? error.statusCode : 500;
 		return c.json({ error: "Error", message, details }, status as 400);
@@ -621,7 +624,9 @@ importInternalRouter.post("/:id/progress", async (c) => {
 
 		return c.json({ success: true, data: result });
 	} catch (error) {
-		console.error("[InternalImports] POST progress error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-imports-post-progress-error" },
+		});
 		const { message, details } = formatInternalError(error);
 		const status = error instanceof APIError ? error.statusCode : 500;
 		return c.json({ error: "Error", message, details }, status as 400);

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { ZodError } from "zod";
+import * as Sentry from "@sentry/cloudflare";
 
 import {
 	InvoiceService,
@@ -216,7 +217,9 @@ invoicesInternalRouter.post("/parse-xml", async (c) => {
 
 		return c.json(result, 201);
 	} catch (error) {
-		console.error("[InternalInvoices] POST parse-xml error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-invoices-post-parse-xml-error" },
+		});
 
 		if (error instanceof APIError) {
 			return c.json(

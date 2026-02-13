@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { ZodError } from "zod";
+import * as Sentry from "@sentry/cloudflare";
 
 import {
 	UBOCreateSchema,
@@ -309,7 +310,9 @@ ubosInternalRouter.patch("/:uboId/pep-status", async (c) => {
 		const updated = await service.updatePEPStatus(uboId, payload);
 		return c.json({ success: true, data: updated });
 	} catch (error) {
-		console.error("[InternalUBOs] PATCH pep-status error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-ubos-patch-pep-status-error" },
+		});
 		if (error instanceof APIError) {
 			return c.json({ error: error.message }, error.statusCode as 400);
 		}
@@ -366,7 +369,9 @@ ubosInternalRouter.get("/stale-pep-checks", async (c) => {
 			})),
 		});
 	} catch (error) {
-		console.error("[InternalUBOs] GET stale-pep-checks error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-ubos-get-stale-pep-checks-error" },
+		});
 		return c.json({ error: "Failed to get stale UBOs" }, 500);
 	}
 });

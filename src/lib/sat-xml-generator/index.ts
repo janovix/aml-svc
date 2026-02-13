@@ -17,6 +17,7 @@
  * ```
  */
 
+import * as Sentry from "@sentry/cloudflare";
 import type {
 	ActivityCode,
 	OperationEntity,
@@ -95,7 +96,11 @@ export function generateSatMonthlyReportXml(
 	for (const operation of operations) {
 		const client = clients.get(operation.clientId);
 		if (!client) {
-			console.warn(`Client not found for operation ${operation.id}, skipping`);
+			Sentry.captureMessage("Client not found for operation", {
+				level: "warning",
+				tags: { context: "sat-xml-client-not-found" },
+				extra: { operationId: operation.id },
+			});
 			continue;
 		}
 

@@ -5,6 +5,7 @@
  * via Cloudflare service binding.
  */
 
+import * as Sentry from "@sentry/cloudflare";
 import type { Bindings } from "../types";
 
 /**
@@ -95,7 +96,6 @@ export async function getResolvedSettings(
 ): Promise<ResolvedSettings | null> {
 	const authService = env.AUTH_SERVICE;
 	if (!authService) {
-		console.warn("AUTH_SERVICE binding not available");
 		return null;
 	}
 
@@ -119,9 +119,11 @@ export async function getResolvedSettings(
 		);
 
 		if (!response.ok) {
-			console.error(
-				`Failed to fetch settings: ${response.status} ${response.statusText}`,
-			);
+			Sentry.captureMessage(`Failed to fetch settings: ${response.status}`, {
+				level: "error",
+				tags: { context: "fetch-settings-failed" },
+				extra: { status: response.status, statusText: response.statusText },
+			});
 			return null;
 		}
 
@@ -132,7 +134,9 @@ export async function getResolvedSettings(
 
 		return result.success ? result.data : null;
 	} catch (error) {
-		console.error("Error fetching settings from auth-svc:", error);
+		Sentry.captureException(error, {
+			tags: { context: "fetch-settings-exception" },
+		});
 		return null;
 	}
 }

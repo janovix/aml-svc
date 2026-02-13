@@ -9,6 +9,8 @@
  * - Updates hourly
  */
 
+import * as Sentry from "@sentry/cloudflare";
+
 const CACHE_TTL = 3600; // 1 hour cache
 const CACHE_KEY_PREFIX = "exchange_rate:";
 
@@ -49,7 +51,6 @@ export class CurrencyService {
 		to: string,
 	): Promise<ExchangeRate | null> {
 		if (!this.apiKey) {
-			console.warn("CURRENCYLAYER_API_KEY not configured");
 			return null;
 		}
 
@@ -89,7 +90,11 @@ export class CurrencyService {
 			const data: CurrencyLayerResponse = await response.json();
 
 			if (!data.success || !data.quotes) {
-				console.error("CurrencyLayer API error:", data.error);
+				Sentry.captureMessage("CurrencyLayer API error", {
+					level: "error",
+					tags: { context: "currency-layer-api-error" },
+					extra: { error: data.error },
+				});
 				return null;
 			}
 
@@ -100,7 +105,11 @@ export class CurrencyService {
 				// USD → X: rate is directly USDX
 				const usdToTo = data.quotes[`USD${to}`];
 				if (!usdToTo) {
-					console.error(`Missing currency quote: USD${to}=${usdToTo}`);
+					Sentry.captureMessage(`Missing currency quote: USD${to}`, {
+						level: "error",
+						tags: { context: "currency-quote-missing" },
+						extra: { to },
+					});
 					return null;
 				}
 				rate = usdToTo;
@@ -108,7 +117,11 @@ export class CurrencyService {
 				// X → USD: rate is 1 / USDX
 				const usdToFrom = data.quotes[`USD${from}`];
 				if (!usdToFrom) {
-					console.error(`Missing currency quote: USD${from}=${usdToFrom}`);
+					Sentry.captureMessage(`Missing currency quote: USD${from}`, {
+						level: "error",
+						tags: { context: "currency-quote-missing" },
+						extra: { from },
+					});
 					return null;
 				}
 				rate = 1 / usdToFrom;
@@ -118,9 +131,11 @@ export class CurrencyService {
 				const usdToTo = data.quotes[`USD${to}`];
 
 				if (!usdToFrom || !usdToTo) {
-					console.error(
-						`Missing currency quotes: USD${from}=${usdToFrom}, USD${to}=${usdToTo}`,
-					);
+					Sentry.captureMessage("Missing currency quotes for conversion", {
+						level: "error",
+						tags: { context: "currency-quotes-missing" },
+						extra: { from, to, usdToFrom, usdToTo },
+					});
 					return null;
 				}
 				rate = usdToTo / usdToFrom;
@@ -156,7 +171,10 @@ export class CurrencyService {
 
 			return result;
 		} catch (error) {
-			console.error("Failed to fetch exchange rate:", error);
+			Sentry.captureException(error, {
+				tags: { context: "fetch-exchange-rate-failed" },
+				extra: { from, to },
+			});
 			return null;
 		}
 	}

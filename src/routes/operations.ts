@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
+import * as Sentry from "@sentry/cloudflare";
 
 import {
 	OperationService,
@@ -411,7 +412,10 @@ operationsRouter.post("/", async (c) => {
 	// Report operation usage to auth-svc for metered billing
 	const usageRightsClient = createUsageRightsClient(c.env);
 	usageRightsClient.meter(organizationId, "operations", 1).catch((err) => {
-		console.error("Failed to report operation usage:", err);
+		Sentry.captureException(err, {
+			tags: { context: "operation-usage-reporting-failed" },
+			extra: { organizationId },
+		});
 	});
 
 	return c.json(created, 201);
@@ -480,7 +484,10 @@ operationsRouter.post("/bulk-import", async (c) => {
 			await alertQueue
 				.queueOperationCreated(created.clientId, created.id)
 				.catch((err) =>
-					console.error(`[BulkImport] Failed to queue alert for op ${i}:`, err),
+					Sentry.captureException(err, {
+						tags: { context: "bulk-import-queue-alert-failed" },
+						extra: { operationIndex: i, operationId: created.id },
+					}),
 				);
 
 			if (warnings.length > 0) {
@@ -524,7 +531,10 @@ operationsRouter.post("/bulk-import", async (c) => {
 		usageRightsClient
 			.meter(organizationId, "operations", successCount + warningCount)
 			.catch((err) => {
-				console.error("[BulkImport] Failed to report usage:", err);
+				Sentry.captureException(err, {
+					tags: { context: "bulk-import-usage-reporting-failed" },
+					extra: { organizationId, count: successCount + warningCount },
+				});
 			});
 	}
 
@@ -694,7 +704,9 @@ operationsInternalRouter.post("/", async (c) => {
 
 		return c.json(created, 201);
 	} catch (error) {
-		console.error("[InternalOperations] POST error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-operations-post-error" },
+		});
 		const { message, details } = formatInternalError(error);
 
 		if (error instanceof Error && error.message.includes("CLIENT_NOT_FOUND")) {
