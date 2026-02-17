@@ -21,7 +21,11 @@ import { organizationSettingsRouter } from "./organization-settings";
 import { reportsRouter } from "./reports";
 // Transaction domain deprecated - use operations instead
 import { umaValuesRouter } from "./uma-values";
-import { ubosRouter, ubosInternalRouter } from "./ubos";
+import { shareholdersRouter } from "./shareholders";
+import {
+	beneficialControllersRouter,
+	beneficialControllersInternalRouter,
+} from "./beneficial-controllers";
 import { exchangeRatesRouter } from "./exchange-rates";
 
 export function createRouter() {
@@ -41,7 +45,10 @@ export function createRouter() {
 	// Transaction internal routes deprecated - use operations
 	router.route("/internal/operations", operationsInternalRouter);
 	router.route("/internal/invoices", invoicesInternalRouter);
-	router.route("/internal/ubos", ubosInternalRouter);
+	router.route(
+		"/internal/beneficial-controllers",
+		beneficialControllersInternalRouter,
+	);
 
 	// Apply auth middleware with organization requirement for tenant-scoped routes
 	// These routes require an active organization to be selected
@@ -76,7 +83,8 @@ export function createRouter() {
 	// Mount resource routers
 	router.route("/catalogs", catalogsRouter);
 	router.route("/clients", clientsRouter);
-	router.route("/clients", ubosRouter); // UBO routes nested under clients (/:clientId/ubos/*)
+	router.route("/clients", shareholdersRouter); // Shareholder routes nested under clients (/:clientId/shareholders/*)
+	router.route("/clients", beneficialControllersRouter); // BC routes nested under clients (/:clientId/beneficial-controllers/*)
 	router.route("/operations", operationsRouter);
 	router.route("/invoices", invoicesRouter);
 	router.route("/alert-rules", alertRulesRouter);

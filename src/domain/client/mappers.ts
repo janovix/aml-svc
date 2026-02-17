@@ -314,15 +314,15 @@ export function mapPrismaClient(
 					}
 				})()
 			: null,
-		// PEP status
+		// Watchlist screening status
 		isPEP: Boolean(record.isPEP),
-		pepStatus:
-			(record.pepStatus as "PENDING" | "CONFIRMED" | "NOT_PEP" | "ERROR") ??
-			"PENDING",
-		pepDetails: record.pepDetails ?? null,
-		pepMatchConfidence: record.pepMatchConfidence ?? null,
-		pepCheckedAt: mapDateTime(record.pepCheckedAt),
-		pepCheckSource: record.pepCheckSource ?? null,
+		watchlistQueryId: record.watchlistQueryId ?? null,
+		ofacSanctioned: Boolean(record.ofacSanctioned),
+		unscSanctioned: Boolean(record.unscSanctioned),
+		sat69bListed: Boolean(record.sat69bListed),
+		adverseMediaFlagged: Boolean(record.adverseMediaFlagged),
+		screeningResult: record.screeningResult ?? "pending",
+		screenedAt: mapDateTime(record.screenedAt),
 		// Resolved catalog names
 		resolvedNames: record.resolvedNames
 			? safeJsonParse<Record<string, string>>(record.resolvedNames)

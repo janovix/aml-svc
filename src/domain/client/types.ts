@@ -1,5 +1,5 @@
 // Import types from schemas.ts (inferred from Zod schemas)
-import type { KYCStatus, PEPStatus, Gender, MaritalStatus } from "./schemas";
+import type { KYCStatus, Gender, MaritalStatus } from "./schemas";
 
 export interface ClientEntity {
 	id: string; // RFC is now the ID
@@ -41,13 +41,15 @@ export interface ClientEntity {
 	// Completeness tracking
 	completenessStatus: "COMPLETE" | "INCOMPLETE" | "MINIMUM";
 	missingFields: string[] | null;
-	// PEP status tracking
-	isPEP: boolean;
-	pepStatus: PEPStatus;
-	pepDetails?: string | null;
-	pepMatchConfidence?: string | null;
-	pepCheckedAt?: string | null;
-	pepCheckSource?: string | null;
+	// Watchlist screening status
+	isPEP?: boolean;
+	watchlistQueryId?: string | null;
+	ofacSanctioned?: boolean;
+	unscSanctioned?: boolean;
+	sat69bListed?: boolean;
+	adverseMediaFlagged?: boolean;
+	screeningResult?: "pending" | "clear" | "flagged";
+	screenedAt?: string | null;
 	// Resolved catalog names for *Code fields
 	resolvedNames?: Record<string, string> | null;
 	// Timestamps

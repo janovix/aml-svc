@@ -18,12 +18,11 @@ import {
 	ClientUpdateSchema,
 	DocumentIdParamSchema,
 	ClientRepository,
-	ClientPEPStatusUpdateSchema,
 } from "../domain/client";
 import type { Bindings } from "../types";
 import { createUsageRightsClient } from "../lib/usage-rights-client";
 import { createAlertQueueService } from "../lib/alert-queue";
-import { createPEPQueueService } from "../lib/pep-queue";
+import { createWatchlistSearchService } from "../lib/watchlist-search";
 import { getPrismaClient } from "../lib/prisma";
 import {
 	parseWithZod,
@@ -245,14 +244,48 @@ clientsRouter.post("/", async (c) => {
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 	await alertQueue.queueClientCreated(created.id);
 
-	// Queue PEP check for new client (non-blocking)
-	const pepQueue = createPEPQueueService(c.env.PEP_CHECK_QUEUE);
+	// Trigger watchlist search (non-blocking)
+	const watchlistSearch = createWatchlistSearchService(c.env.WATCHLIST_SERVICE);
 	const fullName = getClientDisplayName(created);
+	const user = c.get("user");
 	if (fullName) {
-		await pepQueue.queueClientPEPCheck(created.id, fullName, {
-			organizationId,
-			triggeredBy: "create",
-		});
+		c.executionCtx.waitUntil(
+			(async () => {
+				const result = await watchlistSearch.triggerSearch({
+					query: fullName,
+					entityType:
+						created.personType === "physical" ? "person" : "organization",
+					organizationId,
+					userId: user?.id ?? "unknown",
+					birthDate: created.birthDate || undefined,
+					identifiers: created.rfc ? [created.rfc] : undefined,
+					countries: created.nationality ? [created.nationality] : undefined,
+				});
+
+				if (result?.queryId) {
+					// Update client with watchlistQueryId and sync enrichment flags
+					const prisma = getPrismaClient(c.env.DB);
+					const isFlagged =
+						result.ofacCount > 0 ||
+						result.unscCount > 0 ||
+						result.sat69bCount > 0;
+					await prisma.client.update({
+						where: { id: created.id },
+						data: {
+							watchlistQueryId: result.queryId,
+							ofacSanctioned: result.ofacCount > 0,
+							unscSanctioned: result.unscCount > 0,
+							sat69bListed: result.sat69bCount > 0,
+							screeningResult: isFlagged ? "flagged" : "pending",
+							screenedAt: new Date(),
+						},
+					});
+					console.log(
+						`[Client Create] Watchlist search initiated, queryId: ${result.queryId}, sync flags: OFAC=${result.ofacCount > 0}, UNSC=${result.unscCount > 0}, SAT=${result.sat69bCount > 0}`,
+					);
+				}
+			})(),
+		);
 	}
 
 	return c.json(created, 201);
@@ -273,14 +306,48 @@ clientsRouter.put("/:id", async (c) => {
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 	await alertQueue.queueClientUpdated(updated.id);
 
-	// Queue PEP check for updated client (non-blocking)
-	const pepQueue = createPEPQueueService(c.env.PEP_CHECK_QUEUE);
+	// Trigger watchlist search (non-blocking)
+	const watchlistSearch = createWatchlistSearchService(c.env.WATCHLIST_SERVICE);
 	const fullName = getClientDisplayName(updated);
+	const user = c.get("user");
 	if (fullName) {
-		await pepQueue.queueClientPEPCheck(updated.id, fullName, {
-			organizationId,
-			triggeredBy: "update",
-		});
+		c.executionCtx.waitUntil(
+			(async () => {
+				const result = await watchlistSearch.triggerSearch({
+					query: fullName,
+					entityType:
+						updated.personType === "physical" ? "person" : "organization",
+					organizationId,
+					userId: user?.id ?? "unknown",
+					birthDate: updated.birthDate || undefined,
+					identifiers: updated.rfc ? [updated.rfc] : undefined,
+					countries: updated.nationality ? [updated.nationality] : undefined,
+				});
+
+				if (result?.queryId) {
+					// Update client with watchlistQueryId and sync enrichment flags
+					const prisma = getPrismaClient(c.env.DB);
+					const isFlagged =
+						result.ofacCount > 0 ||
+						result.unscCount > 0 ||
+						result.sat69bCount > 0;
+					await prisma.client.update({
+						where: { id: updated.id },
+						data: {
+							watchlistQueryId: result.queryId,
+							ofacSanctioned: result.ofacCount > 0,
+							unscSanctioned: result.unscCount > 0,
+							sat69bListed: result.sat69bCount > 0,
+							screeningResult: isFlagged ? "flagged" : "pending",
+							screenedAt: new Date(),
+						},
+					});
+					console.log(
+						`[Client Update] Watchlist search initiated, queryId: ${result.queryId}, sync flags: OFAC=${result.ofacCount > 0}, UNSC=${result.unscCount > 0}, SAT=${result.sat69bCount > 0}`,
+					);
+				}
+			})(),
+		);
 	}
 
 	return c.json(updated);
@@ -305,21 +372,60 @@ clientsRouter.patch("/:id", async (c) => {
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 	await alertQueue.queueClientUpdated(updated.id);
 
-	// Queue PEP check if name-related fields changed
-	const nameFieldsChanged =
+	// Trigger watchlist search if screening-relevant fields changed
+	const screeningFieldsChanged =
 		payload.firstName !== undefined ||
 		payload.lastName !== undefined ||
 		payload.secondLastName !== undefined ||
-		payload.businessName !== undefined;
+		payload.businessName !== undefined ||
+		payload.birthDate !== undefined ||
+		payload.nationality !== undefined ||
+		"rfc" in payload;
 
-	if (nameFieldsChanged) {
-		const pepQueue = createPEPQueueService(c.env.PEP_CHECK_QUEUE);
+	if (screeningFieldsChanged) {
+		const watchlistSearch = createWatchlistSearchService(
+			c.env.WATCHLIST_SERVICE,
+		);
 		const fullName = getClientDisplayName(updated);
+		const user = c.get("user");
 		if (fullName) {
-			await pepQueue.queueClientPEPCheck(updated.id, fullName, {
-				organizationId,
-				triggeredBy: "update",
-			});
+			c.executionCtx.waitUntil(
+				(async () => {
+					const result = await watchlistSearch.triggerSearch({
+						query: fullName,
+						entityType:
+							updated.personType === "physical" ? "person" : "organization",
+						organizationId,
+						userId: user?.id ?? "unknown",
+						birthDate: updated.birthDate || undefined,
+						identifiers: updated.rfc ? [updated.rfc] : undefined,
+						countries: updated.nationality ? [updated.nationality] : undefined,
+					});
+
+					if (result?.queryId) {
+						// Update client with watchlistQueryId and sync enrichment flags
+						const prisma = getPrismaClient(c.env.DB);
+						const isFlagged =
+							result.ofacCount > 0 ||
+							result.unscCount > 0 ||
+							result.sat69bCount > 0;
+						await prisma.client.update({
+							where: { id: updated.id },
+							data: {
+								watchlistQueryId: result.queryId,
+								ofacSanctioned: result.ofacCount > 0,
+								unscSanctioned: result.unscCount > 0,
+								sat69bListed: result.sat69bCount > 0,
+								screeningResult: isFlagged ? "flagged" : "pending",
+								screenedAt: new Date(),
+							},
+						});
+						console.log(
+							`[Client Patch] Watchlist search initiated, queryId: ${result.queryId}, sync flags: OFAC=${result.ofacCount > 0}, UNSC=${result.unscCount > 0}, SAT=${result.sat69bCount > 0}`,
+						);
+					}
+				})(),
+			);
 		}
 	}
 
@@ -587,56 +693,9 @@ clientsInternalRouter.post("/", async (c) => {
 });
 
 // ============================================================================
-// Internal PEP Status endpoints (for pep-check-worker)
+// Internal Watchlist Screening endpoints
 // ============================================================================
 
-/**
- * PATCH /internal/clients/:id/pep-status
- * Update PEP status for a client (called by pep-check-worker)
- * Note: Uses raw SQL until Prisma client is regenerated with new schema fields
- */
-clientsInternalRouter.patch("/:id/pep-status", async (c) => {
-	const clientId = c.req.param("id");
-	const body = await c.req.json();
-
-	try {
-		const payload = parseWithZod(ClientPEPStatusUpdateSchema, body);
-		const prisma = getPrismaClient(c.env.DB);
-
-		// Use raw SQL to bypass Prisma type checking until client is regenerated
-		await prisma.$executeRaw`
-			UPDATE clients 
-			SET 
-				is_pep = ${payload.isPEP ? 1 : 0},
-				pep_status = ${payload.pepStatus},
-				pep_details = ${payload.pepDetails ?? null},
-				pep_match_confidence = ${payload.pepMatchConfidence ?? null},
-				pep_checked_at = ${new Date(payload.pepCheckedAt).toISOString()},
-				pep_check_source = ${payload.pepCheckSource ?? null},
-				updated_at = ${new Date().toISOString()}
-			WHERE id = ${clientId}
-		`;
-
-		return c.json({ success: true });
-	} catch (error) {
-		Sentry.captureException(error, {
-			tags: { context: "internal-clients-patch-pep-status-error" },
-		});
-		if (error instanceof APIError) {
-			return c.json({ error: error.message }, error.statusCode as 400);
-		}
-		if (error instanceof Error) {
-			return c.json({ error: error.message }, 500);
-		}
-		return c.json({ error: "Unknown error" }, 500);
-	}
-});
-
-/**
- * GET /internal/clients/stale-pep-checks
- * Get clients with stale PEP checks (for cron refresh)
- * Note: Uses raw SQL until Prisma client is regenerated with new schema fields
- */
 clientsInternalRouter.get("/stale-pep-checks", async (c) => {
 	const thresholdStr = c.req.query("threshold");
 	const limitStr = c.req.query("limit");
@@ -676,7 +735,7 @@ clientsInternalRouter.get("/stale-pep-checks", async (c) => {
 				business_name
 			FROM clients
 			WHERE deleted_at IS NULL
-			AND (pep_checked_at IS NULL OR pep_checked_at < ${threshold.toISOString()})
+			AND (screened_at IS NULL OR screened_at < ${threshold.toISOString()})
 			LIMIT ${limit}
 		`;
 
@@ -693,7 +752,7 @@ clientsInternalRouter.get("/stale-pep-checks", async (c) => {
 		});
 	} catch (error) {
 		Sentry.captureException(error, {
-			tags: { context: "internal-clients-get-stale-pep-checks-error" },
+			tags: { context: "internal-clients-get-stale-screening-error" },
 		});
 		return c.json({ error: "Failed to get stale clients" }, 500);
 	}

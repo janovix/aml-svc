@@ -41,6 +41,10 @@
 			"binding": "DOC_SERVICE",
 			"service": "doc-svc",
 		},
+		{
+			"binding": "WATCHLIST_SERVICE",
+			"service": "watchlist-svc",
+		},
 	],
 	"queues": {
 		"producers": [
@@ -51,10 +55,6 @@
 			{
 				"binding": "IMPORT_PROCESSING_QUEUE",
 				"queue": "aml-imports-dev",
-			},
-			{
-				"binding": "PEP_CHECK_QUEUE",
-				"queue": "pep-check-dev",
 			},
 		],
 	},

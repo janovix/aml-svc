@@ -51,21 +51,24 @@ enum KYCStatus {
   EXPIRED
 }
 
-enum PEPStatus {
-  PENDING
-  CONFIRMED
-  NOT_PEP
-  ERROR
+enum ShareholderEntityType {
+  PERSON
+  COMPANY
 }
 
-enum UBORelationshipType {
+enum BCType {
   SHAREHOLDER
-  DIRECTOR
   LEGAL_REP
   TRUSTEE
   SETTLOR
-  BENEFICIARY
-  CONTROLLER
+  TRUST_BENEFICIARY
+  DIRECTOR
+}
+
+enum IdentificationCriteria {
+  BENEFIT
+  CONTROL
+  FALLBACK
 }
 
 enum DocumentStatus {
@@ -210,15 +213,17 @@ model Client {
   kycStatus            KYCStatus  @default(INCOMPLETE) @map("kyc_status")
   kycCompletedAt       DateTime?  @map("kyc_completed_at")
   // Data completeness tracking
-  completenessStatus   String     @default("INCOMPLETE") @map("completeness_status") // COMPLETE, INCOMPLETE, MINIMUM
-  missingFields        String?    @map("missing_fields") // JSON array of missing field names
-  // PEP status tracking
-  isPEP                Boolean    @default(false) @map("is_pep")
-  pepStatus            PEPStatus  @default(PENDING) @map("pep_status")
-  pepDetails           String?    @map("pep_details")
-  pepMatchConfidence   String?    @map("pep_match_confidence")
-  pepCheckedAt         DateTime?  @map("pep_checked_at")
-  pepCheckSource       String?    @map("pep_check_source")
+  completenessStatus     String    @default("INCOMPLETE") @map("completeness_status") // COMPLETE, INCOMPLETE, MINIMUM
+  missingFields          String?   @map("missing_fields") // JSON array of missing field names
+  // Watchlist screening status
+  isPEP                  Boolean   @default(false) @map("is_pep")
+  watchlistQueryId       String?   @map("watchlist_query_id")
+  ofacSanctioned         Boolean   @default(false) @map("ofac_sanctioned")
+  unscSanctioned         Boolean   @default(false) @map("unsc_sanctioned")
+  sat69bListed           Boolean   @default(false) @map("sat69b_listed")
+  adverseMediaFlagged    Boolean   @default(false) @map("adverse_media_flagged")
+  screeningResult        String    @default("pending") @map("screening_result") // "pending", "clear", "flagged"
+  screenedAt             DateTime? @map("screened_at")
   // Catalog name resolution
   resolvedNames        String?    @map("resolved_names")
   // Timestamps
@@ -226,13 +231,14 @@ model Client {
   updatedAt            DateTime   @updatedAt @map("updated_at")
   deletedAt            DateTime?  @map("deleted_at")
 
-  documents   ClientDocument[]
-  addresses   ClientAddress[]
-  operations  Operation[]
-  alerts      Alert[]
-  reports     Report[]
-  ubos        UltimateBeneficialOwner[]
-  uploadLinks UploadLink[]
+  documents             ClientDocument[]
+  addresses             ClientAddress[]
+  operations            Operation[]
+  alerts                Alert[]
+  reports               Report[]
+  shareholders          Shareholder[]
+  beneficialControllers BeneficialController[]
+  uploadLinks           UploadLink[]
 
   @@index([organizationId])
   @@index([rfc])
@@ -241,8 +247,7 @@ model Client {
   @@index([countryCode])
   @@index([economicActivityCode])
   @@index([kycStatus])
-  @@index([pepStatus])
-  @@index([pepCheckedAt])
+  @@index([screeningResult])
   @@map("clients")
 }
 
@@ -288,10 +293,18 @@ model ClientDocument {
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
 
-  client           Client                    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  uploadLink       UploadLink?               @relation(fields: [uploadLinkId], references: [id], onDelete: SetNull)
-  uboIdDocuments   UltimateBeneficialOwner[] @relation("UBOIdDocument")
-  uboAddressProofs UltimateBeneficialOwner[] @relation("UBOAddressProof")
+  client                     Client                 @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  uploadLink                 UploadLink?            @relation(fields: [uploadLinkId], references: [id], onDelete: SetNull)
+  shareholderActaConstitutiva Shareholder[]         @relation("ShareholderActaConstitutiva")
+  shareholderCedulaFiscal    Shareholder[]          @relation("ShareholderCedulaFiscal")
+  shareholderAddressProof    Shareholder[]          @relation("ShareholderAddressProof")
+  shareholderPowerOfAttorney Shareholder[]          @relation("ShareholderPowerOfAttorney")
+  bcIdCopy                   BeneficialController[] @relation("BCIdCopy")
+  bcCurpCopy                 BeneficialController[] @relation("BCCurpCopy")
+  bcCedulaFiscal             BeneficialController[] @relation("BCCedulaFiscal")
+  bcAddressProof             BeneficialController[] @relation("BCAddressProof")
+  bcConstanciaBC             BeneficialController[] @relation("BCConstanciaBC")
+  bcPowerOfAttorney          BeneficialController[] @relation("BCPowerOfAttorney")
 
   @@index([clientId])
   @@index([documentType])
@@ -326,48 +339,125 @@ model ClientAddress {
   @@map("client_addresses")
 }
 
-model UltimateBeneficialOwner {
-  id                  String              @id
-  clientId            String              @map("client_id")
-  firstName           String              @map("first_name")
-  lastName            String              @map("last_name")
-  secondLastName      String?             @map("second_last_name")
-  birthDate           DateTime?           @map("birth_date")
-  nationality         String?
-  curp                String?
-  rfc                 String?
-  ownershipPercentage Decimal?            @map("ownership_percentage")
-  relationshipType    UBORelationshipType @map("relationship_type")
-  position            String?
-  email               String?
-  phone               String?
-  country             String?
-  stateCode           String?             @map("state_code")
-  city                String?
-  street              String?
-  postalCode          String?             @map("postal_code")
-  idDocumentId        String?             @map("id_document_id")
-  addressProofId      String?             @map("address_proof_id")
-  isPEP               Boolean             @default(false) @map("is_pep")
-  pepStatus           PEPStatus           @default(PENDING) @map("pep_status")
-  pepDetails          String?             @map("pep_details")
-  pepMatchConfidence  String?             @map("pep_match_confidence")
-  pepCheckedAt        DateTime?           @map("pep_checked_at")
-  verifiedAt          DateTime?           @map("verified_at")
-  verifiedBy          String?             @map("verified_by")
-  notes               String?
-  createdAt           DateTime            @default(now()) @map("created_at")
-  updatedAt           DateTime            @updatedAt @map("updated_at")
+model Shareholder {
+  id                      String                 @id
+  clientId                String                 @map("client_id")
+  parentShareholderId     String?                @map("parent_shareholder_id")
+  entityType              ShareholderEntityType  @map("entity_type")
+  // PERSON fields
+  firstName               String?                @map("first_name")
+  lastName                String?                @map("last_name")
+  secondLastName          String?                @map("second_last_name")
+  rfc                     String?
+  // COMPANY fields
+  businessName            String?                @map("business_name")
+  taxId                   String?                @map("tax_id")
+  incorporationDate       DateTime?              @map("incorporation_date")
+  nationality             String?
+  // COMPANY Anexo 4: representative
+  representativeName      String?                @map("representative_name")
+  representativeCurp      String?                @map("representative_curp")
+  representativeRfc       String?                @map("representative_rfc")
+  // COMPANY Anexo 4: document references
+  actaConstitutivaDocId   String?                @map("acta_constitutiva_doc_id")
+  cedulaFiscalDocId       String?                @map("cedula_fiscal_doc_id")
+  addressProofDocId       String?                @map("address_proof_doc_id")
+  powerOfAttorneyDocId    String?                @map("power_of_attorney_doc_id")
+  // Ownership (required)
+  ownershipPercentage     Decimal                @map("ownership_percentage")
+  // Contact
+  email                   String?
+  phone                   String?
+  // Timestamps
+  createdAt               DateTime               @default(now()) @map("created_at")
+  updatedAt               DateTime               @updatedAt @map("updated_at")
 
-  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  idDocument   ClientDocument? @relation("UBOIdDocument", fields: [idDocumentId], references: [id], onDelete: SetNull)
-  addressProof ClientDocument? @relation("UBOAddressProof", fields: [addressProofId], references: [id], onDelete: SetNull)
+  client               Client                 @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  parentShareholder    Shareholder?           @relation("ShareholderHierarchy", fields: [parentShareholderId], references: [id], onDelete: Cascade)
+  childShareholders    Shareholder[]          @relation("ShareholderHierarchy")
+  beneficialControllers BeneficialController[]
+  actaConstitutivaDoc  ClientDocument?        @relation("ShareholderActaConstitutiva", fields: [actaConstitutivaDocId], references: [id], onDelete: SetNull)
+  cedulaFiscalDoc      ClientDocument?        @relation("ShareholderCedulaFiscal", fields: [cedulaFiscalDocId], references: [id], onDelete: SetNull)
+  addressProofDoc      ClientDocument?        @relation("ShareholderAddressProof", fields: [addressProofDocId], references: [id], onDelete: SetNull)
+  powerOfAttorneyDoc   ClientDocument?        @relation("ShareholderPowerOfAttorney", fields: [powerOfAttorneyDocId], references: [id], onDelete: SetNull)
 
   @@index([clientId])
-  @@index([relationshipType])
-  @@index([pepStatus])
-  @@index([pepCheckedAt])
-  @@map("ultimate_beneficial_owners")
+  @@index([parentShareholderId])
+  @@index([entityType])
+  @@map("shareholders")
+}
+
+model BeneficialController {
+  id                       String                  @id
+  clientId                 String                  @map("client_id")
+  shareholderId            String?                 @map("shareholder_id")
+  // BC classification
+  bcType                   BCType                  @map("bc_type")
+  identificationCriteria   IdentificationCriteria  @map("identification_criteria")
+  controlMechanism         String?                 @map("control_mechanism")
+  isLegalRepresentative    Boolean                 @default(false) @map("is_legal_representative")
+  // Anexo 3: personal data (all BCs are natural persons)
+  firstName                String                  @map("first_name")
+  lastName                 String                  @map("last_name")
+  secondLastName           String?                 @map("second_last_name")
+  birthDate                DateTime?               @map("birth_date")
+  birthCountry             String?                 @map("birth_country")
+  nationality              String?
+  occupation               String?
+  curp                     String?
+  rfc                      String?
+  // Anexo 3: identification document
+  idDocumentType           String?                 @map("id_document_type")
+  idDocumentNumber         String?                 @map("id_document_number")
+  idDocumentAuthority      String?                 @map("id_document_authority")
+  // Anexo 3: document copy references
+  idCopyDocId              String?                 @map("id_copy_doc_id")
+  curpCopyDocId            String?                 @map("curp_copy_doc_id")
+  cedulaFiscalDocId        String?                 @map("cedula_fiscal_doc_id")
+  addressProofDocId        String?                 @map("address_proof_doc_id")
+  constanciaBcDocId        String?                 @map("constancia_bc_doc_id")
+  powerOfAttorneyDocId     String?                 @map("power_of_attorney_doc_id")
+  // Contact
+  email                    String?
+  phone                    String?
+  // Address (Anexo 3 requires full address)
+  country                  String?
+  stateCode                String?                 @map("state_code")
+  city                     String?
+  street                   String?
+  postalCode               String?                 @map("postal_code")
+  // Watchlist screening
+  isPEP                    Boolean                 @default(false) @map("is_pep")
+  watchlistQueryId         String?                 @map("watchlist_query_id")
+  ofacSanctioned           Boolean                 @default(false) @map("ofac_sanctioned")
+  unscSanctioned           Boolean                 @default(false) @map("unsc_sanctioned")
+  sat69bListed             Boolean                 @default(false) @map("sat69b_listed")
+  adverseMediaFlagged      Boolean                 @default(false) @map("adverse_media_flagged")
+  screeningResult          String                  @default("pending") @map("screening_result")
+  screenedAt               DateTime?               @map("screened_at")
+  // Verification
+  verifiedAt               DateTime?               @map("verified_at")
+  verifiedBy               String?                 @map("verified_by")
+  notes                    String?
+  // Timestamps
+  createdAt                DateTime                @default(now()) @map("created_at")
+  updatedAt                DateTime                @updatedAt @map("updated_at")
+
+  client               Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  shareholder          Shareholder?     @relation(fields: [shareholderId], references: [id], onDelete: SetNull)
+  idCopyDoc            ClientDocument?  @relation("BCIdCopy", fields: [idCopyDocId], references: [id], onDelete: SetNull)
+  curpCopyDoc          ClientDocument?  @relation("BCCurpCopy", fields: [curpCopyDocId], references: [id], onDelete: SetNull)
+  cedulaFiscalDoc      ClientDocument?  @relation("BCCedulaFiscal", fields: [cedulaFiscalDocId], references: [id], onDelete: SetNull)
+  addressProofDoc      ClientDocument?  @relation("BCAddressProof", fields: [addressProofDocId], references: [id], onDelete: SetNull)
+  constanciaBcDoc      ClientDocument?  @relation("BCConstanciaBC", fields: [constanciaBcDocId], references: [id], onDelete: SetNull)
+  powerOfAttorneyDoc   ClientDocument?  @relation("BCPowerOfAttorney", fields: [powerOfAttorneyDocId], references: [id], onDelete: SetNull)
+
+  @@index([clientId])
+  @@index([shareholderId])
+  @@index([bcType])
+  @@index([identificationCriteria])
+  @@index([screeningResult])
+  @@map("beneficial_controllers")
 }
 
 // ============================================================================

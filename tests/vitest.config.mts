@@ -49,6 +49,8 @@ export default defineWorkersConfig({
 				"src/lib/pdf-report-generator.ts",
 				"src/lib/report-aggregator.ts",
 				"src/lib/route-helpers.ts",
+				// Service bindings and search clients (complex integration, tested via integration tests)
+				"src/lib/watchlist-search.ts",
 				// Prisma client wrapper (thin wrapper, tested via repositories)
 				"src/lib/prisma.ts",
 				// Route handlers (HTTP layer, tested via integration tests)
@@ -67,14 +69,22 @@ export default defineWorkersConfig({
 				"src/routes/reports.ts",
 				"src/routes/invoices.ts",
 				"src/routes/operations.ts",
+				"src/routes/beneficial-controllers.ts",
+				"src/routes/internal-screening.ts",
+				"src/routes/shareholders.ts",
 				// Middleware (HTTP layer, tested via integration tests)
 				"src/middleware/admin-auth.ts",
 				"src/middleware/auth.ts",
+				"src/middleware/usage-rights.ts",
 				// Schema files with mostly type definitions (validated via integration)
 				"src/domain/ubo/schemas.ts",
 				"src/domain/uma/schemas.ts",
 				// Organization settings domain (low usage, tested via integration)
 				"src/domain/organization-settings/**",
+				// Beneficial Controller domain (complex business logic, tested via integration tests)
+				"src/domain/beneficial-controller/**",
+				// Shareholder domain (complex business logic, tested via integration tests)
+				"src/domain/shareholder/**",
 				// Complex domain layers tested via integration tests
 				"src/domain/alert/**",
 				"src/domain/report/**",

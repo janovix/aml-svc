@@ -100,6 +100,20 @@ app.all("/organization-settings/:organizationId", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 
+// Screening routes for service binding access from screening-refresh-worker
+app.all("/clients/stale-screening", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/ubos/stale-screening", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/clients/:id/watchlist-query", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+app.all("/ubos/:uboId/watchlist-query", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
+
 // Internal synthetic data generation endpoint (for local development only)
 // Note: GitHub Actions uses the script directly, not this endpoint
 // Only accessible with SYNTHETIC_DATA_SECRET token

@@ -33,6 +33,7 @@ import { ClientRepository } from "../domain/client";
 import { ClientService } from "../domain/client";
 import { OperationService } from "../domain/operation";
 import { handleInternalOrganizationSettingsRequest } from "../routes/internal-organization-settings";
+import { handleInternalScreeningRequest } from "../routes/internal-screening";
 
 /**
  * Service binding helper functions for alert operations
@@ -401,6 +402,18 @@ export async function handleServiceBindingRequest(
 				env,
 				organizationId,
 			);
+		}
+
+		// Route: Screening endpoints (stale-screening and watchlist-query updates)
+		// Called via: env.AML_SERVICE.fetch(new Request(`https://internal/clients/stale-screening?segment=0&limit=200`))
+		// Called via: env.AML_SERVICE.fetch(new Request(`https://internal/clients/${id}/watchlist-query`, { method: 'PATCH', body: ... }))
+		if (
+			path.startsWith("/clients/stale-screening") ||
+			path.startsWith("/ubos/stale-screening") ||
+			path.match(/^\/clients\/[^/]+\/watchlist-query$/) ||
+			path.match(/^\/ubos\/[^/]+\/watchlist-query$/)
+		) {
+			return handleInternalScreeningRequest(request, env, path);
 		}
 
 		// No route matched - return 404 with helpful error message

@@ -34,15 +34,6 @@ export const KYC_STATUS_VALUES = [
 ] as const;
 export const KYCStatusSchema = z.enum(KYC_STATUS_VALUES);
 
-// PEP Status values
-export const PEP_STATUS_VALUES = [
-	"PENDING",
-	"CONFIRMED",
-	"NOT_PEP",
-	"ERROR",
-] as const;
-export const PEPStatusSchema = z.enum(PEP_STATUS_VALUES);
-
 // Gender values
 export const GENDER_VALUES = ["M", "F", "OTHER"] as const;
 export const GenderSchema = z.enum(GENDER_VALUES);
@@ -394,16 +385,6 @@ export const ClientPatchSchema = z.object({
 	kycCompletedAt: isoString.optional().nullable(),
 });
 
-// PEP Status update schema (for internal API use by pep-check-worker)
-export const ClientPEPStatusUpdateSchema = z.object({
-	isPEP: z.boolean(),
-	pepStatus: PEPStatusSchema,
-	pepDetails: z.string().optional().nullable(),
-	pepMatchConfidence: z.string().optional().nullable(), // "exact", "possible"
-	pepCheckedAt: isoString,
-	pepCheckSource: z.string().optional().nullable(), // "VECTORIZE", "GROK"
-});
-
 export const ClientFilterSchema = z.object({
 	search: z.string().min(2).max(100).optional(),
 	rfc: z
@@ -586,11 +567,7 @@ export type ClientAddressUpdateInput = z.infer<
 	typeof ClientAddressUpdateSchema
 >;
 export type ClientAddressPatchInput = z.infer<typeof ClientAddressPatchSchema>;
-export type ClientPEPStatusUpdateInput = z.infer<
-	typeof ClientPEPStatusUpdateSchema
->;
 export type KYCStatus = z.infer<typeof KYCStatusSchema>;
-export type PEPStatus = z.infer<typeof PEPStatusSchema>;
 export type Gender = z.infer<typeof GenderSchema>;
 export type MaritalStatus = z.infer<typeof MaritalStatusSchema>;
 export type VerificationStatus = z.infer<typeof VerificationStatusSchema>;

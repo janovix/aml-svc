@@ -1,5 +1,4 @@
 import type { Context } from "hono";
-import type { PEPJob } from "./lib/pep-queue";
 
 /**
  * Extended environment bindings with custom properties.
@@ -17,8 +16,8 @@ export type Bindings = Omit<Env, "ENVIRONMENT" | "AUTH_JWKS_CACHE_TTL"> & {
 	TRUSTED_ORIGINS?: string;
 	/** Queue for import processing jobs */
 	IMPORT_PROCESSING_QUEUE?: Queue<import("./domain/import").ImportJob>;
-	/** Queue for PEP check jobs */
-	PEP_CHECK_QUEUE?: Queue<PEPJob>;
+	/** Watchlist service binding for automated screening */
+	WATCHLIST_SERVICE?: Fetcher;
 	/** Secret token for synthetic data generation HTTP endpoint (local development only) */
 	SYNTHETIC_DATA_SECRET?: string;
 	/**

@@ -38,7 +38,9 @@ export const ID_PREFIXES = {
 	NOTICE: "NTC",
 	IMPORT: "IMP",
 	IMPORT_ROW_RESULT: "IRR",
-	UBO: "UBO", // Ultimate Beneficial Owner
+	UBO: "UBO", // Ultimate Beneficial Owner (deprecated)
+	SHAREHOLDER: "SHR", // Shareholder
+	BENEFICIAL_CONTROLLER: "BC", // Beneficial Controller (Beneficiario Controlador)
 	FILE: "FIL", // File uploads to R2
 } as const;
 

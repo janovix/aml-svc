@@ -83,9 +83,14 @@ export const openAPISpec = {
 				"File storage endpoints for uploading and downloading files to R2 storage",
 		},
 		{
-			name: "UBOs",
+			name: "Shareholders",
 			description:
-				"Ultimate Beneficial Owner (UBO) management endpoints for tracking shareholders, directors, and other beneficial owners",
+				"Shareholder management endpoints for tracking persons and companies that own the client. Supports 2-level ownership hierarchy.",
+		},
+		{
+			name: "Beneficial Controllers",
+			description:
+				"Beneficial Controller (Beneficiario Controlador) management endpoints per Mexican law (LFPIORPI/CFF 32-B). Tracks natural persons who ultimately benefit from or control the client entity. Includes Anexo 3 compliance and automated watchlist screening.",
 		},
 	],
 	paths: {
@@ -4209,12 +4214,17 @@ export const openAPISpec = {
 				},
 			},
 		},
+		// TODO: Replace legacy UBO documentation with new Shareholder and Beneficial Controller endpoints
+		// Shareholder endpoints: GET/POST /:clientId/shareholders, GET/PUT/PATCH/DELETE /:clientId/shareholders/:shareholderId, GET /:clientId/shareholders/:shareholderId/sub-shareholders
+		// BC endpoints: GET/POST /:clientId/beneficial-controllers, GET/PUT/PATCH/DELETE /:clientId/beneficial-controllers/:bcId
+		// Internal endpoints: GET /internal/beneficial-controllers/stale-screening, PATCH /internal/beneficial-controllers/:bcId/watchlist-query
 		"/api/v1/clients/{clientId}/ubos": {
 			get: {
 				tags: ["UBOs"],
-				summary: "List all UBOs for a client",
+				summary:
+					"List all UBOs for a client (DEPRECATED - use Shareholders/BCs)",
 				description:
-					"Get all Ultimate Beneficial Owners (UBOs) associated with a client. UBOs include shareholders, directors, legal representatives, and other beneficial owners.",
+					"DEPRECATED: Use /shareholders and /beneficial-controllers endpoints instead. This endpoint will be removed in a future version.",
 				parameters: [
 					{
 						name: "clientId",
