@@ -404,12 +404,14 @@ export async function handleServiceBindingRequest(
 			);
 		}
 
-		// Route: Screening endpoints (stale-screening and watchlist-query updates)
+		// Route: Screening endpoints (stale-screening, watchlist-query updates, and callback)
 		// Called via: env.AML_SERVICE.fetch(new Request(`https://internal/clients/stale-screening?segment=0&limit=200`))
 		// Called via: env.AML_SERVICE.fetch(new Request(`https://internal/clients/${id}/watchlist-query`, { method: 'PATCH', body: ... }))
+		// Called via: env.AML_SERVICE.fetch(new Request(`https://internal/screening-callback`, { method: 'PATCH', body: ... }))
 		if (
 			path.startsWith("/clients/stale-screening") ||
-			path.match(/^\/clients\/[^/]+\/watchlist-query$/)
+			path.match(/^\/clients\/[^/]+\/watchlist-query$/) ||
+			path === "/screening-callback"
 		) {
 			return handleInternalScreeningRequest(request, env, path);
 		}

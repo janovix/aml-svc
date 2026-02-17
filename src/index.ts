@@ -107,6 +107,10 @@ app.all("/clients/stale-screening", async (c) => {
 app.all("/clients/:id/watchlist-query", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
+// Callback route for watchlist-svc async screening results
+app.all("/screening-callback", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
 
 // Internal synthetic data generation endpoint (for local development only)
 // Note: GitHub Actions uses the script directly, not this endpoint

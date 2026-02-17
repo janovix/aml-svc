@@ -285,7 +285,7 @@ export async function handleInternalScreeningRequest(
 		}
 
 		// PATCH /internal/screening-callback
-		if (request.method === "PATCH" && path === "screening-callback") {
+		if (request.method === "PATCH" && path === "/screening-callback") {
 			const body = (await request.json()) as {
 				queryId: string;
 				type: "pep_official" | "pep_ai" | "adverse_media";
