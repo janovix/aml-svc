@@ -1,3 +1,10 @@
+# [1.6.0-rc.12](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.11...v1.6.0-rc.12) (2026-02-17)
+
+
+### Features
+
+* implement beneficial controller management and watchlist screening integration ([d940fce](https://github.com/janovix/aml-svc/commit/d940fce3338164283a6f7bf40658d400826f7fd9))
+
 # [1.6.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.10...v1.6.0-rc.11) (2026-02-13)
 
 
