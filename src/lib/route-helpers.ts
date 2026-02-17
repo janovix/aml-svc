@@ -5,7 +5,6 @@
  * duplicated across multiple route files:
  * - clients.ts
  * - transactions.ts
- * - ubos.ts
  * - imports.ts
  */
 
@@ -38,7 +37,6 @@ export const NOT_FOUND_ERRORS = {
 	CLIENT: "CLIENT_NOT_FOUND",
 	DOCUMENT: "DOCUMENT_NOT_FOUND",
 	ADDRESS: "ADDRESS_NOT_FOUND",
-	UBO: "UBO_NOT_FOUND",
 	TRANSACTION: "TRANSACTION_NOT_FOUND",
 } as const;
 
@@ -102,8 +100,6 @@ export function handleServiceError(error: unknown): never {
 				throw new APIError(404, "Document not found");
 			case NOT_FOUND_ERRORS.ADDRESS:
 				throw new APIError(404, "Address not found");
-			case NOT_FOUND_ERRORS.UBO:
-				throw new APIError(404, "UBO not found");
 			case NOT_FOUND_ERRORS.TRANSACTION:
 				throw new APIError(404, "Transaction not found");
 		}

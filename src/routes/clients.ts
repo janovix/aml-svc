@@ -102,15 +102,16 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 		WHERE client_id = ${client.id}
 	`;
 
-	// Get UBOs for this client using raw query
-	const ubos = await prisma.$queryRaw<
+	// Get Beneficial Controllers for this client using raw query
+	// BCs replaced UBOs as the AML compliance entity after migration 0004
+	const beneficialControllers = await prisma.$queryRaw<
 		Array<{
 			id: string;
-			id_document_id: string | null;
+			id_copy_doc_id: string | null;
 		}>
 	>`
-		SELECT id, id_document_id
-		FROM ultimate_beneficial_owners
+		SELECT id, id_copy_doc_id
+		FROM beneficial_controllers
 		WHERE client_id = ${client.id}
 	`;
 
@@ -134,21 +135,21 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 	const verifiedDocs = documents.filter((d) => d.status === "VERIFIED").length;
 	const pendingDocs = documents.filter((d) => d.status === "PENDING").length;
 
-	// UBO requirements for MORAL/TRUST
-	const requiresUBO = ["MORAL", "TRUST"].includes(client.personType);
-	const hasUBO = ubos.length > 0;
-	const uboHasDocs = requiresUBO
-		? ubos.every((ubo) => ubo.id_document_id !== null)
+	// Beneficial Controller requirements for MORAL/TRUST
+	const requiresBC = ["MORAL", "TRUST"].includes(client.personType);
+	const hasBC = beneficialControllers.length > 0;
+	const bcHasDocs = requiresBC
+		? beneficialControllers.every((bc) => bc.id_copy_doc_id !== null)
 		: true;
 
 	// Calculate completion percentage
 	let totalRequirements = requiredDocs.length;
 	let completedRequirements = requiredDocs.length - missingDocs.length;
 
-	if (requiresUBO) {
-		totalRequirements += 2; // UBO exists + UBO has docs
-		if (hasUBO) completedRequirements += 1;
-		if (uboHasDocs) completedRequirements += 1;
+	if (requiresBC) {
+		totalRequirements += 2; // BC exists + BC has docs
+		if (hasBC) completedRequirements += 1;
+		if (bcHasDocs) completedRequirements += 1;
 	}
 
 	const completionPercentage =
@@ -158,7 +159,7 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 
 	// Determine overall KYC status
 	let kycStatus = "INCOMPLETE";
-	if (missingDocs.length === 0 && (!requiresUBO || hasUBO)) {
+	if (missingDocs.length === 0 && (!requiresBC || hasBC)) {
 		if (verifiedDocs === documents.length && documents.length > 0) {
 			kycStatus = "COMPLETE";
 		} else if (pendingDocs > 0) {
@@ -179,15 +180,15 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 			pending: pendingDocs,
 			total: documents.length,
 		},
-		ubos: requiresUBO
+		beneficialControllers: requiresBC
 			? {
 					required: true,
-					hasUBO,
-					count: ubos.length,
-					allHaveDocuments: uboHasDocs,
+					hasBC,
+					count: beneficialControllers.length,
+					allHaveDocuments: bcHasDocs,
 				}
 			: { required: false },
-		// PEP status will be available after Prisma regeneration
+		// Screening status based on client watchlist data
 		pep: {
 			status: "PENDING",
 			isPEP: false,

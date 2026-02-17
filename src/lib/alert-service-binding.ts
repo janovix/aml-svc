@@ -409,9 +409,7 @@ export async function handleServiceBindingRequest(
 		// Called via: env.AML_SERVICE.fetch(new Request(`https://internal/clients/${id}/watchlist-query`, { method: 'PATCH', body: ... }))
 		if (
 			path.startsWith("/clients/stale-screening") ||
-			path.startsWith("/ubos/stale-screening") ||
-			path.match(/^\/clients\/[^/]+\/watchlist-query$/) ||
-			path.match(/^\/ubos\/[^/]+\/watchlist-query$/)
+			path.match(/^\/clients\/[^/]+\/watchlist-query$/)
 		) {
 			return handleInternalScreeningRequest(request, env, path);
 		}

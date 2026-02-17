@@ -59,7 +59,6 @@ export default defineWorkersConfig({
 				"src/routes/files.ts",
 				"src/routes/notices.ts",
 				"src/routes/transactions.ts",
-				"src/routes/ubos.ts",
 				"src/routes/uma-values.ts",
 				"src/routes/organization-settings.ts",
 				"src/routes/internal-organization-settings.ts",
@@ -77,7 +76,6 @@ export default defineWorkersConfig({
 				"src/middleware/auth.ts",
 				"src/middleware/usage-rights.ts",
 				// Schema files with mostly type definitions (validated via integration)
-				"src/domain/ubo/schemas.ts",
 				"src/domain/uma/schemas.ts",
 				// Organization settings domain (low usage, tested via integration)
 				"src/domain/organization-settings/**",

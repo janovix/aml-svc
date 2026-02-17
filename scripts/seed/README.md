@@ -12,7 +12,8 @@ Seed scripts run **only in dev/preview** environments (never in production).
 - **Reports**: Sample compliance reports
 - **Notices**: Test notice records
 - **Upload Links**: Sample file upload links
-- **Ultimate Beneficial Owners**: Test UBO records
+- **Shareholders**: Test shareholder records (cap table)
+- **Beneficial Controllers**: Test beneficial controller records (AML compliance)
 - **Organization Settings**: Test organization configurations
 
 **Note**: Operations are created via imports or API, not seeded.
@@ -32,7 +33,8 @@ Seed scripts run **only in dev/preview** environments (never in production).
 - **`seed-report.mjs`** - Creates sample reports
 - **`seed-notice.mjs`** - Generates test notices
 - **`seed-upload-link.mjs`** - Creates sample upload links
-- **`seed-ultimate-beneficial-owner.mjs`** - Generates test UBOs
+- **`seed-shareholder.mjs`** - Generates test shareholders (cap table)
+- **`seed-beneficial-controller.mjs`** - Generates test beneficial controllers (AML compliance)
 - **`seed-organization-settings.mjs`** - Creates test org settings
 
 ### Validation
@@ -103,7 +105,8 @@ Models that have seed scripts:
 - **`Report`** - `seed-report.mjs`
 - **`Notice`** - `seed-notice.mjs`
 - **`UploadLink`** - `seed-upload-link.mjs`
-- **`UltimateBeneficialOwner`** - `seed-ultimate-beneficial-owner.mjs`
+- **`Shareholder`** - `seed-shareholder.mjs`
+- **`BeneficialController`** - `seed-beneficial-controller.mjs`
 - **`OrganizationSettings`** - `seed-organization-settings.mjs`
 
 ## Seed vs Populate

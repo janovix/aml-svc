@@ -104,13 +104,7 @@ app.all("/organization-settings/:organizationId", async (c) => {
 app.all("/clients/stale-screening", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
-app.all("/ubos/stale-screening", async (c) => {
-	return handleServiceBindingRequest(c.req.raw, c.env);
-});
 app.all("/clients/:id/watchlist-query", async (c) => {
-	return handleServiceBindingRequest(c.req.raw, c.env);
-});
-app.all("/ubos/:uboId/watchlist-query", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
 
