@@ -1,3 +1,10 @@
+# [1.6.0-rc.13](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.12...v1.6.0-rc.13) (2026-02-17)
+
+
+### Features
+
+* add screening callback route for watchlist service integration ([e071a1f](https://github.com/janovix/aml-svc/commit/e071a1f42d196fcdd6406d7d51614556a0db97a3))
+
 # [1.6.0-rc.12](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.11...v1.6.0-rc.12) (2026-02-17)
 
 
