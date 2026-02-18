@@ -245,6 +245,7 @@ describe("NoticeService", () => {
 			const result = await service.markAsSubmitted(
 				organizationId,
 				noticeId,
+				"DOC_submit_123",
 				"SAT-12345",
 			);
 
@@ -253,6 +254,7 @@ describe("NoticeService", () => {
 			expect(mockRepository.markAsSubmitted).toHaveBeenCalledWith(
 				organizationId,
 				noticeId,
+				"DOC_submit_123",
 				"SAT-12345",
 			);
 		});

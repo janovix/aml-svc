@@ -23,6 +23,8 @@ export interface NoticeEntity {
 	generatedAt?: string | null;
 	submittedAt?: string | null;
 	satFolioNumber?: string | null;
+	submitPdfDocumentId?: string | null;
+	ackPdfDocumentId?: string | null;
 	createdBy?: string | null;
 	notes?: string | null;
 

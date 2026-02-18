@@ -454,6 +454,7 @@ export class NoticeRepository {
 	async markAsSubmitted(
 		organizationId: string,
 		id: string,
+		docSvcDocumentId: string,
 		satFolioNumber?: string,
 	): Promise<NoticeEntity> {
 		const notice = await this.get(organizationId, id);
@@ -469,6 +470,7 @@ export class NoticeRepository {
 			data: {
 				status: "SUBMITTED",
 				submittedAt: now,
+				submitPdfDocumentId: docSvcDocumentId,
 				...(satFolioNumber && { satFolioNumber }),
 			},
 		});
@@ -497,6 +499,7 @@ export class NoticeRepository {
 		organizationId: string,
 		id: string,
 		satFolioNumber: string,
+		docSvcDocumentId: string,
 	): Promise<NoticeEntity> {
 		const notice = await this.get(organizationId, id);
 
@@ -509,6 +512,7 @@ export class NoticeRepository {
 			data: {
 				status: "ACKNOWLEDGED",
 				satFolioNumber,
+				ackPdfDocumentId: docSvcDocumentId,
 			},
 		});
 

@@ -121,6 +121,7 @@ export type NoticePreviewInput = z.infer<typeof NoticePreviewSchema>;
 // Submit Schema - for marking notice as submitted to SAT
 export const NoticeSubmitSchema = z.object({
 	satFolioNumber: z.string().max(100).optional(),
+	docSvcDocumentId: z.string().min(1),
 });
 
 export type NoticeSubmitInput = z.infer<typeof NoticeSubmitSchema>;
@@ -128,6 +129,7 @@ export type NoticeSubmitInput = z.infer<typeof NoticeSubmitSchema>;
 // Acknowledge Schema - for recording SAT acknowledgment
 export const NoticeAcknowledgeSchema = z.object({
 	satFolioNumber: z.string().min(1).max(100),
+	docSvcDocumentId: z.string().min(1),
 });
 
 export type NoticeAcknowledgeInput = z.infer<typeof NoticeAcknowledgeSchema>;

@@ -414,7 +414,12 @@ noticesRouter.post("/:id/submit", async (c) => {
 
 	const service = getService(c);
 	const updated = await service
-		.markAsSubmitted(organizationId, params.id, input.satFolioNumber)
+		.markAsSubmitted(
+			organizationId,
+			params.id,
+			input.docSvcDocumentId,
+			input.satFolioNumber,
+		)
 		.catch(handleServiceError);
 
 	return c.json(updated);
@@ -429,7 +434,12 @@ noticesRouter.post("/:id/acknowledge", async (c) => {
 
 	const service = getService(c);
 	const updated = await service
-		.markAsAcknowledged(organizationId, params.id, input.satFolioNumber)
+		.markAsAcknowledged(
+			organizationId,
+			params.id,
+			input.satFolioNumber,
+			input.docSvcDocumentId,
+		)
 		.catch(handleServiceError);
 
 	return c.json(updated);

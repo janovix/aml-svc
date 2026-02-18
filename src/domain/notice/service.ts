@@ -203,9 +203,15 @@ export class NoticeService {
 	async markAsSubmitted(
 		organizationId: string,
 		id: string,
+		docSvcDocumentId: string,
 		satFolioNumber?: string,
 	): Promise<NoticeEntity> {
-		return this.repository.markAsSubmitted(organizationId, id, satFolioNumber);
+		return this.repository.markAsSubmitted(
+			organizationId,
+			id,
+			docSvcDocumentId,
+			satFolioNumber,
+		);
 	}
 
 	/**
@@ -215,11 +221,13 @@ export class NoticeService {
 		organizationId: string,
 		id: string,
 		satFolioNumber: string,
+		docSvcDocumentId: string,
 	): Promise<NoticeEntity> {
 		return this.repository.markAsAcknowledged(
 			organizationId,
 			id,
 			satFolioNumber,
+			docSvcDocumentId,
 		);
 	}
 
