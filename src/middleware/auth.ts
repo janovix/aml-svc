@@ -360,10 +360,12 @@ export function authMiddleware(options?: {
  * Helper to get the authenticated user from context
  * Throws if user is not authenticated
  */
-export function getAuthUser(
-	c: Context<{ Variables: Partial<AuthVariables> }>,
-): AuthUser {
-	const user = c.get("user");
+export function getAuthUser<
+	E extends { Variables?: Partial<AuthVariables> | AuthVariables },
+>(c: Context<E>): AuthUser {
+	const user = (
+		c as unknown as Context<{ Variables: Partial<AuthVariables> }>
+	).get("user");
 	if (!user) {
 		throw new Error("User not authenticated");
 	}
@@ -373,10 +375,14 @@ export function getAuthUser(
 /**
  * Helper to get the authenticated user from context, or null if not authenticated
  */
-export function getAuthUserOrNull(
-	c: Context<{ Variables: Partial<AuthVariables> }>,
-): AuthUser | null {
-	return c.get("user") ?? null;
+export function getAuthUserOrNull<
+	E extends { Variables?: Partial<AuthVariables> | AuthVariables },
+>(c: Context<E>): AuthUser | null {
+	return (
+		(c as unknown as Context<{ Variables: Partial<AuthVariables> }>).get(
+			"user",
+		) ?? null
+	);
 }
 
 /**

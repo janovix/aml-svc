@@ -18,6 +18,12 @@ export type Bindings = Omit<Env, "ENVIRONMENT" | "AUTH_JWKS_CACHE_TTL"> & {
 	IMPORT_PROCESSING_QUEUE?: Queue<import("./domain/import").ImportJob>;
 	/** Watchlist service binding for automated screening */
 	WATCHLIST_SERVICE?: Fetcher;
+	/** Notifications service binding for sending emails and real-time notifications */
+	NOTIFICATIONS_SERVICE?: Fetcher;
+	/** KYC Self-Service app URL for generating invite links */
+	KYC_SELF_SERVICE_URL?: string;
+	/** Internal service-to-service shared secret */
+	INTERNAL_SERVICE_SECRET?: string;
 	/** Secret token for synthetic data generation HTTP endpoint (local development only) */
 	SYNTHETIC_DATA_SECRET?: string;
 	/**

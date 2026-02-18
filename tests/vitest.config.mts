@@ -51,6 +51,7 @@ export default defineWorkersConfig({
 				"src/lib/route-helpers.ts",
 				// Service bindings and search clients (complex integration, tested via integration tests)
 				"src/lib/watchlist-search.ts",
+				"src/lib/kyc-email.ts",
 				// Prisma client wrapper (thin wrapper, tested via repositories)
 				"src/lib/prisma.ts",
 				// Route handlers (HTTP layer, tested via integration tests)
@@ -71,6 +72,9 @@ export default defineWorkersConfig({
 				"src/routes/beneficial-controllers.ts",
 				"src/routes/internal-screening.ts",
 				"src/routes/shareholders.ts",
+				"src/routes/kyc-sessions.ts",
+				"src/routes/public-kyc.ts",
+				"src/routes/exchange-rates.ts",
 				// Middleware (HTTP layer, tested via integration tests)
 				"src/middleware/admin-auth.ts",
 				"src/middleware/auth.ts",
@@ -96,6 +100,7 @@ export default defineWorkersConfig({
 				"src/domain/notice/mappers.ts",
 				"src/domain/notice/schemas.ts",
 				"src/domain/notice/service.ts",
+				"src/domain/kyc-session/**",
 				// Invoice domain (complex business logic, tested via integration tests)
 				"src/domain/invoice/**",
 				// Operation domain (complex business logic, tested via integration tests)

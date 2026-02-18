@@ -1,15 +1,29 @@
 import type { OrganizationSettings } from "@prisma/client";
 
-import type { OrganizationSettingsEntity } from "./types";
+import type { OrganizationSettingsEntity, SelfServiceMode } from "./types";
 
 export function mapPrismaOrganizationSettings(
 	prisma: OrganizationSettings,
 ): OrganizationSettingsEntity {
+	let selfServiceRequiredSections: string[] | null = null;
+	if (prisma.selfServiceRequiredSections) {
+		try {
+			selfServiceRequiredSections = JSON.parse(
+				prisma.selfServiceRequiredSections,
+			) as string[];
+		} catch {
+			selfServiceRequiredSections = null;
+		}
+	}
+
 	return {
 		id: prisma.id,
 		organizationId: prisma.organizationId,
 		obligatedSubjectKey: prisma.obligatedSubjectKey,
 		activityKey: prisma.activityKey,
+		selfServiceMode: (prisma.selfServiceMode as SelfServiceMode) ?? "disabled",
+		selfServiceExpiryHours: prisma.selfServiceExpiryHours ?? 72,
+		selfServiceRequiredSections,
 		createdAt: prisma.createdAt.toISOString(),
 		updatedAt: prisma.updatedAt.toISOString(),
 	};

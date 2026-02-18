@@ -31,6 +31,9 @@ import {
 } from "../lib/route-helpers";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { APIError } from "../middleware/error";
+import { KycSessionService } from "../domain/kyc-session";
+import { OrganizationSettingsRepository } from "../domain/organization-settings";
+import { sendKYCInviteEmail } from "../lib/kyc-email";
 
 export const clientsRouter = new Hono<{
 	Bindings: Bindings;
@@ -167,6 +170,109 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 		}
 	}
 
+	// ── Threshold-aware KYC status (Art. 17 LFPIORPI) ──────────────────────
+	// Get org settings to compute thresholds
+	let identificationRequired = true;
+	let identificationTier: "ALWAYS" | "ABOVE_THRESHOLD" | "BELOW_THRESHOLD" =
+		"ALWAYS";
+	let identificationThresholdMxn: number | null = null;
+	let noticeThresholdMxn: number | null = null;
+	let maxSingleOperationMxn = 0;
+	let sixMonthCumulativeMxn = 0;
+	let singleOpExceedsThreshold = false;
+	let cumulativeExceedsNoticeThreshold = false;
+	let identificationThresholdPct = 100;
+	let noticeThresholdPct = 100;
+
+	try {
+		const { OrganizationSettingsRepository: OrgSettingsRepo } = await import(
+			"../domain/organization-settings/repository"
+		);
+		const { getIdentificationThresholdUma, getNoticeThresholdUma } =
+			await import("../domain/operation/activities/registry");
+		const { UmaValueRepository } = await import("../domain/uma/repository");
+
+		const orgSettingsRepo = new OrgSettingsRepo(prisma);
+		const umaRepo = new UmaValueRepository(prisma);
+
+		const [orgSettings, umaValue] = await Promise.all([
+			orgSettingsRepo.findByOrganizationId(organizationId),
+			umaRepo.getActive(),
+		]);
+
+		if (orgSettings && umaValue) {
+			const activityCode =
+				orgSettings.activityKey as import("../domain/operation/types").ActivityCode;
+			const idThresholdUma = getIdentificationThresholdUma(activityCode);
+			const noticeThresholdUma = getNoticeThresholdUma(activityCode);
+			const dailyValue = parseFloat(umaValue.dailyValue);
+
+			if (idThresholdUma === "ALWAYS") {
+				identificationTier = "ALWAYS";
+				identificationRequired = true;
+			} else {
+				const idMxn = idThresholdUma * dailyValue;
+				const noticeMxn =
+					noticeThresholdUma === "ALWAYS"
+						? 0
+						: (noticeThresholdUma as number) * dailyValue;
+
+				identificationThresholdMxn = idMxn;
+				noticeThresholdMxn = noticeMxn > 0 ? noticeMxn : null;
+
+				// Compute client's operation amounts
+				const maxOpResult = await prisma.operation.aggregate({
+					where: { clientId: client.id, deletedAt: null },
+					_max: { amount: true },
+				});
+				const maxOp = maxOpResult._max.amount;
+				maxSingleOperationMxn =
+					maxOp === null
+						? 0
+						: typeof maxOp === "number"
+							? maxOp
+							: parseFloat(maxOp.toString());
+
+				const sixMonthsAgo = new Date();
+				sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+				const cumulativeResult = await prisma.operation.aggregate({
+					where: {
+						clientId: client.id,
+						deletedAt: null,
+						operationDate: { gte: sixMonthsAgo },
+					},
+					_sum: { amount: true },
+				});
+				const cumulativeOp = cumulativeResult._sum.amount;
+				sixMonthCumulativeMxn =
+					cumulativeOp === null
+						? 0
+						: typeof cumulativeOp === "number"
+							? cumulativeOp
+							: parseFloat(cumulativeOp.toString());
+
+				singleOpExceedsThreshold = maxSingleOperationMxn >= idMxn;
+				cumulativeExceedsNoticeThreshold =
+					noticeMxn > 0 && sixMonthCumulativeMxn >= noticeMxn;
+
+				identificationRequired =
+					singleOpExceedsThreshold || cumulativeExceedsNoticeThreshold;
+				identificationTier = identificationRequired
+					? "ABOVE_THRESHOLD"
+					: "BELOW_THRESHOLD";
+
+				identificationThresholdPct =
+					idMxn > 0 ? Math.round((maxSingleOperationMxn / idMxn) * 100) : 0;
+				noticeThresholdPct =
+					noticeMxn > 0
+						? Math.round((sixMonthCumulativeMxn / noticeMxn) * 100)
+						: 0;
+			}
+		}
+	} catch (err) {
+		console.warn("[kyc-status] Could not compute threshold info:", err);
+	}
+
 	return c.json({
 		clientId: client.id,
 		personType: client.personType,
@@ -193,6 +299,19 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 			status: "PENDING",
 			isPEP: false,
 			checkedAt: null,
+		},
+		// Threshold-aware KYC (Art. 17 LFPIORPI)
+		threshold: {
+			identificationRequired,
+			identificationTier,
+			identificationThresholdMxn,
+			maxSingleOperationMxn,
+			singleOpExceedsThreshold,
+			noticeThresholdMxn,
+			sixMonthCumulativeMxn,
+			cumulativeExceedsNoticeThreshold,
+			identificationThresholdPct,
+			noticeThresholdPct,
 		},
 	});
 });
@@ -283,6 +402,43 @@ clientsRouter.post("/", async (c) => {
 					});
 					console.log(
 						`[Client Create] Watchlist search initiated, queryId: ${result.queryId}, sync flags: OFAC=${result.ofacCount > 0}, UNSC=${result.unscCount > 0}, SAT=${result.sat69bCount > 0}`,
+					);
+				}
+			})(),
+		);
+	}
+
+	// Auto-create KYC session if self-service mode is "automatic" (non-blocking)
+	if (created.email) {
+		c.executionCtx.waitUntil(
+			(async () => {
+				try {
+					const prisma = getPrismaClient(c.env.DB);
+					const orgSettingsRepo = new OrganizationSettingsRepository(prisma);
+					const orgSettings =
+						await orgSettingsRepo.findByOrganizationId(organizationId);
+
+					if (orgSettings?.selfServiceMode === "automatic") {
+						const kycService = new KycSessionService(prisma);
+						const session = await kycService.create(
+							organizationId,
+							{ clientId: created.id, createdBy: "system" },
+							prisma,
+						);
+
+						const clientName = created.firstName
+							? `${created.firstName} ${created.lastName ?? ""}`.trim()
+							: (created.businessName ?? "Cliente");
+
+						await sendKYCInviteEmail(c.env, created.email, session, {
+							clientName,
+						});
+						await kycService.recordEmailSent(session.id);
+					}
+				} catch (err) {
+					console.error(
+						"[Client Create] Failed to auto-create KYC session:",
+						err,
 					);
 				}
 			})(),

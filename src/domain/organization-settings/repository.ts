@@ -26,6 +26,9 @@ export class OrganizationSettingsRepository {
 		data: {
 			obligatedSubjectKey: string;
 			activityKey: string;
+			selfServiceMode?: string;
+			selfServiceExpiryHours?: number;
+			selfServiceRequiredSections?: string[] | null;
 		},
 	): Promise<OrganizationSettingsEntity> {
 		const prisma = await this.prisma.organizationSettings.create({
@@ -34,6 +37,12 @@ export class OrganizationSettingsRepository {
 				organizationId,
 				obligatedSubjectKey: data.obligatedSubjectKey,
 				activityKey: data.activityKey,
+				selfServiceMode: data.selfServiceMode ?? "disabled",
+				selfServiceExpiryHours: data.selfServiceExpiryHours ?? 72,
+				selfServiceRequiredSections:
+					data.selfServiceRequiredSections != null
+						? JSON.stringify(data.selfServiceRequiredSections)
+						: null,
 			},
 		});
 
@@ -45,6 +54,9 @@ export class OrganizationSettingsRepository {
 		data: {
 			obligatedSubjectKey?: string;
 			activityKey?: string;
+			selfServiceMode?: string;
+			selfServiceExpiryHours?: number;
+			selfServiceRequiredSections?: string[] | null;
 		},
 	): Promise<OrganizationSettingsEntity> {
 		const prisma = await this.prisma.organizationSettings.update({
@@ -55,6 +67,18 @@ export class OrganizationSettingsRepository {
 				}),
 				...(data.activityKey !== undefined && {
 					activityKey: data.activityKey,
+				}),
+				...(data.selfServiceMode !== undefined && {
+					selfServiceMode: data.selfServiceMode,
+				}),
+				...(data.selfServiceExpiryHours !== undefined && {
+					selfServiceExpiryHours: data.selfServiceExpiryHours,
+				}),
+				...(data.selfServiceRequiredSections !== undefined && {
+					selfServiceRequiredSections:
+						data.selfServiceRequiredSections != null
+							? JSON.stringify(data.selfServiceRequiredSections)
+							: null,
 				}),
 			},
 		});
@@ -67,6 +91,9 @@ export class OrganizationSettingsRepository {
 		data: {
 			obligatedSubjectKey: string;
 			activityKey: string;
+			selfServiceMode?: string;
+			selfServiceExpiryHours?: number;
+			selfServiceRequiredSections?: string[] | null;
 		},
 	): Promise<OrganizationSettingsEntity> {
 		const prisma = await this.prisma.organizationSettings.upsert({
@@ -76,10 +103,28 @@ export class OrganizationSettingsRepository {
 				organizationId,
 				obligatedSubjectKey: data.obligatedSubjectKey,
 				activityKey: data.activityKey,
+				selfServiceMode: data.selfServiceMode ?? "disabled",
+				selfServiceExpiryHours: data.selfServiceExpiryHours ?? 72,
+				selfServiceRequiredSections:
+					data.selfServiceRequiredSections != null
+						? JSON.stringify(data.selfServiceRequiredSections)
+						: null,
 			},
 			update: {
 				obligatedSubjectKey: data.obligatedSubjectKey,
 				activityKey: data.activityKey,
+				...(data.selfServiceMode !== undefined && {
+					selfServiceMode: data.selfServiceMode,
+				}),
+				...(data.selfServiceExpiryHours !== undefined && {
+					selfServiceExpiryHours: data.selfServiceExpiryHours,
+				}),
+				...(data.selfServiceRequiredSections !== undefined && {
+					selfServiceRequiredSections:
+						data.selfServiceRequiredSections != null
+							? JSON.stringify(data.selfServiceRequiredSections)
+							: null,
+				}),
 			},
 		});
 

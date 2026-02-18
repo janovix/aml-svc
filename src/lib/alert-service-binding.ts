@@ -32,7 +32,10 @@ import { UmaValueService } from "../domain/uma";
 import { ClientRepository } from "../domain/client";
 import { ClientService } from "../domain/client";
 import { OperationService } from "../domain/operation";
-import { handleInternalOrganizationSettingsRequest } from "../routes/internal-organization-settings";
+import {
+	handleInternalOrganizationSettingsRequest,
+	handleInternalSelfServiceSettingsRequest,
+} from "../routes/internal-organization-settings";
 import { handleInternalScreeningRequest } from "../routes/internal-screening";
 
 /**
@@ -398,6 +401,20 @@ export async function handleServiceBindingRequest(
 		if (orgSettingsMatch) {
 			const [, organizationId] = orgSettingsMatch;
 			return handleInternalOrganizationSettingsRequest(
+				request,
+				env,
+				organizationId,
+			);
+		}
+
+		// Route: /organization-settings/:organizationId/self-service (PATCH)
+		// Called via: env.AML_SERVICE.fetch(new Request(`https://internal/organization-settings/${organizationId}/self-service`, { method: 'PATCH', body: ... }))
+		const selfServiceMatch = path.match(
+			/^\/organization-settings\/([^/]+)\/self-service$/,
+		);
+		if (selfServiceMatch) {
+			const [, organizationId] = selfServiceMatch;
+			return handleInternalSelfServiceSettingsRequest(
 				request,
 				env,
 				organizationId,

@@ -27,6 +27,8 @@ import {
 	beneficialControllersInternalRouter,
 } from "./beneficial-controllers";
 import { exchangeRatesRouter } from "./exchange-rates";
+import { kycSessionsRouter } from "./kyc-sessions";
+import { publicKycRouter } from "./public-kyc";
 
 export function createRouter() {
 	const router = new Hono<{
@@ -49,6 +51,13 @@ export function createRouter() {
 		"/internal/beneficial-controllers",
 		beneficialControllersInternalRouter,
 	);
+
+	// KYC Self-Service public endpoints (no auth, token-based)
+	router.route("/public/kyc", publicKycRouter);
+
+	// KYC sessions routes (authenticated, org-scoped)
+	router.use("/kyc-sessions/*", authMiddleware({ requireOrganization: true }));
+	router.use("/kyc-sessions", authMiddleware({ requireOrganization: true }));
 
 	// Apply auth middleware with organization requirement for tenant-scoped routes
 	// These routes require an active organization to be selected
@@ -95,6 +104,7 @@ export function createRouter() {
 	router.route("/uma-values", umaValuesRouter);
 	router.route("/organization-settings", organizationSettingsRouter);
 	router.route("/imports", importsRouter);
+	router.route("/kyc-sessions", kycSessionsRouter);
 
 	return router;
 }

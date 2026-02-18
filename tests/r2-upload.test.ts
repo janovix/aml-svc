@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
 	uploadToR2,
+	uploadFileToR2,
 	generateFileKey,
 	generateReportFileKey,
 	generateNoticeFileKey,
@@ -177,5 +178,218 @@ describe("generateImportFileKey", () => {
 		const key2 = generateImportFileKey("org-123", "data.csv");
 
 		expect(key1).not.toBe(key2);
+	});
+});
+
+describe("uploadFileToR2", () => {
+	let mockBucket: R2Bucket;
+
+	beforeEach(() => {
+		mockBucket = {
+			put: vi.fn().mockResolvedValue({
+				key: "uploads/file-key",
+				size: 2048,
+				etag: "file-etag",
+			}),
+			get: vi.fn(),
+		} as unknown as R2Bucket;
+	});
+
+	it("should upload a file with category and organizationId", async () => {
+		const mockFile = new File(["test content"], "test.pdf", {
+			type: "application/pdf",
+		});
+
+		const result = await uploadFileToR2(mockBucket, mockFile, {
+			category: "documents",
+			organizationId: "org-123",
+		});
+
+		expect(mockBucket.put).toHaveBeenCalledOnce();
+		expect(result.key).toContain("documents/org-123/");
+		expect(result.key).toContain("test.pdf");
+		expect(result.size).toBe(2048);
+		expect(result.etag).toBe("file-etag");
+	});
+
+	it("should include clientId in key when provided", async () => {
+		const mockFile = new File(["test content"], "doc.pdf", {
+			type: "application/pdf",
+		});
+
+		const result = await uploadFileToR2(mockBucket, mockFile, {
+			category: "documents",
+			organizationId: "org-123",
+			clientId: "client-456",
+		});
+
+		expect(result.key).toContain("documents/org-123/client-456/");
+	});
+
+	it("should include documentId in key when provided", async () => {
+		const mockFile = new File(["test content"], "doc.pdf", {
+			type: "application/pdf",
+		});
+
+		const result = await uploadFileToR2(mockBucket, mockFile, {
+			category: "documents",
+			organizationId: "org-123",
+			clientId: "client-456",
+			documentId: "doc-789",
+		});
+
+		expect(result.key).toContain("documents/org-123/client-456/doc-789/");
+	});
+
+	it("should sanitize filename by replacing unsafe characters", async () => {
+		const mockFile = new File(["test content"], "test@file#name!.pdf", {
+			type: "application/pdf",
+		});
+
+		const result = await uploadFileToR2(mockBucket, mockFile, {
+			category: "documents",
+			organizationId: "org-123",
+		});
+
+		expect(result.key).toContain("test_file_name_.pdf");
+		expect(result.key).not.toContain("@");
+		expect(result.key).not.toContain("#");
+		expect(result.key).not.toContain("!");
+	});
+
+	it("should preserve safe characters in filename", async () => {
+		const mockFile = new File(["test content"], "test-file_123.pdf", {
+			type: "application/pdf",
+		});
+
+		const result = await uploadFileToR2(mockBucket, mockFile, {
+			category: "documents",
+			organizationId: "org-123",
+		});
+
+		expect(result.key).toContain("test-file_123.pdf");
+	});
+
+	it("should include custom metadata in upload", async () => {
+		const mockFile = new File(["test content"], "test.pdf", {
+			type: "application/pdf",
+		});
+
+		await uploadFileToR2(mockBucket, mockFile, {
+			category: "documents",
+			organizationId: "org-123",
+			metadata: { clientName: "John Doe", docType: "passport" },
+		});
+
+		const putCall = (mockBucket.put as any).mock.calls[0];
+		const putOptions = putCall[2] as any;
+
+		expect(putOptions.customMetadata).toMatchObject({
+			organizationId: "org-123",
+			originalFileName: "test.pdf",
+			clientName: "John Doe",
+			docType: "passport",
+		});
+		expect(putOptions.customMetadata.uploadedAt).toBeDefined();
+	});
+
+	it("should use file's MIME type as contentType", async () => {
+		const mockFile = new File(["test content"], "test.png", {
+			type: "image/png",
+		});
+
+		await uploadFileToR2(mockBucket, mockFile, {
+			category: "documents",
+			organizationId: "org-123",
+		});
+
+		const putCall = (mockBucket.put as any).mock.calls[0];
+		const putOptions = putCall[2] as any;
+
+		expect(putOptions.httpMetadata.contentType).toBe("image/png");
+	});
+
+	it("should use default contentType when file type is empty", async () => {
+		const mockFile = new File(["test content"], "test", {
+			type: "",
+		});
+
+		await uploadFileToR2(mockBucket, mockFile, {
+			category: "documents",
+			organizationId: "org-123",
+		});
+
+		const putCall = (mockBucket.put as any).mock.calls[0];
+		const putOptions = putCall[2] as any;
+
+		expect(putOptions.httpMetadata.contentType).toBe(
+			"application/octet-stream",
+		);
+	});
+
+	it("should generate timestamp and file ID in key", async () => {
+		const mockFile = new File(["test content"], "test.pdf", {
+			type: "application/pdf",
+		});
+
+		const result = await uploadFileToR2(mockBucket, mockFile, {
+			category: "documents",
+			organizationId: "org-123",
+		});
+
+		// Key should contain ISO timestamp (with colons replaced by dashes)
+		expect(result.key).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}/);
+		// Key should contain FILE prefix (FILE is 3 chars + random chars)
+		expect(result.key).toMatch(/FIL[A-Za-z0-9]+/);
+	});
+
+	it("should pass file stream to bucket.put", async () => {
+		const mockFile = new File(["test content"], "test.pdf", {
+			type: "application/pdf",
+		});
+
+		// Mock the stream() method
+		mockFile.stream = vi.fn().mockReturnValue("mock-stream");
+
+		await uploadFileToR2(mockBucket, mockFile, {
+			category: "documents",
+			organizationId: "org-123",
+		});
+
+		expect(mockFile.stream).toHaveBeenCalled();
+		const putCall = (mockBucket.put as any).mock.calls[0];
+		expect(putCall[1]).toBe("mock-stream");
+	});
+
+	it("should not include clientId in key when not provided", async () => {
+		const mockFile = new File(["test content"], "test.pdf", {
+			type: "application/pdf",
+		});
+
+		const result = await uploadFileToR2(mockBucket, mockFile, {
+			category: "documents",
+			organizationId: "org-123",
+		});
+
+		const keyParts = result.key.split("/");
+		// Should be: documents / org-123 / timestamp-fileid-filename
+		expect(keyParts.length).toBe(3);
+	});
+
+	it("should include clientId but not documentId when only clientId is provided", async () => {
+		const mockFile = new File(["test content"], "test.pdf", {
+			type: "application/pdf",
+		});
+
+		const result = await uploadFileToR2(mockBucket, mockFile, {
+			category: "documents",
+			organizationId: "org-123",
+			clientId: "client-456",
+		});
+
+		const keyParts = result.key.split("/");
+		// Should be: documents / org-123 / client-456 / timestamp-fileid-filename
+		expect(keyParts.length).toBe(4);
+		expect(keyParts[2]).toBe("client-456");
 	});
 });

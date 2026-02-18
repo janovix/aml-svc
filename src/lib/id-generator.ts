@@ -42,6 +42,8 @@ export const ID_PREFIXES = {
 	SHAREHOLDER: "SHR", // Shareholder
 	BENEFICIAL_CONTROLLER: "BC", // Beneficial Controller (Beneficiario Controlador)
 	FILE: "FIL", // File uploads to R2
+	KYC_SESSION: "KYC", // KYC Self-Service Session
+	KYC_SESSION_EVENT: "KYE", // KYC Session Event (audit trail)
 } as const;
 
 export type EntityType = keyof typeof ID_PREFIXES;

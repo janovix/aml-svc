@@ -15,6 +15,9 @@ export class OrganizationSettingsService {
 		data: {
 			obligatedSubjectKey: string;
 			activityKey: string;
+			selfServiceMode?: string;
+			selfServiceExpiryHours?: number;
+			selfServiceRequiredSections?: string[] | null;
 		},
 	): Promise<OrganizationSettingsEntity> {
 		return this.repository.upsert(organizationId, data);
@@ -25,6 +28,9 @@ export class OrganizationSettingsService {
 		data: {
 			obligatedSubjectKey?: string;
 			activityKey?: string;
+			selfServiceMode?: string;
+			selfServiceExpiryHours?: number;
+			selfServiceRequiredSections?: string[] | null;
 		},
 	): Promise<OrganizationSettingsEntity> {
 		return this.repository.update(organizationId, data);

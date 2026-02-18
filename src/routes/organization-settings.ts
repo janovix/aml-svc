@@ -10,6 +10,7 @@ import {
 	OrganizationSettingsService,
 	organizationSettingsCreateSchema,
 	organizationSettingsUpdateSchema,
+	selfServiceSettingsUpdateSchema,
 } from "../domain/organization-settings";
 
 export const organizationSettingsRouter = new Hono<{
@@ -66,6 +67,9 @@ organizationSettingsRouter.put("/", async (c) => {
 	const settings = await service.createOrUpdate(organizationId, {
 		obligatedSubjectKey: data.obligatedSubjectKey,
 		activityKey: data.activityKey,
+		selfServiceMode: data.selfServiceMode,
+		selfServiceExpiryHours: data.selfServiceExpiryHours,
+		selfServiceRequiredSections: data.selfServiceRequiredSections,
 	});
 
 	return c.json({ configured: true, settings }, 200);
@@ -96,6 +100,40 @@ organizationSettingsRouter.patch("/", async (c) => {
 	const settings = await service.update(organizationId, {
 		obligatedSubjectKey: data.obligatedSubjectKey,
 		activityKey: data.activityKey,
+		selfServiceMode: data.selfServiceMode,
+		selfServiceExpiryHours: data.selfServiceExpiryHours,
+		selfServiceRequiredSections: data.selfServiceRequiredSections,
+	});
+
+	return c.json({ configured: true, settings });
+});
+
+// PATCH /api/v1/organization-settings/self-service - Update only self-service settings
+organizationSettingsRouter.patch("/self-service", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const prisma = getPrismaClient(c.env.DB);
+	const repository = new OrganizationSettingsRepository(prisma);
+	const service = new OrganizationSettingsService(repository);
+
+	const existing = await service.getByOrganizationId(organizationId);
+	if (!existing) {
+		return c.json(
+			{
+				configured: false,
+				error: "Not Configured",
+				message:
+					"Organization settings have not been configured yet. Use PUT to create them.",
+			},
+			404,
+		);
+	}
+
+	const body = await c.req.json();
+	const data = parseWithZod(selfServiceSettingsUpdateSchema, body);
+	const settings = await service.update(organizationId, {
+		selfServiceMode: data.selfServiceMode,
+		selfServiceExpiryHours: data.selfServiceExpiryHours,
+		selfServiceRequiredSections: data.selfServiceRequiredSections,
 	});
 
 	return c.json({ configured: true, settings });

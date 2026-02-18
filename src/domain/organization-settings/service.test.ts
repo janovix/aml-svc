@@ -12,6 +12,9 @@ describe("OrganizationSettingsService", () => {
 		organizationId: "org-123",
 		obligatedSubjectKey: "ABC123456DE7",
 		activityKey: "VEH",
+		selfServiceMode: "disabled",
+		selfServiceExpiryHours: 72,
+		selfServiceRequiredSections: null,
 		createdAt: "2024-01-01T00:00:00.000Z",
 		updatedAt: "2024-01-01T00:00:00.000Z",
 	};

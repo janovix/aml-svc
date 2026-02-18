@@ -1202,17 +1202,79 @@ model UmaValue {
 // ============================================================================
 
 model OrganizationSettings {
-  id                  String   @id
-  organizationId      String   @unique @map("organization_id")
-  obligatedSubjectKey String   @map("obligated_subject_key")
-  activityKey         String   @map("activity_key")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  id                          String   @id
+  organizationId              String   @unique @map("organization_id")
+  obligatedSubjectKey         String   @map("obligated_subject_key")
+  activityKey                 String   @map("activity_key")
+  // KYC Self-Service settings
+  selfServiceMode             String   @default("disabled") @map("self_service_mode")
+  selfServiceExpiryHours      Int      @default(72) @map("self_service_expiry_hours")
+  selfServiceRequiredSections String?  @map("self_service_required_sections") // JSON array
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
 
   @@index([organizationId])
   @@index([obligatedSubjectKey])
   @@index([activityKey])
   @@map("organization_settings")
+}
+
+// ============================================================================
+// KYC Session Domain
+// ============================================================================
+
+model KycSession {
+  id                    String   @id
+  organizationId        String   @map("organization_id")
+  clientId              String   @map("client_id")
+  token                 String   @unique
+  status                String   @default("ACTIVE") // ACTIVE, IN_PROGRESS, SUBMITTED, PENDING_REVIEW, APPROVED, REJECTED, EXPIRED, REVOKED
+  expiresAt             DateTime @map("expires_at")
+  createdBy             String   @map("created_by") // user ID or "system"
+  emailSentAt           DateTime? @map("email_sent_at")
+  startedAt             DateTime? @map("started_at")
+  submittedAt           DateTime? @map("submitted_at")
+  reviewedAt            DateTime? @map("reviewed_at")
+  reviewedBy            String?  @map("reviewed_by")
+  rejectionReason       String?  @map("rejection_reason")
+  editableSections      String?  @map("editable_sections") // JSON array
+  uploadLinkId          String?  @map("upload_link_id")
+  // Threshold awareness (Art. 17 LFPIORPI)
+  identificationTier    String   @default("ALWAYS") @map("identification_tier") // ALWAYS, ABOVE_THRESHOLD, BELOW_THRESHOLD
+  thresholdAmountMxn    Float?   @map("threshold_amount_mxn")
+  clientCumulativeMxn   Float?   @map("client_cumulative_mxn")
+  // Progress tracking
+  completedSections     String?  @map("completed_sections") // JSON array
+  lastActivityAt        DateTime? @map("last_activity_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  events KycSessionEvent[]
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([token])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("kyc_sessions")
+}
+
+model KycSessionEvent {
+  id          String   @id
+  sessionId   String   @map("session_id")
+  eventType   String   @map("event_type") // session_accessed, personal_info_updated, document_uploaded, shareholder_added, beneficial_controller_added, session_submitted, session_approved, session_rejected
+  actorIp     String?  @map("actor_ip")
+  actorType   String   @default("client") @map("actor_type") // client, admin, system
+  actorId     String?  @map("actor_id")
+  payload     String?  // JSON snapshot of before/after changes
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  session KycSession @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("kyc_session_events")
 }
 
 // ============================================================================
