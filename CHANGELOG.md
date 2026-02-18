@@ -1,3 +1,10 @@
+# [1.6.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.13...v1.6.0-rc.14) (2026-02-18)
+
+
+### Features
+
+* add KYC self-service module with session management and email notifications ([01b1d91](https://github.com/janovix/aml-svc/commit/01b1d91b4c90611a8659aadb71e313dc2d2547a1))
+
 # [1.6.0-rc.13](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.12...v1.6.0-rc.13) (2026-02-17)
 
 
