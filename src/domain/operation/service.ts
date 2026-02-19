@@ -105,6 +105,14 @@ export class OperationService {
 		return this.repository.softDelete(organizationId, id);
 	}
 
+	async getStats(organizationId: string): Promise<{
+		totalOperations: number;
+		operationsToday: number;
+		totalAmountMxn: string;
+	}> {
+		return this.repository.getStats(organizationId);
+	}
+
 	async getByClientId(
 		organizationId: string,
 		clientId: string,

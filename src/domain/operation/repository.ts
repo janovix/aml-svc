@@ -1148,6 +1148,46 @@ export class OperationRepository {
 		return operations.map((op) => mapOperationToEntity(op));
 	}
 
+	async getStats(organizationId: string): Promise<{
+		totalOperations: number;
+		operationsToday: number;
+		totalAmountMxn: string;
+	}> {
+		const todayStart = new Date();
+		todayStart.setHours(0, 0, 0, 0);
+
+		const [totalOperations, operationsToday, aggregate] = await Promise.all([
+			this.prisma.operation.count({
+				where: { organizationId, deletedAt: null },
+			}),
+			this.prisma.operation.count({
+				where: {
+					organizationId,
+					deletedAt: null,
+					operationDate: { gte: todayStart },
+				},
+			}),
+			this.prisma.operation.aggregate({
+				where: { organizationId, deletedAt: null },
+				_sum: { amountMxn: true },
+			}),
+		]);
+
+		const rawSum = aggregate._sum.amountMxn;
+		const totalMxn =
+			rawSum === null
+				? 0
+				: typeof rawSum === "number"
+					? rawSum
+					: parseFloat(rawSum.toString());
+
+		return {
+			totalOperations,
+			operationsToday,
+			totalAmountMxn: totalMxn.toFixed(2),
+		};
+	}
+
 	/**
 	 * Auto-detects completeness based on whether the activity extension is present.
 	 * Operations without their VA-specific extension are marked as INCOMPLETE.

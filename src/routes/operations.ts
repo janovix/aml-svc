@@ -120,6 +120,20 @@ operationsRouter.get("/", async (c) => {
 });
 
 /**
+ * GET /operations/stats
+ * Get summary statistics for operations in the organization.
+ * IMPORTANT: must be defined before /:id to avoid "stats" being matched as an id.
+ */
+operationsRouter.get("/stats", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const service = getService(c);
+	const stats = await service
+		.getStats(organizationId)
+		.catch(handleServiceError);
+	return c.json(stats);
+});
+
+/**
  * GET /operations/activities
  * Get list of all supported vulnerable activities with their details
  */
