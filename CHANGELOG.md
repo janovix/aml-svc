@@ -1,3 +1,10 @@
+# [1.6.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.14...v1.6.0-rc.15) (2026-02-18)
+
+
+### Features
+
+* add submit and acknowledgment PDF document ID fields to Notice model and update related functionality ([57a5bbf](https://github.com/janovix/aml-svc/commit/57a5bbfb790abc64796db547af972f089350071e))
+
 # [1.6.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.13...v1.6.0-rc.14) (2026-02-18)
 
 
