@@ -1,3 +1,10 @@
+# [1.6.0-rc.16](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.15...v1.6.0-rc.16) (2026-02-19)
+
+
+### Features
+
+* add statistics endpoint for operations and implement related repository and service methods ([96efca9](https://github.com/janovix/aml-svc/commit/96efca95bb3a635181fc7c7a47d1ff80bbb1b5d7))
+
 # [1.6.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.14...v1.6.0-rc.15) (2026-02-18)
 
 
