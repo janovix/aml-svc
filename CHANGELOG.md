@@ -1,3 +1,10 @@
+# [1.6.0-rc.17](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.16...v1.6.0-rc.17) (2026-02-19)
+
+
+### Features
+
+* add getStats method to InvoiceRepository and InvoiceService, and create /invoices/stats endpoint ([b4d64c8](https://github.com/janovix/aml-svc/commit/b4d64c86531ccaee2554e636b7fe038e372c26bf))
+
 # [1.6.0-rc.16](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.15...v1.6.0-rc.16) (2026-02-19)
 
 
