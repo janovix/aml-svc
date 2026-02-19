@@ -80,6 +80,20 @@ invoicesRouter.get("/", async (c) => {
 });
 
 /**
+ * GET /invoices/stats
+ * Get summary statistics for invoices in the organization.
+ * IMPORTANT: must be defined before /:id to avoid "stats" being matched as an id.
+ */
+invoicesRouter.get("/stats", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const service = getService(c);
+	const stats = await service
+		.getStats(organizationId)
+		.catch(handleServiceError);
+	return c.json(stats);
+});
+
+/**
  * GET /invoices/:id
  * Get a single invoice by ID
  */

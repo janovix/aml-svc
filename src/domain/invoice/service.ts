@@ -121,6 +121,17 @@ export class InvoiceService {
 	}
 
 	/**
+	 * Get invoice statistics for the organization
+	 */
+	async getStats(organizationId: string): Promise<{
+		totalInvoices: number;
+		ingresoInvoices: number;
+		egresoInvoices: number;
+	}> {
+		return this.repository.getStats(organizationId);
+	}
+
+	/**
 	 * Soft delete invoice
 	 */
 	async delete(organizationId: string, id: string): Promise<boolean> {

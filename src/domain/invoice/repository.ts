@@ -286,6 +286,26 @@ export class InvoiceRepository {
 		return invoice ? mapInvoiceToEntity(invoice) : null;
 	}
 
+	async getStats(organizationId: string): Promise<{
+		totalInvoices: number;
+		ingresoInvoices: number;
+		egresoInvoices: number;
+	}> {
+		const [totalInvoices, ingresoInvoices, egresoInvoices] = await Promise.all([
+			this.prisma.invoice.count({
+				where: { organizationId, deletedAt: null },
+			}),
+			this.prisma.invoice.count({
+				where: { organizationId, deletedAt: null, voucherTypeCode: "I" },
+			}),
+			this.prisma.invoice.count({
+				where: { organizationId, deletedAt: null, voucherTypeCode: "E" },
+			}),
+		]);
+
+		return { totalInvoices, ingresoInvoices, egresoInvoices };
+	}
+
 	async softDelete(organizationId: string, id: string): Promise<boolean> {
 		const existing = await this.prisma.invoice.findFirst({
 			where: { id, organizationId, deletedAt: null },
