@@ -29,6 +29,7 @@ import {
 import { exchangeRatesRouter } from "./exchange-rates";
 import { kycSessionsRouter } from "./kyc-sessions";
 import { publicKycRouter } from "./public-kyc";
+import { maintenanceRouter } from "./internal-maintenance";
 
 export function createRouter() {
 	const router = new Hono<{
@@ -42,6 +43,7 @@ export function createRouter() {
 	// Import SSE events handle their own auth (EventSource can't send headers)
 	router.route("/imports", importEventsRouter);
 	// Internal routes for worker-to-service communication (no auth, service binding only)
+	router.route("/internal/maintenance", maintenanceRouter);
 	router.route("/internal/imports", importInternalRouter);
 	router.route("/internal/clients", clientsInternalRouter);
 	// Transaction internal routes deprecated - use operations
