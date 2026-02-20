@@ -1,3 +1,10 @@
+# [1.6.0-rc.19](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.18...v1.6.0-rc.19) (2026-02-20)
+
+
+### Bug Fixes
+
+* update ruleType in alertRules from transaction_amount_uma to operation_amount_uma for clarity ([43c4465](https://github.com/janovix/aml-svc/commit/43c446564f49d3b726ee43f5a8dfe2b6eb728ef6))
+
 # [1.6.0-rc.18](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.17...v1.6.0-rc.18) (2026-02-20)
 
 
