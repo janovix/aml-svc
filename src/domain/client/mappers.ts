@@ -314,6 +314,26 @@ export function mapPrismaClient(
 					}
 				})()
 			: null,
+		// KYC progress (persisted fields)
+		kycCompletionPct: Number(record.kycCompletionPct) || 0,
+		documentsComplete: Number(record.documentsComplete) || 0,
+		documentsCount: Number(record.documentsCount) || 0,
+		documentsRequired: Number(record.documentsRequired) || 0,
+		shareholdersCount: Number(record.shareholdersCount) || 0,
+		beneficialControllersCount: Number(record.beneficialControllersCount) || 0,
+		// Threshold-aware KYC (Art. 17 LFPIORPI)
+		identificationRequired: Boolean(record.identificationRequired) || true,
+		identificationTier:
+			(record.identificationTier as
+				| "ALWAYS"
+				| "ABOVE_THRESHOLD"
+				| "BELOW_THRESHOLD") || "ALWAYS",
+		identificationThresholdMxn: record.identificationThresholdMxn
+			? Number(record.identificationThresholdMxn)
+			: null,
+		noticeThresholdMxn: record.noticeThresholdMxn
+			? Number(record.noticeThresholdMxn)
+			: null,
 		// Watchlist screening status
 		isPEP: Boolean(record.isPEP),
 		watchlistQueryId: record.watchlistQueryId ?? null,

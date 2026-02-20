@@ -21,6 +21,7 @@ import {
 	mapPatchInputToPrisma,
 } from "./mappers.js";
 import { generateId } from "../../lib/id-generator.js";
+import { recalculateKycProgress } from "../client/kyc-progress.js";
 
 export class BeneficialControllerRepository {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,6 +102,9 @@ export class BeneficialControllerRepository {
 			},
 		});
 
+		// Recalculate KYC progress after BC creation
+		await recalculateKycProgress(this.prisma as PrismaClient, clientId);
+
 		return mapPrismaBC(bc);
 	}
 
@@ -115,6 +119,9 @@ export class BeneficialControllerRepository {
 			where: { id: bcId, clientId },
 			data,
 		});
+
+		// Recalculate KYC progress after BC update
+		await recalculateKycProgress(this.prisma as PrismaClient, clientId);
 
 		return mapPrismaBC(bc);
 	}
@@ -131,6 +138,9 @@ export class BeneficialControllerRepository {
 			data,
 		});
 
+		// Recalculate KYC progress after BC patch
+		await recalculateKycProgress(this.prisma as PrismaClient, clientId);
+
 		return mapPrismaBC(bc);
 	}
 
@@ -138,6 +148,9 @@ export class BeneficialControllerRepository {
 		await (this.prisma as PrismaClient).beneficialController.delete({
 			where: { id: bcId, clientId },
 		});
+
+		// Recalculate KYC progress after BC deletion
+		await recalculateKycProgress(this.prisma as PrismaClient, clientId);
 	}
 
 	async findByShareholderId(

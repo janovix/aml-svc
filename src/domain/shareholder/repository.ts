@@ -21,6 +21,7 @@ import {
 	mapPatchInputToPrisma,
 } from "./mappers.js";
 import { generateId } from "../../lib/id-generator.js";
+import { recalculateKycProgress } from "../client/kyc-progress.js";
 
 export class ShareholderRepository {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -98,6 +99,9 @@ export class ShareholderRepository {
 			},
 		});
 
+		// Recalculate KYC progress after shareholder creation
+		await recalculateKycProgress(this.prisma as PrismaClient, clientId);
+
 		return mapPrismaShareholder(shareholder);
 	}
 
@@ -135,6 +139,9 @@ export class ShareholderRepository {
 		await (this.prisma as PrismaClient).shareholder.delete({
 			where: { id: shareholderId, clientId },
 		});
+
+		// Recalculate KYC progress after shareholder deletion
+		await recalculateKycProgress(this.prisma as PrismaClient, clientId);
 	}
 
 	async listByParent(

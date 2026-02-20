@@ -41,6 +41,18 @@ export interface ClientEntity {
 	// Completeness tracking
 	completenessStatus: "COMPLETE" | "INCOMPLETE" | "MINIMUM";
 	missingFields: string[] | null;
+	// KYC progress (persisted fields)
+	kycCompletionPct: number;
+	documentsComplete: number; // 0 or 1
+	documentsCount: number;
+	documentsRequired: number;
+	shareholdersCount: number;
+	beneficialControllersCount: number;
+	// Threshold-aware KYC (Art. 17 LFPIORPI)
+	identificationRequired: boolean;
+	identificationTier: "ALWAYS" | "ABOVE_THRESHOLD" | "BELOW_THRESHOLD";
+	identificationThresholdMxn?: number | null;
+	noticeThresholdMxn?: number | null;
 	// Watchlist screening status
 	isPEP?: boolean;
 	watchlistQueryId?: string | null;

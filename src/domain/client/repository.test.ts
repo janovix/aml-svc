@@ -51,6 +51,16 @@ describe("ClientRepository", () => {
 		kycCompletedAt: null,
 		completenessStatus: "INCOMPLETE",
 		missingFields: null,
+		kycCompletionPct: 0,
+		documentsComplete: 0,
+		documentsCount: 0,
+		documentsRequired: 3,
+		shareholdersCount: 0,
+		beneficialControllersCount: 0,
+		identificationRequired: true,
+		identificationTier: "ALWAYS",
+		identificationThresholdMxn: null,
+		noticeThresholdMxn: null,
 		isPEP: false,
 		watchlistQueryId: null,
 		ofacSanctioned: false,
@@ -117,6 +127,7 @@ describe("ClientRepository", () => {
 			client: {
 				findMany: vi.fn(),
 				findFirst: vi.fn(),
+				findUnique: vi.fn(),
 				count: vi.fn(),
 				create: vi.fn(),
 				update: vi.fn(),
@@ -135,7 +146,8 @@ describe("ClientRepository", () => {
 				update: vi.fn(),
 				delete: vi.fn(),
 			},
-		} as unknown as PrismaClient;
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		} as any;
 
 		// Mock catalog resolver to avoid catalog database calls
 		mockCatalogResolver = {
@@ -288,6 +300,14 @@ describe("ClientRepository", () => {
 			};
 
 			vi.mocked(mockPrisma.client.create).mockResolvedValue(mockClient);
+			vi.mocked(mockPrisma.client.findUnique).mockResolvedValue({
+				...mockClient,
+				documents: [],
+				beneficialControllers: [],
+				shareholders: [],
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any);
+			vi.mocked(mockPrisma.client.update).mockResolvedValue(mockClient);
 
 			const result = await repository.create("org-123", input);
 
@@ -317,11 +337,17 @@ describe("ClientRepository", () => {
 				postalCode: "06000",
 			};
 
+			const updatedClient = { ...mockClient, firstName: "Jane" };
+
 			vi.mocked(mockPrisma.client.findFirst).mockResolvedValue(mockClient);
-			vi.mocked(mockPrisma.client.update).mockResolvedValue({
-				...mockClient,
-				firstName: "Jane",
-			});
+			vi.mocked(mockPrisma.client.update).mockResolvedValue(updatedClient);
+			vi.mocked(mockPrisma.client.findUnique).mockResolvedValue({
+				...updatedClient,
+				documents: [],
+				beneficialControllers: [],
+				shareholders: [],
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any);
 
 			const result = await repository.update("org-123", "CLT123456789", input);
 
@@ -362,11 +388,17 @@ describe("ClientRepository", () => {
 				email: "newemail@example.com",
 			};
 
+			const updatedClient = { ...mockClient, email: "newemail@example.com" };
+
 			vi.mocked(mockPrisma.client.findFirst).mockResolvedValue(mockClient);
-			vi.mocked(mockPrisma.client.update).mockResolvedValue({
-				...mockClient,
-				email: "newemail@example.com",
-			});
+			vi.mocked(mockPrisma.client.update).mockResolvedValue(updatedClient);
+			vi.mocked(mockPrisma.client.findUnique).mockResolvedValue({
+				...updatedClient,
+				documents: [],
+				beneficialControllers: [],
+				shareholders: [],
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any);
 
 			const result = await repository.patch("org-123", "CLT123456789", input);
 
@@ -446,6 +478,14 @@ describe("ClientRepository", () => {
 			vi.mocked(mockPrisma.clientDocument.create).mockResolvedValue(
 				mockDocument,
 			);
+			vi.mocked(mockPrisma.client.findUnique).mockResolvedValue({
+				...mockClient,
+				documents: [mockDocument],
+				beneficialControllers: [],
+				shareholders: [],
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any);
+			vi.mocked(mockPrisma.client.update).mockResolvedValue(mockClient);
 
 			const result = await repository.createDocument("org-123", input);
 
@@ -476,15 +516,27 @@ describe("ClientRepository", () => {
 				status: "VERIFIED",
 			};
 
+			const updatedDocument = {
+				...mockDocument,
+				documentType: "PASSPORT" as const,
+				documentNumber: "ABC123",
+			};
+
 			vi.mocked(mockPrisma.client.findFirst).mockResolvedValue(mockClient);
 			vi.mocked(mockPrisma.clientDocument.findFirst).mockResolvedValue(
 				mockDocument,
 			);
-			vi.mocked(mockPrisma.clientDocument.update).mockResolvedValue({
-				...mockDocument,
-				documentType: "PASSPORT",
-				documentNumber: "ABC123",
-			});
+			vi.mocked(mockPrisma.clientDocument.update).mockResolvedValue(
+				updatedDocument as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+			);
+			vi.mocked(mockPrisma.client.findUnique).mockResolvedValue({
+				...mockClient,
+				documents: [updatedDocument as any], // eslint-disable-line @typescript-eslint/no-explicit-any
+				beneficialControllers: [],
+				shareholders: [],
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any);
+			vi.mocked(mockPrisma.client.update).mockResolvedValue(mockClient);
 
 			const result = await repository.updateDocument(
 				"org-123",
@@ -523,14 +575,26 @@ describe("ClientRepository", () => {
 				status: "VERIFIED",
 			};
 
+			const patchedDocument = {
+				...mockDocument,
+				status: "VERIFIED" as const,
+			};
+
 			vi.mocked(mockPrisma.client.findFirst).mockResolvedValue(mockClient);
 			vi.mocked(mockPrisma.clientDocument.findFirst).mockResolvedValue(
 				mockDocument,
 			);
-			vi.mocked(mockPrisma.clientDocument.update).mockResolvedValue({
-				...mockDocument,
-				status: "VERIFIED",
-			});
+			vi.mocked(mockPrisma.clientDocument.update).mockResolvedValue(
+				patchedDocument as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+			);
+			vi.mocked(mockPrisma.client.findUnique).mockResolvedValue({
+				...mockClient,
+				documents: [patchedDocument as any], // eslint-disable-line @typescript-eslint/no-explicit-any
+				beneficialControllers: [],
+				shareholders: [],
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any);
+			vi.mocked(mockPrisma.client.update).mockResolvedValue(mockClient);
 
 			const result = await repository.patchDocument(
 				"org-123",
@@ -552,6 +616,14 @@ describe("ClientRepository", () => {
 			vi.mocked(mockPrisma.clientDocument.delete).mockResolvedValue(
 				mockDocument,
 			);
+			vi.mocked(mockPrisma.client.findUnique).mockResolvedValue({
+				...mockClient,
+				documents: [],
+				beneficialControllers: [],
+				shareholders: [],
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any);
+			vi.mocked(mockPrisma.client.update).mockResolvedValue(mockClient);
 
 			await repository.deleteDocument(
 				"org-123",

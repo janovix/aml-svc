@@ -215,6 +215,18 @@ model Client {
   // Data completeness tracking
   completenessStatus     String    @default("INCOMPLETE") @map("completeness_status") // COMPLETE, INCOMPLETE, MINIMUM
   missingFields          String?   @map("missing_fields") // JSON array of missing field names
+  // KYC progress (persisted fields)
+  kycCompletionPct       Int       @default(0) @map("kyc_completion_pct")
+  documentsComplete      Int       @default(0) @map("documents_complete") // 0 or 1
+  documentsCount         Int       @default(0) @map("documents_count")
+  documentsRequired      Int       @default(0) @map("documents_required")
+  shareholdersCount      Int       @default(0) @map("shareholders_count")
+  beneficialControllersCount Int   @default(0) @map("beneficial_controllers_count")
+  // Threshold-aware KYC (Art. 17 LFPIORPI)
+  identificationRequired  Boolean  @default(true) @map("identification_required")
+  identificationTier      String   @default("ALWAYS") @map("identification_tier") // ALWAYS, ABOVE_THRESHOLD, BELOW_THRESHOLD
+  identificationThresholdMxn Decimal? @map("identification_threshold_mxn")
+  noticeThresholdMxn      Decimal? @map("notice_threshold_mxn")
   // Watchlist screening status
   isPEP                  Boolean   @default(false) @map("is_pep")
   watchlistQueryId       String?   @map("watchlist_query_id")

@@ -38,6 +38,7 @@ import {
 	type CatalogFieldsConfig,
 } from "../catalog/name-resolver";
 import { CatalogRepository } from "../catalog/repository";
+import { recalculateKycProgress } from "./kyc-progress";
 
 /**
  * Catalog fields configuration for clients.
@@ -153,6 +154,10 @@ export class ClientRepository {
 						: null,
 			},
 		});
+
+		// Recalculate KYC progress after creation
+		await recalculateKycProgress(this.prisma, created.id);
+
 		return mapPrismaClient(created);
 	}
 
@@ -186,6 +191,9 @@ export class ClientRepository {
 						: null,
 			},
 		});
+
+		// Recalculate KYC progress after update
+		await recalculateKycProgress(this.prisma, updated.id);
 
 		return mapPrismaClient(updated);
 	}
@@ -228,6 +236,9 @@ export class ClientRepository {
 			data: payload,
 		});
 
+		// Recalculate KYC progress after patch
+		await recalculateKycProgress(this.prisma, updated.id);
+
 		return mapPrismaClient(updated);
 	}
 
@@ -262,6 +273,10 @@ export class ClientRepository {
 		const created = await this.prisma.clientDocument.create({
 			data: mapDocumentCreateInputToPrisma(input),
 		});
+
+		// Recalculate KYC progress after document creation
+		await recalculateKycProgress(this.prisma, input.clientId);
+
 		return mapPrismaDocument(created);
 	}
 
@@ -277,6 +292,10 @@ export class ClientRepository {
 			where: { id: documentId },
 			data: mapDocumentUpdateInputToPrisma(input),
 		});
+
+		// Recalculate KYC progress after document update
+		await recalculateKycProgress(this.prisma, clientId);
+
 		return mapPrismaDocument(updated);
 	}
 
@@ -292,6 +311,10 @@ export class ClientRepository {
 			where: { id: documentId },
 			data: mapDocumentPatchInputToPrisma(input),
 		});
+
+		// Recalculate KYC progress after document patch
+		await recalculateKycProgress(this.prisma, clientId);
+
 		return mapPrismaDocument(updated);
 	}
 
@@ -303,6 +326,9 @@ export class ClientRepository {
 		await this.ensureExists(organizationId, clientId);
 		await this.ensureDocumentExists(clientId, documentId);
 		await this.prisma.clientDocument.delete({ where: { id: documentId } });
+
+		// Recalculate KYC progress after document deletion
+		await recalculateKycProgress(this.prisma, clientId);
 	}
 
 	async listAddresses(
