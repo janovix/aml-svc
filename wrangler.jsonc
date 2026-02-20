@@ -45,6 +45,10 @@
 			"binding": "WATCHLIST_SERVICE",
 			"service": "watchlist-svc",
 		},
+		{
+			"binding": "NOTIFICATIONS_SERVICE",
+			"service": "notifications-svc",
+		},
 	],
 	"queues": {
 		"producers": [

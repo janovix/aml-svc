@@ -28,6 +28,10 @@
 			"binding": "AUTH_SERVICE",
 			"service": "auth-svc-prod",
 		},
+		{
+			"binding": "NOTIFICATIONS_SERVICE",
+			"service": "notifications-svc",
+		},
 	],
 	"queues": {
 		"producers": [

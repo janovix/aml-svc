@@ -52,6 +52,8 @@ export default defineWorkersConfig({
 				// Service bindings and search clients (complex integration, tested via integration tests)
 				"src/lib/watchlist-search.ts",
 				"src/lib/kyc-email.ts",
+				// Screening notifications (fire-and-forget service bindings, tested via integration)
+				"src/lib/screening-notifications.ts",
 				// Prisma client wrapper (thin wrapper, tested via repositories)
 				"src/lib/prisma.ts",
 				// Route handlers (HTTP layer, tested via integration tests)

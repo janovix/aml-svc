@@ -6,6 +6,7 @@ import * as Sentry from "@sentry/cloudflare";
 import { getPrismaClient } from "../lib/prisma";
 import type { Bindings } from "../types";
 import { createHash } from "crypto";
+import { sendScreeningFlaggedNotification } from "../lib/screening-notifications";
 
 /**
  * Calculate segment for an entity ID using deterministic hash modulo 7
@@ -202,10 +203,38 @@ export async function handleInternalScreeningRequest(
 			if (body.screenedAt !== undefined)
 				updateData.screenedAt = new Date(body.screenedAt);
 
-			await prisma.client.update({
+			const updatedClient = await prisma.client.update({
 				where: { id: clientId },
 				data: updateData,
+				select: {
+					organizationId: true,
+					firstName: true,
+					lastName: true,
+					businessName: true,
+				},
 			});
+
+			// Notify the org if this screening result is flagged (sanctions match)
+			if (body.screeningResult === "flagged") {
+				const clientName =
+					updatedClient.businessName ??
+					([updatedClient.firstName, updatedClient.lastName]
+						.filter(Boolean)
+						.join(" ") ||
+						clientId);
+				sendScreeningFlaggedNotification(env, {
+					organizationId: updatedClient.organizationId,
+					entityId: clientId,
+					entityName: clientName,
+					entityKind: "client",
+					hitType: "sanctions",
+				}).catch((err) =>
+					console.error(
+						"[InternalScreening] Unexpected error in screening notification:",
+						err,
+					),
+				);
+			}
 
 			return new Response(
 				JSON.stringify({
@@ -270,10 +299,36 @@ export async function handleInternalScreeningRequest(
 			if (body.screenedAt !== undefined)
 				updateData.screenedAt = new Date(body.screenedAt);
 
-			await prisma.beneficialController.update({
+			const updatedBc = await prisma.beneficialController.update({
 				where: { id: bcId },
 				data: updateData,
+				select: {
+					firstName: true,
+					lastName: true,
+					client: {
+						select: { organizationId: true },
+					},
+				},
 			});
+
+			// Notify the org if this screening result is flagged (sanctions match)
+			if (body.screeningResult === "flagged") {
+				const bcName =
+					[updatedBc.firstName, updatedBc.lastName].filter(Boolean).join(" ") ||
+					bcId;
+				sendScreeningFlaggedNotification(env, {
+					organizationId: updatedBc.client.organizationId,
+					entityId: bcId,
+					entityName: bcName,
+					entityKind: "beneficial_controller",
+					hitType: "sanctions",
+				}).catch((err) =>
+					console.error(
+						"[InternalScreening] Unexpected error in screening notification:",
+						err,
+					),
+				);
+			}
 
 			return new Response(
 				JSON.stringify({
@@ -372,6 +427,58 @@ export async function handleInternalScreeningRequest(
 				console.log(
 					`[InternalScreening] Updated BC ${bc.id} with callback data: ${body.type}`,
 				);
+			}
+
+			// Notify the org when a match is confirmed
+			if (body.matched && body.status === "completed") {
+				const hitType =
+					body.type === "pep_official" || body.type === "pep_ai"
+						? "pep"
+						: "adverse_media";
+
+				if (client) {
+					const clientName =
+						client.businessName ??
+						([client.firstName, client.lastName].filter(Boolean).join(" ") ||
+							client.id);
+					sendScreeningFlaggedNotification(env, {
+						organizationId: client.organizationId,
+						entityId: client.id,
+						entityName: clientName,
+						entityKind: "client",
+						hitType,
+					}).catch((err) =>
+						console.error(
+							"[InternalScreening] Unexpected error in screening notification:",
+							err,
+						),
+					);
+				} else if (bc) {
+					const bcName =
+						[bc.firstName, bc.lastName].filter(Boolean).join(" ") || bc.id;
+					// Fetch org ID from the parent client
+					prisma.client
+						.findUnique({
+							where: { id: bc.clientId },
+							select: { organizationId: true },
+						})
+						.then((parent) => {
+							if (!parent) return;
+							sendScreeningFlaggedNotification(env, {
+								organizationId: parent.organizationId,
+								entityId: bc.id,
+								entityName: bcName,
+								entityKind: "beneficial_controller",
+								hitType,
+							});
+						})
+						.catch((err) =>
+							console.error(
+								"[InternalScreening] Unexpected error in screening notification:",
+								err,
+							),
+						);
+				}
 			}
 
 			return new Response(
