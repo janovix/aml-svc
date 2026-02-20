@@ -829,6 +829,51 @@ clientsInternalRouter.post("/", async (c) => {
 		const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 		await alertQueue.queueClientCreated(created.id);
 
+		// Trigger watchlist screening (non-blocking) — mirrors the public POST /clients
+		const watchlistSearch = createWatchlistSearchService(
+			c.env.WATCHLIST_SERVICE,
+		);
+		const fullName = getClientDisplayName(created);
+		if (fullName) {
+			c.executionCtx.waitUntil(
+				(async () => {
+					const result = await watchlistSearch.triggerSearch({
+						query: fullName,
+						entityType:
+							created.personType === "physical" ? "person" : "organization",
+						organizationId,
+						userId: "import-worker",
+						source: "import",
+						birthDate: created.birthDate || undefined,
+						identifiers: created.rfc ? [created.rfc] : undefined,
+						countries: created.nationality ? [created.nationality] : undefined,
+					});
+
+					if (result?.queryId) {
+						const prisma = getPrismaClient(c.env.DB);
+						const isFlagged =
+							result.ofacCount > 0 ||
+							result.unscCount > 0 ||
+							result.sat69bCount > 0;
+						await prisma.client.update({
+							where: { id: created.id },
+							data: {
+								watchlistQueryId: result.queryId,
+								ofacSanctioned: result.ofacCount > 0,
+								unscSanctioned: result.unscCount > 0,
+								sat69bListed: result.sat69bCount > 0,
+								screeningResult: isFlagged ? "flagged" : "pending",
+								screenedAt: new Date(),
+							},
+						});
+						console.log(
+							`[Internal Client Create] Watchlist screening done, queryId: ${result.queryId}, OFAC=${result.ofacCount > 0}, UNSC=${result.unscCount > 0}, SAT=${result.sat69bCount > 0}`,
+						);
+					}
+				})(),
+			);
+		}
+
 		return c.json(created, 201);
 	} catch (error) {
 		Sentry.captureException(error, {
