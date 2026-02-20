@@ -1,3 +1,10 @@
+# [1.6.0-rc.24](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.23...v1.6.0-rc.24) (2026-02-20)
+
+
+### Features
+
+* add internal maintenance routes for KYC progress recalculation ([1cef456](https://github.com/janovix/aml-svc/commit/1cef456494dcd8b4d66efc76ff36443a8aba61f0))
+
 # [1.6.0-rc.23](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.22...v1.6.0-rc.23) (2026-02-20)
 
 
