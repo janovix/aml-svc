@@ -1,3 +1,10 @@
+# [1.6.0-rc.23](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.22...v1.6.0-rc.23) (2026-02-20)
+
+
+### Features
+
+* add notifications service integration for screening alerts ([86455da](https://github.com/janovix/aml-svc/commit/86455daad22ecc760a287439012241b22db14e5f))
+
 # [1.6.0-rc.22](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.21...v1.6.0-rc.22) (2026-02-20)
 
 
