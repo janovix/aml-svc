@@ -1,3 +1,10 @@
+# [1.6.0-rc.22](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.21...v1.6.0-rc.22) (2026-02-20)
+
+
+### Features
+
+* add KYC progress persistence to clients table ([15b3f9c](https://github.com/janovix/aml-svc/commit/15b3f9c18ec7fcc96543f773544b2c3119d4b48d))
+
 # [1.6.0-rc.21](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.20...v1.6.0-rc.21) (2026-02-20)
 
 
