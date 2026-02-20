@@ -382,7 +382,7 @@ const alertRules = [
 			"Se dispara cuando el precio total del vehículo es igual o superior a 6,420 UMA. Genera aviso obligatorio al SAT.",
 		active: true,
 		severity: "HIGH",
-		ruleType: "transaction_amount_uma",
+		ruleType: "operation_amount_uma",
 		isManualOnly: false,
 		activityCode: "VEH",
 		metadata: {
