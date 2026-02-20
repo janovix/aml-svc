@@ -1,3 +1,10 @@
+# [1.6.0-rc.20](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.19...v1.6.0-rc.20) (2026-02-20)
+
+
+### Features
+
+* add synthetic test data generation and validation scripts ([117bd7c](https://github.com/janovix/aml-svc/commit/117bd7cdfe5ee59c8b0ecb3ed3ac93202aa03683))
+
 # [1.6.0-rc.19](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.18...v1.6.0-rc.19) (2026-02-20)
 
 
