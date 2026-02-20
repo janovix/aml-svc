@@ -1,3 +1,11 @@
+# [1.6.0-rc.21](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.20...v1.6.0-rc.21) (2026-02-20)
+
+
+### Features
+
+* enhance import event streaming with progress counts ([f75b552](https://github.com/janovix/aml-svc/commit/f75b552d590d3d2701b9fcef251b355de769a888))
+* update catalog field mappings and add resolvedNames to client updates ([6ada746](https://github.com/janovix/aml-svc/commit/6ada7468c0c8e7ab25dd3b98663e905e4ba7a431))
+
 # [1.6.0-rc.20](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.19...v1.6.0-rc.20) (2026-02-20)
 
 
