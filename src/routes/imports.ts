@@ -213,12 +213,19 @@ importEventsRouter.get("/:id/events", async (c) => {
 	}
 
 	return streamSSE(c, async (stream) => {
-		// Send initial connection event
+		// Send initial connection event — include current counts so the frontend
+		// shows accurate progress immediately (important for reconnects and page
+		// navigations to an already-running import).
 		await stream.writeSSE({
 			event: "connected",
 			data: JSON.stringify({
 				importId: importRecord.id,
 				status: importRecord.status,
+				totalRows: importRecord.totalRows,
+				processedRows: importRecord.processedRows,
+				successCount: importRecord.successCount,
+				warningCount: importRecord.warningCount,
+				errorCount: importRecord.errorCount,
 				timestamp: new Date().toISOString(),
 			}),
 		});
@@ -226,6 +233,7 @@ importEventsRouter.get("/:id/events", async (c) => {
 		// Track last update time for polling
 		let lastUpdateTime = new Date();
 		let currentStatus = importRecord.status;
+		let lastProcessedRows = importRecord.processedRows;
 		let isCompleted =
 			currentStatus === "COMPLETED" || currentStatus === "FAILED";
 
@@ -253,9 +261,15 @@ importEventsRouter.get("/:id/events", async (c) => {
 				lastUpdateTime = new Date();
 			}
 
-			// Check import status
+			// Check import status AND progress counts.
+			// status_change is emitted whenever the status OR processedRows changes
+			// so the frontend progress ring updates continuously during processing
+			// (not only on status transitions).
 			const currentImport = await service.get(organizationId, importId);
-			if (currentImport.status !== currentStatus) {
+			if (
+				currentImport.status !== currentStatus ||
+				currentImport.processedRows !== lastProcessedRows
+			) {
 				await stream.writeSSE({
 					event: "status_change",
 					data: JSON.stringify({
@@ -268,6 +282,7 @@ importEventsRouter.get("/:id/events", async (c) => {
 					}),
 				});
 				currentStatus = currentImport.status;
+				lastProcessedRows = currentImport.processedRows;
 			}
 
 			if (
