@@ -1,3 +1,10 @@
+# [1.6.0-rc.18](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.17...v1.6.0-rc.18) (2026-02-20)
+
+
+### Features
+
+* add organizationId to AlertEntity and mapPrismaAlert function ([292bffe](https://github.com/janovix/aml-svc/commit/292bffe1d891a2c7f495ef8521b7ad7f7128167d))
+
 # [1.6.0-rc.17](https://github.com/janovix/aml-svc/compare/v1.6.0-rc.16...v1.6.0-rc.17) (2026-02-19)
 
 
