@@ -117,6 +117,7 @@ export function mapPrismaAlertRuleConfig(
 export function mapPrismaAlert(prisma: PrismaAlertModel): AlertEntity {
 	return {
 		id: prisma.id,
+		organizationId: prisma.organizationId,
 		alertRuleId: prisma.alertRuleId,
 		clientId: prisma.clientId,
 		status: ALERT_STATUS_FROM_PRISMA[prisma.status],
