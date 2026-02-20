@@ -44,12 +44,13 @@ import { CatalogRepository } from "../catalog/repository";
  * Maps client field names to their catalog keys and resolution strategies.
  */
 const CLIENT_CATALOG_FIELDS: CatalogFieldsConfig = {
-	stateCode: { catalog: "cfdi-states", strategy: "BY_CODE" },
-	countryCode: { catalog: "cfdi-countries", strategy: "BY_CODE" },
+	stateCode: { catalog: "states", strategy: "BY_CODE" },
+	countryCode: { catalog: "countries", strategy: "BY_CODE" },
 	economicActivityCode: {
 		catalog: "economic-activities",
 		strategy: "BY_CODE",
 	},
+	nationality: { catalog: "countries", strategy: "BY_ID" },
 };
 
 export class ClientRepository {
@@ -165,6 +166,13 @@ export class ClientRepository {
 		const prismaData = mapUpdateInputToPrisma(input);
 		const { completenessStatus, missingFields } =
 			this.detectCompleteness(input);
+
+		// Resolve catalog names for *Code fields
+		const resolvedNames = await this.catalogResolver.resolveNames(
+			input,
+			CLIENT_CATALOG_FIELDS,
+		);
+
 		const updated = await this.prisma.client.update({
 			where: { id },
 			data: {
@@ -172,6 +180,10 @@ export class ClientRepository {
 				completenessStatus,
 				missingFields:
 					missingFields.length > 0 ? JSON.stringify(missingFields) : null,
+				resolvedNames:
+					Object.keys(resolvedNames).length > 0
+						? JSON.stringify(resolvedNames)
+						: null,
 			},
 		});
 
@@ -199,6 +211,16 @@ export class ClientRepository {
 				completenessStatus;
 			(payload as Record<string, unknown>).missingFields =
 				missingFields.length > 0 ? JSON.stringify(missingFields) : null;
+
+			// Resolve catalog names for *Code fields
+			const resolvedNames = await this.catalogResolver.resolveNames(
+				merged,
+				CLIENT_CATALOG_FIELDS,
+			);
+			(payload as Record<string, unknown>).resolvedNames =
+				Object.keys(resolvedNames).length > 0
+					? JSON.stringify(resolvedNames)
+					: null;
 		}
 
 		const updated = await this.prisma.client.update({
