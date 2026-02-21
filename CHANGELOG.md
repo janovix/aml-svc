@@ -1,3 +1,10 @@
+# [1.7.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.5...v1.7.0-rc.6) (2026-02-21)
+
+
+### Features
+
+* overhaul notice module with amendment cycle, event tracking, and deadline notifications ([d811086](https://github.com/janovix/aml-svc/commit/d81108655617979771184ac1a63f86bb5a87044c))
+
 # [1.7.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.4...v1.7.0-rc.5) (2026-02-21)
 
 
