@@ -1,3 +1,10 @@
+# [1.7.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.2...v1.7.0-rc.3) (2026-02-21)
+
+
+### Features
+
+* enhance filtering capabilities in repositories by supporting multi-value parameters ([3e94bca](https://github.com/janovix/aml-svc/commit/3e94bca55018329fa6e72f278cd6ce01b630ee07))
+
 # [1.7.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.1...v1.7.0-rc.2) (2026-02-21)
 
 
