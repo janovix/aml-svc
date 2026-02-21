@@ -1,3 +1,10 @@
+# [1.7.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.3...v1.7.0-rc.4) (2026-02-21)
+
+
+### Features
+
+* enhance personType filtering by normalizing input to lowercase ([d5b6bb0](https://github.com/janovix/aml-svc/commit/d5b6bb08dee7e9a0631b34d9775b1425702c8b79))
+
 # [1.7.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.2...v1.7.0-rc.3) (2026-02-21)
 
 
