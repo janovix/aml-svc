@@ -400,7 +400,12 @@ export const ClientFilterSchema = z.object({
 			"Invalid RFC",
 		)
 		.optional(),
-	personType: multiEnum(PersonTypeSchema),
+	personType: multiEnum(
+		z.preprocess(
+			(val) => (typeof val === "string" ? val.toLowerCase() : val),
+			PersonTypeSchema,
+		),
+	),
 	stateCode: multiEnum(z.string().min(1).max(10)),
 	page: z.coerce.number().int().min(1).default(1),
 	limit: z.coerce.number().int().min(1).max(100).default(10),
