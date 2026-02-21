@@ -200,3 +200,4 @@ dist
 
 ### Generated SQL Files ###
 scripts/populate/sql/*.sql
+scripts/generate-test-data/output/*.csv
