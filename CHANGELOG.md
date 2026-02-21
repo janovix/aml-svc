@@ -1,3 +1,11 @@
+# [1.7.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.1...v1.7.0-rc.2) (2026-02-21)
+
+
+### Features
+
+* add endpoint to retrieve client by RFC ([cbce23a](https://github.com/janovix/aml-svc/commit/cbce23a8988a5b8307dc092ad8a2637d9f048075))
+* enhance client and import services with filter metadata and pagination support ([c2efa29](https://github.com/janovix/aml-svc/commit/c2efa29a87763a81913a8983e0a7e4267df769b1))
+
 # [1.7.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.6.0...v1.7.0-rc.1) (2026-02-21)
 
 
