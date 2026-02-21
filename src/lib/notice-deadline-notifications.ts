@@ -29,17 +29,20 @@ interface PendingOrgInfo {
 function getReportableMonth(now: Date): { year: number; month: number } {
 	const day = now.getUTCDate();
 
+	// Deadline is the 17th of the reported month.
+	// Before/on the 17th → current month is the reportable period.
+	// After the 17th → next month's period is open (deadline is next month's 17th).
 	if (day <= 17) {
-		let m = now.getUTCMonth(); // 0-indexed, previous month
-		let y = now.getUTCFullYear();
-		if (m === 0) {
-			m = 12;
-			y -= 1;
-		}
-		return { year: y, month: m };
+		return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
 	}
 
-	return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
+	let m = now.getUTCMonth() + 2; // next month (1-indexed)
+	let y = now.getUTCFullYear();
+	if (m > 12) {
+		m = 1;
+		y += 1;
+	}
+	return { year: y, month: m };
 }
 
 function daysBetween(a: Date, b: Date): number {

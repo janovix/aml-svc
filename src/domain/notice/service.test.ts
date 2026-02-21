@@ -93,30 +93,30 @@ describe("Notice Period Calculations (SAT 17-17 Cycle)", () => {
 	});
 
 	describe("getNoticeSubmissionDeadline", () => {
-		it("should return day 17 of the following month for regular months", () => {
-			// January 2024 notice is due by February 17, 2024
+		it("should return day 17 of the reported month", () => {
+			// January 2024 period (Dec 17 - Jan 16) is due by January 17, 2024
 			const deadline = getNoticeSubmissionDeadline(2024, 1);
 
 			expect(deadline.getUTCFullYear()).toBe(2024);
-			expect(deadline.getUTCMonth()).toBe(1); // February (0-indexed)
+			expect(deadline.getUTCMonth()).toBe(0); // January (0-indexed)
 			expect(deadline.getUTCDate()).toBe(17);
 		});
 
-		it("should handle year rollover for December", () => {
-			// December 2024 notice is due by January 17, 2025
+		it("should stay in the same year for December", () => {
+			// December 2024 period (Nov 17 - Dec 16) is due by December 17, 2024
 			const deadline = getNoticeSubmissionDeadline(2024, 12);
 
-			expect(deadline.getUTCFullYear()).toBe(2025);
-			expect(deadline.getUTCMonth()).toBe(0); // January
+			expect(deadline.getUTCFullYear()).toBe(2024);
+			expect(deadline.getUTCMonth()).toBe(11); // December
 			expect(deadline.getUTCDate()).toBe(17);
 		});
 
 		it("should handle mid-year months", () => {
-			// June 2024 notice is due by July 17, 2024
+			// June 2024 period (May 17 - Jun 16) is due by June 17, 2024
 			const deadline = getNoticeSubmissionDeadline(2024, 6);
 
 			expect(deadline.getUTCFullYear()).toBe(2024);
-			expect(deadline.getUTCMonth()).toBe(6); // July (0-indexed)
+			expect(deadline.getUTCMonth()).toBe(5); // June (0-indexed)
 			expect(deadline.getUTCDate()).toBe(17);
 		});
 
@@ -140,9 +140,9 @@ describe("Notice Period Calculations (SAT 17-17 Cycle)", () => {
 			expect(period.start.getUTCFullYear()).toBe(2024);
 			expect(period.end.getUTCFullYear()).toBe(2025);
 
-			// Deadline is in the same year as the reported month
+			// Deadline is Jan 17 of the reported month
 			expect(deadline.getUTCFullYear()).toBe(2025);
-			expect(deadline.getUTCMonth()).toBe(1); // February
+			expect(deadline.getUTCMonth()).toBe(0); // January
 		});
 
 		it("should maintain consistent period length (approximately 30 days)", () => {

@@ -156,23 +156,15 @@ export function calculateNoticePeriod(
 }
 
 /**
- * Get the submission deadline for a SAT notice
- * SAT requires submission by day 17 of the month following the reported period
+ * Get the submission deadline for a SAT notice.
+ * The period for month M covers (M-1) 17th through M 16th.
+ * The deadline to submit is the 17th of the reported month itself
+ * (i.e. the day after the period closes).
  *
  * @param year - The year of the reported month
  * @param month - The month (1-12) of the reported month
  * @returns The submission deadline date
  */
 export function getNoticeSubmissionDeadline(year: number, month: number): Date {
-	// Deadline is day 17 of the following month
-	let deadlineMonth = month + 1;
-	let deadlineYear = year;
-	if (deadlineMonth > 12) {
-		deadlineMonth = 1;
-		deadlineYear = year + 1;
-	}
-
-	return new Date(
-		Date.UTC(deadlineYear, deadlineMonth - 1, 17, 23, 59, 59, 999),
-	);
+	return new Date(Date.UTC(year, month - 1, 17, 23, 59, 59, 999));
 }
