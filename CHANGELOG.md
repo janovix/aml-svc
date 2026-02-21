@@ -1,3 +1,10 @@
+# [1.7.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.4...v1.7.0-rc.5) (2026-02-21)
+
+
+### Features
+
+* add endpoint to check if a client exists by RFC ([7df05f1](https://github.com/janovix/aml-svc/commit/7df05f1ff09064a388f3f39a5ac17021b2287e61))
+
 # [1.7.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.3...v1.7.0-rc.4) (2026-02-21)
 
 
