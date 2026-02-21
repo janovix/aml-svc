@@ -806,6 +806,40 @@ clientsInternalRouter.get("/", async (c) => {
 });
 
 /**
+ * GET /internal/clients/by-rfc/:rfc
+ * Lookup a single client by exact RFC match (internal, called by worker)
+ */
+clientsInternalRouter.get("/by-rfc/:rfc", async (c) => {
+	const organizationId = c.req.header("X-Organization-Id");
+	if (!organizationId) {
+		return c.json(
+			{ error: "Bad Request", message: "Missing X-Organization-Id header" },
+			400,
+		);
+	}
+
+	const rfc = c.req.param("rfc");
+
+	try {
+		const service = getInternalService(c);
+		const client = await service.findByRfc(organizationId, rfc);
+
+		if (!client) {
+			return c.json({ error: "Not Found", message: "Client not found" }, 404);
+		}
+
+		return c.json({ id: client.id });
+	} catch (error) {
+		Sentry.captureException(error, {
+			tags: { context: "internal-clients-by-rfc-error" },
+		});
+		const { message, details } = formatInternalError(error);
+		const status = error instanceof APIError ? error.statusCode : 500;
+		return c.json({ error: "Error", message, details }, status as 400);
+	}
+});
+
+/**
  * POST /internal/clients
  * Create a client (internal, called by worker)
  */

@@ -127,6 +127,16 @@ export class ClientRepository {
 		return record ? mapPrismaClient(record) : null;
 	}
 
+	async findByRfc(
+		organizationId: string,
+		rfc: string,
+	): Promise<ClientEntity | null> {
+		const record = await this.prisma.client.findFirst({
+			where: { organizationId, rfc: rfc.toUpperCase(), deletedAt: null },
+		});
+		return record ? mapPrismaClient(record) : null;
+	}
+
 	async create(
 		organizationId: string,
 		input: ClientCreateInput,

@@ -36,6 +36,10 @@ export class ClientService {
 		return client;
 	}
 
+	findByRfc(organizationId: string, rfc: string): Promise<ClientEntity | null> {
+		return this.repository.findByRfc(organizationId, rfc);
+	}
+
 	create(
 		organizationId: string,
 		input: ClientCreateInput,
