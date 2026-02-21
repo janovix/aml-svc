@@ -66,7 +66,28 @@ clientsRouter.get("/", async (c) => {
 	return c.json(result);
 });
 
-// IMPORTANT: /stats must be defined BEFORE /:id to avoid "stats" being matched as an id parameter
+// IMPORTANT: named sub-paths must be defined BEFORE /:id to avoid being matched as an id parameter
+
+clientsRouter.get("/check-rfc/:rfc", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const rfc = c.req.param("rfc");
+
+	const service = getService(c);
+	const client = await service
+		.findByRfc(organizationId, rfc)
+		.catch(handleServiceError);
+
+	if (!client) {
+		return c.json({ exists: false });
+	}
+
+	return c.json({
+		exists: true,
+		clientId: client.id,
+		clientName: getClientDisplayName(client),
+	});
+});
+
 clientsRouter.get("/stats", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const service = getService(c);
