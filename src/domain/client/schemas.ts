@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { multiEnum } from "../../lib/query-params";
 
 export const PERSON_TYPE_VALUES = ["physical", "moral", "trust"] as const;
 export const PersonTypeSchema = z.enum(PERSON_TYPE_VALUES);
@@ -326,7 +327,12 @@ export const ClientUpdateSchema = z.discriminatedUnion("personType", [
 
 // Patch schema: RFC cannot be changed, so we omit it
 export const ClientPatchSchema = z.object({
-	personType: PersonTypeSchema.optional(),
+	personType: z
+		.preprocess(
+			(val) => (typeof val === "string" ? val.toLowerCase() : val),
+			PersonTypeSchema,
+		)
+		.optional(),
 	firstName: z.string().min(1).optional().nullable(),
 	lastName: z.string().min(1).optional().nullable(),
 	secondLastName: z.string().optional().nullable(),
@@ -394,8 +400,8 @@ export const ClientFilterSchema = z.object({
 			"Invalid RFC",
 		)
 		.optional(),
-	personType: PersonTypeSchema.optional(),
-	stateCode: z.string().min(1).max(10).optional(),
+	personType: multiEnum(PersonTypeSchema),
+	stateCode: multiEnum(z.string().min(1).max(10)),
 	page: z.coerce.number().int().min(1).default(1),
 	limit: z.coerce.number().int().min(1).max(100).default(10),
 });

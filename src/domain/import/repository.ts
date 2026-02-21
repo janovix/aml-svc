@@ -47,17 +47,19 @@ export class ImportRepository {
 		const baseWhere: Prisma.ImportWhereInput = { organizationId };
 
 		const where: Prisma.ImportWhereInput = { ...baseWhere };
-		if (status) where.status = toPrismaImportStatus(status);
-		if (entityType) where.entityType = toPrismaEntityType(entityType);
+		if (status?.length) where.status = { in: status.map(toPrismaImportStatus) };
+		if (entityType?.length)
+			where.entityType = { in: entityType.map(toPrismaEntityType) };
 
 		// status counts: apply entityType only
 		const statusCountWhere: Prisma.ImportWhereInput = { ...baseWhere };
-		if (entityType)
-			statusCountWhere.entityType = toPrismaEntityType(entityType);
+		if (entityType?.length)
+			statusCountWhere.entityType = { in: entityType.map(toPrismaEntityType) };
 
 		// entityType counts: apply status only
 		const entityTypeCountWhere: Prisma.ImportWhereInput = { ...baseWhere };
-		if (status) entityTypeCountWhere.status = toPrismaImportStatus(status);
+		if (status?.length)
+			entityTypeCountWhere.status = { in: status.map(toPrismaImportStatus) };
 
 		const [total, records, statusGroups, entityTypeGroups] = await Promise.all([
 			this.prisma.import.count({ where }),

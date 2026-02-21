@@ -107,7 +107,7 @@ describe("Import Schemas", () => {
 				status: "PROCESSING",
 			});
 			expect(result.success).toBe(true);
-			expect(result.data?.status).toBe("PROCESSING");
+			expect(result.data?.status).toEqual(["PROCESSING"]);
 		});
 
 		it("should accept valid entity type filter", () => {
@@ -115,7 +115,7 @@ describe("Import Schemas", () => {
 				entityType: "CLIENT",
 			});
 			expect(result.success).toBe(true);
-			expect(result.data?.entityType).toBe("CLIENT");
+			expect(result.data?.entityType).toEqual(["CLIENT"]);
 		});
 
 		it("should coerce string page and limit to numbers", () => {

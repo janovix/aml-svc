@@ -34,6 +34,7 @@ import { APIError } from "../middleware/error";
 import { KycSessionService } from "../domain/kyc-session";
 import { OrganizationSettingsRepository } from "../domain/organization-settings";
 import { sendKYCInviteEmail } from "../lib/kyc-email";
+import { parseQueryParams } from "../lib/query-params";
 
 export const clientsRouter = new Hono<{
 	Bindings: Bindings;
@@ -51,7 +52,10 @@ function getService(
 clientsRouter.get("/", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
-	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const queryObject = parseQueryParams(url.searchParams, [
+		"personType",
+		"stateCode",
+	]);
 	const filters = parseWithZod(ClientFilterSchema, queryObject);
 
 	const service = getService(c);
@@ -788,7 +792,10 @@ clientsInternalRouter.get("/", async (c) => {
 
 	try {
 		const url = new URL(c.req.url);
-		const queryObject = Object.fromEntries(url.searchParams.entries());
+		const queryObject = parseQueryParams(url.searchParams, [
+			"personType",
+			"stateCode",
+		]);
 		const filters = parseWithZod(ClientFilterSchema, queryObject);
 
 		const service = getInternalService(c);

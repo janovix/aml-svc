@@ -180,7 +180,7 @@ describe("ClientRepository", () => {
 			const filters: ClientFilters = {
 				page: 1,
 				limit: 10,
-				personType: "physical",
+				personType: ["physical"],
 			};
 
 			vi.mocked(mockPrisma.client.count).mockResolvedValue(1);
@@ -191,7 +191,7 @@ describe("ClientRepository", () => {
 			expect(mockPrisma.client.findMany).toHaveBeenCalledWith(
 				expect.objectContaining({
 					where: expect.objectContaining({
-						personType: "PHYSICAL",
+						personType: { in: ["PHYSICAL"] },
 					}),
 				}),
 			);

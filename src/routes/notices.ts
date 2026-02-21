@@ -31,6 +31,7 @@ import { mapOperationToEntity } from "../domain/operation/mappers";
 import type { OperationEntity, ActivityCode } from "../domain/operation/types";
 import type { ClientEntity } from "../domain/client/types";
 import { generateNoticeFileKey } from "../lib/r2-upload";
+import { parseQueryParams } from "../lib/query-params";
 
 export const noticesRouter = new Hono<{
 	Bindings: Bindings;
@@ -84,7 +85,7 @@ function handleServiceError(error: unknown): never {
 noticesRouter.get("/", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
-	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const queryObject = parseQueryParams(url.searchParams, ["status"]);
 	const filters = parseWithZod(NoticeFilterSchema, queryObject);
 
 	const service = getService(c);

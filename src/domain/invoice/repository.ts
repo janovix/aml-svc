@@ -236,19 +236,20 @@ export class InvoiceRepository {
 		}
 
 		const where: Prisma.InvoiceWhereInput = { ...baseWhere };
-		if (filters.voucherTypeCode)
-			where.voucherTypeCode = filters.voucherTypeCode;
-		if (filters.currencyCode) where.currencyCode = filters.currencyCode;
+		if (filters.voucherTypeCode?.length)
+			where.voucherTypeCode = { in: filters.voucherTypeCode };
+		if (filters.currencyCode?.length)
+			where.currencyCode = { in: filters.currencyCode };
 
 		// voucherType counts: apply currencyCode but not voucherType
 		const voucherCountWhere: Prisma.InvoiceWhereInput = { ...baseWhere };
-		if (filters.currencyCode)
-			voucherCountWhere.currencyCode = filters.currencyCode;
+		if (filters.currencyCode?.length)
+			voucherCountWhere.currencyCode = { in: filters.currencyCode };
 
 		// currency counts: apply voucherType but not currency
 		const currencyCountWhere: Prisma.InvoiceWhereInput = { ...baseWhere };
-		if (filters.voucherTypeCode)
-			currencyCountWhere.voucherTypeCode = filters.voucherTypeCode;
+		if (filters.voucherTypeCode?.length)
+			currencyCountWhere.voucherTypeCode = { in: filters.voucherTypeCode };
 
 		const [invoices, total, voucherGroups, currencyGroups, amountAgg] =
 			await Promise.all([

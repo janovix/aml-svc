@@ -36,6 +36,7 @@ import {
 	ACTIVITY_EXTENSION_COLUMNS,
 	type ActivityCode,
 } from "../domain/import/template-columns";
+import { parseQueryParams } from "../lib/query-params";
 
 // CSV templates for clients
 const CLIENT_TEMPLATE = `person_type,rfc,first_name,last_name,second_last_name,birth_date,curp,business_name,incorporation_date,nationality,email,phone,country,state_code,city,municipality,neighborhood,street,external_number,internal_number,postal_code,reference,notes,country_code,economic_activity_code,gender,occupation,marital_status,source_of_funds,source_of_wealth
@@ -361,7 +362,10 @@ function handleServiceError(error: unknown): never {
 importsRouter.get("/", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
-	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const queryObject = parseQueryParams(url.searchParams, [
+		"status",
+		"entityType",
+	]);
 	const filters = parseWithZod(ImportFilterSchema, queryObject);
 
 	const service = getService(c);

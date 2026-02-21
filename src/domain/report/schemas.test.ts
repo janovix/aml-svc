@@ -290,17 +290,17 @@ describe("Report Schemas", () => {
 			const result = ReportFilterSchema.parse({
 				template: "EXECUTIVE_SUMMARY",
 			});
-			expect(result.template).toBe("EXECUTIVE_SUMMARY");
+			expect(result.template).toEqual(["EXECUTIVE_SUMMARY"]);
 		});
 
 		it("should validate periodType filter", () => {
 			const result = ReportFilterSchema.parse({ periodType: "QUARTERLY" });
-			expect(result.periodType).toBe("QUARTERLY");
+			expect(result.periodType).toEqual(["QUARTERLY"]);
 		});
 
 		it("should validate status filter", () => {
 			const result = ReportFilterSchema.parse({ status: "GENERATED" });
-			expect(result.status).toBe("GENERATED");
+			expect(result.status).toEqual(["GENERATED"]);
 		});
 
 		it("should validate clientId filter", () => {

@@ -39,14 +39,14 @@ export class NoticeRepository {
 		if (year) baseWhere.reportedMonth = { startsWith: String(year) };
 
 		const where: Prisma.NoticeWhereInput = { ...baseWhere };
-		if (status) where.status = status;
+		if (status?.length) where.status = { in: status };
 
 		// status counts: apply date/year filters but not status
 		const statusCountWhere: Prisma.NoticeWhereInput = { ...baseWhere };
 
 		// year counts: apply status but not year
 		const yearCountWhere: Prisma.NoticeWhereInput = { organizationId };
-		if (status) yearCountWhere.status = status;
+		if (status?.length) yearCountWhere.status = { in: status };
 		if (periodStart)
 			yearCountWhere.periodStart = { gte: new Date(periodStart) };
 		if (periodEnd) yearCountWhere.periodEnd = { lte: new Date(periodEnd) };

@@ -669,30 +669,37 @@ export class OperationRepository {
 
 		// Full data query where (includes all active enum filters)
 		const where: Prisma.OperationWhereInput = { ...baseWhere };
-		if (filters.activityCode) where.activityCode = filters.activityCode;
-		if (filters.watchlistStatus)
-			where.watchlistStatus =
-				filters.watchlistStatus as import("@prisma/client").WatchlistStatus;
-		if (filters.dataSource) where.dataSource = filters.dataSource;
+		if (filters.activityCode?.length)
+			where.activityCode = { in: filters.activityCode };
+		if (filters.watchlistStatus?.length)
+			where.watchlistStatus = {
+				in: filters.watchlistStatus as import("@prisma/client").WatchlistStatus[],
+			};
+		if (filters.dataSource?.length)
+			where.dataSource = { in: filters.dataSource };
 
 		// For each enum filter's counts: apply all OTHER active enum filters but not its own
 		const activityWhere: Prisma.OperationWhereInput = { ...baseWhere };
-		if (filters.watchlistStatus)
-			activityWhere.watchlistStatus =
-				filters.watchlistStatus as import("@prisma/client").WatchlistStatus;
-		if (filters.dataSource) activityWhere.dataSource = filters.dataSource;
+		if (filters.watchlistStatus?.length)
+			activityWhere.watchlistStatus = {
+				in: filters.watchlistStatus as import("@prisma/client").WatchlistStatus[],
+			};
+		if (filters.dataSource?.length)
+			activityWhere.dataSource = { in: filters.dataSource };
 
 		const watchlistWhere: Prisma.OperationWhereInput = { ...baseWhere };
-		if (filters.activityCode)
-			watchlistWhere.activityCode = filters.activityCode;
-		if (filters.dataSource) watchlistWhere.dataSource = filters.dataSource;
+		if (filters.activityCode?.length)
+			watchlistWhere.activityCode = { in: filters.activityCode };
+		if (filters.dataSource?.length)
+			watchlistWhere.dataSource = { in: filters.dataSource };
 
 		const dataSourceWhere: Prisma.OperationWhereInput = { ...baseWhere };
-		if (filters.activityCode)
-			dataSourceWhere.activityCode = filters.activityCode;
-		if (filters.watchlistStatus)
-			dataSourceWhere.watchlistStatus =
-				filters.watchlistStatus as import("@prisma/client").WatchlistStatus;
+		if (filters.activityCode?.length)
+			dataSourceWhere.activityCode = { in: filters.activityCode };
+		if (filters.watchlistStatus?.length)
+			dataSourceWhere.watchlistStatus = {
+				in: filters.watchlistStatus as import("@prisma/client").WatchlistStatus[],
+			};
 
 		const [
 			operations,

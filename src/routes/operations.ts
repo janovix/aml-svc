@@ -29,6 +29,7 @@ import {
 } from "../domain/operation/activities/registry";
 import type { ActivityCode } from "../domain/operation/types";
 import { sendKYCInviteEmail } from "../lib/kyc-email";
+import { parseQueryParams } from "../lib/query-params";
 
 export const operationsRouter = new Hono<{
 	Bindings: Bindings;
@@ -108,7 +109,11 @@ function handleServiceError(error: unknown): never {
 operationsRouter.get("/", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
-	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const queryObject = parseQueryParams(url.searchParams, [
+		"activityCode",
+		"watchlistStatus",
+		"dataSource",
+	]);
 	const filters = parseWithZod(OperationFilterSchema, queryObject);
 
 	const service = getService(c);

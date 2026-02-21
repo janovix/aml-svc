@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { multiEnum } from "../../lib/query-params";
 
 export const ALERT_STATUS_VALUES = [
 	"DETECTED",
@@ -183,8 +184,8 @@ export const AlertFilterSchema = z.object({
 	clientId: z.string().min(1).optional(),
 	operationId: z.string().min(1).optional(), // Filter by operation
 	activityCode: z.string().min(2).max(5).optional(), // Filter by activity code
-	status: AlertStatusSchema.optional(),
-	severity: AlertSeveritySchema.optional(),
+	status: multiEnum(AlertStatusSchema),
+	severity: multiEnum(AlertSeveritySchema),
 	isOverdue: z.coerce.boolean().optional(), // Filter by overdue status
 	isManual: z.coerce.boolean().optional(), // Filter by manual flag
 	page: z.coerce.number().int().min(1).default(1),

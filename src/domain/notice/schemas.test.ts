@@ -244,7 +244,7 @@ describe("Notice Schemas", () => {
 
 		it("should validate status filter", () => {
 			const result = NoticeFilterSchema.parse({ status: "SUBMITTED" });
-			expect(result.status).toBe("SUBMITTED");
+			expect(result.status).toEqual(["SUBMITTED"]);
 		});
 
 		it("should validate year filter", () => {

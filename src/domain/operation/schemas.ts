@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ACTIVITY_CODES } from "./types";
+import { multiEnum } from "../../lib/query-params";
 
 const RESOURCE_ID_REGEX = /^[A-Za-z0-9-]+$/;
 const POSTAL_CODE_REGEX = /^\d{4,10}$/;
@@ -467,21 +468,21 @@ export const OperationFilterSchema = z
 	.object({
 		clientId: ResourceIdSchema.optional(),
 		invoiceId: ResourceIdSchema.optional(),
-		activityCode: ActivityCodeSchema.optional(),
+		activityCode: multiEnum(ActivityCodeSchema),
 		operationTypeCode: z.string().optional(),
 		branchPostalCode: z.string().regex(POSTAL_CODE_REGEX).optional(),
 		alertTypeCode: z.string().optional(),
-		watchlistStatus: z
-			.enum([
+		watchlistStatus: multiEnum(
+			z.enum([
 				"PENDING",
 				"QUEUED",
 				"CHECKING",
 				"COMPLETED",
 				"ERROR",
 				"NOT_AVAILABLE",
-			])
-			.optional(),
-		dataSource: DataSourceSchema.optional(),
+			]),
+		),
+		dataSource: multiEnum(DataSourceSchema),
 		startDate: IsoDateSchema.optional(),
 		endDate: IsoDateSchema.optional(),
 		minAmount: AmountSchema.optional(),

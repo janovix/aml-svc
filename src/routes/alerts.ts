@@ -17,6 +17,7 @@ import { getPrismaClient } from "../lib/prisma";
 import { createUsageRightsClient } from "../lib/usage-rights-client";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import { parseQueryParams } from "../lib/query-params";
 
 export const alertsRouter = new Hono<{
 	Bindings: Bindings;
@@ -66,7 +67,10 @@ function handleServiceError(error: unknown): never {
 alertsRouter.get("/", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
-	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const queryObject = parseQueryParams(url.searchParams, [
+		"status",
+		"severity",
+	]);
 	const filters = parseWithZod(AlertFilterSchema, queryObject);
 
 	const service = getService(c);

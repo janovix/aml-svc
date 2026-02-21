@@ -126,11 +126,15 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findMany).mockResolvedValue([]);
 			vi.mocked(prisma.notice.count).mockResolvedValue(0);
 
-			await repository.list("org_123", { page: 1, limit: 10, status: "DRAFT" });
+			await repository.list("org_123", {
+				page: 1,
+				limit: 10,
+				status: ["DRAFT"],
+			});
 
 			expect(prisma.notice.findMany).toHaveBeenCalledWith(
 				expect.objectContaining({
-					where: { organizationId: "org_123", status: "DRAFT" },
+					where: { organizationId: "org_123", status: { in: ["DRAFT"] } },
 				}),
 			);
 		});

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { multiEnum } from "../../lib/query-params";
 
 export const NOTICE_STATUS_VALUES = [
 	"DRAFT",
@@ -102,7 +103,7 @@ export const NoticeIdParamSchema = z.object({
 export const NoticeFilterSchema = z.object({
 	page: z.coerce.number().int().min(1).default(1),
 	limit: z.coerce.number().int().min(1).max(100).default(20),
-	status: NoticeStatusSchema.optional(),
+	status: multiEnum(NoticeStatusSchema),
 	periodStart: isoString.optional(),
 	periodEnd: isoString.optional(),
 	year: z.coerce.number().int().min(2020).max(2100).optional(),

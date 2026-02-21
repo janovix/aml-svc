@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { multiEnum } from "../../lib/query-params";
 
 export const REPORT_PERIOD_TYPE_VALUES = [
 	"MONTHLY",
@@ -163,9 +164,9 @@ export type ReportIdParam = z.infer<typeof ReportIdParamSchema>;
 export const ReportFilterSchema = z.object({
 	page: z.coerce.number().int().min(1).default(1),
 	limit: z.coerce.number().int().min(1).max(100).default(20),
-	template: ReportTemplateSchema.optional(),
-	periodType: ReportPeriodTypeSchema.optional(),
-	status: ReportStatusSchema.optional(),
+	template: multiEnum(ReportTemplateSchema),
+	periodType: multiEnum(ReportPeriodTypeSchema),
+	status: multiEnum(ReportStatusSchema),
 	periodStart: isoString.optional(),
 	periodEnd: isoString.optional(),
 	clientId: ResourceIdSchema.optional(),

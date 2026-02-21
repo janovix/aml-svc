@@ -28,6 +28,7 @@ import {
 } from "../lib/pdf-report-generator";
 import { generateReportFileKey } from "../lib/r2-upload";
 import { createUsageRightsClient } from "../lib/usage-rights-client";
+import { parseQueryParams } from "../lib/query-params";
 
 export const reportsRouter = new Hono<{
 	Bindings: Bindings;
@@ -93,7 +94,11 @@ reportsRouter.get("/templates", async (c) => {
 reportsRouter.get("/", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
-	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const queryObject = parseQueryParams(url.searchParams, [
+		"template",
+		"periodType",
+		"status",
+	]);
 	const filters = parseWithZod(ReportFilterSchema, queryObject);
 
 	const service = getService(c);

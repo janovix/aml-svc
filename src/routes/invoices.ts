@@ -15,6 +15,7 @@ import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { z } from "zod";
+import { parseQueryParams } from "../lib/query-params";
 
 export const invoicesRouter = new Hono<{
 	Bindings: Bindings;
@@ -68,7 +69,10 @@ function handleServiceError(error: unknown): never {
 invoicesRouter.get("/", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
-	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const queryObject = parseQueryParams(url.searchParams, [
+		"voucherTypeCode",
+		"currencyCode",
+	]);
 	const filters = parseWithZod(InvoiceFilterSchema, queryObject);
 
 	const service = getService(c);

@@ -98,22 +98,24 @@ export class ClientRepository {
 		// Active filter conditions for the data query
 		const where: Prisma.ClientWhereInput = { ...baseWhere };
 
-		if (personType) {
-			where.personType = toPrismaPersonType(personType);
+		if (personType?.length) {
+			where.personType = { in: personType.map(toPrismaPersonType) };
 		}
 
-		if (stateCode) {
-			where.stateCode = stateCode;
+		if (stateCode?.length) {
+			where.stateCode = { in: stateCode };
 		}
 
 		// personType counts: apply stateCode but NOT personType (so all types show up)
 		const personTypeCountWhere: Prisma.ClientWhereInput = { ...baseWhere };
-		if (stateCode) personTypeCountWhere.stateCode = stateCode;
+		if (stateCode?.length) personTypeCountWhere.stateCode = { in: stateCode };
 
 		// stateCode counts: apply personType but NOT stateCode
 		const stateCodeCountWhere: Prisma.ClientWhereInput = { ...baseWhere };
-		if (personType)
-			stateCodeCountWhere.personType = toPrismaPersonType(personType);
+		if (personType?.length)
+			stateCodeCountWhere.personType = {
+				in: personType.map(toPrismaPersonType),
+			};
 
 		const [total, records, personTypeGroups, stateCodeGroups] =
 			await Promise.all([
