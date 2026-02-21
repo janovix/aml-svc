@@ -1,217 +1,257 @@
 # Seed Scripts
 
-Seed scripts generate **synthetic test data** for development and preview environments to make the UI testable with sample data.
+This directory contains scripts for generating **synthetic test data** for development and preview environments.
 
-> **Important**: Seeds are NOT for reference data (catalogs, constants). For catalogs, use the [populate scripts](../populate/README.md) instead.
+Seed scripts run **only in dev/preview** environments (never in production).
 
-## 🔍 Seeds vs Population
+## What Gets Seeded
 
-| Aspect           | Seeds (this directory)             | Population (../populate/)         |
-| ---------------- | ---------------------------------- | --------------------------------- |
-| **Purpose**      | Synthetic test data                | Real reference data               |
-| **Examples**     | Fake clients, transactions, alerts | Countries, currencies, CFDI codes |
-| **Environments** | Dev, Preview only                  | All (including prod)              |
-| **Idempotent**   | Usually replaces data              | Always idempotent                 |
-| **Required**     | No (optional for testing)          | Yes (app won't work without)      |
+### Synthetic Test Data
 
-## 🚀 Quick Start
+- **Clients**: Fake client records for testing
+- **Reports**: Sample compliance reports
+- **Notices**: Test notice records
+- **Upload Links**: Sample file upload links
+- **Shareholders**: Test shareholder records (cap table)
+- **Beneficial Controllers**: Test beneficial controller records (AML compliance)
+- **Organization Settings**: Test organization configurations
+
+**Note**: Operations are created via imports or API, not seeded.
+
+## Scripts
+
+### Main Scripts
+
+- **`all.mjs`** - Master script that runs all seed scripts
+  - Discovers and executes all `seed-*.mjs` files
+  - Skips execution in production environments
+  - Usage: `pnpm seed` (local) or `pnpm seed:dev` (remote dev)
+
+### Individual Seed Scripts
+
+- **`seed-client.mjs`** - Generates fake clients
+- **`seed-report.mjs`** - Creates sample reports
+- **`seed-notice.mjs`** - Generates test notices
+- **`seed-upload-link.mjs`** - Creates sample upload links
+- **`seed-shareholder.mjs`** - Generates test shareholders (cap table)
+- **`seed-beneficial-controller.mjs`** - Generates test beneficial controllers (AML compliance)
+- **`seed-organization-settings.mjs`** - Creates test org settings
+
+### Validation
+
+- **`validate.mjs`** - Validates that all Prisma models have corresponding seeds or are excluded
+  - Runs in pre-commit hook and CI
+  - Ensures dev/preview environments always have test data
+  - Models can be in: `EXCLUDED_MODELS`, `POPULATED_MODELS`, or have a seed script
+
+## Usage
+
+### Local Development
 
 ```bash
-# Local development (after populating catalogs)
+# Seed all test data (local DB)
+pnpm seed
+
+# Seed to a specific local config
 pnpm seed:local
-
-# Dev environment
-pnpm seed:dev
-
-# Preview environment
-pnpm seed:preview
-
-# Production - DON'T RUN SEEDS IN PROD!
-# (Seeds are automatically skipped in production)
 ```
 
-## 📋 When Seeds Run
-
-- **Local**: Manually via `pnpm seed:local`
-- **Dev**: Manually via `pnpm seed:dev` (after populate:dev)
-- **Preview**: Manually via `pnpm seed:preview` (after populate:preview)
-- **Production**: ❌ **NEVER** - Seeds are automatically skipped
-
-## 📝 Available Seed Scripts
-
-Each seed script generates synthetic data for a specific model:
-
-| Script                               | Purpose                                     | Typical Count |
-| ------------------------------------ | ------------------------------------------- | ------------- |
-| `seed-client.mjs`                    | Synthetic clients (individuals & companies) | 10-50         |
-| `seed-transaction.mjs`               | Synthetic transactions                      | 50-200        |
-| `seed-alert-rule.mjs`                | Alert rule definitions                      | 5-20          |
-| `seed-alert-rule-config.mjs`         | Alert rule configurations                   | 5-20          |
-| `seed-notice.mjs`                    | Synthetic PLD notices                       | 10-30         |
-| `seed-report.mjs`                    | Synthetic PLD reports                       | 5-15          |
-| `seed-ultimate-beneficial-owner.mjs` | Synthetic UBOs                              | 10-30         |
-| `seed-upload-link.mjs`               | Synthetic upload links                      | 5-10          |
-| `seed-organization-settings.mjs`     | Organization settings                       | 1-5           |
-| `seed-uma-value.mjs`                 | UMA values (should be in populate!)         | 1             |
-
-## ✅ Seed Validation
-
-Run `pnpm seed:validate` to verify seed script coverage:
+### Remote Environments
 
 ```bash
+# Seed dev environment
+pnpm seed:dev
+
+# Seed preview environment
+pnpm seed:preview
+
+# Production - automatically skipped
+pnpm seed:prod  # Will skip seeding
+```
+
+### Validation
+
+```bash
+# Check that all models have seeds or are excluded
 pnpm seed:validate
 ```
 
-This checks:
+## Model Categories
 
-- All models have corresponding seed scripts
-- Seed scripts follow naming conventions
-- Dependencies between seeds are correct
+### Excluded Models
 
-Validation runs in:
+Models that don't need seeds (defined in `validate.mjs`):
 
-- Husky pre-commit hook
-- CI pipeline
+- **Junction tables**: `TransactionPaymentMethod`, `ClientDocument`, `ClientAddress`
+- **Worker-generated**: `Alert`, `Import`, `ImportRowResult`
+- **API-generated**: `Invoice`, `InvoiceItem`, `Operation`, `OperationPayment`, etc.
+- **User-configured**: `ComplianceOrganization`
 
-## 🔧 Creating New Seed Scripts
+### Populated Models
 
-When adding a new model, create a corresponding seed script:
+Models populated by reference data scripts (not seeded):
 
-1. Create `seed-{model-name}.mjs` in this directory
-2. Follow the existing patterns (see other seed scripts)
-3. Use deterministic IDs for reproducibility
-4. Handle dependencies (e.g., clients before transactions)
-5. Run `pnpm seed:validate` to verify
+- **`Catalog`** - Populated via `scripts/populate/catalogs.mjs`
+- **`CatalogMapping`** - Populated via `scripts/populate/catalog-cfdi-pld-mappings.mjs`
+- **`AlertRule`** - Populated via `scripts/populate/alert-rules.mjs`
+- **`AlertRuleConfig`** - Populated via `scripts/populate/alert-rule-configs.mjs`
+- **`UmaValue`** - Populated via `scripts/populate/uma-values.mjs`
 
-### Template
+### Seeded Models
+
+Models that have seed scripts:
+
+- **`Client`** - `seed-client.mjs`
+- **`Report`** - `seed-report.mjs`
+- **`Notice`** - `seed-notice.mjs`
+- **`UploadLink`** - `seed-upload-link.mjs`
+- **`Shareholder`** - `seed-shareholder.mjs`
+- **`BeneficialController`** - `seed-beneficial-controller.mjs`
+- **`OrganizationSettings`** - `seed-organization-settings.mjs`
+
+## Seed vs Populate
+
+| Aspect          | Seed (this folder)         | Populate (`scripts/populate/`)     |
+| --------------- | -------------------------- | ---------------------------------- |
+| **Purpose**     | Synthetic test data        | Reference data                     |
+| **Data Type**   | Clients, reports, notices  | Catalogs, rules, constants         |
+| **Environment** | Dev/preview only           | All (local, dev, preview, prod)    |
+| **Frequency**   | As needed for testing      | Once per environment setup         |
+| **Examples**    | Fake clients, test reports | Countries, CFDI codes, alert rules |
+
+## Environment Detection
+
+Seed scripts automatically detect the environment:
+
+- **Production**: Skipped (based on `NODE_ENV=production` and absence of preview flags)
+- **Preview**: Enabled (based on `CF_PAGES_BRANCH` or `PREVIEW=true`)
+- **Dev**: Enabled (based on `ENVIRONMENT=dev` or `WRANGLER_CONFIG=wrangler.jsonc`)
+- **Local**: Enabled (default)
+
+## Seed Script Structure
+
+Each seed script follows this pattern:
 
 ```javascript
 #!/usr/bin/env node
 /**
- * Seed {ModelName}
- *
- * Generates synthetic {model} data for dev/preview environments.
+ * Seed [ModelName]
  */
 
-import { execSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-import { writeFileSync, unlinkSync } from "node:fs";
-import { getWranglerConfig } from "../populate/lib/cfdi-catalog-base.mjs";
+async function seed() {
+  // Detect environment
+  const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
 
-// Generate synthetic data
-const items = [
-	// ... your synthetic data
-];
+  // Generate synthetic data
+  const data = [...];
 
-// Generate SQL
-const sql = items
-	.map(
-		(item) => `
-  INSERT OR REPLACE INTO {table} (...)
-  VALUES (...);
-`,
-	)
-	.join("\n");
+  // Generate SQL
+  const sql = generateSql(data);
 
-// Execute SQL via wrangler
-const { isRemote, configFile } = getWranglerConfig();
-const sqlFile = join(__dirname, `temp-seed-{model}-${Date.now()}.sql`);
-// ... execute and cleanup
-```
+  // Execute via wrangler d1
+  executeSql(sql);
+}
 
-## 🎯 Best Practices
+// Export for all.mjs
+export { seed as seedModelName };
 
-### 1. Run Seeds After Population
-
-Always populate catalogs before seeding:
-
-```bash
-# Correct order
-pnpm populate:local    # Reference data first
-pnpm seed:local        # Test data second
-
-# Wrong order (will fail due to missing catalogs)
-pnpm seed:local        # ❌ Missing foreign keys
-pnpm populate:local
-```
-
-### 2. Use Deterministic IDs
-
-Generate consistent IDs for reproducibility:
-
-```javascript
-function generateId(seed) {
-	let hash = 0;
-	for (let i = 0; i < seed.length; i++) {
-		hash = (hash << 5) - hash + seed.charCodeAt(i);
-	}
-	return Math.abs(hash).toString(16).padStart(32, "0");
+// Allow direct execution
+if (isDirectRun) {
+  seed().catch(console.error);
 }
 ```
 
-### 3. Handle Dependencies
+## Adding New Seeds
 
-Respect foreign key relationships:
+To add a new seed script:
 
-```javascript
-// seed-client.mjs runs first
-// seed-transaction.mjs runs second (depends on clients)
-// seed-alert.mjs runs third (depends on transactions)
-```
+1. Create `seed-model-name.mjs` in this directory
+2. Follow the structure above
+3. Export your seed function
+4. Test locally: `node seed-model-name.mjs`
+5. Verify it runs in `all.mjs`: `pnpm seed`
+6. Run validation: `pnpm seed:validate`
 
-The `all.mjs` script handles ordering automatically.
+If the model should NOT be seeded:
 
-### 4. Make Seeds Idempotent
+1. Add to `EXCLUDED_MODELS` in `validate.mjs` (for junction tables, worker-generated data)
+2. Add to `POPULATED_MODELS` in `validate.mjs` (for reference data)
+3. Document the reason in the comment
 
-Use `INSERT OR REPLACE` or `INSERT OR IGNORE`:
+## Validation Rules
 
-```sql
-INSERT OR REPLACE INTO clients (id, name, ...)
-VALUES ('...', '...', ...);
-```
+The `validate.mjs` script ensures:
 
-### 5. Keep Seeds Realistic
+1. Every Prisma model has a seed script OR is in `EXCLUDED_MODELS` OR is in `POPULATED_MODELS`
+2. Every seed script corresponds to a Prisma model
+3. No orphaned seed scripts exist
 
-Generate realistic test data:
+This runs automatically:
 
-- Valid email formats
-- Realistic names and addresses
-- Proper date ranges
-- Valid foreign keys
+- In pre-commit hook (via husky)
+- In CI (GitHub Actions)
 
-## 🔍 Troubleshooting
+## Best Practices
 
-### Foreign Key Constraint Failed
+### Synthetic Data Quality
 
-**Error**: `FOREIGN KEY constraint failed`
+- Use realistic data (proper names, addresses, amounts)
+- Vary data to test edge cases
+- Include both valid and boundary cases
+- Consider relationships between models
 
-**Solution**: Ensure catalogs are populated first:
+### Performance
 
-```bash
-pnpm populate:local
-pnpm seed:local
-```
+- Batch inserts when possible
+- Use `INSERT OR REPLACE` for idempotency
+- Limit data volume to what's needed for testing
+- Use deterministic IDs for repeatability
 
-### Seeds Running in Production
+### Maintainability
 
-Seeds are automatically skipped in production. If you see seeds running in prod, check:
+- Document unusual data patterns
+- Keep seed logic simple
+- Avoid complex business logic
+- Use shared utilities from `scripts/populate/lib/shared.mjs`
 
-- `NODE_ENV` environment variable
-- `CF_PAGES_BRANCH` or `WORKERS_CI_BRANCH`
-- Wrangler config file being used
+## Troubleshooting
 
-### Duplicate Key Errors
+### Validation fails with "Model X has no seed script"
 
-Seeds use `INSERT OR REPLACE`, so duplicates should be handled. If you see errors:
+Either:
 
-- Check that IDs are deterministic
-- Verify the seed script uses `OR REPLACE` or `OR IGNORE`
+1. Create `seed-x.mjs` for the model
+2. Add the model to `EXCLUDED_MODELS` in `validate.mjs` (if it shouldn't be seeded)
+3. Add the model to `POPULATED_MODELS` in `validate.mjs` (if it's reference data)
 
----
+### Seed fails in CI but works locally
 
-## 📚 Related Documentation
+Check environment detection logic. CI sets `CI=true`, which affects config file selection.
 
-- [Populate Scripts](../populate/README.md) - Reference data (catalogs)
-- [Database Migrations](../../migrations/README.md) - Schema management
-- [CFDI Catalogs](../cfdi-catalogs/README.md) - CFDI catalog extraction
+### Foreign key constraint errors
+
+Ensure seeds run in dependency order:
+
+1. Seed parent models first (e.g., `Client` before `Transaction`)
+2. Populate catalogs before seeding (catalogs are populated, not seeded)
+3. Check `all.mjs` execution order
+
+### Duplicate key errors
+
+Use `INSERT OR REPLACE` or `ON CONFLICT DO UPDATE` for idempotency. Seed scripts should be runnable multiple times.
+
+## Contributing
+
+When contributing seed scripts:
+
+1. Follow existing script structure
+2. Use meaningful, realistic test data
+3. Document any special data patterns
+4. Update this README if adding new model categories
+5. Run `pnpm seed:validate` before committing
+
+## See Also
+
+- `scripts/populate/README.md` - Reference data population
+- `prisma/schema.prisma` - Database schema
+- `.husky/pre-commit` - Validation hook

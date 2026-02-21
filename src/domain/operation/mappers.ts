@@ -70,6 +70,7 @@ export function mapPaymentToEntity(
 		monetaryInstrumentCode: payment.monetaryInstrumentCode,
 		currencyCode: payment.currencyCode,
 		amount: payment.amount.toString(),
+		exchangeRate: payment.exchangeRate?.toString() ?? null,
 		bankName: payment.bankName,
 		accountNumberMasked: payment.accountNumberMasked,
 		checkNumber: payment.checkNumber,
@@ -81,12 +82,18 @@ export function mapPaymentToEntity(
 
 export function mapVehicleToExtension(
 	vehicle: OperationVehicle,
+	brandName?: string | null,
 ): VehicleExtension {
+	const resolvedNames = vehicle.resolvedNames
+		? safeJsonParse<Record<string, string>>(vehicle.resolvedNames)
+		: null;
+
 	return {
 		id: vehicle.id,
 		operationId: vehicle.operationId,
 		vehicleType: vehicle.vehicleType as VehicleType,
 		brand: vehicle.brand,
+		brandName: vehicle.brandName ?? brandName ?? null,
 		model: vehicle.model,
 		year: vehicle.year,
 		vin: vehicle.vin,
@@ -98,12 +105,17 @@ export function mapVehicleToExtension(
 		armorLevelCode: vehicle.armorLevelCode,
 		engineNumber: vehicle.engineNumber,
 		description: vehicle.description,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapRealEstateToExtension(
 	re: OperationRealEstate,
 ): RealEstateExtension {
+	const resolvedNames = re.resolvedNames
+		? safeJsonParse<Record<string, string>>(re.resolvedNames)
+		: null;
+
 	return {
 		id: re.id,
 		operationId: re.operationId,
@@ -123,10 +135,15 @@ export function mapRealEstateToExtension(
 		clientFigureCode: re.clientFigureCode,
 		personFigureCode: re.personFigureCode,
 		description: re.description,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapJewelryToExtension(j: OperationJewelry): JewelryExtension {
+	const resolvedNames = j.resolvedNames
+		? safeJsonParse<Record<string, string>>(j.resolvedNames)
+		: null;
+
 	return {
 		id: j.id,
 		operationId: j.operationId,
@@ -136,16 +153,22 @@ export function mapJewelryToExtension(j: OperationJewelry): JewelryExtension {
 		purity: j.purity,
 		jewelryDescription: j.jewelryDescription,
 		brand: j.brand,
+		brandName: j.brandName,
 		serialNumber: j.serialNumber,
 		tradeUnitCode: j.tradeUnitCode,
 		quantity: j.quantity?.toString() ?? null,
 		unitPrice: j.unitPrice?.toString() ?? null,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapVirtualAssetToExtension(
 	va: OperationVirtualAsset,
 ): VirtualAssetExtension {
+	const resolvedNames = va.resolvedNames
+		? safeJsonParse<Record<string, string>>(va.resolvedNames)
+		: null;
+
 	return {
 		id: va.id,
 		operationId: va.operationId,
@@ -158,12 +181,17 @@ export function mapVirtualAssetToExtension(
 		assetQuantity: va.assetQuantity?.toString() ?? null,
 		assetUnitPrice: va.assetUnitPrice?.toString() ?? null,
 		blockchainTxHash: va.blockchainTxHash,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapGamblingToExtension(
 	g: OperationGambling,
 ): GamblingExtension {
+	const resolvedNames = g.resolvedNames
+		? safeJsonParse<Record<string, string>>(g.resolvedNames)
+		: null;
+
 	return {
 		id: g.id,
 		operationId: g.operationId,
@@ -177,10 +205,15 @@ export function mapGamblingToExtension(
 		eventDate: g.eventDate?.toISOString().split("T")[0] ?? null,
 		propertyTypeCode: g.propertyTypeCode,
 		propertyDescription: g.propertyDescription,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapRentalToExtension(r: OperationRental): RentalExtension {
+	const resolvedNames = r.resolvedNames
+		? safeJsonParse<Record<string, string>>(r.resolvedNames)
+		: null;
+
 	return {
 		id: r.id,
 		operationId: r.operationId,
@@ -200,12 +233,17 @@ export function mapRentalToExtension(r: OperationRental): RentalExtension {
 		isPrepaid: r.isPrepaid,
 		prepaidMonths: r.prepaidMonths,
 		description: r.description,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapArmoringToExtension(
 	a: OperationArmoring,
 ): ArmoringExtension {
+	const resolvedNames = a.resolvedNames
+		? safeJsonParse<Record<string, string>>(a.resolvedNames)
+		: null;
+
 	return {
 		id: a.id,
 		operationId: a.operationId,
@@ -220,12 +258,17 @@ export function mapArmoringToExtension(
 		vehicleVin: a.vehicleVin,
 		vehiclePlates: a.vehiclePlates,
 		serviceDescription: a.serviceDescription,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapDonationToExtension(
 	d: OperationDonation,
 ): DonationExtension {
+	const resolvedNames = d.resolvedNames
+		? safeJsonParse<Record<string, string>>(d.resolvedNames)
+		: null;
+
 	return {
 		id: d.id,
 		operationId: d.operationId,
@@ -236,10 +279,15 @@ export function mapDonationToExtension(
 		itemValue: d.itemValue?.toString() ?? null,
 		isAnonymous: d.isAnonymous,
 		campaignName: d.campaignName,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapLoanToExtension(l: OperationLoan): LoanExtension {
+	const resolvedNames = l.resolvedNames
+		? safeJsonParse<Record<string, string>>(l.resolvedNames)
+		: null;
+
 	return {
 		id: l.id,
 		operationId: l.operationId,
@@ -253,12 +301,17 @@ export function mapLoanToExtension(l: OperationLoan): LoanExtension {
 		maturityDate: l.maturityDate?.toISOString().split("T")[0] ?? null,
 		guaranteeDescription: l.guaranteeDescription,
 		guaranteeValue: l.guaranteeValue?.toString() ?? null,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapOfficialToExtension(
 	o: OperationOfficial,
 ): OfficialExtension {
+	const resolvedNames = o.resolvedNames
+		? safeJsonParse<Record<string, string>>(o.resolvedNames)
+		: null;
+
 	return {
 		id: o.id,
 		operationId: o.operationId,
@@ -280,10 +333,15 @@ export function mapOfficialToExtension(
 		itemTypeCode: o.itemTypeCode,
 		itemDescription: o.itemDescription,
 		itemValue: o.itemValue?.toString() ?? null,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapNotaryToExtension(n: OperationNotary): NotaryExtension {
+	const resolvedNames = n.resolvedNames
+		? safeJsonParse<Record<string, string>>(n.resolvedNames)
+		: null;
+
 	return {
 		id: n.id,
 		operationId: n.operationId,
@@ -304,12 +362,17 @@ export function mapNotaryToExtension(n: OperationNotary): NotaryExtension {
 		itemDescription: n.itemDescription,
 		appraisalValue: n.appraisalValue?.toString() ?? null,
 		guaranteeTypeCode: n.guaranteeTypeCode,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapProfessionalToExtension(
 	p: OperationProfessional,
 ): ProfessionalExtension {
+	const resolvedNames = p.resolvedNames
+		? safeJsonParse<Record<string, string>>(p.resolvedNames)
+		: null;
+
 	return {
 		id: p.id,
 		operationId: p.operationId,
@@ -328,12 +391,17 @@ export function mapProfessionalToExtension(
 		financialInstitutionName: p.financialInstitutionName,
 		occupationCode: p.occupationCode,
 		serviceDescription: p.serviceDescription,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapTravelerCheckToExtension(
 	tc: OperationTravelerCheck,
 ): TravelerCheckExtension {
+	const resolvedNames = tc.resolvedNames
+		? safeJsonParse<Record<string, string>>(tc.resolvedNames)
+		: null;
+
 	return {
 		id: tc.id,
 		operationId: tc.operationId,
@@ -342,10 +410,15 @@ export function mapTravelerCheckToExtension(
 		serialNumbers: tc.serialNumbers,
 		issuerName: tc.issuerName,
 		issuerCountryCode: tc.issuerCountryCode,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapCardToExtension(c: OperationCard): CardExtension {
+	const resolvedNames = c.resolvedNames
+		? safeJsonParse<Record<string, string>>(c.resolvedNames)
+		: null;
+
 	return {
 		id: c.id,
 		operationId: c.operationId,
@@ -355,10 +428,15 @@ export function mapCardToExtension(c: OperationCard): CardExtension {
 		issuerName: c.issuerName,
 		creditLimit: c.creditLimit?.toString() ?? null,
 		transactionType: c.transactionType,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapPrepaidToExtension(p: OperationPrepaid): PrepaidExtension {
+	const resolvedNames = p.resolvedNames
+		? safeJsonParse<Record<string, string>>(p.resolvedNames)
+		: null;
+
 	return {
 		id: p.id,
 		operationId: p.operationId,
@@ -368,10 +446,15 @@ export function mapPrepaidToExtension(p: OperationPrepaid): PrepaidExtension {
 		reloadAmount: p.reloadAmount?.toString() ?? null,
 		currentBalance: p.currentBalance?.toString() ?? null,
 		issuerName: p.issuerName,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapRewardToExtension(r: OperationReward): RewardExtension {
+	const resolvedNames = r.resolvedNames
+		? safeJsonParse<Record<string, string>>(r.resolvedNames)
+		: null;
+
 	return {
 		id: r.id,
 		operationId: r.operationId,
@@ -382,12 +465,17 @@ export function mapRewardToExtension(r: OperationReward): RewardExtension {
 		pointsExpiryDate: r.pointsExpiryDate?.toISOString().split("T")[0] ?? null,
 		redemptionType: r.redemptionType,
 		redemptionDescription: r.redemptionDescription,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapValuableToExtension(
 	v: OperationValuable,
 ): ValuableExtension {
+	const resolvedNames = v.resolvedNames
+		? safeJsonParse<Record<string, string>>(v.resolvedNames)
+		: null;
+
 	return {
 		id: v.id,
 		operationId: v.operationId,
@@ -402,10 +490,15 @@ export function mapValuableToExtension(
 		declaredValue: v.declaredValue?.toString() ?? null,
 		insuredValue: v.insuredValue?.toString() ?? null,
 		description: v.description,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapArtToExtension(a: OperationArt): ArtExtension {
+	const resolvedNames = a.resolvedNames
+		? safeJsonParse<Record<string, string>>(a.resolvedNames)
+		: null;
+
 	return {
 		id: a.id,
 		operationId: a.operationId,
@@ -421,12 +514,17 @@ export function mapArtToExtension(a: OperationArt): ArtExtension {
 		isAntique: a.isAntique,
 		auctionHouse: a.auctionHouse,
 		lotNumber: a.lotNumber,
+		resolvedNames: resolvedNames,
 	};
 }
 
 export function mapDevelopmentToExtension(
 	d: OperationDevelopment,
 ): DevelopmentExtension {
+	const resolvedNames = d.resolvedNames
+		? safeJsonParse<Record<string, string>>(d.resolvedNames)
+		: null;
+
 	return {
 		id: d.id,
 		operationId: d.operationId,
@@ -440,6 +538,7 @@ export function mapDevelopmentToExtension(
 		thirdPartyName: d.thirdPartyName,
 		financialInstitutionTypeCode: d.financialInstitutionTypeCode,
 		financialInstitutionName: d.financialInstitutionName,
+		resolvedNames: resolvedNames,
 	};
 }
 
@@ -468,6 +567,8 @@ type OperationWithRelations = Operation & {
 
 export function mapOperationToEntity(
 	op: OperationWithRelations,
+	/** Optional map of catalog item IDs to their display names */
+	catalogNames?: Map<string, string>,
 ): OperationEntity {
 	return {
 		id: op.id,
@@ -504,7 +605,9 @@ export function mapOperationToEntity(
 		deletedAt: op.deletedAt?.toISOString() ?? null,
 		payments: op.payments?.map(mapPaymentToEntity) ?? [],
 		// Activity extensions
-		vehicle: op.vehicle ? mapVehicleToExtension(op.vehicle) : null,
+		vehicle: op.vehicle
+			? mapVehicleToExtension(op.vehicle, catalogNames?.get(op.vehicle.brand))
+			: null,
 		realEstate: op.realEstate ? mapRealEstateToExtension(op.realEstate) : null,
 		jewelry: op.jewelry ? mapJewelryToExtension(op.jewelry) : null,
 		virtualAsset: op.virtualAsset

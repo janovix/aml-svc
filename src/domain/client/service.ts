@@ -15,7 +15,7 @@ import type {
 	ClientAddressEntity,
 	ClientDocumentEntity,
 	ClientEntity,
-	ListResult,
+	ListResultWithMeta,
 } from "./types";
 
 export class ClientService {
@@ -24,7 +24,7 @@ export class ClientService {
 	list(
 		organizationId: string,
 		filters: ClientFilters,
-	): Promise<ListResult<ClientEntity>> {
+	): Promise<ListResultWithMeta<ClientEntity>> {
 		return this.repository.list(organizationId, filters);
 	}
 
@@ -34,6 +34,10 @@ export class ClientService {
 			throw new Error("CLIENT_NOT_FOUND");
 		}
 		return client;
+	}
+
+	findByRfc(organizationId: string, rfc: string): Promise<ClientEntity | null> {
+		return this.repository.findByRfc(organizationId, rfc);
 	}
 
 	create(

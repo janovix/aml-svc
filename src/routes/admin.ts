@@ -443,10 +443,16 @@ adminRouter.get("/organization-settings/:orgId", async (c) => {
 	const settings = await service.getByOrganizationId(orgId);
 
 	if (!settings) {
-		return c.json({ success: true, data: null }, 404);
+		return c.json({
+			success: true,
+			data: { configured: false, settings: null },
+		});
 	}
 
-	return c.json({ success: true, data: settings });
+	return c.json({
+		success: true,
+		data: { configured: true, settings },
+	});
 });
 
 /**
@@ -476,7 +482,7 @@ adminRouter.put("/organization-settings/:orgId", async (c) => {
 	}
 
 	const settings = await service.createOrUpdate(orgId, parseResult.data);
-	return c.json({ success: true, data: settings });
+	return c.json({ success: true, data: { configured: true, settings } });
 });
 
 /**
@@ -497,8 +503,10 @@ adminRouter.patch("/organization-settings/:orgId", async (c) => {
 		return c.json(
 			{
 				success: false,
-				error: "Not Found",
-				message: "Organization settings not found for this organization",
+				configured: false,
+				error: "Not Configured",
+				message:
+					"Organization settings have not been configured yet. Use PUT to create them.",
 			},
 			404,
 		);
@@ -530,5 +538,8 @@ adminRouter.patch("/organization-settings/:orgId", async (c) => {
 	}
 
 	const settings = await service.update(orgId, parseResult.data);
-	return c.json({ success: true, data: settings });
+	return c.json({
+		success: true,
+		data: { configured: true, settings },
+	});
 });

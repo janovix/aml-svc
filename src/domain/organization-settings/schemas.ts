@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export const selfServiceModeSchema = z.enum([
+	"disabled",
+	"manual",
+	"automatic",
+]);
+
 export const organizationSettingsCreateSchema = z.object({
 	obligatedSubjectKey: z
 		.string()
@@ -12,14 +18,26 @@ export const organizationSettingsCreateSchema = z.object({
 		.string()
 		.min(1, "activityKey is required")
 		.max(10, "activityKey must be at most 10 characters"),
+	selfServiceMode: selfServiceModeSchema.optional(),
+	selfServiceExpiryHours: z.number().int().min(1).max(720).optional(),
+	selfServiceRequiredSections: z.array(z.string()).nullable().optional(),
 });
 
 export const organizationSettingsUpdateSchema =
 	organizationSettingsCreateSchema.partial();
+
+export const selfServiceSettingsUpdateSchema = z.object({
+	selfServiceMode: selfServiceModeSchema.optional(),
+	selfServiceExpiryHours: z.number().int().min(1).max(720).optional(),
+	selfServiceRequiredSections: z.array(z.string()).nullable().optional(),
+});
 
 export type OrganizationSettingsCreateInput = z.infer<
 	typeof organizationSettingsCreateSchema
 >;
 export type OrganizationSettingsUpdateInput = z.infer<
 	typeof organizationSettingsUpdateSchema
+>;
+export type SelfServiceSettingsUpdateInput = z.infer<
+	typeof selfServiceSettingsUpdateSchema
 >;

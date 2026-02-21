@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { ZodError } from "zod";
+import * as Sentry from "@sentry/cloudflare";
 
 import {
 	InvoiceService,
@@ -14,6 +15,7 @@ import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { z } from "zod";
+import { parseQueryParams } from "../lib/query-params";
 
 export const invoicesRouter = new Hono<{
 	Bindings: Bindings;
@@ -67,7 +69,10 @@ function handleServiceError(error: unknown): never {
 invoicesRouter.get("/", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
-	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const queryObject = parseQueryParams(url.searchParams, [
+		"voucherTypeCode",
+		"currencyCode",
+	]);
 	const filters = parseWithZod(InvoiceFilterSchema, queryObject);
 
 	const service = getService(c);
@@ -76,6 +81,20 @@ invoicesRouter.get("/", async (c) => {
 		.catch(handleServiceError);
 
 	return c.json(result);
+});
+
+/**
+ * GET /invoices/stats
+ * Get summary statistics for invoices in the organization.
+ * IMPORTANT: must be defined before /:id to avoid "stats" being matched as an id.
+ */
+invoicesRouter.get("/stats", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const service = getService(c);
+	const stats = await service
+		.getStats(organizationId)
+		.catch(handleServiceError);
+	return c.json(stats);
 });
 
 /**
@@ -216,7 +235,9 @@ invoicesInternalRouter.post("/parse-xml", async (c) => {
 
 		return c.json(result, 201);
 	} catch (error) {
-		console.error("[InternalInvoices] POST parse-xml error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-invoices-post-parse-xml-error" },
+		});
 
 		if (error instanceof APIError) {
 			return c.json(

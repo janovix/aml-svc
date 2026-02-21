@@ -1,5 +1,5 @@
 // Import types from schemas.ts (inferred from Zod schemas)
-import type { KYCStatus, PEPStatus, Gender, MaritalStatus } from "./schemas";
+import type { KYCStatus, Gender, MaritalStatus } from "./schemas";
 
 export interface ClientEntity {
 	id: string; // RFC is now the ID
@@ -41,13 +41,29 @@ export interface ClientEntity {
 	// Completeness tracking
 	completenessStatus: "COMPLETE" | "INCOMPLETE" | "MINIMUM";
 	missingFields: string[] | null;
-	// PEP status tracking
-	isPEP: boolean;
-	pepStatus: PEPStatus;
-	pepDetails?: string | null;
-	pepMatchConfidence?: string | null;
-	pepCheckedAt?: string | null;
-	pepCheckSource?: string | null;
+	// KYC progress (persisted fields)
+	kycCompletionPct: number;
+	documentsComplete: number; // 0 or 1
+	documentsCount: number;
+	documentsRequired: number;
+	shareholdersCount: number;
+	beneficialControllersCount: number;
+	// Threshold-aware KYC (Art. 17 LFPIORPI)
+	identificationRequired: boolean;
+	identificationTier: "ALWAYS" | "ABOVE_THRESHOLD" | "BELOW_THRESHOLD";
+	identificationThresholdMxn?: number | null;
+	noticeThresholdMxn?: number | null;
+	// Watchlist screening status
+	isPEP?: boolean;
+	watchlistQueryId?: string | null;
+	ofacSanctioned?: boolean;
+	unscSanctioned?: boolean;
+	sat69bListed?: boolean;
+	adverseMediaFlagged?: boolean;
+	screeningResult?: "pending" | "clear" | "flagged";
+	screenedAt?: string | null;
+	// Resolved catalog names for *Code fields
+	resolvedNames?: Record<string, string> | null;
 	// Timestamps
 	createdAt: string;
 	updatedAt: string;
@@ -93,14 +109,11 @@ export interface ClientAddressEntity {
 	createdAt: string;
 	updatedAt: string;
 }
-export interface Pagination {
-	page: number;
-	limit: number;
-	total: number;
-	totalPages: number;
-}
-
-export interface ListResult<T> {
-	data: T[];
-	pagination: Pagination;
-}
+export type {
+	Pagination,
+	ListResult,
+	ListResultWithMeta,
+	FilterMetaDef,
+	FilterMetaOption,
+	FilterType,
+} from "../../lib/list-result";

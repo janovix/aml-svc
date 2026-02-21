@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ACTIVITY_CODES } from "./types";
+import { multiEnum } from "../../lib/query-params";
 
 const RESOURCE_ID_REGEX = /^[A-Za-z0-9-]+$/;
 const POSTAL_CODE_REGEX = /^\d{4,10}$/;
@@ -44,6 +45,8 @@ export const OperationPaymentSchema = z.object({
 	monetaryInstrumentCode: z.string().max(3).optional().nullable(),
 	currencyCode: CurrencyCodeSchema.default("MXN"),
 	amount: AmountSchema,
+	/** Per-payment exchange rate (payment currency → operation currency) */
+	exchangeRate: AmountSchema.optional().nullable(),
 	bankName: z.string().max(200).optional().nullable(),
 	accountNumberMasked: z.string().max(20).optional().nullable(),
 	checkNumber: z.string().max(50).optional().nullable(),
@@ -380,10 +383,22 @@ export const OperationCreateSchema = BaseOperationSchema.extend({
 	development: DevelopmentExtensionSchema.optional(),
 }).refine(
 	(data) => {
-		const totalPaymentAmount = data.payments.reduce(
-			(sum, pm) => sum + parseFloat(pm.amount),
-			0,
-		);
+		// Calculate total payment amount, converting foreign currencies
+		const totalPaymentAmount = data.payments.reduce((sum, pm) => {
+			const amount = parseFloat(pm.amount);
+			const paymentCurrency = pm.currencyCode || "MXN";
+			const operationCurrency = data.currencyCode || "MXN";
+
+			// If same currency, add directly
+			if (paymentCurrency === operationCurrency) {
+				return sum + amount;
+			}
+
+			// If different currency, convert using the payment's exchange rate
+			const rate = parseFloat(pm.exchangeRate || "0");
+			return sum + amount * rate;
+		}, 0);
+
 		const operationAmount = parseFloat(data.amount);
 		return Math.abs(totalPaymentAmount - operationAmount) < 0.01;
 	},
@@ -420,10 +435,22 @@ export const OperationUpdateSchema = BaseOperationSchema.omit({
 	})
 	.refine(
 		(data) => {
-			const totalPaymentAmount = data.payments.reduce(
-				(sum, pm) => sum + parseFloat(pm.amount),
-				0,
-			);
+			// Calculate total payment amount, converting foreign currencies
+			const totalPaymentAmount = data.payments.reduce((sum, pm) => {
+				const amount = parseFloat(pm.amount);
+				const paymentCurrency = pm.currencyCode || "MXN";
+				const operationCurrency = data.currencyCode || "MXN";
+
+				// If same currency, add directly
+				if (paymentCurrency === operationCurrency) {
+					return sum + amount;
+				}
+
+				// If different currency, convert using the payment's exchange rate
+				const rate = parseFloat(pm.exchangeRate || "0");
+				return sum + amount * rate;
+			}, 0);
+
 			const operationAmount = parseFloat(data.amount);
 			return Math.abs(totalPaymentAmount - operationAmount) < 0.01;
 		},
@@ -441,20 +468,21 @@ export const OperationFilterSchema = z
 	.object({
 		clientId: ResourceIdSchema.optional(),
 		invoiceId: ResourceIdSchema.optional(),
-		activityCode: ActivityCodeSchema.optional(),
+		activityCode: multiEnum(ActivityCodeSchema),
 		operationTypeCode: z.string().optional(),
 		branchPostalCode: z.string().regex(POSTAL_CODE_REGEX).optional(),
 		alertTypeCode: z.string().optional(),
-		watchlistStatus: z
-			.enum([
+		watchlistStatus: multiEnum(
+			z.enum([
 				"PENDING",
 				"QUEUED",
 				"CHECKING",
 				"COMPLETED",
 				"ERROR",
 				"NOT_AVAILABLE",
-			])
-			.optional(),
+			]),
+		),
+		dataSource: multiEnum(DataSourceSchema),
 		startDate: IsoDateSchema.optional(),
 		endDate: IsoDateSchema.optional(),
 		minAmount: AmountSchema.optional(),

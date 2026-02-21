@@ -1,6 +1,6 @@
 {
 	"compatibility_date": "2025-10-08",
-	"compatibility_flags": ["nodejs_als"],
+	"compatibility_flags": ["nodejs_compat", "nodejs_als"],
 	"main": "src/index.ts",
 	"name": "aml-svc-preview",
 	"upload_source_maps": true,
@@ -30,6 +30,10 @@
 			"binding": "AUTH_SERVICE",
 			"service": "auth-svc",
 		},
+		{
+			"binding": "NOTIFICATIONS_SERVICE",
+			"service": "notifications-svc",
+		},
 	],
 	"queues": {
 		"producers": [
@@ -51,7 +55,6 @@
 	],
 	"vars": {
 		"ENVIRONMENT": "preview",
-		"AUTH_SERVICE_URL": "https://auth-svc.janovix.workers.dev",
 		"AUTH_JWKS_CACHE_TTL": "3600",
 		"TRUSTED_ORIGINS": "*.janovix.workers.dev,http://localhost:*",
 	},

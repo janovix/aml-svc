@@ -37,14 +37,14 @@ export class ReportRepository {
 			organizationId,
 		};
 
-		if (template) {
-			where.template = template;
+		if (template?.length) {
+			where.template = { in: template };
 		}
-		if (periodType) {
-			where.periodType = periodType;
+		if (periodType?.length) {
+			where.periodType = { in: periodType };
 		}
-		if (status) {
-			where.status = status;
+		if (status?.length) {
+			where.status = { in: status };
 		}
 		if (periodStart) {
 			where.periodStart = { gte: new Date(periodStart) };

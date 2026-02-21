@@ -2,6 +2,7 @@
  * Internal organization settings routes for service binding access
  * These endpoints are used by auth-svc via Cloudflare service bindings
  */
+import * as Sentry from "@sentry/cloudflare";
 import { getPrismaClient } from "../lib/prisma";
 import {
 	OrganizationSettingsRepository,
@@ -31,20 +32,18 @@ export async function handleInternalOrganizationSettingsRequest(
 	try {
 		// GET - Fetch organization settings
 		if (request.method === "GET") {
-			console.log(
-				`[InternalOrgSettings] GET organization settings for ${organizationId}`,
-			);
 			const settings = await service.getByOrganizationId(organizationId);
 
 			if (!settings) {
 				return new Response(
 					JSON.stringify({
-						success: false,
-						error: "Not Found",
-						message: "Organization settings not found for this organization",
+						success: true,
+						data: {
+							configured: false,
+							settings: null,
+						},
 					}),
 					{
-						status: 404,
 						headers: { "Content-Type": "application/json" },
 					},
 				);
@@ -53,7 +52,10 @@ export async function handleInternalOrganizationSettingsRequest(
 			return new Response(
 				JSON.stringify({
 					success: true,
-					data: settings,
+					data: {
+						configured: true,
+						settings,
+					},
 				}),
 				{
 					headers: { "Content-Type": "application/json" },
@@ -63,9 +65,6 @@ export async function handleInternalOrganizationSettingsRequest(
 
 		// PUT - Create or update organization settings
 		if (request.method === "PUT") {
-			console.log(
-				`[InternalOrgSettings] PUT organization settings for ${organizationId}`,
-			);
 			const body = await request.json();
 			const parseResult = organizationSettingsCreateSchema.safeParse(body);
 
@@ -91,7 +90,7 @@ export async function handleInternalOrganizationSettingsRequest(
 			return new Response(
 				JSON.stringify({
 					success: true,
-					data: settings,
+					data: { configured: true, settings },
 				}),
 				{
 					headers: { "Content-Type": "application/json" },
@@ -101,18 +100,16 @@ export async function handleInternalOrganizationSettingsRequest(
 
 		// PATCH - Partial update organization settings
 		if (request.method === "PATCH") {
-			console.log(
-				`[InternalOrgSettings] PATCH organization settings for ${organizationId}`,
-			);
-
 			// Check if settings exist first
 			const existing = await service.getByOrganizationId(organizationId);
 			if (!existing) {
 				return new Response(
 					JSON.stringify({
 						success: false,
-						error: "Not Found",
-						message: "Organization settings not found for this organization",
+						configured: false,
+						error: "Not Configured",
+						message:
+							"Organization settings have not been configured yet. Use PUT to create them.",
 					}),
 					{
 						status: 404,
@@ -158,7 +155,7 @@ export async function handleInternalOrganizationSettingsRequest(
 			return new Response(
 				JSON.stringify({
 					success: true,
-					data: settings,
+					data: { configured: true, settings },
 				}),
 				{
 					headers: { "Content-Type": "application/json" },
@@ -179,7 +176,120 @@ export async function handleInternalOrganizationSettingsRequest(
 			},
 		);
 	} catch (error) {
-		console.error("[InternalOrgSettings] Error processing request:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-org-settings-error" },
+		});
+		return new Response(
+			JSON.stringify({
+				success: false,
+				error: "Internal Server Error",
+				message: error instanceof Error ? error.message : "Unknown error",
+			}),
+			{
+				status: 500,
+				headers: { "Content-Type": "application/json" },
+			},
+		);
+	}
+}
+
+/**
+ * Handle internal self-service settings requests from service bindings
+ *
+ * Route:
+ * - PATCH /organization-settings/:organizationId/self-service - Partial update self-service settings
+ */
+export async function handleInternalSelfServiceSettingsRequest(
+	request: Request,
+	env: Bindings,
+	organizationId: string,
+): Promise<Response> {
+	const prisma = getPrismaClient(env.DB);
+	const repository = new OrganizationSettingsRepository(prisma);
+	const service = new OrganizationSettingsService(repository);
+
+	try {
+		// PATCH - Partial update self-service settings only
+		if (request.method === "PATCH") {
+			// Check if settings exist first
+			const existing = await service.getByOrganizationId(organizationId);
+			if (!existing) {
+				return new Response(
+					JSON.stringify({
+						success: false,
+						configured: false,
+						error: "Not Configured",
+						message:
+							"Organization settings have not been configured yet. Use PUT to create them.",
+					}),
+					{
+						status: 404,
+						headers: { "Content-Type": "application/json" },
+					},
+				);
+			}
+
+			const body = await request.json();
+			const parseResult = organizationSettingsUpdateSchema.safeParse(body);
+
+			if (!parseResult.success) {
+				return new Response(
+					JSON.stringify({
+						success: false,
+						error: "Validation Error",
+						details: parseResult.error.format(),
+					}),
+					{
+						status: 400,
+						headers: { "Content-Type": "application/json" },
+					},
+				);
+			}
+
+			// Check if payload is empty
+			if (Object.keys(parseResult.data).length === 0) {
+				return new Response(
+					JSON.stringify({
+						success: false,
+						error: "Validation Error",
+						message: "Payload is empty",
+					}),
+					{
+						status: 400,
+						headers: { "Content-Type": "application/json" },
+					},
+				);
+			}
+
+			const settings = await service.update(organizationId, parseResult.data);
+
+			return new Response(
+				JSON.stringify({
+					success: true,
+					data: { configured: true, settings },
+				}),
+				{
+					headers: { "Content-Type": "application/json" },
+				},
+			);
+		}
+
+		// Method not allowed
+		return new Response(
+			JSON.stringify({
+				success: false,
+				error: "Method Not Allowed",
+				message: `Method ${request.method} is not allowed for this endpoint`,
+			}),
+			{
+				status: 405,
+				headers: { "Content-Type": "application/json" },
+			},
+		);
+	} catch (error) {
+		Sentry.captureException(error, {
+			tags: { context: "internal-self-service-settings-error" },
+		});
 		return new Response(
 			JSON.stringify({
 				success: false,

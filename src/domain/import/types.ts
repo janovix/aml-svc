@@ -23,6 +23,7 @@ export interface ImportEntity {
 	id: string;
 	organizationId: string;
 	entityType: ImportEntityType;
+	activityCode: string | null; // Activity code for OPERATION imports
 	fileName: string;
 	fileUrl: string;
 	fileSize: number;
@@ -57,17 +58,14 @@ export interface ImportWithResults extends ImportEntity {
 	rowResults: ImportRowResultEntity[];
 }
 
-export interface Pagination {
-	page: number;
-	limit: number;
-	total: number;
-	totalPages: number;
-}
-
-export interface ListResult<T> {
-	data: T[];
-	pagination: Pagination;
-}
+export type {
+	Pagination,
+	ListResult,
+	ListResultWithMeta,
+	FilterMetaDef,
+	FilterMetaOption,
+	FilterType,
+} from "../../lib/list-result";
 
 /**
  * Progress update sent from import worker
@@ -88,6 +86,7 @@ export interface ImportJob {
 	importId: string;
 	organizationId: string;
 	entityType: ImportEntityType;
+	activityCode?: string; // Required when entityType is OPERATION
 	fileUrl: string;
 	createdBy: string;
 }

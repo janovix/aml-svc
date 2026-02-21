@@ -14,6 +14,7 @@ describe("Import Mappers", () => {
 				id: "IMP123456789",
 				organizationId: "org-123",
 				entityType: "CLIENT" as const,
+				activityCode: null,
 				fileName: "clients.csv",
 				fileUrl: "imports/org-123/clients.csv",
 				fileSize: 1024,

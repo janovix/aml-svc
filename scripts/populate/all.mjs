@@ -2,99 +2,90 @@
 /**
  * Populate All Reference Data
  *
- * Master script that populates ALL reference data needed for the application:
- * - Core catalogs (countries, states, currencies, etc.)
- * - CFDI catalogs (SAT codes)
- * - PLD catalogs (consolidated across VAs)
- * - Activity-specific catalogs (all 19 vulnerable activities)
- * - UMA values (economic reference data)
+ * Unified script that populates ALL reference data:
+ * - ALL catalogs (regular + zip-codes + cfdi-product-services)
+ * - Alert rules and configs
+ * - CFDI-PLD mappings
+ * - UMA values
  *
- * NOTE: Large catalogs (zip-codes, cfdi-units, cfdi-product-services) are
- * excluded by default. Run them separately if needed.
- *
- * This is for REFERENCE DATA only (catalogs, constants).
- * For SYNTHETIC TEST DATA, use the seed scripts instead.
+ * This script auto-generates SQL dump files then imports them via wrangler.
+ * Two SQL files, two wrangler calls, everything populated in seconds.
  */
 
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
+import { executeSqlFile, getWranglerConfig } from "./lib/shared.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Determine config file based on environment
-// Setup:
-// - aml-svc (dev worker): dev branch = production → wrangler.jsonc
-// - aml-svc-prod (prod worker): main branch = production → wrangler.prod.jsonc
-// - aml-svc (preview): other branches = preview → wrangler.preview.jsonc
-function getConfigFile() {
-	// Check if config is explicitly set
-	if (process.env.WRANGLER_CONFIG) {
-		return process.env.WRANGLER_CONFIG;
-	}
-	const branch = process.env.CF_PAGES_BRANCH || process.env.WORKERS_CI_BRANCH;
-
-	// Main branch → use prod config (aml-svc-prod worker)
-	if (branch === "main") {
-		return "wrangler.prod.jsonc";
-	}
-
-	// Dev branch → use dev config (aml-svc worker production)
-	if (branch === "dev") {
-		return "wrangler.jsonc";
-	}
-
-	// Preview branches or explicit preview flag → use preview config
-	if (branch || process.env.PREVIEW === "true") {
-		return "wrangler.preview.jsonc";
-	}
-
-	// Default: no config (will use wrangler.jsonc as default)
-	return "";
-}
-
 async function populateAll() {
 	console.log("╔════════════════════════════════════════════════════════════╗");
-	console.log("║        Reference Data Population (All Catalogs)            ║");
+	console.log("║        Reference Data Population (Unified)                 ║");
 	console.log(
 		"╚════════════════════════════════════════════════════════════╝\n",
 	);
 
-	const configFile = getConfigFile();
-	const env = { ...process.env };
-	if (configFile) {
-		env.WRANGLER_CONFIG = configFile;
-		console.log(`📝 Using config: ${configFile}`);
-	}
-
-	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
+	const { isRemote, configFile } = getWranglerConfig();
+	console.log(`📝 Config: ${configFile || "default (wrangler.jsonc)"}`);
 	console.log(`📦 Mode: ${isRemote ? "remote" : "local"}\n`);
 
-	try {
-		// Step 1: Populate catalogs (core + essential)
-		console.log("═══════════════════════════════════════════════════════════");
-		console.log("Step 1/2: Populating catalogs...");
-		console.log(
-			"═══════════════════════════════════════════════════════════\n",
-		);
-		execSync(`node "${join(__dirname, "all-catalogs.mjs")}"`, {
-			stdio: "inherit",
-			env,
-		});
+	const sqlDir = join(__dirname, "sql");
+	const catalogsSqlPath = join(sqlDir, "catalogs.sql");
+	const referenceDataSqlPath = join(sqlDir, "reference-data.sql");
 
-		// Step 2: Populate UMA values (essential reference data)
+	// Check if --skip-generate flag is present (for CI optimization)
+	const skipGenerate = process.argv.includes("--skip-generate");
+
+	try {
+		// Step 1: Generate SQL dump files (unless --skip-generate is set)
+		if (!skipGenerate) {
+			console.log(
+				"═══════════════════════════════════════════════════════════",
+			);
+			console.log("Step 1/3: Generating SQL dump files...");
+			console.log(
+				"═══════════════════════════════════════════════════════════\n",
+			);
+
+			const generateScript = join(__dirname, "generate-sql.mjs");
+			execSync(`node "${generateScript}"`, {
+				stdio: "inherit",
+				env: process.env,
+			});
+		} else {
+			console.log("⏭️  Skipping SQL generation (--skip-generate flag)\n");
+
+			// Verify SQL files exist
+			if (!existsSync(catalogsSqlPath) || !existsSync(referenceDataSqlPath)) {
+				console.error(
+					"❌ SQL files not found. Run without --skip-generate first.",
+				);
+				process.exit(1);
+			}
+		}
+
+		// Step 2: Import catalogs SQL
 		console.log(
 			"\n═══════════════════════════════════════════════════════════",
 		);
-		console.log("Step 2/2: Populating UMA values...");
+		console.log("Step 2/3: Importing catalogs...");
 		console.log(
 			"═══════════════════════════════════════════════════════════\n",
 		);
-		execSync(`node "${join(__dirname, "uma-values.mjs")}"`, {
-			stdio: "inherit",
-			env,
-		});
+		executeSqlFile(catalogsSqlPath, "catalogs");
+
+		// Step 3: Import reference data SQL
+		console.log(
+			"\n═══════════════════════════════════════════════════════════",
+		);
+		console.log("Step 3/3: Importing reference data...");
+		console.log(
+			"═══════════════════════════════════════════════════════════\n",
+		);
+		executeSqlFile(referenceDataSqlPath, "reference-data");
 	} catch (error) {
 		console.error("\n❌ Failed to populate reference data:", error);
 		process.exit(1);
@@ -108,8 +99,12 @@ async function populateAll() {
 		"╚════════════════════════════════════════════════════════════╝\n",
 	);
 	console.log("✅ All reference data populated successfully!");
-	console.log("\n💡 Optional: Populate large catalogs separately:");
-	console.log("   pnpm populate:catalogs:large");
+	console.log(
+		"   - ALL catalogs (including zip-codes + cfdi-product-services)",
+	);
+	console.log("   - Alert rules and configs");
+	console.log("   - CFDI-PLD mappings");
+	console.log("   - UMA values");
 }
 
 populateAll().catch((error) => {

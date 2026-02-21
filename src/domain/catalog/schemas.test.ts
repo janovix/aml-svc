@@ -21,10 +21,10 @@ describe("CatalogListQuerySchema", () => {
 			expect(result.search).toBeUndefined();
 		});
 
-		it("rejects single character search", () => {
-			expect(() => CatalogListQuerySchema.parse({ search: "a" })).toThrow(
-				"search must be at least 2 characters long",
-			);
+		it("accepts single character search", () => {
+			const result = CatalogListQuerySchema.parse({ search: "a" });
+
+			expect(result.search).toBe("a");
 		});
 
 		it("accepts valid 2+ character search", () => {

@@ -1,8 +1,8 @@
 import type { PrismaClient, Prisma } from "@prisma/client";
 import type {
 	OperationEntity,
-	OperationListResult,
 	ActivityCode,
+	ListResultWithMeta,
 } from "./types";
 import type {
 	OperationFilters,
@@ -10,6 +10,33 @@ import type {
 	OperationUpdateInput,
 } from "./schemas";
 import { mapOperationToEntity } from "./mappers";
+import {
+	buildEnumFilterMeta,
+	buildRangeFilterMeta,
+	fromPrismaGroupBy,
+} from "../../lib/filter-metadata";
+import { CatalogNameResolver } from "../catalog/name-resolver";
+import type { CatalogFieldsConfig } from "../catalog/name-resolver";
+import { CatalogRepository } from "../catalog/repository";
+import { CATALOG_FIELDS as VEH_CATALOG_FIELDS } from "./activities/veh";
+import { CATALOG_FIELDS as INM_CATALOG_FIELDS } from "./activities/inm";
+import { CATALOG_FIELDS as MJR_CATALOG_FIELDS } from "./activities/mjr";
+import { CATALOG_FIELDS as AVI_CATALOG_FIELDS } from "./activities/avi";
+import { CATALOG_FIELDS as JYS_CATALOG_FIELDS } from "./activities/jys";
+import { CATALOG_FIELDS as ARI_CATALOG_FIELDS } from "./activities/ari";
+import { CATALOG_FIELDS as BLI_CATALOG_FIELDS } from "./activities/bli";
+import { CATALOG_FIELDS as DON_CATALOG_FIELDS } from "./activities/don";
+import { CATALOG_FIELDS as MPC_CATALOG_FIELDS } from "./activities/mpc";
+import { CATALOG_FIELDS as FEP_CATALOG_FIELDS } from "./activities/fep";
+import { CATALOG_FIELDS as FES_CATALOG_FIELDS } from "./activities/fes";
+import { CATALOG_FIELDS as SPR_CATALOG_FIELDS } from "./activities/spr";
+import { CATALOG_FIELDS as CHV_CATALOG_FIELDS } from "./activities/chv";
+import { CATALOG_FIELDS as TSC_CATALOG_FIELDS } from "./activities/tsc";
+import { CATALOG_FIELDS as TPP_CATALOG_FIELDS } from "./activities/tpp";
+import { CATALOG_FIELDS as TDR_CATALOG_FIELDS } from "./activities/tdr";
+import { CATALOG_FIELDS as TCV_CATALOG_FIELDS } from "./activities/tcv";
+import { CATALOG_FIELDS as OBA_CATALOG_FIELDS } from "./activities/oba";
+import { CATALOG_FIELDS as DIN_CATALOG_FIELDS } from "./activities/din";
 
 // Include clause for all activity extensions
 const operationInclude = {
@@ -36,7 +63,66 @@ const operationInclude = {
 } as const;
 
 export class OperationRepository {
-	constructor(private prisma: PrismaClient) {}
+	private catalogResolver: CatalogNameResolver;
+
+	constructor(
+		private prisma: PrismaClient,
+		catalogResolver?: CatalogNameResolver,
+	) {
+		// Create catalog resolver if not provided (for backward compatibility)
+		this.catalogResolver =
+			catalogResolver ?? new CatalogNameResolver(new CatalogRepository(prisma));
+	}
+
+	/**
+	 * Get catalog fields config for an activity code
+	 */
+	private getCatalogFieldsConfig(
+		activityCode: ActivityCode,
+	): CatalogFieldsConfig {
+		switch (activityCode) {
+			case "VEH":
+				return VEH_CATALOG_FIELDS;
+			case "INM":
+				return INM_CATALOG_FIELDS;
+			case "MJR":
+				return MJR_CATALOG_FIELDS;
+			case "AVI":
+				return AVI_CATALOG_FIELDS;
+			case "JYS":
+				return JYS_CATALOG_FIELDS;
+			case "ARI":
+				return ARI_CATALOG_FIELDS;
+			case "BLI":
+				return BLI_CATALOG_FIELDS;
+			case "DON":
+				return DON_CATALOG_FIELDS;
+			case "MPC":
+				return MPC_CATALOG_FIELDS;
+			case "FEP":
+				return FEP_CATALOG_FIELDS;
+			case "FES":
+				return FES_CATALOG_FIELDS;
+			case "SPR":
+				return SPR_CATALOG_FIELDS;
+			case "CHV":
+				return CHV_CATALOG_FIELDS;
+			case "TSC":
+				return TSC_CATALOG_FIELDS;
+			case "TPP":
+				return TPP_CATALOG_FIELDS;
+			case "TDR":
+				return TDR_CATALOG_FIELDS;
+			case "TCV":
+				return TCV_CATALOG_FIELDS;
+			case "OBA":
+				return OBA_CATALOG_FIELDS;
+			case "DIN":
+				return DIN_CATALOG_FIELDS;
+			default:
+				return {};
+		}
+	}
 
 	async create(
 		organizationId: string,
@@ -59,86 +145,217 @@ export class OperationRepository {
 				}
 			: this.detectCompleteness(input);
 
-		// Create operation with activity extension in transaction
-		const operation = await this.prisma.$transaction(async (tx) => {
-			// Create base operation
-			const op = await tx.operation.create({
-				data: {
-					id: operationId,
-					organizationId,
-					clientId: input.clientId,
-					invoiceId: input.invoiceId,
-					activityCode: input.activityCode,
-					operationTypeCode: input.operationTypeCode,
-					operationDate: new Date(input.operationDate),
-					branchPostalCode: input.branchPostalCode,
-					amount: input.amount,
-					currencyCode: input.currencyCode,
-					exchangeRate: input.exchangeRate,
-					amountMxn: amountMxn.toString(),
-					umaValue: umaInfo?.umaValue.toString(),
-					umaDailyValue: umaInfo?.umaDailyValue.toString(),
-					alertTypeCode: input.alertTypeCode,
-					alertDescription: input.alertDescription,
-					priorityCode: input.priorityCode,
-					dataSource: input.dataSource ?? "MANUAL",
-					completenessStatus,
-					missingFields: missingFields ? JSON.stringify(missingFields) : null,
-					referenceNumber: input.referenceNumber,
-					notes: input.notes,
-					payments: {
-						create: input.payments.map((p) => ({
-							id: crypto.randomUUID(),
-							paymentDate: new Date(p.paymentDate),
-							paymentFormCode: p.paymentFormCode,
-							monetaryInstrumentCode: p.monetaryInstrumentCode,
-							currencyCode: p.currencyCode,
-							amount: p.amount,
-							bankName: p.bankName,
-							accountNumberMasked: p.accountNumberMasked,
-							checkNumber: p.checkNumber,
-							reference: p.reference,
-						})),
-					},
+		// Resolve catalog names for extension fields
+		const resolvedExtension = await this.resolveExtensionCatalogNames(
+			input.activityCode as ActivityCode,
+			input,
+		);
+
+		// Create operation with activity extension in batch transaction (D1 compatible)
+		const operationCreateQuery = this.prisma.operation.create({
+			data: {
+				id: operationId,
+				organizationId,
+				clientId: input.clientId,
+				invoiceId: input.invoiceId,
+				activityCode: input.activityCode,
+				operationTypeCode: input.operationTypeCode,
+				operationDate: new Date(input.operationDate),
+				branchPostalCode: input.branchPostalCode,
+				amount: input.amount,
+				currencyCode: input.currencyCode,
+				exchangeRate: input.exchangeRate,
+				amountMxn: amountMxn.toString(),
+				umaValue: umaInfo?.umaValue.toString(),
+				umaDailyValue: umaInfo?.umaDailyValue.toString(),
+				alertTypeCode: input.alertTypeCode,
+				alertDescription: input.alertDescription,
+				priorityCode: input.priorityCode,
+				dataSource: input.dataSource ?? "MANUAL",
+				completenessStatus,
+				missingFields: missingFields ? JSON.stringify(missingFields) : null,
+				referenceNumber: input.referenceNumber,
+				notes: input.notes,
+				payments: {
+					create: input.payments.map((p) => ({
+						id: crypto.randomUUID(),
+						paymentDate: new Date(p.paymentDate),
+						paymentFormCode: p.paymentFormCode,
+						monetaryInstrumentCode: p.monetaryInstrumentCode,
+						currencyCode: p.currencyCode,
+						amount: p.amount,
+						exchangeRate: p.exchangeRate ?? null,
+						bankName: p.bankName,
+						accountNumberMasked: p.accountNumberMasked,
+						checkNumber: p.checkNumber,
+						reference: p.reference,
+					})),
 				},
-			});
-
-			// Create activity extension based on activity code
-			await this.createActivityExtension(tx, operationId, input);
-
-			return op;
+			},
 		});
+
+		const queries: Prisma.PrismaPromise<unknown>[] = [operationCreateQuery];
+
+		// Add activity extension query based on activity code
+		const extensionQuery = this.getActivityExtensionQuery(
+			operationId,
+			input,
+			resolvedExtension,
+		);
+		if (extensionQuery) {
+			queries.push(extensionQuery);
+		}
+
+		await this.prisma.$transaction(queries);
 
 		// Fetch with all relations
 		const result = await this.prisma.operation.findUnique({
-			where: { id: operation.id },
+			where: { id: operationId },
 			include: operationInclude,
 		});
 
 		if (!result) {
-			throw new Error(`Operation ${operation.id} not found after creation`);
+			throw new Error(`Operation ${operationId} not found after creation`);
 		}
 		return mapOperationToEntity(result);
 	}
 
-	private async createActivityExtension(
-		tx: Prisma.TransactionClient,
+	/**
+	 * Resolve catalog names for extension fields
+	 * Returns the extension data with resolved names and brandName
+	 */
+	private async resolveExtensionCatalogNames(
+		activityCode: ActivityCode,
+		input: OperationCreateInput,
+	): Promise<{
+		resolvedNames: string | null;
+		brandName: string | null;
+	}> {
+		// Get the extension data based on activity code
+		let extensionData: Record<string, unknown> | null = null;
+		switch (activityCode) {
+			case "VEH":
+				extensionData = input.vehicle ?? null;
+				break;
+			case "INM":
+				extensionData = input.realEstate ?? null;
+				break;
+			case "MJR":
+				extensionData = input.jewelry ?? null;
+				break;
+			case "AVI":
+				extensionData = input.virtualAsset ?? null;
+				break;
+			case "JYS":
+				extensionData = input.gambling ?? null;
+				break;
+			case "ARI":
+				extensionData = input.rental ?? null;
+				break;
+			case "BLI":
+				extensionData = input.armoring ?? null;
+				break;
+			case "DON":
+				extensionData = input.donation ?? null;
+				break;
+			case "MPC":
+				extensionData = input.loan ?? null;
+				break;
+			case "FEP":
+				extensionData = input.official ?? null;
+				break;
+			case "FES":
+				extensionData = input.notary ?? null;
+				break;
+			case "SPR":
+				extensionData = input.professional ?? null;
+				break;
+			case "CHV":
+				extensionData = input.travelerCheck ?? null;
+				break;
+			case "TSC":
+				extensionData = input.card ?? null;
+				break;
+			case "TPP":
+				extensionData = input.prepaid ?? null;
+				break;
+			case "TDR":
+				extensionData = input.reward ?? null;
+				break;
+			case "TCV":
+				extensionData = input.valuable ?? null;
+				break;
+			case "OBA":
+				extensionData = input.art ?? null;
+				break;
+			case "DIN":
+				extensionData = input.development ?? null;
+				break;
+			default:
+				return { resolvedNames: null, brandName: null };
+		}
+
+		if (!extensionData) {
+			return { resolvedNames: null, brandName: null };
+		}
+
+		// Get catalog fields config for this activity
+		const catalogFieldsConfig = this.getCatalogFieldsConfig(activityCode);
+
+		// Resolve all catalog names
+		const resolvedNamesMap = await this.catalogResolver.resolveNames(
+			extensionData,
+			catalogFieldsConfig,
+		);
+
+		// Extract brandName if present (for open catalogs like vehicle brands, jewelry brands)
+		const brandName = resolvedNamesMap.brand ?? null;
+
+		// Remove brand from resolvedNames since it has its own column
+		if (brandName) {
+			delete resolvedNamesMap.brand;
+		}
+
+		// Serialize resolved names to JSON
+		const resolvedNames =
+			Object.keys(resolvedNamesMap).length > 0
+				? JSON.stringify(resolvedNamesMap)
+				: null;
+
+		return { resolvedNames, brandName };
+	}
+
+	/**
+	 * Get activity extension query for batch transaction (D1 compatible)
+	 * Returns a Prisma query that can be added to a batch transaction
+	 */
+	private getActivityExtensionQuery(
 		operationId: string,
 		input: OperationCreateInput,
-	): Promise<void> {
+		resolvedExtension: {
+			resolvedNames: string | null;
+			brandName: string | null;
+		},
+	): Prisma.PrismaPromise<unknown> | null {
 		const extensionId = crypto.randomUUID();
 
 		switch (input.activityCode as ActivityCode) {
 			case "VEH":
 				if (input.vehicle) {
-					await tx.operationVehicle.create({
-						data: { id: extensionId, operationId, ...input.vehicle },
+					return this.prisma.operationVehicle.create({
+						data: {
+							id: extensionId,
+							operationId,
+							...input.vehicle,
+							brandName: resolvedExtension.brandName,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "INM":
 				if (input.realEstate) {
-					await tx.operationRealEstate.create({
+					return this.prisma.operationRealEstate.create({
 						data: {
 							id: extensionId,
 							operationId,
@@ -146,27 +363,39 @@ export class OperationRepository {
 							registryDate: input.realEstate.registryDate
 								? new Date(input.realEstate.registryDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
 				break;
 			case "MJR":
 				if (input.jewelry) {
-					await tx.operationJewelry.create({
-						data: { id: extensionId, operationId, ...input.jewelry },
+					return this.prisma.operationJewelry.create({
+						data: {
+							id: extensionId,
+							operationId,
+							...input.jewelry,
+							brandName: resolvedExtension.brandName,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "AVI":
 				if (input.virtualAsset) {
-					await tx.operationVirtualAsset.create({
-						data: { id: extensionId, operationId, ...input.virtualAsset },
+					return this.prisma.operationVirtualAsset.create({
+						data: {
+							id: extensionId,
+							operationId,
+							...input.virtualAsset,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "JYS":
 				if (input.gambling) {
-					await tx.operationGambling.create({
+					return this.prisma.operationGambling.create({
 						data: {
 							id: extensionId,
 							operationId,
@@ -174,13 +403,14 @@ export class OperationRepository {
 							eventDate: input.gambling.eventDate
 								? new Date(input.gambling.eventDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
 				break;
 			case "ARI":
 				if (input.rental) {
-					await tx.operationRental.create({
+					return this.prisma.operationRental.create({
 						data: {
 							id: extensionId,
 							operationId,
@@ -191,27 +421,38 @@ export class OperationRepository {
 							contractEndDate: input.rental.contractEndDate
 								? new Date(input.rental.contractEndDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
 				break;
 			case "BLI":
 				if (input.armoring) {
-					await tx.operationArmoring.create({
-						data: { id: extensionId, operationId, ...input.armoring },
+					return this.prisma.operationArmoring.create({
+						data: {
+							id: extensionId,
+							operationId,
+							...input.armoring,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "DON":
 				if (input.donation) {
-					await tx.operationDonation.create({
-						data: { id: extensionId, operationId, ...input.donation },
+					return this.prisma.operationDonation.create({
+						data: {
+							id: extensionId,
+							operationId,
+							...input.donation,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "MPC":
 				if (input.loan) {
-					await tx.operationLoan.create({
+					return this.prisma.operationLoan.create({
 						data: {
 							id: extensionId,
 							operationId,
@@ -222,13 +463,14 @@ export class OperationRepository {
 							maturityDate: input.loan.maturityDate
 								? new Date(input.loan.maturityDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
 				break;
 			case "FEP":
 				if (input.official) {
-					await tx.operationOfficial.create({
+					return this.prisma.operationOfficial.create({
 						data: {
 							id: extensionId,
 							operationId,
@@ -236,13 +478,14 @@ export class OperationRepository {
 							instrumentDate: input.official.instrumentDate
 								? new Date(input.official.instrumentDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
 				break;
 			case "FES":
 				if (input.notary) {
-					await tx.operationNotary.create({
+					return this.prisma.operationNotary.create({
 						data: {
 							id: extensionId,
 							operationId,
@@ -250,41 +493,62 @@ export class OperationRepository {
 							instrumentDate: input.notary.instrumentDate
 								? new Date(input.notary.instrumentDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
 				break;
 			case "SPR":
 				if (input.professional) {
-					await tx.operationProfessional.create({
-						data: { id: extensionId, operationId, ...input.professional },
+					return this.prisma.operationProfessional.create({
+						data: {
+							id: extensionId,
+							operationId,
+							...input.professional,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "CHV":
 				if (input.travelerCheck) {
-					await tx.operationTravelerCheck.create({
-						data: { id: extensionId, operationId, ...input.travelerCheck },
+					return this.prisma.operationTravelerCheck.create({
+						data: {
+							id: extensionId,
+							operationId,
+							...input.travelerCheck,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "TSC":
 				if (input.card) {
-					await tx.operationCard.create({
-						data: { id: extensionId, operationId, ...input.card },
+					return this.prisma.operationCard.create({
+						data: {
+							id: extensionId,
+							operationId,
+							...input.card,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "TPP":
 				if (input.prepaid) {
-					await tx.operationPrepaid.create({
-						data: { id: extensionId, operationId, ...input.prepaid },
+					return this.prisma.operationPrepaid.create({
+						data: {
+							id: extensionId,
+							operationId,
+							...input.prepaid,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "TDR":
 				if (input.reward) {
-					await tx.operationReward.create({
+					return this.prisma.operationReward.create({
 						data: {
 							id: extensionId,
 							operationId,
@@ -292,13 +556,14 @@ export class OperationRepository {
 							pointsExpiryDate: input.reward.pointsExpiryDate
 								? new Date(input.reward.pointsExpiryDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
 				break;
 			case "TCV":
 				if (input.valuable) {
-					await tx.operationValuable.create({
+					return this.prisma.operationValuable.create({
 						data: {
 							id: extensionId,
 							operationId,
@@ -309,25 +574,37 @@ export class OperationRepository {
 							custodyEndDate: input.valuable.custodyEndDate
 								? new Date(input.valuable.custodyEndDate)
 								: null,
+							resolvedNames: resolvedExtension.resolvedNames,
 						},
 					});
 				}
 				break;
 			case "OBA":
 				if (input.art) {
-					await tx.operationArt.create({
-						data: { id: extensionId, operationId, ...input.art },
+					return this.prisma.operationArt.create({
+						data: {
+							id: extensionId,
+							operationId,
+							...input.art,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 			case "DIN":
 				if (input.development) {
-					await tx.operationDevelopment.create({
-						data: { id: extensionId, operationId, ...input.development },
+					return this.prisma.operationDevelopment.create({
+						data: {
+							id: extensionId,
+							operationId,
+							...input.development,
+							resolvedNames: resolvedExtension.resolvedNames,
+						},
 					});
 				}
 				break;
 		}
+		return null;
 	}
 
 	async findById(
@@ -343,67 +620,95 @@ export class OperationRepository {
 			include: operationInclude,
 		});
 
-		return operation ? mapOperationToEntity(operation) : null;
+		if (!operation) return null;
+
+		return mapOperationToEntity(operation);
 	}
 
 	async list(
 		organizationId: string,
 		filters: OperationFilters,
-	): Promise<OperationListResult> {
-		const where: Prisma.OperationWhereInput = {
+	): Promise<ListResultWithMeta<OperationEntity>> {
+		// Base conditions (always applied, not affected by active filters)
+		const baseWhere: Prisma.OperationWhereInput = {
 			organizationId,
 			deletedAt: null,
 		};
 
-		if (filters.clientId) {
-			where.clientId = filters.clientId;
-		}
-
-		if (filters.invoiceId) {
-			where.invoiceId = filters.invoiceId;
-		}
-
-		if (filters.activityCode) {
-			where.activityCode = filters.activityCode;
-		}
-
-		if (filters.operationTypeCode) {
-			where.operationTypeCode = filters.operationTypeCode;
-		}
-
-		if (filters.branchPostalCode) {
-			where.branchPostalCode = filters.branchPostalCode;
-		}
-
-		if (filters.alertTypeCode) {
-			where.alertTypeCode = filters.alertTypeCode;
-		}
-
-		if (filters.watchlistStatus) {
-			where.watchlistStatus = filters.watchlistStatus;
-		}
+		if (filters.clientId) baseWhere.clientId = filters.clientId;
+		if (filters.invoiceId) baseWhere.invoiceId = filters.invoiceId;
+		if (filters.operationTypeCode)
+			baseWhere.operationTypeCode = filters.operationTypeCode;
+		if (filters.branchPostalCode)
+			baseWhere.branchPostalCode = filters.branchPostalCode;
+		if (filters.alertTypeCode) baseWhere.alertTypeCode = filters.alertTypeCode;
 
 		if (filters.startDate || filters.endDate) {
-			where.operationDate = {};
-			if (filters.startDate) {
-				where.operationDate.gte = new Date(filters.startDate);
-			}
-			if (filters.endDate) {
-				where.operationDate.lte = new Date(filters.endDate);
-			}
+			baseWhere.operationDate = {};
+			if (filters.startDate)
+				(baseWhere.operationDate as Prisma.DateTimeFilter).gte = new Date(
+					filters.startDate,
+				);
+			if (filters.endDate)
+				(baseWhere.operationDate as Prisma.DateTimeFilter).lte = new Date(
+					filters.endDate,
+				);
 		}
 
 		if (filters.minAmount || filters.maxAmount) {
-			where.amount = {};
-			if (filters.minAmount) {
-				where.amount.gte = parseFloat(filters.minAmount);
-			}
-			if (filters.maxAmount) {
-				where.amount.lte = parseFloat(filters.maxAmount);
-			}
+			baseWhere.amount = {};
+			if (filters.minAmount)
+				(baseWhere.amount as Prisma.DecimalFilter).gte = parseFloat(
+					filters.minAmount,
+				);
+			if (filters.maxAmount)
+				(baseWhere.amount as Prisma.DecimalFilter).lte = parseFloat(
+					filters.maxAmount,
+				);
 		}
 
-		const [operations, total] = await Promise.all([
+		// Full data query where (includes all active enum filters)
+		const where: Prisma.OperationWhereInput = { ...baseWhere };
+		if (filters.activityCode?.length)
+			where.activityCode = { in: filters.activityCode };
+		if (filters.watchlistStatus?.length)
+			where.watchlistStatus = {
+				in: filters.watchlistStatus as import("@prisma/client").WatchlistStatus[],
+			};
+		if (filters.dataSource?.length)
+			where.dataSource = { in: filters.dataSource };
+
+		// For each enum filter's counts: apply all OTHER active enum filters but not its own
+		const activityWhere: Prisma.OperationWhereInput = { ...baseWhere };
+		if (filters.watchlistStatus?.length)
+			activityWhere.watchlistStatus = {
+				in: filters.watchlistStatus as import("@prisma/client").WatchlistStatus[],
+			};
+		if (filters.dataSource?.length)
+			activityWhere.dataSource = { in: filters.dataSource };
+
+		const watchlistWhere: Prisma.OperationWhereInput = { ...baseWhere };
+		if (filters.activityCode?.length)
+			watchlistWhere.activityCode = { in: filters.activityCode };
+		if (filters.dataSource?.length)
+			watchlistWhere.dataSource = { in: filters.dataSource };
+
+		const dataSourceWhere: Prisma.OperationWhereInput = { ...baseWhere };
+		if (filters.activityCode?.length)
+			dataSourceWhere.activityCode = { in: filters.activityCode };
+		if (filters.watchlistStatus?.length)
+			dataSourceWhere.watchlistStatus = {
+				in: filters.watchlistStatus as import("@prisma/client").WatchlistStatus[],
+			};
+
+		const [
+			operations,
+			total,
+			activityGroups,
+			watchlistGroups,
+			dataSourceGroups,
+			amountAgg,
+		] = await Promise.all([
 			this.prisma.operation.findMany({
 				where,
 				include: operationInclude,
@@ -412,16 +717,104 @@ export class OperationRepository {
 				take: filters.limit,
 			}),
 			this.prisma.operation.count({ where }),
+			this.prisma.operation.groupBy({
+				by: ["activityCode"],
+				where: activityWhere,
+				_count: { activityCode: true },
+			}),
+			this.prisma.operation.groupBy({
+				by: ["watchlistStatus"],
+				where: watchlistWhere,
+				_count: { watchlistStatus: true },
+			}),
+			this.prisma.operation.groupBy({
+				by: ["dataSource"],
+				where: dataSourceWhere,
+				_count: { dataSource: true },
+			}),
+			this.prisma.operation.aggregate({
+				where: baseWhere,
+				_min: { amount: true, operationDate: true },
+				_max: { amount: true, operationDate: true },
+			}),
 		]);
 
+		const WATCHLIST_LABELS: Record<string, string> = {
+			PENDING: "Pendiente",
+			QUEUED: "En cola",
+			CHECKING: "Revisando",
+			COMPLETED: "Completado",
+			ERROR: "Error",
+			NOT_AVAILABLE: "No disponible",
+		};
+
+		const DATA_SOURCE_LABELS: Record<string, string> = {
+			MANUAL: "Manual",
+			CFDI: "CFDI",
+			IMPORT: "Importación",
+			ENRICHED: "Enriquecido",
+		};
+
 		return {
-			data: operations.map(mapOperationToEntity),
+			data: operations.map((op) => mapOperationToEntity(op)),
 			pagination: {
 				page: filters.page,
 				limit: filters.limit,
 				total,
 				totalPages: Math.ceil(total / filters.limit),
 			},
+			filterMeta: [
+				buildEnumFilterMeta(
+					{ id: "activityCode", label: "Actividad" },
+					fromPrismaGroupBy(activityGroups, "activityCode", "activityCode"),
+				),
+				buildEnumFilterMeta(
+					{ id: "dataSource", label: "Fuente", labelMap: DATA_SOURCE_LABELS },
+					fromPrismaGroupBy(dataSourceGroups, "dataSource", "dataSource"),
+				),
+				buildEnumFilterMeta(
+					{
+						id: "watchlistStatus",
+						label: "Watchlist",
+						labelMap: WATCHLIST_LABELS,
+					},
+					fromPrismaGroupBy(
+						watchlistGroups,
+						"watchlistStatus",
+						"watchlistStatus",
+					),
+				),
+				buildRangeFilterMeta(
+					{ id: "amount", label: "Monto", type: "number-range" },
+					{
+						min:
+							amountAgg._min.amount != null
+								? String(amountAgg._min.amount)
+								: null,
+						max:
+							amountAgg._max.amount != null
+								? String(amountAgg._max.amount)
+								: null,
+					},
+				),
+				buildRangeFilterMeta(
+					{
+						id: "operationDate",
+						label: "Fecha de operación",
+						type: "date-range",
+					},
+					{
+						min:
+							amountAgg._min.operationDate != null
+								? amountAgg._min.operationDate.toISOString()
+								: null,
+						max:
+							amountAgg._max.operationDate != null
+								? amountAgg._max.operationDate.toISOString()
+								: null,
+					},
+				),
+			],
 		};
 	}
 
@@ -444,9 +837,10 @@ export class OperationRepository {
 			: 1;
 		const amountMxn = parseFloat(input.amount) * exchangeRate;
 
-		await this.prisma.$transaction(async (tx) => {
+		// Build batch transaction queries (D1 compatible)
+		const queries: Prisma.PrismaPromise<unknown>[] = [
 			// Update base operation
-			await tx.operation.update({
+			this.prisma.operation.update({
 				where: { id },
 				data: {
 					invoiceId: input.invoiceId,
@@ -470,11 +864,11 @@ export class OperationRepository {
 					referenceNumber: input.referenceNumber,
 					notes: input.notes,
 				},
-			});
-
-			// Delete and recreate payments
-			await tx.operationPayment.deleteMany({ where: { operationId: id } });
-			await tx.operationPayment.createMany({
+			}),
+			// Delete existing payments
+			this.prisma.operationPayment.deleteMany({ where: { operationId: id } }),
+			// Recreate payments
+			this.prisma.operationPayment.createMany({
 				data: input.payments.map((p) => ({
 					id: crypto.randomUUID(),
 					operationId: id,
@@ -483,36 +877,43 @@ export class OperationRepository {
 					monetaryInstrumentCode: p.monetaryInstrumentCode,
 					currencyCode: p.currencyCode,
 					amount: p.amount,
+					exchangeRate: p.exchangeRate ?? null,
 					bankName: p.bankName,
 					accountNumberMasked: p.accountNumberMasked,
 					checkNumber: p.checkNumber,
 					reference: p.reference,
 				})),
-			});
+			}),
+		];
 
-			// Update activity extension if provided
-			// Note: Activity code cannot change, so we update the existing extension type
-			await this.updateActivityExtension(
-				tx,
-				id,
-				existing.activityCode as ActivityCode,
-				input,
-			);
-		});
+		// Add activity extension update query
+		const extensionQuery = this.getActivityExtensionUpdateQuery(
+			id,
+			existing.activityCode as ActivityCode,
+			input,
+		);
+		if (extensionQuery) {
+			queries.push(extensionQuery);
+		}
+
+		await this.prisma.$transaction(queries);
 
 		return this.findById(organizationId, id);
 	}
 
-	private async updateActivityExtension(
-		tx: Prisma.TransactionClient,
+	/**
+	 * Get activity extension update query for batch transaction (D1 compatible)
+	 * Returns a Prisma upsert query that can be added to a batch transaction
+	 */
+	private getActivityExtensionUpdateQuery(
 		operationId: string,
 		activityCode: ActivityCode,
 		input: OperationUpdateInput,
-	): Promise<void> {
+	): Prisma.PrismaPromise<unknown> | null {
 		switch (activityCode) {
 			case "VEH":
 				if (input.vehicle) {
-					await tx.operationVehicle.upsert({
+					return this.prisma.operationVehicle.upsert({
 						where: { operationId },
 						create: { id: crypto.randomUUID(), operationId, ...input.vehicle },
 						update: input.vehicle,
@@ -521,7 +922,7 @@ export class OperationRepository {
 				break;
 			case "INM":
 				if (input.realEstate) {
-					await tx.operationRealEstate.upsert({
+					return this.prisma.operationRealEstate.upsert({
 						where: { operationId },
 						create: {
 							id: crypto.randomUUID(),
@@ -542,7 +943,7 @@ export class OperationRepository {
 				break;
 			case "MJR":
 				if (input.jewelry) {
-					await tx.operationJewelry.upsert({
+					return this.prisma.operationJewelry.upsert({
 						where: { operationId },
 						create: { id: crypto.randomUUID(), operationId, ...input.jewelry },
 						update: input.jewelry,
@@ -551,7 +952,7 @@ export class OperationRepository {
 				break;
 			case "AVI":
 				if (input.virtualAsset) {
-					await tx.operationVirtualAsset.upsert({
+					return this.prisma.operationVirtualAsset.upsert({
 						where: { operationId },
 						create: {
 							id: crypto.randomUUID(),
@@ -564,7 +965,7 @@ export class OperationRepository {
 				break;
 			case "JYS":
 				if (input.gambling) {
-					await tx.operationGambling.upsert({
+					return this.prisma.operationGambling.upsert({
 						where: { operationId },
 						create: {
 							id: crypto.randomUUID(),
@@ -585,7 +986,7 @@ export class OperationRepository {
 				break;
 			case "ARI":
 				if (input.rental) {
-					await tx.operationRental.upsert({
+					return this.prisma.operationRental.upsert({
 						where: { operationId },
 						create: {
 							id: crypto.randomUUID(),
@@ -612,7 +1013,7 @@ export class OperationRepository {
 				break;
 			case "BLI":
 				if (input.armoring) {
-					await tx.operationArmoring.upsert({
+					return this.prisma.operationArmoring.upsert({
 						where: { operationId },
 						create: { id: crypto.randomUUID(), operationId, ...input.armoring },
 						update: input.armoring,
@@ -621,7 +1022,7 @@ export class OperationRepository {
 				break;
 			case "DON":
 				if (input.donation) {
-					await tx.operationDonation.upsert({
+					return this.prisma.operationDonation.upsert({
 						where: { operationId },
 						create: { id: crypto.randomUUID(), operationId, ...input.donation },
 						update: input.donation,
@@ -630,7 +1031,7 @@ export class OperationRepository {
 				break;
 			case "MPC":
 				if (input.loan) {
-					await tx.operationLoan.upsert({
+					return this.prisma.operationLoan.upsert({
 						where: { operationId },
 						create: {
 							id: crypto.randomUUID(),
@@ -657,7 +1058,7 @@ export class OperationRepository {
 				break;
 			case "FEP":
 				if (input.official) {
-					await tx.operationOfficial.upsert({
+					return this.prisma.operationOfficial.upsert({
 						where: { operationId },
 						create: {
 							id: crypto.randomUUID(),
@@ -678,7 +1079,7 @@ export class OperationRepository {
 				break;
 			case "FES":
 				if (input.notary) {
-					await tx.operationNotary.upsert({
+					return this.prisma.operationNotary.upsert({
 						where: { operationId },
 						create: {
 							id: crypto.randomUUID(),
@@ -699,7 +1100,7 @@ export class OperationRepository {
 				break;
 			case "SPR":
 				if (input.professional) {
-					await tx.operationProfessional.upsert({
+					return this.prisma.operationProfessional.upsert({
 						where: { operationId },
 						create: {
 							id: crypto.randomUUID(),
@@ -712,7 +1113,7 @@ export class OperationRepository {
 				break;
 			case "CHV":
 				if (input.travelerCheck) {
-					await tx.operationTravelerCheck.upsert({
+					return this.prisma.operationTravelerCheck.upsert({
 						where: { operationId },
 						create: {
 							id: crypto.randomUUID(),
@@ -725,7 +1126,7 @@ export class OperationRepository {
 				break;
 			case "TSC":
 				if (input.card) {
-					await tx.operationCard.upsert({
+					return this.prisma.operationCard.upsert({
 						where: { operationId },
 						create: { id: crypto.randomUUID(), operationId, ...input.card },
 						update: input.card,
@@ -734,7 +1135,7 @@ export class OperationRepository {
 				break;
 			case "TPP":
 				if (input.prepaid) {
-					await tx.operationPrepaid.upsert({
+					return this.prisma.operationPrepaid.upsert({
 						where: { operationId },
 						create: { id: crypto.randomUUID(), operationId, ...input.prepaid },
 						update: input.prepaid,
@@ -743,7 +1144,7 @@ export class OperationRepository {
 				break;
 			case "TDR":
 				if (input.reward) {
-					await tx.operationReward.upsert({
+					return this.prisma.operationReward.upsert({
 						where: { operationId },
 						create: {
 							id: crypto.randomUUID(),
@@ -764,7 +1165,7 @@ export class OperationRepository {
 				break;
 			case "TCV":
 				if (input.valuable) {
-					await tx.operationValuable.upsert({
+					return this.prisma.operationValuable.upsert({
 						where: { operationId },
 						create: {
 							id: crypto.randomUUID(),
@@ -791,7 +1192,7 @@ export class OperationRepository {
 				break;
 			case "OBA":
 				if (input.art) {
-					await tx.operationArt.upsert({
+					return this.prisma.operationArt.upsert({
 						where: { operationId },
 						create: { id: crypto.randomUUID(), operationId, ...input.art },
 						update: input.art,
@@ -800,7 +1201,7 @@ export class OperationRepository {
 				break;
 			case "DIN":
 				if (input.development) {
-					await tx.operationDevelopment.upsert({
+					return this.prisma.operationDevelopment.upsert({
 						where: { operationId },
 						create: {
 							id: crypto.randomUUID(),
@@ -812,6 +1213,7 @@ export class OperationRepository {
 				}
 				break;
 		}
+		return null;
 	}
 
 	async softDelete(organizationId: string, id: string): Promise<boolean> {
@@ -862,7 +1264,47 @@ export class OperationRepository {
 			orderBy: { operationDate: "desc" },
 		});
 
-		return operations.map(mapOperationToEntity);
+		return operations.map((op) => mapOperationToEntity(op));
+	}
+
+	async getStats(organizationId: string): Promise<{
+		totalOperations: number;
+		operationsToday: number;
+		totalAmountMxn: string;
+	}> {
+		const todayStart = new Date();
+		todayStart.setHours(0, 0, 0, 0);
+
+		const [totalOperations, operationsToday, aggregate] = await Promise.all([
+			this.prisma.operation.count({
+				where: { organizationId, deletedAt: null },
+			}),
+			this.prisma.operation.count({
+				where: {
+					organizationId,
+					deletedAt: null,
+					operationDate: { gte: todayStart },
+				},
+			}),
+			this.prisma.operation.aggregate({
+				where: { organizationId, deletedAt: null },
+				_sum: { amountMxn: true },
+			}),
+		]);
+
+		const rawSum = aggregate._sum.amountMxn;
+		const totalMxn =
+			rawSum === null
+				? 0
+				: typeof rawSum === "number"
+					? rawSum
+					: parseFloat(rawSum.toString());
+
+		return {
+			totalOperations,
+			operationsToday,
+			totalAmountMxn: totalMxn.toFixed(2),
+		};
 	}
 
 	/**

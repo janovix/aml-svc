@@ -34,6 +34,7 @@ export interface AlertRuleConfigEntity {
 
 export interface AlertEntity {
 	id: string;
+	organizationId: string;
 	alertRuleId: string;
 	clientId: string;
 	status: AlertStatus;

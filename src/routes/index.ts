@@ -21,7 +21,15 @@ import { organizationSettingsRouter } from "./organization-settings";
 import { reportsRouter } from "./reports";
 // Transaction domain deprecated - use operations instead
 import { umaValuesRouter } from "./uma-values";
-import { ubosRouter, ubosInternalRouter } from "./ubos";
+import { shareholdersRouter } from "./shareholders";
+import {
+	beneficialControllersRouter,
+	beneficialControllersInternalRouter,
+} from "./beneficial-controllers";
+import { exchangeRatesRouter } from "./exchange-rates";
+import { kycSessionsRouter } from "./kyc-sessions";
+import { publicKycRouter } from "./public-kyc";
+import { maintenanceRouter } from "./internal-maintenance";
 
 export function createRouter() {
 	const router = new Hono<{
@@ -35,12 +43,23 @@ export function createRouter() {
 	// Import SSE events handle their own auth (EventSource can't send headers)
 	router.route("/imports", importEventsRouter);
 	// Internal routes for worker-to-service communication (no auth, service binding only)
+	router.route("/internal/maintenance", maintenanceRouter);
 	router.route("/internal/imports", importInternalRouter);
 	router.route("/internal/clients", clientsInternalRouter);
 	// Transaction internal routes deprecated - use operations
 	router.route("/internal/operations", operationsInternalRouter);
 	router.route("/internal/invoices", invoicesInternalRouter);
-	router.route("/internal/ubos", ubosInternalRouter);
+	router.route(
+		"/internal/beneficial-controllers",
+		beneficialControllersInternalRouter,
+	);
+
+	// KYC Self-Service public endpoints (no auth, token-based)
+	router.route("/public/kyc", publicKycRouter);
+
+	// KYC sessions routes (authenticated, org-scoped)
+	router.use("/kyc-sessions/*", authMiddleware({ requireOrganization: true }));
+	router.use("/kyc-sessions", authMiddleware({ requireOrganization: true }));
 
 	// Apply auth middleware with organization requirement for tenant-scoped routes
 	// These routes require an active organization to be selected
@@ -51,13 +70,19 @@ export function createRouter() {
 	router.use("/alerts/*", authMiddleware({ requireOrganization: true }));
 	router.use("/notices/*", authMiddleware({ requireOrganization: true }));
 	router.use("/reports/*", authMiddleware({ requireOrganization: true }));
-	router.use("/imports/*", authMiddleware({ requireOrganization: true }));
+	// Note: /imports/templates and /imports/:id/events are public, handled separately above
+	router.use("/imports", authMiddleware({ requireOrganization: true }));
+	router.use("/imports/:id", authMiddleware({ requireOrganization: true }));
+	router.use("/imports/:id/*", authMiddleware({ requireOrganization: true }));
 
 	// Organization settings requires auth and organization context
 	router.use(
 		"/organization-settings/*",
 		authMiddleware({ requireOrganization: true }),
 	);
+
+	// Exchange rates are global utility - auth required but no org
+	router.use("/exchange-rates/*", authMiddleware());
 
 	// UMA values are global (regulatory standard) - auth required but no org
 	router.use("/uma-values/*", authMiddleware());
@@ -69,16 +94,19 @@ export function createRouter() {
 	// Mount resource routers
 	router.route("/catalogs", catalogsRouter);
 	router.route("/clients", clientsRouter);
-	router.route("/clients", ubosRouter); // UBO routes nested under clients (/:clientId/ubos/*)
+	router.route("/clients", shareholdersRouter); // Shareholder routes nested under clients (/:clientId/shareholders/*)
+	router.route("/clients", beneficialControllersRouter); // BC routes nested under clients (/:clientId/beneficial-controllers/*)
 	router.route("/operations", operationsRouter);
 	router.route("/invoices", invoicesRouter);
 	router.route("/alert-rules", alertRulesRouter);
 	router.route("/alerts", alertsRouter);
 	router.route("/notices", noticesRouter);
 	router.route("/reports", reportsRouter);
+	router.route("/exchange-rates", exchangeRatesRouter);
 	router.route("/uma-values", umaValuesRouter);
 	router.route("/organization-settings", organizationSettingsRouter);
 	router.route("/imports", importsRouter);
+	router.route("/kyc-sessions", kycSessionsRouter);
 
 	return router;
 }

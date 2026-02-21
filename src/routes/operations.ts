@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
+import * as Sentry from "@sentry/cloudflare";
 
 import {
 	OperationService,
@@ -18,7 +19,17 @@ import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { createAlertQueueService } from "../lib/alert-queue";
-import { createSubscriptionClient } from "../lib/subscription-client";
+import { createUsageRightsClient } from "../lib/usage-rights-client";
+import { KycSessionService } from "../domain/kyc-session";
+import { OrganizationSettingsRepository } from "../domain/organization-settings";
+import { UmaValueRepository } from "../domain/uma/repository";
+import {
+	getIdentificationThresholdUma,
+	getNoticeThresholdUma,
+} from "../domain/operation/activities/registry";
+import type { ActivityCode } from "../domain/operation/types";
+import { sendKYCInviteEmail } from "../lib/kyc-email";
+import { parseQueryParams } from "../lib/query-params";
 
 export const operationsRouter = new Hono<{
 	Bindings: Bindings;
@@ -98,7 +109,11 @@ function handleServiceError(error: unknown): never {
 operationsRouter.get("/", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
-	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const queryObject = parseQueryParams(url.searchParams, [
+		"activityCode",
+		"watchlistStatus",
+		"dataSource",
+	]);
 	const filters = parseWithZod(OperationFilterSchema, queryObject);
 
 	const service = getService(c);
@@ -107,6 +122,20 @@ operationsRouter.get("/", async (c) => {
 		.catch(handleServiceError);
 
 	return c.json(result);
+});
+
+/**
+ * GET /operations/stats
+ * Get summary statistics for operations in the organization.
+ * IMPORTANT: must be defined before /:id to avoid "stats" being matched as an id.
+ */
+operationsRouter.get("/stats", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const service = getService(c);
+	const stats = await service
+		.getStats(organizationId)
+		.catch(handleServiceError);
+	return c.json(stats);
 });
 
 /**
@@ -409,12 +438,134 @@ operationsRouter.post("/", async (c) => {
 	await alertQueue.queueOperationCreated(created.clientId, created.id);
 
 	// Report operation usage to auth-svc for metered billing
-	const subscriptionClient = createSubscriptionClient(c.env);
-	subscriptionClient
-		.reportUsage(organizationId, "operations", 1)
-		.catch((err) => {
-			console.error("Failed to report operation usage:", err);
+	const usageRightsClient = createUsageRightsClient(c.env);
+	usageRightsClient.meter(organizationId, "operations", 1).catch((err) => {
+		Sentry.captureException(err, {
+			tags: { context: "operation-usage-reporting-failed" },
+			extra: { organizationId },
 		});
+	});
+
+	// Threshold-crossing KYC trigger (non-blocking, Art. 17 LFPIORPI)
+	// If this operation pushes a client above the identification or notice threshold,
+	// auto-create a new KYC session if self-service mode is "automatic".
+	c.executionCtx.waitUntil(
+		(async () => {
+			try {
+				const prisma = getPrismaClient(c.env.DB);
+				const orgSettingsRepo = new OrganizationSettingsRepository(prisma);
+				const umaRepo = new UmaValueRepository(prisma);
+
+				const [orgSettings, umaValue] = await Promise.all([
+					orgSettingsRepo.findByOrganizationId(organizationId),
+					umaRepo.getActive(),
+				]);
+
+				if (!orgSettings || !umaValue) return;
+
+				const activityCode = orgSettings.activityKey as ActivityCode;
+				const idThresholdUma = getIdentificationThresholdUma(activityCode);
+				const noticeThresholdUma = getNoticeThresholdUma(activityCode);
+
+				// Skip threshold check for ALWAYS activities
+				if (idThresholdUma === "ALWAYS") return;
+
+				const dailyValue = parseFloat(umaValue.dailyValue);
+				const idThresholdMxn = (idThresholdUma as number) * dailyValue;
+				const noticeThresholdMxn =
+					noticeThresholdUma === "ALWAYS"
+						? 0
+						: (noticeThresholdUma as number) * dailyValue;
+
+				const opAmount =
+					typeof created.amount === "number"
+						? created.amount
+						: parseFloat(String(created.amount ?? 0));
+
+				// Check single operation threshold
+				const singleOpTriggered = opAmount >= idThresholdMxn;
+
+				// Check 6-month cumulative threshold
+				let cumulativeTriggered = false;
+				if (noticeThresholdMxn > 0) {
+					const sixMonthsAgo = new Date();
+					sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+					const cumulativeResult = await prisma.operation.aggregate({
+						where: {
+							clientId: created.clientId,
+							deletedAt: null,
+							operationDate: { gte: sixMonthsAgo },
+						},
+						_sum: { amount: true },
+					});
+					const cumulativeOp = cumulativeResult._sum.amount;
+					const cumulativeMxn =
+						cumulativeOp === null
+							? 0
+							: typeof cumulativeOp === "number"
+								? cumulativeOp
+								: parseFloat(cumulativeOp.toString());
+					cumulativeTriggered = cumulativeMxn >= noticeThresholdMxn;
+				}
+
+				if (!singleOpTriggered && !cumulativeTriggered) return;
+
+				// Check if client already has an ABOVE_THRESHOLD or ALWAYS KYC session
+				const existingSession = await prisma.kycSession.findFirst({
+					where: {
+						clientId: created.clientId,
+						organizationId,
+						identificationTier: { in: ["ABOVE_THRESHOLD", "ALWAYS"] },
+						status: { notIn: ["REVOKED", "EXPIRED", "REJECTED"] },
+					},
+					orderBy: { createdAt: "desc" },
+				});
+
+				if (existingSession) return; // Already has appropriate KYC session
+
+				// Auto-create ABOVE_THRESHOLD session if mode is automatic
+				if (orgSettings.selfServiceMode !== "automatic") return;
+
+				const kycService = new KycSessionService(prisma);
+				const session = await kycService.create(
+					organizationId,
+					{
+						clientId: created.clientId,
+						createdBy: "system",
+					},
+					prisma,
+				);
+
+				// Send email if client has email
+				const client = await prisma.client.findUnique({
+					where: { id: created.clientId },
+					select: {
+						email: true,
+						firstName: true,
+						lastName: true,
+						businessName: true,
+					},
+				});
+
+				if (client?.email) {
+					const clientName = client.firstName
+						? `${client.firstName} ${client.lastName ?? ""}`.trim()
+						: (client.businessName ?? "Cliente");
+
+					await sendKYCInviteEmail(c.env, client.email, session, {
+						clientName,
+					});
+					await kycService.recordEmailSent(session.id);
+				}
+
+				console.log(
+					`[Operations] Threshold crossed for client ${created.clientId}, auto-created KYC session ${session.id}`,
+				);
+			} catch (err) {
+				console.error("[Operations] Threshold KYC trigger failed:", err);
+			}
+		})(),
+	);
 
 	return c.json(created, 201);
 });
@@ -436,7 +587,7 @@ operationsRouter.post("/bulk-import", async (c) => {
 
 	const service = getService(c);
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
-	const subscriptionClient = createSubscriptionClient(c.env);
+	const usageRightsClient = createUsageRightsClient(c.env);
 
 	const results: Array<{
 		index: number;
@@ -482,7 +633,10 @@ operationsRouter.post("/bulk-import", async (c) => {
 			await alertQueue
 				.queueOperationCreated(created.clientId, created.id)
 				.catch((err) =>
-					console.error(`[BulkImport] Failed to queue alert for op ${i}:`, err),
+					Sentry.captureException(err, {
+						tags: { context: "bulk-import-queue-alert-failed" },
+						extra: { operationIndex: i, operationId: created.id },
+					}),
 				);
 
 			if (warnings.length > 0) {
@@ -523,10 +677,13 @@ operationsRouter.post("/bulk-import", async (c) => {
 
 	// Report usage for all successfully created operations
 	if (successCount + warningCount > 0) {
-		subscriptionClient
-			.reportUsage(organizationId, "operations", successCount + warningCount)
+		usageRightsClient
+			.meter(organizationId, "operations", successCount + warningCount)
 			.catch((err) => {
-				console.error("[BulkImport] Failed to report usage:", err);
+				Sentry.captureException(err, {
+					tags: { context: "bulk-import-usage-reporting-failed" },
+					extra: { organizationId, count: successCount + warningCount },
+				});
 			});
 	}
 
@@ -696,7 +853,9 @@ operationsInternalRouter.post("/", async (c) => {
 
 		return c.json(created, 201);
 	} catch (error) {
-		console.error("[InternalOperations] POST error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-operations-post-error" },
+		});
 		const { message, details } = formatInternalError(error);
 
 		if (error instanceof Error && error.message.includes("CLIENT_NOT_FOUND")) {

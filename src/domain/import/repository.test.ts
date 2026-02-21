@@ -129,7 +129,7 @@ describe("ImportRepository", () => {
 			const filters: ImportFilters = {
 				page: 1,
 				limit: 10,
-				entityType: "CLIENT",
+				entityType: ["CLIENT"],
 			};
 
 			const result = await repository.list(organizationId, filters);
@@ -150,7 +150,7 @@ describe("ImportRepository", () => {
 			const filters: ImportFilters = {
 				page: 1,
 				limit: 10,
-				status: "COMPLETED",
+				status: ["COMPLETED"],
 			};
 
 			const result = await repository.list(organizationId, filters);

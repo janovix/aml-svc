@@ -4,6 +4,7 @@
  */
 
 import { z } from "zod";
+import { multiEnum } from "../../lib/query-params";
 
 // Import ID format: IMP + 9 base62 characters (12 characters total)
 const IMPORT_ID_REGEX = /^IMP[A-Za-z0-9]{9}$/;
@@ -55,19 +56,34 @@ export const ImportRowIdParamSchema = z.object({
 		),
 });
 
-export const ImportCreateSchema = z.object({
-	entityType: ImportEntityTypeSchema,
-	fileName: z.string().min(1).max(255),
-	fileSize: z
-		.number()
-		.int()
-		.positive()
-		.max(50 * 1024 * 1024), // Max 50MB
-});
+export const ImportCreateSchema = z
+	.object({
+		entityType: ImportEntityTypeSchema,
+		activityCode: z.string().optional(),
+		fileName: z.string().min(1).max(255),
+		fileSize: z
+			.number()
+			.int()
+			.positive()
+			.max(50 * 1024 * 1024), // Max 50MB
+	})
+	.refine(
+		(data) => {
+			// If entityType is OPERATION, activityCode is required
+			if (data.entityType === "OPERATION") {
+				return !!data.activityCode;
+			}
+			return true;
+		},
+		{
+			message: "activityCode is required when entityType is OPERATION",
+			path: ["activityCode"],
+		},
+	);
 
 export const ImportFilterSchema = z.object({
-	status: ImportStatusSchema.optional(),
-	entityType: ImportEntityTypeSchema.optional(),
+	status: multiEnum(ImportStatusSchema),
+	entityType: multiEnum(ImportEntityTypeSchema),
 	page: z.coerce.number().int().min(1).default(1),
 	limit: z.coerce.number().int().min(1).max(100).default(10),
 });

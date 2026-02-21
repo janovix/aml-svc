@@ -1,6 +1,7 @@
 {
+	"account_id": "37d5ea9be13559a1ea8f5a46068eac99",
 	"compatibility_date": "2025-10-08",
-	"compatibility_flags": ["nodejs_als"],
+	"compatibility_flags": ["nodejs_compat", "nodejs_als"],
 	"main": "src/index.ts",
 	"name": "aml-svc",
 	"upload_source_maps": true,
@@ -40,6 +41,14 @@
 			"binding": "DOC_SERVICE",
 			"service": "doc-svc",
 		},
+		{
+			"binding": "WATCHLIST_SERVICE",
+			"service": "watchlist-svc",
+		},
+		{
+			"binding": "NOTIFICATIONS_SERVICE",
+			"service": "notifications-svc",
+		},
 	],
 	"queues": {
 		"producers": [
@@ -51,15 +60,10 @@
 				"binding": "IMPORT_PROCESSING_QUEUE",
 				"queue": "aml-imports-dev",
 			},
-			{
-				"binding": "PEP_CHECK_QUEUE",
-				"queue": "pep-check-dev",
-			},
 		],
 	},
 	"vars": {
 		"ENVIRONMENT": "dev",
-		"AUTH_SERVICE_URL": "https://auth-svc.janovix.workers.dev",
 		"AUTH_JWKS_CACHE_TTL": "3600",
 		"TRUSTED_ORIGINS": "*.janovix.workers.dev,http://localhost:*",
 	},

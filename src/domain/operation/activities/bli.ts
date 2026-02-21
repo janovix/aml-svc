@@ -1,6 +1,13 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { ArmoringExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	armorLevelCode: { catalog: "armor-levels", strategy: "BY_CODE" },
+	itemStatusCode: { catalog: "pld-item-status", strategy: "BY_CODE" },
+	armoredPartCode: { catalog: "pld-armored-parts", strategy: "BY_CODE" },
+};
 
 export const armoringHandler: ActivityHandler = {
 	code: "BLI",

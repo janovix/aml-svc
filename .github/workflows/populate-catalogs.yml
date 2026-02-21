@@ -1,4 +1,4 @@
-name: Populate Catalogs
+name: Populate Reference Data
 
 on:
   workflow_dispatch:
@@ -12,23 +12,19 @@ on:
           - prod
           - preview
         default: dev
-      skip_zip_codes:
-        description: "Skip zip codes catalog (zip codes are large and slow)"
-        required: false
-        type: boolean
-        default: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: populate-catalogs-${{ github.event.inputs.environment }}
+  group: populate-reference-data-${{ github.event.inputs.environment }}
   cancel-in-progress: false
 
 jobs:
   populate:
+    name: Populate All Reference Data
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     env:
       HUSKY: 0
     steps:
@@ -60,56 +56,34 @@ jobs:
               ;;
           esac
 
-      - name: Populate all catalogs
+      - name: Generate SQL dump files
+        run: node scripts/populate/generate-sql.mjs
+
+      - name: Import catalogs
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          REMOTE: "true"
-          WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
-          SKIP_ZIP_CODES: ${{ github.event.inputs.skip_zip_codes }}
-        run: node scripts/populate/all-catalogs.mjs
+        run: pnpm wrangler d1 execute DB --config ${{ steps.config.outputs.config }} --remote --file scripts/populate/sql/catalogs.sql
 
-      - name: Summary
+      - name: Import reference data
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm wrangler d1 execute DB --config ${{ steps.config.outputs.config }} --remote --file scripts/populate/sql/reference-data.sql
+
+      - name: Generate Summary
+        if: always()
         run: |
-          echo "## Catalogs Population Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## Reference Data Population Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Environment | \`${{ github.event.inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Config | \`${{ steps.config.outputs.config }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Skip Zip Codes | \`${{ github.event.inputs.skip_zip_codes }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Catalogs Populated" >> $GITHUB_STEP_SUMMARY
+          echo "### Data Populated" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### Core Catalogs (14)" >> $GITHUB_STEP_SUMMARY
-          echo "- Countries, States, Currencies" >> $GITHUB_STEP_SUMMARY
-          echo "- Armor Levels, Business Activities" >> $GITHUB_STEP_SUMMARY
-          echo "- Economic Activities, Operation Types" >> $GITHUB_STEP_SUMMARY
-          echo "- Payment Forms, Payment Methods" >> $GITHUB_STEP_SUMMARY
-          echo "- Vulnerable Activities" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### Vehicle Catalogs (3)" >> $GITHUB_STEP_SUMMARY
-          echo "- Terrestrial, Maritime, Air Vehicle Brands" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### CFDI Catalogs (12)" >> $GITHUB_STEP_SUMMARY
-          echo "- Payment Forms, Payment Methods" >> $GITHUB_STEP_SUMMARY
-          echo "- Tax Regimes, Usages, Voucher Types" >> $GITHUB_STEP_SUMMARY
-          echo "- Currencies, Countries, Taxes" >> $GITHUB_STEP_SUMMARY
-          echo "- Tax Factors, Tax Objects" >> $GITHUB_STEP_SUMMARY
-          echo "- Relation Types, Export Types" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### CFDI-PLD Integration (1)" >> $GITHUB_STEP_SUMMARY
-          echo "- CFDI-PLD Mappings" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### PLD Consolidated Catalogs (15)" >> $GITHUB_STEP_SUMMARY
-          echo "- Alert Types, Monetary Instruments, Payment Forms" >> $GITHUB_STEP_SUMMARY
-          echo "- Property Types, Incorporation Reasons" >> $GITHUB_STEP_SUMMARY
-          echo "- And more..." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### Activity-Specific Catalogs (47)" >> $GITHUB_STEP_SUMMARY
-          echo "- Individual catalogs for each of 19 vulnerable activities" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event.inputs.skip_zip_codes }}" != "true" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "#### Large Catalogs" >> $GITHUB_STEP_SUMMARY
-            echo "- Zip Codes (~140K+ items)" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "- **All Catalogs** (including zip-codes + cfdi-product-services)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Alert Rules & Configs**" >> $GITHUB_STEP_SUMMARY
+          echo "- **CFDI-PLD Mappings**" >> $GITHUB_STEP_SUMMARY
+          echo "- **UMA Values**" >> $GITHUB_STEP_SUMMARY

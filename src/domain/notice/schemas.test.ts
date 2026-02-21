@@ -244,7 +244,7 @@ describe("Notice Schemas", () => {
 
 		it("should validate status filter", () => {
 			const result = NoticeFilterSchema.parse({ status: "SUBMITTED" });
-			expect(result.status).toBe("SUBMITTED");
+			expect(result.status).toEqual(["SUBMITTED"]);
 		});
 
 		it("should validate year filter", () => {
@@ -286,21 +286,27 @@ describe("Notice Schemas", () => {
 
 	describe("NoticeSubmitSchema", () => {
 		it("should accept optional satFolioNumber", () => {
-			const result = NoticeSubmitSchema.parse({});
+			const result = NoticeSubmitSchema.parse({
+				docSvcDocumentId: "DOC-123",
+			});
 			expect(result.satFolioNumber).toBeUndefined();
+			expect(result.docSvcDocumentId).toBe("DOC-123");
 		});
 
 		it("should accept satFolioNumber when provided", () => {
 			const result = NoticeSubmitSchema.parse({
 				satFolioNumber: "SAT-12345-ABC",
+				docSvcDocumentId: "DOC-456",
 			});
 			expect(result.satFolioNumber).toBe("SAT-12345-ABC");
+			expect(result.docSvcDocumentId).toBe("DOC-456");
 		});
 
 		it("should reject satFolioNumber over 100 characters", () => {
 			expect(() =>
 				NoticeSubmitSchema.parse({
 					satFolioNumber: "A".repeat(101),
+					docSvcDocumentId: "DOC-789",
 				}),
 			).toThrow();
 		});
@@ -308,20 +314,27 @@ describe("Notice Schemas", () => {
 
 	describe("NoticeAcknowledgeSchema", () => {
 		it("should require satFolioNumber", () => {
-			expect(() => NoticeAcknowledgeSchema.parse({})).toThrow();
+			expect(() =>
+				NoticeAcknowledgeSchema.parse({
+					docSvcDocumentId: "DOC-123",
+				}),
+			).toThrow();
 		});
 
 		it("should accept valid satFolioNumber", () => {
 			const result = NoticeAcknowledgeSchema.parse({
 				satFolioNumber: "SAT-ACK-12345",
+				docSvcDocumentId: "DOC-ACK-123",
 			});
 			expect(result.satFolioNumber).toBe("SAT-ACK-12345");
+			expect(result.docSvcDocumentId).toBe("DOC-ACK-123");
 		});
 
 		it("should reject empty satFolioNumber", () => {
 			expect(() =>
 				NoticeAcknowledgeSchema.parse({
 					satFolioNumber: "",
+					docSvcDocumentId: "DOC-123",
 				}),
 			).toThrow();
 		});

@@ -35,8 +35,24 @@ describe("ClientService", () => {
 		kycStatus: "INCOMPLETE",
 		completenessStatus: "INCOMPLETE",
 		missingFields: null,
+		kycCompletionPct: 0,
+		documentsComplete: 0,
+		documentsCount: 0,
+		documentsRequired: 3,
+		shareholdersCount: 0,
+		beneficialControllersCount: 0,
+		identificationRequired: true,
+		identificationTier: "ALWAYS",
+		identificationThresholdMxn: null,
+		noticeThresholdMxn: null,
 		isPEP: false,
-		pepStatus: "PENDING",
+		watchlistQueryId: null,
+		ofacSanctioned: false,
+		unscSanctioned: false,
+		sat69bListed: false,
+		adverseMediaFlagged: false,
+		screeningResult: "pending",
+		screenedAt: null,
 		createdAt: "2024-01-01T00:00:00Z",
 		updatedAt: "2024-01-01T00:00:00Z",
 	};
@@ -71,6 +87,7 @@ describe("ClientService", () => {
 			vi.mocked(mockRepository.list).mockResolvedValue({
 				data: [mockClient],
 				pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+				filterMeta: [],
 			});
 
 			const result = await service.list(organizationId, filters);

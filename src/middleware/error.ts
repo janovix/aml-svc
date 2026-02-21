@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import type { StatusCode } from "hono/utils/http-status";
+import * as Sentry from "@sentry/cloudflare";
 
 export class APIError extends Error {
 	constructor(
@@ -13,7 +14,9 @@ export class APIError extends Error {
 }
 
 export const errorHandler = (err: Error, c: Context) => {
-	console.error("Error:", err);
+	Sentry.captureException(err, {
+		tags: { context: "error-handler" },
+	});
 
 	if (err instanceof APIError) {
 		return c.json(

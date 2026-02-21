@@ -11,11 +11,6 @@ declare namespace Cloudflare {
 		ENVIRONMENT?: string;
 		API_VERSION?: string;
 		/**
-		 * URL of the auth-svc for JWKS verification
-		 * Example: https://auth-svc.janovix.workers.dev
-		 */
-		AUTH_SERVICE_URL?: string;
-		/**
 		 * Cache TTL for JWKS in seconds (default: 3600)
 		 */
 		AUTH_JWKS_CACHE_TTL?: string;
@@ -34,6 +29,11 @@ declare namespace Cloudflare {
 		 * If not set, Sentry will be disabled.
 		 */
 		SENTRY_DSN?: string;
+		/**
+		 * CurrencyLayer API key for real-time exchange rates.
+		 * Get your key at: https://currencylayer.com/
+		 */
+		CURRENCYLAYER_API_KEY?: string;
 		/**
 		 * Service binding to doc-svc for document processing
 		 */

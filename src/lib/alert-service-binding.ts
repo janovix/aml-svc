@@ -14,6 +14,7 @@
  * Or using the helper methods defined below.
  */
 
+import * as Sentry from "@sentry/cloudflare";
 import type { Bindings } from "../types";
 import { getPrismaClient } from "./prisma";
 import {
@@ -31,7 +32,11 @@ import { UmaValueService } from "../domain/uma";
 import { ClientRepository } from "../domain/client";
 import { ClientService } from "../domain/client";
 import { OperationService } from "../domain/operation";
-import { handleInternalOrganizationSettingsRequest } from "../routes/internal-organization-settings";
+import {
+	handleInternalOrganizationSettingsRequest,
+	handleInternalSelfServiceSettingsRequest,
+} from "../routes/internal-organization-settings";
+import { handleInternalScreeningRequest } from "../routes/internal-screening";
 
 /**
  * Service binding helper functions for alert operations
@@ -193,20 +198,11 @@ export async function handleServiceBindingRequest(
 		path = path.slice("/internal".length);
 	}
 
-	// Debug logging for service binding requests
-	console.log(
-		`[ServiceBinding] ${request.method} ${path} (original pathname: ${url.pathname}, full URL: ${request.url})`,
-	);
-
 	try {
 		// Route: /alert-rules/active (global - no organizationId required)
 		if (path === "/alert-rules/active" && request.method === "GET") {
-			console.log("[ServiceBinding] Fetching active alert rules for seekers");
 			const service = new AlertServiceBinding(env);
 			const rules = await service.getActiveAlertRules();
-			console.log(
-				`[ServiceBinding] Found ${rules.length} active alert rules for seekers`,
-			);
 			return new Response(JSON.stringify(rules), {
 				headers: { "Content-Type": "application/json" },
 			});
@@ -404,9 +400,6 @@ export async function handleServiceBindingRequest(
 		const orgSettingsMatch = path.match(/^\/organization-settings\/([^/]+)$/);
 		if (orgSettingsMatch) {
 			const [, organizationId] = orgSettingsMatch;
-			console.log(
-				`[ServiceBinding] Organization settings request for ${organizationId}`,
-			);
 			return handleInternalOrganizationSettingsRequest(
 				request,
 				env,
@@ -414,10 +407,33 @@ export async function handleServiceBindingRequest(
 			);
 		}
 
-		// No route matched - return 404 with helpful error message
-		console.warn(
-			`[ServiceBinding] No route matched for ${request.method} ${path}`,
+		// Route: /organization-settings/:organizationId/self-service (PATCH)
+		// Called via: env.AML_SERVICE.fetch(new Request(`https://internal/organization-settings/${organizationId}/self-service`, { method: 'PATCH', body: ... }))
+		const selfServiceMatch = path.match(
+			/^\/organization-settings\/([^/]+)\/self-service$/,
 		);
+		if (selfServiceMatch) {
+			const [, organizationId] = selfServiceMatch;
+			return handleInternalSelfServiceSettingsRequest(
+				request,
+				env,
+				organizationId,
+			);
+		}
+
+		// Route: Screening endpoints (stale-screening, watchlist-query updates, and callback)
+		// Called via: env.AML_SERVICE.fetch(new Request(`https://internal/clients/stale-screening?segment=0&limit=200`))
+		// Called via: env.AML_SERVICE.fetch(new Request(`https://internal/clients/${id}/watchlist-query`, { method: 'PATCH', body: ... }))
+		// Called via: env.AML_SERVICE.fetch(new Request(`https://internal/screening-callback`, { method: 'PATCH', body: ... }))
+		if (
+			path.startsWith("/clients/stale-screening") ||
+			path.match(/^\/clients\/[^/]+\/watchlist-query$/) ||
+			path === "/screening-callback"
+		) {
+			return handleInternalScreeningRequest(request, env, path);
+		}
+
+		// No route matched - return 404 with helpful error message
 		return new Response(
 			JSON.stringify({
 				error: "Not Found",
@@ -431,7 +447,9 @@ export async function handleServiceBindingRequest(
 			},
 		);
 	} catch (error) {
-		console.error("[ServiceBinding] Error processing request:", error);
+		Sentry.captureException(error, {
+			tags: { context: "service-binding-error" },
+		});
 		return new Response(
 			JSON.stringify({
 				error: "Internal Server Error",

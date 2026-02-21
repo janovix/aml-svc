@@ -49,7 +49,7 @@ async function createTestJWT(
 describe("Multi-Tenant Security", () => {
 	let keyPair: KeyPairResult;
 	let jwks: JSONWebKeySet;
-	let fetchMock: ReturnType<typeof vi.fn>;
+	let mockAuthService: Fetcher;
 
 	beforeEach(async () => {
 		clearJWKSCache();
@@ -58,22 +58,23 @@ describe("Multi-Tenant Security", () => {
 		const publicJWK = await publicKeyToJWK(keyPair.publicKey);
 		jwks = { keys: [publicJWK] };
 
-		// Mock fetch for JWKS endpoint
-		fetchMock = vi.fn().mockImplementation(async (url: string) => {
-			if (url.includes("/api/auth/jwks")) {
-				return new Response(JSON.stringify(jwks), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				});
-			}
-			return new Response("Not Found", { status: 404 });
-		});
-
-		vi.stubGlobal("fetch", fetchMock);
+		// Mock AUTH_SERVICE binding for JWKS endpoint
+		mockAuthService = {
+			fetch: vi.fn().mockImplementation(async (url: string | Request) => {
+				const urlStr = typeof url === "string" ? url : url.url;
+				if (urlStr.includes("/api/auth/jwks")) {
+					return new Response(JSON.stringify(jwks), {
+						status: 200,
+						headers: { "Content-Type": "application/json" },
+					});
+				}
+				return new Response("Not Found", { status: 404 });
+			}),
+			connect: vi.fn(),
+		} as unknown as Fetcher;
 	});
 
 	afterEach(() => {
-		vi.unstubAllGlobals();
 		clearJWKSCache();
 	});
 
@@ -132,7 +133,7 @@ describe("Multi-Tenant Security", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			// 409 Conflict is used to distinguish from 403 Forbidden (access denied)
@@ -158,7 +159,7 @@ describe("Multi-Tenant Security", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			expect(res.status).toBe(200);
@@ -181,7 +182,7 @@ describe("Multi-Tenant Security", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			expect(res.status).toBe(200);
@@ -207,7 +208,7 @@ describe("Multi-Tenant Security", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			expect(res.status).toBe(200);
@@ -230,7 +231,7 @@ describe("Multi-Tenant Security", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			// 409 Conflict is used to distinguish from 403 Forbidden (access denied)
@@ -255,7 +256,7 @@ describe("Multi-Tenant Security", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			// 409 Conflict is used to distinguish from 403 Forbidden (access denied)
@@ -291,7 +292,7 @@ describe("Multi-Tenant Security", () => {
 				{
 					headers: { Authorization: `Bearer ${tokenOrgA}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			const responseB = await app.request(
@@ -299,7 +300,7 @@ describe("Multi-Tenant Security", () => {
 				{
 					headers: { Authorization: `Bearer ${tokenOrgB}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			expect(responseA.status).toBe(200);
@@ -329,7 +330,7 @@ describe("Multi-Tenant Security", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE_URL: "https://auth-svc.test" } as AuthBindings,
+				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
 			expect(res.status).toBe(200);

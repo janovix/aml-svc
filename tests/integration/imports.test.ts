@@ -1,29 +1,12 @@
 import { SELF } from "cloudflare:test";
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { generateKeyPair, exportJWK, SignJWT, type JSONWebKeySet } from "jose";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { SignJWT } from "jose";
 import { clearJWKSCache } from "../../src/middleware/auth";
-
-// Generate a test key pair for signing/verifying JWTs
-async function generateTestKeyPair() {
-	return await generateKeyPair("ES256", { extractable: true });
-}
-
-// Convert public key to JWK for JWKS response
-async function publicKeyToJWK(
-	publicKey: Awaited<ReturnType<typeof generateKeyPair>>["publicKey"],
-) {
-	const jwk = await exportJWK(publicKey);
-	return {
-		...jwk,
-		kid: "test-key-id",
-		use: "sig",
-		alg: "ES256",
-	};
-}
+import { getTestKeyPair } from "../helpers/test-auth";
 
 // Create a signed JWT for testing
 async function createTestJWT(
-	privateKey: Awaited<ReturnType<typeof generateKeyPair>>["privateKey"],
+	privateKey: Awaited<ReturnType<typeof getTestKeyPair>>["privateKey"],
 	payload: Record<string, unknown>,
 ) {
 	const builder = new SignJWT(payload)
@@ -36,17 +19,12 @@ async function createTestJWT(
 }
 
 describe("Imports API", () => {
-	let testKeyPair: Awaited<ReturnType<typeof generateTestKeyPair>>;
-	let testJWKS: JSONWebKeySet;
 	let testToken: string;
-	let fetchMock: ReturnType<typeof vi.fn>;
 	const testOrgId = "imports-test-org";
 
 	beforeEach(async () => {
-		// Generate fresh key pair for each test
-		testKeyPair = await generateTestKeyPair();
-		const publicJWK = await publicKeyToJWK(testKeyPair.publicKey);
-		testJWKS = { keys: [publicJWK] };
+		// Use shared test keypair for AUTH_SERVICE mock
+		const testKeyPair = await getTestKeyPair();
 
 		// Create a test JWT token
 		testToken = await createTestJWT(testKeyPair.privateKey, {
@@ -57,25 +35,9 @@ describe("Imports API", () => {
 
 		// Clear JWKS cache before each test
 		clearJWKSCache();
-
-		// Mock fetch for JWKS endpoint
-		fetchMock = vi.fn().mockImplementation(async (url: string | Request) => {
-			const urlString = typeof url === "string" ? url : url.url;
-			if (urlString.includes("/api/auth/jwks")) {
-				return new Response(JSON.stringify(testJWKS), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				});
-			}
-			// Fallback to original fetch for other requests
-			return fetch(url);
-		});
-
-		vi.stubGlobal("fetch", fetchMock);
 	});
 
 	afterEach(() => {
-		vi.unstubAllGlobals();
 		clearJWKSCache();
 	});
 
@@ -98,15 +60,15 @@ describe("Imports API", () => {
 			expect(body).toContain("last_name");
 		});
 
-		it("downloads TRANSACTION template without authentication", async () => {
+		it("downloads OPERATION template without authentication", async () => {
 			const res = await SELF.fetch(
-				"http://local.test/api/v1/imports/templates/TRANSACTION",
+				"http://local.test/api/v1/imports/templates/OPERATION/VEH",
 			);
 
 			expect(res.status).toBe(200);
 			expect(res.headers.get("Content-Type")).toBe("text/csv; charset=utf-8");
 			expect(res.headers.get("Content-Disposition")).toBe(
-				'attachment; filename="transactions_template.csv"',
+				'attachment; filename="operations_veh_template.csv"',
 			);
 
 			const body = await res.text();
@@ -132,12 +94,14 @@ describe("Imports API", () => {
 			expect(mixed.status).toBe(200);
 		});
 
-		it("returns 400 for invalid entity type", async () => {
+		it("returns 400 for invalid activity code", async () => {
 			const res = await SELF.fetch(
-				"http://local.test/api/v1/imports/templates/INVALID",
+				"http://local.test/api/v1/imports/templates/OPERATION/INVALID",
 			);
 
 			expect(res.status).toBe(400);
+			const body = (await res.json()) as { message: string };
+			expect(body.message).toContain("Invalid activity code");
 		});
 	});
 

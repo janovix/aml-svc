@@ -45,10 +45,23 @@ describe("Import Schemas", () => {
 		it("should validate correct input for OPERATION", () => {
 			const result = ImportCreateSchema.safeParse({
 				entityType: "OPERATION",
+				activityCode: "VEH",
 				fileName: "operations.xlsx",
 				fileSize: 2048,
 			});
 			expect(result.success).toBe(true);
+		});
+
+		it("should reject OPERATION without activityCode", () => {
+			const result = ImportCreateSchema.safeParse({
+				entityType: "OPERATION",
+				fileName: "operations.xlsx",
+				fileSize: 2048,
+			});
+			expect(result.success).toBe(false);
+			if (!result.success) {
+				expect(result.error.issues[0].path).toContain("activityCode");
+			}
 		});
 
 		it("should reject invalid entity type", () => {
@@ -94,7 +107,7 @@ describe("Import Schemas", () => {
 				status: "PROCESSING",
 			});
 			expect(result.success).toBe(true);
-			expect(result.data?.status).toBe("PROCESSING");
+			expect(result.data?.status).toEqual(["PROCESSING"]);
 		});
 
 		it("should accept valid entity type filter", () => {
@@ -102,7 +115,7 @@ describe("Import Schemas", () => {
 				entityType: "CLIENT",
 			});
 			expect(result.success).toBe(true);
-			expect(result.data?.entityType).toBe("CLIENT");
+			expect(result.data?.entityType).toEqual(["CLIENT"]);
 		});
 
 		it("should coerce string page and limit to numbers", () => {

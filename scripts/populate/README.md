@@ -1,309 +1,200 @@
-# Catalog Population Scripts
+# Populate Scripts
 
-This directory contains scripts for populating **reference data** (catalogs, constants) into the database.
+This directory contains scripts for populating **reference data** (catalogs, constants, legal rules) required for the application to function.
 
-> **Important**: These are NOT seed scripts. Seeds create synthetic test data. Population scripts load real reference data required for the application to function.
+Populate scripts run in **all environments** (local, dev, preview, production).
 
-## 📋 Table of Contents
+## What Gets Populated
 
-- [Quick Start](#quick-start)
-- [Script Organization](#script-organization)
-- [Environment-Specific Commands](#environment-specific-commands)
-- [Catalog Categories](#catalog-categories)
-- [Large Catalogs](#large-catalogs)
-- [Best Practices](#best-practices)
+### Reference Data (not synthetic)
 
----
+- **ALL Catalogs** (~87 catalogs including large ones): Countries, currencies, CFDI codes, PLD codes, activity-specific codes, zip-codes (~157K items), cfdi-product-services (~52K items)
+- **CFDI-PLD Mappings**: Cross-reference tables between CFDI and PLD catalogs
+- **Alert Rules**: Legal/system rules for AML compliance (based on LFPIORPI)
+- **Alert Rule Configs**: Configuration values for automated alert seekers
+- **UMA Values**: Official UMA (Unidad de Medida y Actualización) values by year
 
-## 🚀 Quick Start
+## Architecture
+
+All reference data is now populated using a unified, fast SQL dump approach:
+
+1. **Generate** SQL dump files from CSV data and hardcoded constants
+2. **Import** SQL files via `wrangler d1 execute --file --remote`
+
+Two SQL files, two wrangler calls, everything populated in seconds.
+
+## Scripts
+
+### Main Scripts
+
+- **`all.mjs`** - Master script that populates ALL reference data
+
+  - Auto-generates SQL dump files
+  - Imports `sql/catalogs.sql` (all ~87 catalogs)
+  - Imports `sql/reference-data.sql` (rules, configs, mappings, UMA)
+  - Usage: `pnpm populate` (local) or `pnpm populate:dev` (remote dev)
+
+- **`generate-sql.mjs`** - Generates SQL dump files from CSV + hardcoded data
+  - Fetches all CSVs from `catalogs.janovix.com`
+  - Writes `sql/catalogs.sql` and `sql/reference-data.sql`
+  - Usage: `pnpm generate:sql`
+
+### Library Modules
+
+- **`lib/shared.mjs`** - Shared utilities for all populate scripts
+
+  - Wrangler config management
+  - SQL execution (`executeSql`, `executeSqlFile`)
+  - CSV fetching/parsing
+  - MD5-based ID generation (content-addressable)
+
+- **`lib/catalogs.mjs`** - ALL catalog definitions and SQL generation
+
+  - ~87 catalog definitions (regular + large)
+  - `generateAllCatalogsSql()` - returns SQL string for all catalogs
+
+- **`lib/reference-data.mjs`** - Reference data SQL generation
+  - Alert rules, configs, CFDI-PLD mappings, UMA values
+  - `generateReferenceDataSql()` - returns SQL string
+
+## Usage
 
 ### Local Development
 
 ```bash
-# Populate ALL reference data (recommended for first-time setup)
+# Populate all reference data (local DB)
+pnpm populate
+
+# Or populate to a specific local config
 pnpm populate:local
-
-# Or populate just catalogs (faster, excludes UMA values)
-pnpm populate:catalogs:local
-
-# Optional: Populate large catalogs separately (zip codes, CFDI units, products)
-pnpm populate:catalogs:large:local
 ```
 
 ### Remote Environments
 
 ```bash
-# Dev environment
+# Populate dev environment
 pnpm populate:dev
 
-# Production (catalogs only, no seeds)
+# Populate production environment
 pnpm populate:prod
 
-# Preview environment
+# Populate preview environment
 pnpm populate:preview
 ```
 
----
-
-## 📁 Script Organization
-
-### Master Scripts
-
-| Script                   | Purpose                     | Catalogs                             | Time      |
-| ------------------------ | --------------------------- | ------------------------------------ | --------- |
-| `all.mjs`                | **Complete reference data** | Core + CFDI + PLD + Activities + UMA | ~2-5 min  |
-| `all-catalogs.mjs`       | **Core catalogs only**      | Core + CFDI + PLD + Activities       | ~1-3 min  |
-| `all-catalogs-large.mjs` | **Large catalogs only**     | Zip codes + CFDI units + Products    | ~5-15 min |
-
-### Individual Catalog Scripts
-
-All individual catalog scripts follow the pattern: `catalog-{name}.mjs`
-
-Examples:
-
-- `catalog-countries.mjs` - Countries catalog
-- `catalog-cfdi-payment-forms.mjs` - CFDI payment forms
-- `catalog-pld-consolidated.mjs` - PLD consolidated catalogs
-- `catalog-activity-all.mjs` - All activity-specific catalogs
-
----
-
-## 🌍 Environment-Specific Commands
-
-### Pattern
+### Manual SQL Generation (optional)
 
 ```bash
-pnpm populate[:<scope>][:<env>]
+# Generate SQL dump files only (without importing)
+pnpm generate:sql
 ```
 
-Where:
+## Why SQL Dumps?
 
-- `<scope>` = `catalogs`, `catalogs:large`, or omitted for all
-- `<env>` = `local`, `dev`, `prod`, `preview`, or omitted for default
+The new approach generates SQL dumps instead of fetching CSV at runtime:
 
-### Examples
+**Benefits:**
+
+- **Fast**: ~157K zip code items imported in seconds (vs minutes with old approach)
+- **Idempotent**: Content-addressable MD5 IDs ensure safe re-runs
+- **Unified**: No distinction between "regular" and "large" catalogs
+- **Reliable**: D1 Import API handles large files (up to 5 GB)
+- **Simple**: Two wrangler calls populate everything
+
+**Data Source:**
+
+All catalogs are fetched from **`https://catalogs.janovix.com`** during SQL generation.
+
+## Populate vs Seed
+
+| Aspect          | Populate (this folder)             | Seed (`scripts/seed/`)     |
+| --------------- | ---------------------------------- | -------------------------- |
+| **Purpose**     | Reference data                     | Synthetic test data        |
+| **Data Type**   | Catalogs, rules, constants         | Clients, reports, notices  |
+| **Environment** | All (local, dev, preview, prod)    | Dev/preview only           |
+| **Frequency**   | Once per environment setup         | As needed for testing      |
+| **Examples**    | Countries, CFDI codes, alert rules | Fake clients, test reports |
+
+## Data Sources
+
+- **Catalogs**: `https://catalogs.janovix.com/*.csv`
+- **Alert Rules**: Hardcoded in `alert-rules.mjs` (based on LFPIORPI legal requirements)
+- **Alert Rule Configs**: Hardcoded in `alert-rule-configs.mjs`
+- **UMA Values**: Hardcoded in `uma-values.mjs` (official government values)
+- **CFDI-PLD Mappings**: Hardcoded in `catalog-cfdi-pld-mappings.mjs`
+
+## Consolidated Catalogs
+
+Previously separate catalogs are now unified:
+
+- **Countries**: Combines `countries.csv` (ISO-2) and `cfdi-countries.csv` (ISO-3) → single `countries.csv` with both codes
+- **Currencies**: `currencies.csv` is the single source (replaces `cfdi-currencies.csv`)
+  - Metadata includes: `code` (ISO), `shortName` (ISO), `decimal_places`, `country`
+
+## Implementation Details
+
+### ID Generation (Content-Addressable)
+
+- **Catalog IDs**: `md5("catalog:" + catalogKey)` - deterministic from catalog key
+- **Item IDs**: `md5(catalogKey + ":" + normalizedName)` - identity-based, metadata-independent
+- Metadata can change without affecting IDs (clean updates via `INSERT OR REPLACE`)
+
+### SQL Generation
+
+- Multi-row INSERT statements (50 rows per statement) for efficiency
+- Uses `INSERT OR REPLACE` for catalog items (idempotent)
+- Uses `ON CONFLICT DO UPDATE` for alert rules (preserves FK constraints from alerts table)
+- Each catalog deletes its existing items before inserting (`DELETE FROM catalog_items WHERE catalog_id = ...`)
+
+### Metadata Storage
+
+Catalog items store additional data in JSON `metadata` field:
+
+- `code`: The catalog code (e.g., "MXN", "01", "VEH")
+- `shortName`: For currencies (backward compatibility)
+- `decimal_places`: For currencies
+- `iso2`, `iso3`: For countries
+- `zip_code`, `settlement`, `municipality`, `state`, etc.: For zip codes
+- `originCountry`, `type`: For vehicle brands
+
+## Troubleshooting
+
+### Script fails with "No wrangler config found"
+
+Set `WRANGLER_CONFIG` environment variable:
 
 ```bash
-# All reference data
-pnpm populate              # Local (default DB)
-pnpm populate:local        # Local (wrangler.local.jsonc)
-pnpm populate:dev          # Remote dev
-pnpm populate:prod         # Remote prod
-pnpm populate:preview      # Remote preview
-
-# Core catalogs only
-pnpm populate:catalogs
-pnpm populate:catalogs:local
-pnpm populate:catalogs:dev
-pnpm populate:catalogs:prod
-pnpm populate:catalogs:preview
-
-# Large catalogs only
-pnpm populate:catalogs:large
-pnpm populate:catalogs:large:local
-pnpm populate:catalogs:large:dev
-pnpm populate:catalogs:large:prod
-
-# Individual large catalogs
-pnpm populate:catalog:zip-codes:local
-pnpm populate:catalog:cfdi-units:dev
-pnpm populate:catalog:cfdi-product-services:prod
+export WRANGLER_CONFIG=wrangler.jsonc
+pnpm populate
 ```
 
----
+### Catalog items not appearing
 
-## 📊 Catalog Categories
+1. Check if catalog was created: `SELECT * FROM catalogs WHERE key = 'catalog-name';`
+2. Check if items were created: `SELECT COUNT(*) FROM catalog_items WHERE catalog_id = 'catalog-id';`
+3. Check for SQL errors in wrangler output
 
-### Core Catalogs (14)
+### UMA values not updating
 
-Essential reference data, fast to populate (~1-2 min):
+UMA values are populated from `uma-values.mjs`. Update the hardcoded values there and re-run `pnpm populate`.
 
-- Countries, States, Currencies
-- Armor Levels, Business Activities
-- Economic Activities, Operation Types
-- Payment Forms, Payment Methods
-- Vulnerable Activities
+## Contributing
 
-### Vehicle Catalogs (3)
+When adding new catalogs:
 
-Vehicle brand catalogs (~30 sec):
+1. Add CSV to `https://catalogs.janovix.com/catalog-name.csv`
+2. Add catalog definition to `lib/catalogs.mjs` in the appropriate section
+3. Document metadata structure if non-standard
+4. Update this README
 
-- Terrestrial Vehicle Brands
-- Maritime Vehicle Brands
-- Air Vehicle Brands
+When adding new alert rules:
 
-### CFDI Catalogs (12)
+1. Update `lib/reference-data.mjs` with new rule definitions
+2. Add corresponding configs if needed
+3. Document the legal basis in metadata
 
-SAT CFDI codes, small to medium size (~1-2 min):
+## See Also
 
-- Payment Forms, Payment Methods
-- Tax Regimes, Usages, Voucher Types
-- Currencies, Countries, Taxes
-- Tax Factors, Tax Objects
-- Relation Types, Export Types
-
-### CFDI-PLD Integration (1)
-
-Mappings between CFDI and PLD catalogs (~10 sec):
-
-- CFDI-PLD Mappings (payment forms → monetary instruments, etc.)
-
-### PLD Consolidated Catalogs (15)
-
-Unified catalogs across multiple vulnerable activities (~30 sec):
-
-- Alert Types (395 items across 19 VAs)
-- Monetary Instruments, Payment Forms
-- Property Types, Incorporation Reasons
-- Shareholder Positions, Merger Types
-- Power of Attorney Types, Guarantee Types
-- Armor Levels, Financial Institution Types
-- And more...
-
-### Activity-Specific Catalogs (47)
-
-Individual catalogs for each vulnerable activity (~1 min):
-
-- Operation types, alert types, etc. for each of 19 VAs
-- Examples: `veh-operation-types`, `tcv-transferred-value-types`, `tdr-operation-types`
-
-### UMA Values (1)
-
-Economic reference data (~5 sec):
-
-- UMA (Unidad de Medida y Actualización) values
-
----
-
-## 🐘 Large Catalogs
-
-These catalogs are **excluded by default** due to their size. Run them separately when needed.
-
-| Catalog                    | Items  | Time      | Command                                             |
-| -------------------------- | ------ | --------- | --------------------------------------------------- |
-| **Zip Codes**              | ~140K+ | ~5-10 min | `pnpm populate:catalog:zip-codes:local`             |
-| **CFDI Units**             | ~1K    | ~30 sec   | `pnpm populate:catalog:cfdi-units:local`            |
-| **CFDI Products/Services** | ~52K   | ~3-5 min  | `pnpm populate:catalog:cfdi-product-services:local` |
-
-### When to Populate Large Catalogs?
-
-- **Zip Codes**: Only if your app needs address validation with zip code lookup
-- **CFDI Units**: Only if generating CFDI invoices with detailed unit codes
-- **CFDI Products/Services**: Only if generating CFDI invoices with detailed product/service codes
-
-### Populate All Large Catalogs at Once
-
-```bash
-pnpm populate:catalogs:large:local
-```
-
----
-
-## ✅ Best Practices
-
-### 1. Stop Dev Server Before Populating
-
-SQLite doesn't allow concurrent writes. Stop your dev server before running populate scripts:
-
-```bash
-# Stop dev server (Ctrl+C)
-pnpm populate:local
-# Restart dev server
-pnpm dev:local
-```
-
-### 2. Population Order
-
-For a fresh database:
-
-```bash
-# 1. Run migrations first
-pnpm wrangler d1 migrations apply DB --local --config wrangler.local.jsonc
-
-# 2. Populate core catalogs
-pnpm populate:local
-
-# 3. (Optional) Populate large catalogs
-pnpm populate:catalogs:large:local
-
-# 4. (Dev/Preview only) Seed synthetic test data
-pnpm seed:local
-```
-
-### 3. Production Deployment
-
-For production, **only populate catalogs** (no seeds):
-
-```bash
-# After migrations
-pnpm populate:prod
-
-# Large catalogs only if needed
-pnpm populate:catalogs:large:prod
-```
-
-### 4. CI/CD Integration
-
-In your CI/CD pipeline:
-
-```bash
-# Dev branch → dev environment
-pnpm populate:dev
-
-# Main branch → prod environment
-pnpm populate:prod
-
-# Other branches → preview environment
-pnpm populate:preview
-```
-
----
-
-## 🔍 Troubleshooting
-
-### Database Locked Error
-
-**Error**: `SQLITE_BUSY: database is locked`
-
-**Solution**: Stop the dev server before running populate scripts.
-
-### Catalog Already Exists
-
-All populate scripts use `INSERT OR REPLACE` or `INSERT OR IGNORE`, so they're **idempotent**. You can safely re-run them.
-
-### Missing CSV Files
-
-Some catalogs require CSV files from the extraction process:
-
-```bash
-# Extract CFDI catalogs from SAT sources
-cd scripts/cfdi-catalogs
-node download-sat-catalogs.mjs
-node extract-activity-catalogs.mjs
-node consolidate-catalogs.mjs
-```
-
-### Slow Population
-
-Large catalogs take time. Use the separated scripts:
-
-- Run core catalogs first (fast)
-- Run large catalogs separately when needed
-- Consider skipping large catalogs in dev if not needed
-
----
-
-## 📚 Related Documentation
-
-- [Seed Scripts](../seed/README.md) - Synthetic test data generation
-- [CFDI Catalogs](../cfdi-catalogs/README.md) - CFDI catalog extraction
-- [Database Migrations](../../migrations/README.md) - Schema management
-
----
-
-## 🆘 Need Help?
-
-- Check if CSV files exist in `scripts/cfdi-catalogs/output/`
-- Verify wrangler config files exist (`wrangler.local.jsonc`, etc.)
-- Ensure migrations have been applied
-- Check that dev server is stopped before populating
+- `scripts/seed/README.md` - Synthetic test data generation
+- `scripts/cfdi-catalogs/README.md` - CFDI catalog sources
+- `prisma/schema.prisma` - Database schema

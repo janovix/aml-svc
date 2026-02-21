@@ -5,6 +5,7 @@
  * This should only be used in non-production environments.
  */
 
+import * as Sentry from "@sentry/cloudflare";
 import type { PrismaClient, DocumentType, AddressType } from "@prisma/client";
 import { generateId } from "./id-generator";
 import type { ClientCreateInput } from "../domain/client/schemas";
@@ -716,7 +717,6 @@ export class SyntheticDataGenerator {
 		for (const clientRfc of clientRfcs) {
 			const clientId = clientIdMap.get(clientRfc);
 			if (!clientId) {
-				console.warn(`Client with RFC ${clientRfc} not found, skipping`);
 				continue;
 			}
 
@@ -726,9 +726,7 @@ export class SyntheticDataGenerator {
 				try {
 					// Currently only VEH activity is supported for synthetic data
 					if (activityCode !== "VEH") {
-						console.warn(
-							`Activity ${activityCode} not yet supported for synthetic data, using VEH`,
-						);
+						activityCode = "VEH"; // Default to VEH
 					}
 
 					const operationData = generateVehicleOperation(clientId, created);
@@ -770,7 +768,9 @@ export class SyntheticDataGenerator {
 					created++;
 				} catch (error) {
 					// Log error but continue
-					console.error(`Error creating operation: ${error}`);
+					Sentry.captureException(error, {
+						tags: { context: "synthetic-data-create-operation-error" },
+					});
 				}
 			}
 

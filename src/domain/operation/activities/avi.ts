@@ -1,6 +1,12 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { VirtualAssetExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	assetTypeCode: { catalog: "pld-asset-types", strategy: "BY_CODE" },
+	exchangeCountryCode: { catalog: "countries", strategy: "BY_CODE" },
+};
 
 export const virtualAssetHandler: ActivityHandler = {
 	code: "AVI",

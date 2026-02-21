@@ -16,6 +16,7 @@ import type {
 	ImportRowResultEntity,
 	ImportWithResults,
 	ListResult,
+	ListResultWithMeta,
 	ImportRowStatus,
 	ImportJob,
 } from "./types";
@@ -29,7 +30,7 @@ export class ImportService {
 	list(
 		organizationId: string,
 		filters: ImportFilters,
-	): Promise<ListResult<ImportEntity>> {
+	): Promise<ListResultWithMeta<ImportEntity>> {
 		return this.repository.list(organizationId, filters);
 	}
 
@@ -83,6 +84,7 @@ export class ImportService {
 			importId: importRecord.id,
 			organizationId,
 			entityType: importRecord.entityType,
+			activityCode: importRecord.activityCode ?? undefined,
 			fileUrl: importRecord.fileUrl,
 			createdBy,
 		};

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { multiEnum } from "../../lib/query-params";
 
 const RESOURCE_ID_REGEX = /^[A-Za-z0-9-]+$/;
 const _RFC_FISICA_REGEX = /^[A-ZÑ&]{4}\d{6}[A-Z0-9]{3}$/;
@@ -115,8 +116,8 @@ export const InvoiceFilterSchema = z
 		issuerRfc: z.string().optional(),
 		receiverRfc: z.string().optional(),
 		uuid: z.string().uuid().optional(),
-		voucherTypeCode: z.string().max(2).optional(),
-		currencyCode: CurrencyCodeSchema.optional(),
+		voucherTypeCode: multiEnum(z.string().max(2)),
+		currencyCode: multiEnum(CurrencyCodeSchema),
 		startDate: IsoDateSchema.optional(),
 		endDate: IsoDateSchema.optional(),
 		minAmount: AmountSchema.optional(),

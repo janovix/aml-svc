@@ -32,22 +32,22 @@ Or place the file as `catCFDI.xls` in this directory and run without arguments.
 
 ## Generated Catalogs
 
-| Output File               | SAT Sheet           | Description                                  |
-| ------------------------- | ------------------- | -------------------------------------------- |
-| cfdi-payment-forms.csv    | c_FormaPago         | Payment forms (01=Efectivo, 02=Cheque, etc.) |
-| cfdi-payment-methods.csv  | c_MetodoPago        | Payment methods (PUE, PPD)                   |
-| cfdi-tax-regimes.csv      | c_RegimenFiscal     | Tax regimes (601-626)                        |
-| cfdi-usages.csv           | c_UsoCFDI           | CFDI usage codes (G01, G02, etc.)            |
-| cfdi-voucher-types.csv    | c_TipoDeComprobante | Voucher types (I, E, T, N, P)                |
-| cfdi-currencies.csv       | c_Moneda            | Currencies (ISO 4217)                        |
-| cfdi-countries.csv        | c_Pais              | Countries (ISO 3166-1 alpha-3)               |
-| cfdi-taxes.csv            | c_Impuesto          | Taxes (001=ISR, 002=IVA, 003=IEPS)           |
-| cfdi-tax-factors.csv      | c_TipoFactor        | Tax factors (Tasa, Cuota, Exento)            |
-| cfdi-product-services.csv | c_ClaveProdServ     | Product/service codes (~53K items)           |
-| cfdi-units.csv            | c_ClaveUnidad       | Unit codes (~2.4K items)                     |
-| cfdi-tax-objects.csv      | c_ObjetoImp         | Tax objects (01, 02, 03)                     |
-| cfdi-relation-types.csv   | c_TipoRelacion      | Invoice relation types                       |
-| cfdi-export-types.csv     | c_Exportacion       | Export types                                 |
+| Output File               | SAT Sheet           | Description                                                                |
+| ------------------------- | ------------------- | -------------------------------------------------------------------------- |
+| cfdi-payment-forms.csv    | c_FormaPago         | Payment forms (01=Efectivo, 02=Cheque, etc.)                               |
+| cfdi-payment-methods.csv  | c_MetodoPago        | Payment methods (PUE, PPD)                                                 |
+| cfdi-tax-regimes.csv      | c_RegimenFiscal     | Tax regimes (601-626)                                                      |
+| cfdi-usages.csv           | c_UsoCFDI           | CFDI usage codes (G01, G02, etc.)                                          |
+| cfdi-voucher-types.csv    | c_TipoDeComprobante | Voucher types (I, E, T, N, P)                                              |
+| cfdi-currencies.csv       | c_Moneda            | Currencies (ISO 4217) - **Now consolidated into `currencies.csv`**         |
+| cfdi-countries.csv        | c_Pais              | Countries (ISO 3166-1 alpha-3) - **Now consolidated into `countries.csv`** |
+| cfdi-taxes.csv            | c_Impuesto          | Taxes (001=ISR, 002=IVA, 003=IEPS)                                         |
+| cfdi-tax-factors.csv      | c_TipoFactor        | Tax factors (Tasa, Cuota, Exento)                                          |
+| cfdi-product-services.csv | c_ClaveProdServ     | Product/service codes (~53K items)                                         |
+| cfdi-units.csv            | c_ClaveUnidad       | Unit codes (~2.4K items)                                                   |
+| cfdi-tax-objects.csv      | c_ObjetoImp         | Tax objects (01, 02, 03)                                                   |
+| cfdi-relation-types.csv   | c_TipoRelacion      | Invoice relation types                                                     |
+| cfdi-export-types.csv     | c_Exportacion       | Export types                                                               |
 
 ## CSV Format
 

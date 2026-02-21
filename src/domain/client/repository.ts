@@ -31,34 +31,63 @@ import type {
 	ClientAddressEntity,
 	ClientDocumentEntity,
 	ClientEntity,
-	ListResult,
+	ListResultWithMeta,
 } from "./types";
+import {
+	buildEnumFilterMeta,
+	fromPrismaGroupBy,
+} from "../../lib/filter-metadata";
+import {
+	CatalogNameResolver,
+	type CatalogFieldsConfig,
+} from "../catalog/name-resolver";
+import { CatalogRepository } from "../catalog/repository";
+import { recalculateKycProgress } from "./kyc-progress";
+
+/**
+ * Catalog fields configuration for clients.
+ * Maps client field names to their catalog keys and resolution strategies.
+ */
+const CLIENT_CATALOG_FIELDS: CatalogFieldsConfig = {
+	stateCode: { catalog: "states", strategy: "BY_CODE" },
+	countryCode: { catalog: "countries", strategy: "BY_CODE" },
+	economicActivityCode: {
+		catalog: "economic-activities",
+		strategy: "BY_CODE",
+	},
+	nationality: { catalog: "countries", strategy: "BY_ID" },
+};
 
 export class ClientRepository {
-	constructor(private readonly prisma: PrismaClient) {}
+	private catalogResolver: CatalogNameResolver;
+
+	constructor(
+		private readonly prisma: PrismaClient,
+		catalogResolver?: CatalogNameResolver,
+	) {
+		this.catalogResolver =
+			catalogResolver || new CatalogNameResolver(new CatalogRepository(prisma));
+	}
 
 	async list(
 		organizationId: string,
 		filters: ClientFilters,
-	): Promise<ListResult<ClientEntity>> {
-		const { page, limit, search, rfc, personType } = filters;
+	): Promise<ListResultWithMeta<ClientEntity>> {
+		const { page, limit, search, rfc, personType, stateCode } = filters;
 
-		const where: Prisma.ClientWhereInput = {
+		// Base where clause – applies to data fetch AND to each filter's count query
+		const baseWhere: Prisma.ClientWhereInput = {
 			organizationId,
 			deletedAt: null,
 		};
 
-		if (personType) {
-			where.personType = toPrismaPersonType(personType);
-		}
-
 		if (rfc) {
-			where.rfc = { contains: rfc.toUpperCase() };
+			baseWhere.rfc = { contains: rfc.toUpperCase() };
 		}
 
 		if (search) {
 			const likeFilter = { contains: search };
-			where.OR = [
+			baseWhere.OR = [
 				{ firstName: likeFilter },
 				{ lastName: likeFilter },
 				{ secondLastName: likeFilter },
@@ -66,26 +95,74 @@ export class ClientRepository {
 			];
 		}
 
-		const [total, records] = await Promise.all([
-			this.prisma.client.count({ where }),
-			this.prisma.client.findMany({
-				where,
-				skip: (page - 1) * limit,
-				take: limit,
-				orderBy: { createdAt: "desc" },
-			}),
-		]);
+		// Active filter conditions for the data query
+		const where: Prisma.ClientWhereInput = { ...baseWhere };
+
+		if (personType?.length) {
+			where.personType = { in: personType.map(toPrismaPersonType) };
+		}
+
+		if (stateCode?.length) {
+			where.stateCode = { in: stateCode };
+		}
+
+		// personType counts: apply stateCode but NOT personType (so all types show up)
+		const personTypeCountWhere: Prisma.ClientWhereInput = { ...baseWhere };
+		if (stateCode?.length) personTypeCountWhere.stateCode = { in: stateCode };
+
+		// stateCode counts: apply personType but NOT stateCode
+		const stateCodeCountWhere: Prisma.ClientWhereInput = { ...baseWhere };
+		if (personType?.length)
+			stateCodeCountWhere.personType = {
+				in: personType.map(toPrismaPersonType),
+			};
+
+		const [total, records, personTypeGroups, stateCodeGroups] =
+			await Promise.all([
+				this.prisma.client.count({ where }),
+				this.prisma.client.findMany({
+					where,
+					skip: (page - 1) * limit,
+					take: limit,
+					orderBy: { createdAt: "desc" },
+				}),
+				this.prisma.client.groupBy({
+					by: ["personType"],
+					where: personTypeCountWhere,
+					_count: { personType: true },
+				}),
+				this.prisma.client.groupBy({
+					by: ["stateCode"],
+					where: stateCodeCountWhere,
+					_count: { stateCode: true },
+				}),
+			]);
 
 		const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
+		const PERSON_TYPE_LABELS: Record<string, string> = {
+			PHYSICAL: "Persona Física",
+			MORAL: "Persona Moral",
+			TRUST: "Fideicomiso",
+		};
+
 		return {
 			data: records.map(mapPrismaClient),
-			pagination: {
-				page,
-				limit,
-				total,
-				totalPages,
-			},
+			pagination: { page, limit, total, totalPages },
+			filterMeta: [
+				buildEnumFilterMeta(
+					{
+						id: "personType",
+						label: "Tipo de persona",
+						labelMap: PERSON_TYPE_LABELS,
+					},
+					fromPrismaGroupBy(personTypeGroups, "personType", "personType"),
+				),
+				buildEnumFilterMeta(
+					{ id: "stateCode", label: "Estado" },
+					fromPrismaGroupBy(stateCodeGroups, "stateCode", "stateCode"),
+				),
+			],
 		};
 	}
 
@@ -99,6 +176,16 @@ export class ClientRepository {
 		return record ? mapPrismaClient(record) : null;
 	}
 
+	async findByRfc(
+		organizationId: string,
+		rfc: string,
+	): Promise<ClientEntity | null> {
+		const record = await this.prisma.client.findFirst({
+			where: { organizationId, rfc: rfc.toUpperCase(), deletedAt: null },
+		});
+		return record ? mapPrismaClient(record) : null;
+	}
+
 	async create(
 		organizationId: string,
 		input: ClientCreateInput,
@@ -106,6 +193,13 @@ export class ClientRepository {
 		const prismaData = mapCreateInputToPrisma(input);
 		const { completenessStatus, missingFields } =
 			this.detectCompleteness(input);
+
+		// Resolve catalog names for *Code fields
+		const resolvedNames = await this.catalogResolver.resolveNames(
+			input,
+			CLIENT_CATALOG_FIELDS,
+		);
+
 		const created = await this.prisma.client.create({
 			data: {
 				...prismaData,
@@ -113,8 +207,16 @@ export class ClientRepository {
 				completenessStatus,
 				missingFields:
 					missingFields.length > 0 ? JSON.stringify(missingFields) : null,
+				resolvedNames:
+					Object.keys(resolvedNames).length > 0
+						? JSON.stringify(resolvedNames)
+						: null,
 			},
 		});
+
+		// Recalculate KYC progress after creation
+		await recalculateKycProgress(this.prisma, created.id);
+
 		return mapPrismaClient(created);
 	}
 
@@ -128,6 +230,13 @@ export class ClientRepository {
 		const prismaData = mapUpdateInputToPrisma(input);
 		const { completenessStatus, missingFields } =
 			this.detectCompleteness(input);
+
+		// Resolve catalog names for *Code fields
+		const resolvedNames = await this.catalogResolver.resolveNames(
+			input,
+			CLIENT_CATALOG_FIELDS,
+		);
+
 		const updated = await this.prisma.client.update({
 			where: { id },
 			data: {
@@ -135,8 +244,15 @@ export class ClientRepository {
 				completenessStatus,
 				missingFields:
 					missingFields.length > 0 ? JSON.stringify(missingFields) : null,
+				resolvedNames:
+					Object.keys(resolvedNames).length > 0
+						? JSON.stringify(resolvedNames)
+						: null,
 			},
 		});
+
+		// Recalculate KYC progress after update
+		await recalculateKycProgress(this.prisma, updated.id);
 
 		return mapPrismaClient(updated);
 	}
@@ -162,12 +278,25 @@ export class ClientRepository {
 				completenessStatus;
 			(payload as Record<string, unknown>).missingFields =
 				missingFields.length > 0 ? JSON.stringify(missingFields) : null;
+
+			// Resolve catalog names for *Code fields
+			const resolvedNames = await this.catalogResolver.resolveNames(
+				merged,
+				CLIENT_CATALOG_FIELDS,
+			);
+			(payload as Record<string, unknown>).resolvedNames =
+				Object.keys(resolvedNames).length > 0
+					? JSON.stringify(resolvedNames)
+					: null;
 		}
 
 		const updated = await this.prisma.client.update({
 			where: { id },
 			data: payload,
 		});
+
+		// Recalculate KYC progress after patch
+		await recalculateKycProgress(this.prisma, updated.id);
 
 		return mapPrismaClient(updated);
 	}
@@ -203,6 +332,10 @@ export class ClientRepository {
 		const created = await this.prisma.clientDocument.create({
 			data: mapDocumentCreateInputToPrisma(input),
 		});
+
+		// Recalculate KYC progress after document creation
+		await recalculateKycProgress(this.prisma, input.clientId);
+
 		return mapPrismaDocument(created);
 	}
 
@@ -218,6 +351,10 @@ export class ClientRepository {
 			where: { id: documentId },
 			data: mapDocumentUpdateInputToPrisma(input),
 		});
+
+		// Recalculate KYC progress after document update
+		await recalculateKycProgress(this.prisma, clientId);
+
 		return mapPrismaDocument(updated);
 	}
 
@@ -233,6 +370,10 @@ export class ClientRepository {
 			where: { id: documentId },
 			data: mapDocumentPatchInputToPrisma(input),
 		});
+
+		// Recalculate KYC progress after document patch
+		await recalculateKycProgress(this.prisma, clientId);
+
 		return mapPrismaDocument(updated);
 	}
 
@@ -244,6 +385,9 @@ export class ClientRepository {
 		await this.ensureExists(organizationId, clientId);
 		await this.ensureDocumentExists(clientId, documentId);
 		await this.prisma.clientDocument.delete({ where: { id: documentId } });
+
+		// Recalculate KYC progress after document deletion
+		await recalculateKycProgress(this.prisma, clientId);
 	}
 
 	async listAddresses(

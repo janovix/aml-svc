@@ -1,5 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 import * as jose from "jose";
+import * as Sentry from "@sentry/cloudflare";
 
 import type { Bindings } from "../types";
 
@@ -47,11 +48,10 @@ export interface AuthOrganization {
  * Extended bindings with auth context
  */
 export type AuthBindings = Bindings & {
-	AUTH_SERVICE_URL: string;
 	AUTH_JWKS_CACHE_TTL?: string;
 	/** Service binding to auth-svc for direct worker-to-worker communication */
-	AUTH_SERVICE?: Fetcher;
-	/** Environment name (local, development, staging, production) */
+	AUTH_SERVICE: Fetcher;
+	/** Environment name (used to bypass auth in test environment) */
 	ENVIRONMENT?: string;
 };
 
@@ -76,13 +76,11 @@ let cachedJWKSExpiry: number = 0;
 
 /**
  * Fetches JWKS from auth-svc with in-memory caching
- * Uses service binding if available for direct worker-to-worker communication
+ * Uses service binding for direct worker-to-worker communication
  */
 async function getJWKS(
-	authServiceUrl: string,
 	cacheTtl: number,
-	authServiceBinding?: Fetcher,
-	environment?: string,
+	authServiceBinding: Fetcher,
 ): Promise<jose.JSONWebKeySet> {
 	const now = Date.now();
 
@@ -91,36 +89,21 @@ async function getJWKS(
 		return cachedJWKS;
 	}
 
-	// Fetch from auth service
-	const jwksUrl = `${authServiceUrl}/api/auth/jwks`;
-	let response: Response;
+	// Construct JWKS URL with internal hostname
+	// When using service binding, the hostname doesn't affect routing but is used for Host header
+	const jwksUrl = "http://internal/api/auth/jwks";
 
-	// Service bindings don't work reliably in local development with wrangler dev
-	// Skip service binding in local environment and use regular HTTP fetch instead
-	const useServiceBinding = authServiceBinding && environment !== "local";
-
-	if (useServiceBinding) {
-		// Use service binding for direct worker-to-worker communication
-		// This bypasses the public URL and avoids routing issues
-		response = await authServiceBinding.fetch(
-			new Request(jwksUrl, {
-				headers: { Accept: "application/json" },
-			}),
-		);
-	} else {
-		// Fallback to regular fetch with cf options
-		response = await fetch(jwksUrl, {
+	// Use service binding for direct worker-to-worker communication
+	// The hostname in the URL is used for the Host header but routing is handled by the binding
+	const response = await authServiceBinding.fetch(
+		new Request(jwksUrl, {
 			headers: { Accept: "application/json" },
-			cf: {
-				cacheTtl: 0,
-				cacheEverything: false,
-			},
-		} as RequestInit);
-	}
+		}),
+	);
 
 	if (!response.ok) {
 		throw new Error(
-			`Failed to fetch JWKS from ${jwksUrl}: ${response.status} ${response.statusText}`,
+			`Failed to fetch JWKS from service binding: ${response.status} ${response.statusText}`,
 		);
 	}
 
@@ -144,17 +127,10 @@ async function getJWKS(
  */
 export async function verifyToken(
 	token: string,
-	authServiceUrl: string,
 	cacheTtl: number,
-	authServiceBinding?: Fetcher,
-	environment?: string,
+	authServiceBinding: Fetcher,
 ): Promise<AuthTokenPayload> {
-	const jwks = await getJWKS(
-		authServiceUrl,
-		cacheTtl,
-		authServiceBinding,
-		environment,
-	);
+	const jwks = await getJWKS(cacheTtl, authServiceBinding);
 
 	// Create a local JWKS for verification
 	const jwksInstance = jose.createLocalJWKSet(jwks);
@@ -217,6 +193,25 @@ export function authMiddleware(options?: {
 		const authHeader = c.req.header("Authorization");
 		const token = extractBearerToken(authHeader);
 
+		// Skip JWT verification in test environment but still require token
+		if (c.env.ENVIRONMENT === "test" && token) {
+			// Set a mock user for tests
+			c.set("user", {
+				id: "test-user-id",
+				email: "test@example.com",
+				name: "Test User",
+			});
+			c.set("tokenPayload", {
+				sub: "test-user-id",
+				email: "test@example.com",
+				name: "Test User",
+				organizationId: "test-org-id",
+			});
+			c.set("organization", { id: "test-org-id" });
+			c.set("token", token);
+			return next();
+		}
+
 		// No token provided
 		if (!token) {
 			if (optional) {
@@ -232,10 +227,15 @@ export function authMiddleware(options?: {
 			);
 		}
 
-		// Validate environment
-		const authServiceUrl = c.env.AUTH_SERVICE_URL;
-		if (!authServiceUrl) {
-			console.error("AUTH_SERVICE_URL is not configured");
+		// Get the service binding for direct worker-to-worker communication
+		const authServiceBinding = c.env.AUTH_SERVICE;
+
+		// Validate that service binding is configured
+		if (!authServiceBinding) {
+			Sentry.captureMessage("AUTH_SERVICE binding is not configured", {
+				level: "error",
+				tags: { context: "auth-middleware-missing-binding" },
+			});
 			return c.json(
 				{
 					success: false,
@@ -250,17 +250,8 @@ export function authMiddleware(options?: {
 			? parseInt(c.env.AUTH_JWKS_CACHE_TTL, 10)
 			: DEFAULT_JWKS_CACHE_TTL;
 
-		// Get the service binding for direct worker-to-worker communication
-		const authServiceBinding = c.env.AUTH_SERVICE;
-
 		try {
-			const payload = await verifyToken(
-				token,
-				authServiceUrl,
-				cacheTtl,
-				authServiceBinding,
-				c.env.ENVIRONMENT,
-			);
+			const payload = await verifyToken(token, cacheTtl, authServiceBinding);
 
 			// Attach user info to context
 			const user: AuthUser = {
@@ -369,10 +360,12 @@ export function authMiddleware(options?: {
  * Helper to get the authenticated user from context
  * Throws if user is not authenticated
  */
-export function getAuthUser(
-	c: Context<{ Variables: Partial<AuthVariables> }>,
-): AuthUser {
-	const user = c.get("user");
+export function getAuthUser<
+	E extends { Variables?: Partial<AuthVariables> | AuthVariables },
+>(c: Context<E>): AuthUser {
+	const user = (
+		c as unknown as Context<{ Variables: Partial<AuthVariables> }>
+	).get("user");
 	if (!user) {
 		throw new Error("User not authenticated");
 	}
@@ -382,10 +375,14 @@ export function getAuthUser(
 /**
  * Helper to get the authenticated user from context, or null if not authenticated
  */
-export function getAuthUserOrNull(
-	c: Context<{ Variables: Partial<AuthVariables> }>,
-): AuthUser | null {
-	return c.get("user") ?? null;
+export function getAuthUserOrNull<
+	E extends { Variables?: Partial<AuthVariables> | AuthVariables },
+>(c: Context<E>): AuthUser | null {
+	return (
+		(c as unknown as Context<{ Variables: Partial<AuthVariables> }>).get(
+			"user",
+		) ?? null
+	);
 }
 
 /**

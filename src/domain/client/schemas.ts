@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { multiEnum } from "../../lib/query-params";
 
 export const PERSON_TYPE_VALUES = ["physical", "moral", "trust"] as const;
 export const PersonTypeSchema = z.enum(PERSON_TYPE_VALUES);
@@ -33,15 +34,6 @@ export const KYC_STATUS_VALUES = [
 	"EXPIRED",
 ] as const;
 export const KYCStatusSchema = z.enum(KYC_STATUS_VALUES);
-
-// PEP Status values
-export const PEP_STATUS_VALUES = [
-	"PENDING",
-	"CONFIRMED",
-	"NOT_PEP",
-	"ERROR",
-] as const;
-export const PEPStatusSchema = z.enum(PEP_STATUS_VALUES);
 
 // Gender values
 export const GENDER_VALUES = ["M", "F", "OTHER"] as const;
@@ -335,7 +327,12 @@ export const ClientUpdateSchema = z.discriminatedUnion("personType", [
 
 // Patch schema: RFC cannot be changed, so we omit it
 export const ClientPatchSchema = z.object({
-	personType: PersonTypeSchema.optional(),
+	personType: z
+		.preprocess(
+			(val) => (typeof val === "string" ? val.toLowerCase() : val),
+			PersonTypeSchema,
+		)
+		.optional(),
 	firstName: z.string().min(1).optional().nullable(),
 	lastName: z.string().min(1).optional().nullable(),
 	secondLastName: z.string().optional().nullable(),
@@ -394,16 +391,6 @@ export const ClientPatchSchema = z.object({
 	kycCompletedAt: isoString.optional().nullable(),
 });
 
-// PEP Status update schema (for internal API use by pep-check-worker)
-export const ClientPEPStatusUpdateSchema = z.object({
-	isPEP: z.boolean(),
-	pepStatus: PEPStatusSchema,
-	pepDetails: z.string().optional().nullable(),
-	pepMatchConfidence: z.string().optional().nullable(), // "exact", "possible"
-	pepCheckedAt: isoString,
-	pepCheckSource: z.string().optional().nullable(), // "VECTORIZE", "GROK"
-});
-
 export const ClientFilterSchema = z.object({
 	search: z.string().min(2).max(100).optional(),
 	rfc: z
@@ -413,7 +400,13 @@ export const ClientFilterSchema = z.object({
 			"Invalid RFC",
 		)
 		.optional(),
-	personType: PersonTypeSchema.optional(),
+	personType: multiEnum(
+		z.preprocess(
+			(val) => (typeof val === "string" ? val.toLowerCase() : val),
+			PersonTypeSchema,
+		),
+	),
+	stateCode: multiEnum(z.string().min(1).max(10)),
 	page: z.coerce.number().int().min(1).default(1),
 	limit: z.coerce.number().int().min(1).max(100).default(10),
 });
@@ -586,11 +579,7 @@ export type ClientAddressUpdateInput = z.infer<
 	typeof ClientAddressUpdateSchema
 >;
 export type ClientAddressPatchInput = z.infer<typeof ClientAddressPatchSchema>;
-export type ClientPEPStatusUpdateInput = z.infer<
-	typeof ClientPEPStatusUpdateSchema
->;
 export type KYCStatus = z.infer<typeof KYCStatusSchema>;
-export type PEPStatus = z.infer<typeof PEPStatusSchema>;
 export type Gender = z.infer<typeof GenderSchema>;
 export type MaritalStatus = z.infer<typeof MaritalStatusSchema>;
 export type VerificationStatus = z.infer<typeof VerificationStatusSchema>;

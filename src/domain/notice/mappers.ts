@@ -48,6 +48,8 @@ export function mapPrismaNotice(prisma: PrismaNoticeModel): NoticeEntity {
 		generatedAt: mapDateTime(prisma.generatedAt),
 		submittedAt: mapDateTime(prisma.submittedAt),
 		satFolioNumber: prisma.satFolioNumber,
+		submitPdfDocumentId: prisma.submitPdfDocumentId,
+		ackPdfDocumentId: prisma.ackPdfDocumentId,
 		createdBy: prisma.createdBy,
 		notes: prisma.notes,
 		createdAt: mapDateTime(prisma.createdAt) ?? "",

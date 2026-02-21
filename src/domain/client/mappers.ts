@@ -6,6 +6,17 @@ import type {
 } from "@prisma/client";
 
 import { generateId } from "../../lib/id-generator";
+
+/**
+ * Safely parses JSON, returning null on parse errors instead of throwing.
+ */
+function safeJsonParse<T>(json: string): T | null {
+	try {
+		return JSON.parse(json);
+	} catch {
+		return null;
+	}
+}
 import type {
 	ClientAddressCreateInput,
 	ClientAddressPatchInput,
@@ -303,15 +314,39 @@ export function mapPrismaClient(
 					}
 				})()
 			: null,
-		// PEP status
+		// KYC progress (persisted fields)
+		kycCompletionPct: Number(record.kycCompletionPct) || 0,
+		documentsComplete: Number(record.documentsComplete) || 0,
+		documentsCount: Number(record.documentsCount) || 0,
+		documentsRequired: Number(record.documentsRequired) || 0,
+		shareholdersCount: Number(record.shareholdersCount) || 0,
+		beneficialControllersCount: Number(record.beneficialControllersCount) || 0,
+		// Threshold-aware KYC (Art. 17 LFPIORPI)
+		identificationRequired: Boolean(record.identificationRequired) || true,
+		identificationTier:
+			(record.identificationTier as
+				| "ALWAYS"
+				| "ABOVE_THRESHOLD"
+				| "BELOW_THRESHOLD") || "ALWAYS",
+		identificationThresholdMxn: record.identificationThresholdMxn
+			? Number(record.identificationThresholdMxn)
+			: null,
+		noticeThresholdMxn: record.noticeThresholdMxn
+			? Number(record.noticeThresholdMxn)
+			: null,
+		// Watchlist screening status
 		isPEP: Boolean(record.isPEP),
-		pepStatus:
-			(record.pepStatus as "PENDING" | "CONFIRMED" | "NOT_PEP" | "ERROR") ??
-			"PENDING",
-		pepDetails: record.pepDetails ?? null,
-		pepMatchConfidence: record.pepMatchConfidence ?? null,
-		pepCheckedAt: mapDateTime(record.pepCheckedAt),
-		pepCheckSource: record.pepCheckSource ?? null,
+		watchlistQueryId: record.watchlistQueryId ?? null,
+		ofacSanctioned: Boolean(record.ofacSanctioned),
+		unscSanctioned: Boolean(record.unscSanctioned),
+		sat69bListed: Boolean(record.sat69bListed),
+		adverseMediaFlagged: Boolean(record.adverseMediaFlagged),
+		screeningResult: record.screeningResult ?? "pending",
+		screenedAt: mapDateTime(record.screenedAt),
+		// Resolved catalog names
+		resolvedNames: record.resolvedNames
+			? safeJsonParse<Record<string, string>>(record.resolvedNames)
+			: null,
 		// Timestamps
 		createdAt: mapDateTime(record.createdAt) ?? new Date().toISOString(),
 		updatedAt: mapDateTime(record.updatedAt) ?? new Date().toISOString(),

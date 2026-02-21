@@ -1,6 +1,11 @@
 import type { ActivityHandler, ActivityAlertMetadata } from "./types";
 import type { OperationEntity } from "../types";
 import { CardExtensionSchema } from "../schemas";
+import type { CatalogFieldsConfig } from "../../catalog/name-resolver";
+
+export const CATALOG_FIELDS: CatalogFieldsConfig = {
+	cardTypeCode: { catalog: "pld-card-types", strategy: "BY_CODE" },
+};
 
 export const cardHandler: ActivityHandler = {
 	code: "TSC",

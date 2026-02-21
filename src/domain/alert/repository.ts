@@ -305,12 +305,12 @@ export class AlertRepository {
 			where.activityCode = activityCode;
 		}
 
-		if (status) {
-			where.status = status;
+		if (status?.length) {
+			where.status = { in: status };
 		}
 
-		if (severity) {
-			where.severity = severity;
+		if (severity?.length) {
+			where.severity = { in: severity };
 		}
 
 		if (isOverdue !== undefined) {

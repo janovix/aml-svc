@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import * as Sentry from "@sentry/cloudflare";
 
 import {
 	AddressIdParamSchema,
@@ -17,11 +18,11 @@ import {
 	ClientUpdateSchema,
 	DocumentIdParamSchema,
 	ClientRepository,
-	ClientPEPStatusUpdateSchema,
 } from "../domain/client";
 import type { Bindings } from "../types";
+import { createUsageRightsClient } from "../lib/usage-rights-client";
 import { createAlertQueueService } from "../lib/alert-queue";
-import { createPEPQueueService } from "../lib/pep-queue";
+import { createWatchlistSearchService } from "../lib/watchlist-search";
 import { getPrismaClient } from "../lib/prisma";
 import {
 	parseWithZod,
@@ -30,6 +31,10 @@ import {
 } from "../lib/route-helpers";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { APIError } from "../middleware/error";
+import { KycSessionService } from "../domain/kyc-session";
+import { OrganizationSettingsRepository } from "../domain/organization-settings";
+import { sendKYCInviteEmail } from "../lib/kyc-email";
+import { parseQueryParams } from "../lib/query-params";
 
 export const clientsRouter = new Hono<{
 	Bindings: Bindings;
@@ -47,7 +52,10 @@ function getService(
 clientsRouter.get("/", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
-	const queryObject = Object.fromEntries(url.searchParams.entries());
+	const queryObject = parseQueryParams(url.searchParams, [
+		"personType",
+		"stateCode",
+	]);
 	const filters = parseWithZod(ClientFilterSchema, queryObject);
 
 	const service = getService(c);
@@ -101,15 +109,16 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 		WHERE client_id = ${client.id}
 	`;
 
-	// Get UBOs for this client using raw query
-	const ubos = await prisma.$queryRaw<
+	// Get Beneficial Controllers for this client using raw query
+	// BCs replaced UBOs as the AML compliance entity after migration 0004
+	const beneficialControllers = await prisma.$queryRaw<
 		Array<{
 			id: string;
-			id_document_id: string | null;
+			id_copy_doc_id: string | null;
 		}>
 	>`
-		SELECT id, id_document_id
-		FROM ultimate_beneficial_owners
+		SELECT id, id_copy_doc_id
+		FROM beneficial_controllers
 		WHERE client_id = ${client.id}
 	`;
 
@@ -133,21 +142,21 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 	const verifiedDocs = documents.filter((d) => d.status === "VERIFIED").length;
 	const pendingDocs = documents.filter((d) => d.status === "PENDING").length;
 
-	// UBO requirements for MORAL/TRUST
-	const requiresUBO = ["MORAL", "TRUST"].includes(client.personType);
-	const hasUBO = ubos.length > 0;
-	const uboHasDocs = requiresUBO
-		? ubos.every((ubo) => ubo.id_document_id !== null)
+	// Beneficial Controller requirements for MORAL/TRUST
+	const requiresBC = ["MORAL", "TRUST"].includes(client.personType);
+	const hasBC = beneficialControllers.length > 0;
+	const bcHasDocs = requiresBC
+		? beneficialControllers.every((bc) => bc.id_copy_doc_id !== null)
 		: true;
 
 	// Calculate completion percentage
 	let totalRequirements = requiredDocs.length;
 	let completedRequirements = requiredDocs.length - missingDocs.length;
 
-	if (requiresUBO) {
-		totalRequirements += 2; // UBO exists + UBO has docs
-		if (hasUBO) completedRequirements += 1;
-		if (uboHasDocs) completedRequirements += 1;
+	if (requiresBC) {
+		totalRequirements += 2; // BC exists + BC has docs
+		if (hasBC) completedRequirements += 1;
+		if (bcHasDocs) completedRequirements += 1;
 	}
 
 	const completionPercentage =
@@ -157,12 +166,115 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 
 	// Determine overall KYC status
 	let kycStatus = "INCOMPLETE";
-	if (missingDocs.length === 0 && (!requiresUBO || hasUBO)) {
+	if (missingDocs.length === 0 && (!requiresBC || hasBC)) {
 		if (verifiedDocs === documents.length && documents.length > 0) {
 			kycStatus = "COMPLETE";
 		} else if (pendingDocs > 0) {
 			kycStatus = "PENDING_VERIFICATION";
 		}
+	}
+
+	// ── Threshold-aware KYC status (Art. 17 LFPIORPI) ──────────────────────
+	// Get org settings to compute thresholds
+	let identificationRequired = true;
+	let identificationTier: "ALWAYS" | "ABOVE_THRESHOLD" | "BELOW_THRESHOLD" =
+		"ALWAYS";
+	let identificationThresholdMxn: number | null = null;
+	let noticeThresholdMxn: number | null = null;
+	let maxSingleOperationMxn = 0;
+	let sixMonthCumulativeMxn = 0;
+	let singleOpExceedsThreshold = false;
+	let cumulativeExceedsNoticeThreshold = false;
+	let identificationThresholdPct = 100;
+	let noticeThresholdPct = 100;
+
+	try {
+		const { OrganizationSettingsRepository: OrgSettingsRepo } = await import(
+			"../domain/organization-settings/repository"
+		);
+		const { getIdentificationThresholdUma, getNoticeThresholdUma } =
+			await import("../domain/operation/activities/registry");
+		const { UmaValueRepository } = await import("../domain/uma/repository");
+
+		const orgSettingsRepo = new OrgSettingsRepo(prisma);
+		const umaRepo = new UmaValueRepository(prisma);
+
+		const [orgSettings, umaValue] = await Promise.all([
+			orgSettingsRepo.findByOrganizationId(organizationId),
+			umaRepo.getActive(),
+		]);
+
+		if (orgSettings && umaValue) {
+			const activityCode =
+				orgSettings.activityKey as import("../domain/operation/types").ActivityCode;
+			const idThresholdUma = getIdentificationThresholdUma(activityCode);
+			const noticeThresholdUma = getNoticeThresholdUma(activityCode);
+			const dailyValue = parseFloat(umaValue.dailyValue);
+
+			if (idThresholdUma === "ALWAYS") {
+				identificationTier = "ALWAYS";
+				identificationRequired = true;
+			} else {
+				const idMxn = idThresholdUma * dailyValue;
+				const noticeMxn =
+					noticeThresholdUma === "ALWAYS"
+						? 0
+						: (noticeThresholdUma as number) * dailyValue;
+
+				identificationThresholdMxn = idMxn;
+				noticeThresholdMxn = noticeMxn > 0 ? noticeMxn : null;
+
+				// Compute client's operation amounts
+				const maxOpResult = await prisma.operation.aggregate({
+					where: { clientId: client.id, deletedAt: null },
+					_max: { amount: true },
+				});
+				const maxOp = maxOpResult._max.amount;
+				maxSingleOperationMxn =
+					maxOp === null
+						? 0
+						: typeof maxOp === "number"
+							? maxOp
+							: parseFloat(maxOp.toString());
+
+				const sixMonthsAgo = new Date();
+				sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+				const cumulativeResult = await prisma.operation.aggregate({
+					where: {
+						clientId: client.id,
+						deletedAt: null,
+						operationDate: { gte: sixMonthsAgo },
+					},
+					_sum: { amount: true },
+				});
+				const cumulativeOp = cumulativeResult._sum.amount;
+				sixMonthCumulativeMxn =
+					cumulativeOp === null
+						? 0
+						: typeof cumulativeOp === "number"
+							? cumulativeOp
+							: parseFloat(cumulativeOp.toString());
+
+				singleOpExceedsThreshold = maxSingleOperationMxn >= idMxn;
+				cumulativeExceedsNoticeThreshold =
+					noticeMxn > 0 && sixMonthCumulativeMxn >= noticeMxn;
+
+				identificationRequired =
+					singleOpExceedsThreshold || cumulativeExceedsNoticeThreshold;
+				identificationTier = identificationRequired
+					? "ABOVE_THRESHOLD"
+					: "BELOW_THRESHOLD";
+
+				identificationThresholdPct =
+					idMxn > 0 ? Math.round((maxSingleOperationMxn / idMxn) * 100) : 0;
+				noticeThresholdPct =
+					noticeMxn > 0
+						? Math.round((sixMonthCumulativeMxn / noticeMxn) * 100)
+						: 0;
+			}
+		}
+	} catch (err) {
+		console.warn("[kyc-status] Could not compute threshold info:", err);
 	}
 
 	return c.json({
@@ -178,19 +290,32 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 			pending: pendingDocs,
 			total: documents.length,
 		},
-		ubos: requiresUBO
+		beneficialControllers: requiresBC
 			? {
 					required: true,
-					hasUBO,
-					count: ubos.length,
-					allHaveDocuments: uboHasDocs,
+					hasBC,
+					count: beneficialControllers.length,
+					allHaveDocuments: bcHasDocs,
 				}
 			: { required: false },
-		// PEP status will be available after Prisma regeneration
+		// Screening status based on client watchlist data
 		pep: {
 			status: "PENDING",
 			isPEP: false,
 			checkedAt: null,
+		},
+		// Threshold-aware KYC (Art. 17 LFPIORPI)
+		threshold: {
+			identificationRequired,
+			identificationTier,
+			identificationThresholdMxn,
+			maxSingleOperationMxn,
+			singleOpExceedsThreshold,
+			noticeThresholdMxn,
+			sixMonthCumulativeMxn,
+			cumulativeExceedsNoticeThreshold,
+			identificationThresholdPct,
+			noticeThresholdPct,
 		},
 	});
 });
@@ -209,6 +334,28 @@ clientsRouter.get("/:id", async (c) => {
 
 clientsRouter.post("/", async (c) => {
 	const organizationId = getOrganizationId(c);
+
+	// Gate check: verify org has quota for clients (meter is incremented atomically)
+	const usageRights = createUsageRightsClient(c.env);
+	const gateResult = await usageRights.gate(organizationId, "clients");
+	if (!gateResult.allowed) {
+		return c.json(
+			{
+				success: false,
+				error: gateResult.error ?? "usage_limit_exceeded",
+				code: "USAGE_LIMIT_EXCEEDED",
+				upgradeRequired: true,
+				metric: "clients",
+				used: gateResult.used,
+				limit: gateResult.limit,
+				entitlementType: gateResult.entitlementType,
+				message:
+					"You have reached the limit for clients. Please upgrade your plan or contact your administrator.",
+			},
+			403,
+		);
+	}
+
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientCreateSchema, body);
 
@@ -221,14 +368,85 @@ clientsRouter.post("/", async (c) => {
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 	await alertQueue.queueClientCreated(created.id);
 
-	// Queue PEP check for new client (non-blocking)
-	const pepQueue = createPEPQueueService(c.env.PEP_CHECK_QUEUE);
+	// Trigger watchlist search (non-blocking)
+	const watchlistSearch = createWatchlistSearchService(c.env.WATCHLIST_SERVICE);
 	const fullName = getClientDisplayName(created);
+	const user = c.get("user");
 	if (fullName) {
-		await pepQueue.queueClientPEPCheck(created.id, fullName, {
-			organizationId,
-			triggeredBy: "create",
-		});
+		c.executionCtx.waitUntil(
+			(async () => {
+				const result = await watchlistSearch.triggerSearch({
+					query: fullName,
+					entityType:
+						created.personType === "physical" ? "person" : "organization",
+					organizationId,
+					userId: user?.id ?? "unknown",
+					birthDate: created.birthDate || undefined,
+					identifiers: created.rfc ? [created.rfc] : undefined,
+					countries: created.nationality ? [created.nationality] : undefined,
+				});
+
+				if (result?.queryId) {
+					// Update client with watchlistQueryId and sync enrichment flags
+					const prisma = getPrismaClient(c.env.DB);
+					const isFlagged =
+						result.ofacCount > 0 ||
+						result.unscCount > 0 ||
+						result.sat69bCount > 0;
+					await prisma.client.update({
+						where: { id: created.id },
+						data: {
+							watchlistQueryId: result.queryId,
+							ofacSanctioned: result.ofacCount > 0,
+							unscSanctioned: result.unscCount > 0,
+							sat69bListed: result.sat69bCount > 0,
+							screeningResult: isFlagged ? "flagged" : "pending",
+							screenedAt: new Date(),
+						},
+					});
+					console.log(
+						`[Client Create] Watchlist search initiated, queryId: ${result.queryId}, sync flags: OFAC=${result.ofacCount > 0}, UNSC=${result.unscCount > 0}, SAT=${result.sat69bCount > 0}`,
+					);
+				}
+			})(),
+		);
+	}
+
+	// Auto-create KYC session if self-service mode is "automatic" (non-blocking)
+	if (created.email) {
+		c.executionCtx.waitUntil(
+			(async () => {
+				try {
+					const prisma = getPrismaClient(c.env.DB);
+					const orgSettingsRepo = new OrganizationSettingsRepository(prisma);
+					const orgSettings =
+						await orgSettingsRepo.findByOrganizationId(organizationId);
+
+					if (orgSettings?.selfServiceMode === "automatic") {
+						const kycService = new KycSessionService(prisma);
+						const session = await kycService.create(
+							organizationId,
+							{ clientId: created.id, createdBy: "system" },
+							prisma,
+						);
+
+						const clientName = created.firstName
+							? `${created.firstName} ${created.lastName ?? ""}`.trim()
+							: (created.businessName ?? "Cliente");
+
+						await sendKYCInviteEmail(c.env, created.email, session, {
+							clientName,
+						});
+						await kycService.recordEmailSent(session.id);
+					}
+				} catch (err) {
+					console.error(
+						"[Client Create] Failed to auto-create KYC session:",
+						err,
+					);
+				}
+			})(),
+		);
 	}
 
 	return c.json(created, 201);
@@ -249,14 +467,48 @@ clientsRouter.put("/:id", async (c) => {
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 	await alertQueue.queueClientUpdated(updated.id);
 
-	// Queue PEP check for updated client (non-blocking)
-	const pepQueue = createPEPQueueService(c.env.PEP_CHECK_QUEUE);
+	// Trigger watchlist search (non-blocking)
+	const watchlistSearch = createWatchlistSearchService(c.env.WATCHLIST_SERVICE);
 	const fullName = getClientDisplayName(updated);
+	const user = c.get("user");
 	if (fullName) {
-		await pepQueue.queueClientPEPCheck(updated.id, fullName, {
-			organizationId,
-			triggeredBy: "update",
-		});
+		c.executionCtx.waitUntil(
+			(async () => {
+				const result = await watchlistSearch.triggerSearch({
+					query: fullName,
+					entityType:
+						updated.personType === "physical" ? "person" : "organization",
+					organizationId,
+					userId: user?.id ?? "unknown",
+					birthDate: updated.birthDate || undefined,
+					identifiers: updated.rfc ? [updated.rfc] : undefined,
+					countries: updated.nationality ? [updated.nationality] : undefined,
+				});
+
+				if (result?.queryId) {
+					// Update client with watchlistQueryId and sync enrichment flags
+					const prisma = getPrismaClient(c.env.DB);
+					const isFlagged =
+						result.ofacCount > 0 ||
+						result.unscCount > 0 ||
+						result.sat69bCount > 0;
+					await prisma.client.update({
+						where: { id: updated.id },
+						data: {
+							watchlistQueryId: result.queryId,
+							ofacSanctioned: result.ofacCount > 0,
+							unscSanctioned: result.unscCount > 0,
+							sat69bListed: result.sat69bCount > 0,
+							screeningResult: isFlagged ? "flagged" : "pending",
+							screenedAt: new Date(),
+						},
+					});
+					console.log(
+						`[Client Update] Watchlist search initiated, queryId: ${result.queryId}, sync flags: OFAC=${result.ofacCount > 0}, UNSC=${result.unscCount > 0}, SAT=${result.sat69bCount > 0}`,
+					);
+				}
+			})(),
+		);
 	}
 
 	return c.json(updated);
@@ -281,21 +533,60 @@ clientsRouter.patch("/:id", async (c) => {
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 	await alertQueue.queueClientUpdated(updated.id);
 
-	// Queue PEP check if name-related fields changed
-	const nameFieldsChanged =
+	// Trigger watchlist search if screening-relevant fields changed
+	const screeningFieldsChanged =
 		payload.firstName !== undefined ||
 		payload.lastName !== undefined ||
 		payload.secondLastName !== undefined ||
-		payload.businessName !== undefined;
+		payload.businessName !== undefined ||
+		payload.birthDate !== undefined ||
+		payload.nationality !== undefined ||
+		"rfc" in payload;
 
-	if (nameFieldsChanged) {
-		const pepQueue = createPEPQueueService(c.env.PEP_CHECK_QUEUE);
+	if (screeningFieldsChanged) {
+		const watchlistSearch = createWatchlistSearchService(
+			c.env.WATCHLIST_SERVICE,
+		);
 		const fullName = getClientDisplayName(updated);
+		const user = c.get("user");
 		if (fullName) {
-			await pepQueue.queueClientPEPCheck(updated.id, fullName, {
-				organizationId,
-				triggeredBy: "update",
-			});
+			c.executionCtx.waitUntil(
+				(async () => {
+					const result = await watchlistSearch.triggerSearch({
+						query: fullName,
+						entityType:
+							updated.personType === "physical" ? "person" : "organization",
+						organizationId,
+						userId: user?.id ?? "unknown",
+						birthDate: updated.birthDate || undefined,
+						identifiers: updated.rfc ? [updated.rfc] : undefined,
+						countries: updated.nationality ? [updated.nationality] : undefined,
+					});
+
+					if (result?.queryId) {
+						// Update client with watchlistQueryId and sync enrichment flags
+						const prisma = getPrismaClient(c.env.DB);
+						const isFlagged =
+							result.ofacCount > 0 ||
+							result.unscCount > 0 ||
+							result.sat69bCount > 0;
+						await prisma.client.update({
+							where: { id: updated.id },
+							data: {
+								watchlistQueryId: result.queryId,
+								ofacSanctioned: result.ofacCount > 0,
+								unscSanctioned: result.unscCount > 0,
+								sat69bListed: result.sat69bCount > 0,
+								screeningResult: isFlagged ? "flagged" : "pending",
+								screenedAt: new Date(),
+							},
+						});
+						console.log(
+							`[Client Patch] Watchlist search initiated, queryId: ${result.queryId}, sync flags: OFAC=${result.ofacCount > 0}, UNSC=${result.unscCount > 0}, SAT=${result.sat69bCount > 0}`,
+						);
+					}
+				})(),
+			);
 		}
 	}
 
@@ -501,7 +792,10 @@ clientsInternalRouter.get("/", async (c) => {
 
 	try {
 		const url = new URL(c.req.url);
-		const queryObject = Object.fromEntries(url.searchParams.entries());
+		const queryObject = parseQueryParams(url.searchParams, [
+			"personType",
+			"stateCode",
+		]);
 		const filters = parseWithZod(ClientFilterSchema, queryObject);
 
 		const service = getInternalService(c);
@@ -509,7 +803,43 @@ clientsInternalRouter.get("/", async (c) => {
 
 		return c.json(result);
 	} catch (error) {
-		console.error("[InternalClients] GET error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-clients-get-error" },
+		});
+		const { message, details } = formatInternalError(error);
+		const status = error instanceof APIError ? error.statusCode : 500;
+		return c.json({ error: "Error", message, details }, status as 400);
+	}
+});
+
+/**
+ * GET /internal/clients/by-rfc/:rfc
+ * Lookup a single client by exact RFC match (internal, called by worker)
+ */
+clientsInternalRouter.get("/by-rfc/:rfc", async (c) => {
+	const organizationId = c.req.header("X-Organization-Id");
+	if (!organizationId) {
+		return c.json(
+			{ error: "Bad Request", message: "Missing X-Organization-Id header" },
+			400,
+		);
+	}
+
+	const rfc = c.req.param("rfc");
+
+	try {
+		const service = getInternalService(c);
+		const client = await service.findByRfc(organizationId, rfc);
+
+		if (!client) {
+			return c.json({ error: "Not Found", message: "Client not found" }, 404);
+		}
+
+		return c.json({ id: client.id });
+	} catch (error) {
+		Sentry.captureException(error, {
+			tags: { context: "internal-clients-by-rfc-error" },
+		});
 		const { message, details } = formatInternalError(error);
 		const status = error instanceof APIError ? error.statusCode : 500;
 		return c.json({ error: "Error", message, details }, status as 400);
@@ -540,9 +870,56 @@ clientsInternalRouter.post("/", async (c) => {
 		const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 		await alertQueue.queueClientCreated(created.id);
 
+		// Trigger watchlist screening (non-blocking) — mirrors the public POST /clients
+		const watchlistSearch = createWatchlistSearchService(
+			c.env.WATCHLIST_SERVICE,
+		);
+		const fullName = getClientDisplayName(created);
+		if (fullName) {
+			c.executionCtx.waitUntil(
+				(async () => {
+					const result = await watchlistSearch.triggerSearch({
+						query: fullName,
+						entityType:
+							created.personType === "physical" ? "person" : "organization",
+						organizationId,
+						userId: "import-worker",
+						source: "import",
+						birthDate: created.birthDate || undefined,
+						identifiers: created.rfc ? [created.rfc] : undefined,
+						countries: created.nationality ? [created.nationality] : undefined,
+					});
+
+					if (result?.queryId) {
+						const prisma = getPrismaClient(c.env.DB);
+						const isFlagged =
+							result.ofacCount > 0 ||
+							result.unscCount > 0 ||
+							result.sat69bCount > 0;
+						await prisma.client.update({
+							where: { id: created.id },
+							data: {
+								watchlistQueryId: result.queryId,
+								ofacSanctioned: result.ofacCount > 0,
+								unscSanctioned: result.unscCount > 0,
+								sat69bListed: result.sat69bCount > 0,
+								screeningResult: isFlagged ? "flagged" : "pending",
+								screenedAt: new Date(),
+							},
+						});
+						console.log(
+							`[Internal Client Create] Watchlist screening done, queryId: ${result.queryId}, OFAC=${result.ofacCount > 0}, UNSC=${result.unscCount > 0}, SAT=${result.sat69bCount > 0}`,
+						);
+					}
+				})(),
+			);
+		}
+
 		return c.json(created, 201);
 	} catch (error) {
-		console.error("[InternalClients] POST error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-clients-post-error" },
+		});
 		const { message, details } = formatInternalError(error);
 
 		// Return 409 for duplicate key errors
@@ -559,54 +936,9 @@ clientsInternalRouter.post("/", async (c) => {
 });
 
 // ============================================================================
-// Internal PEP Status endpoints (for pep-check-worker)
+// Internal Watchlist Screening endpoints
 // ============================================================================
 
-/**
- * PATCH /internal/clients/:id/pep-status
- * Update PEP status for a client (called by pep-check-worker)
- * Note: Uses raw SQL until Prisma client is regenerated with new schema fields
- */
-clientsInternalRouter.patch("/:id/pep-status", async (c) => {
-	const clientId = c.req.param("id");
-	const body = await c.req.json();
-
-	try {
-		const payload = parseWithZod(ClientPEPStatusUpdateSchema, body);
-		const prisma = getPrismaClient(c.env.DB);
-
-		// Use raw SQL to bypass Prisma type checking until client is regenerated
-		await prisma.$executeRaw`
-			UPDATE clients 
-			SET 
-				is_pep = ${payload.isPEP ? 1 : 0},
-				pep_status = ${payload.pepStatus},
-				pep_details = ${payload.pepDetails ?? null},
-				pep_match_confidence = ${payload.pepMatchConfidence ?? null},
-				pep_checked_at = ${new Date(payload.pepCheckedAt).toISOString()},
-				pep_check_source = ${payload.pepCheckSource ?? null},
-				updated_at = ${new Date().toISOString()}
-			WHERE id = ${clientId}
-		`;
-
-		return c.json({ success: true });
-	} catch (error) {
-		console.error("[InternalClients] PATCH pep-status error:", error);
-		if (error instanceof APIError) {
-			return c.json({ error: error.message }, error.statusCode as 400);
-		}
-		if (error instanceof Error) {
-			return c.json({ error: error.message }, 500);
-		}
-		return c.json({ error: "Unknown error" }, 500);
-	}
-});
-
-/**
- * GET /internal/clients/stale-pep-checks
- * Get clients with stale PEP checks (for cron refresh)
- * Note: Uses raw SQL until Prisma client is regenerated with new schema fields
- */
 clientsInternalRouter.get("/stale-pep-checks", async (c) => {
 	const thresholdStr = c.req.query("threshold");
 	const limitStr = c.req.query("limit");
@@ -646,7 +978,7 @@ clientsInternalRouter.get("/stale-pep-checks", async (c) => {
 				business_name
 			FROM clients
 			WHERE deleted_at IS NULL
-			AND (pep_checked_at IS NULL OR pep_checked_at < ${threshold.toISOString()})
+			AND (screened_at IS NULL OR screened_at < ${threshold.toISOString()})
 			LIMIT ${limit}
 		`;
 
@@ -662,7 +994,9 @@ clientsInternalRouter.get("/stale-pep-checks", async (c) => {
 			})),
 		});
 	} catch (error) {
-		console.error("[InternalClients] GET stale-pep-checks error:", error);
+		Sentry.captureException(error, {
+			tags: { context: "internal-clients-get-stale-screening-error" },
+		});
 		return c.json({ error: "Failed to get stale clients" }, 500);
 	}
 });

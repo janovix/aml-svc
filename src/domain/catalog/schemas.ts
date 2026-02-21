@@ -43,12 +43,12 @@ const optionalSearchString = z.preprocess((val) => {
 		return trimmed === "" ? undefined : trimmed;
 	}
 	return val;
-}, z.string().min(2, "search must be at least 2 characters long").max(100, "search must be at most 100 characters long").optional());
+}, z.string().min(1, "search must be at least 1 character long").max(100, "search must be at most 100 characters long").optional());
 
 export const CatalogListQuerySchema = z.object({
 	search: optionalSearchString,
 	page: z.coerce.number().int().min(1).default(1),
-	pageSize: z.coerce.number().int().min(1).max(100).default(10),
+	pageSize: z.coerce.number().int().min(1).max(200).default(10),
 	active: booleanFromQuery.optional(),
 	// Metadata filters for specialized queries
 	vaCode: z.string().max(10).optional(), // Filter by va_code in metadata (for alert types)

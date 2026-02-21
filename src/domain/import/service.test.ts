@@ -14,6 +14,7 @@ import type {
 	ImportRowResultEntity,
 	ImportWithResults,
 	ListResult,
+	ListResultWithMeta,
 } from "./types";
 
 describe("ImportService", () => {
@@ -27,6 +28,7 @@ describe("ImportService", () => {
 		id: "import_123",
 		organizationId,
 		entityType: "CLIENT",
+		activityCode: null,
 		fileName: "test.csv",
 		fileUrl: "https://example.com/test.csv",
 		fileSize: 1024,
@@ -69,7 +71,7 @@ describe("ImportService", () => {
 				limit: 10,
 			};
 
-			const expected: ListResult<ImportEntity> = {
+			const expected: ListResultWithMeta<ImportEntity> = {
 				data: [mockImport],
 				pagination: {
 					page: 1,
@@ -77,6 +79,7 @@ describe("ImportService", () => {
 					total: 1,
 					totalPages: 1,
 				},
+				filterMeta: [],
 			};
 
 			vi.mocked(mockRepository.list).mockResolvedValue(expected);

@@ -24,10 +24,8 @@
 			"id": "test-cache-id",
 		},
 	],
-	// No service binding for tests - falls back to regular fetch via AUTH_SERVICE_URL
 	"vars": {
 		"ENVIRONMENT": "test",
-		"AUTH_SERVICE_URL": "https://auth-svc.test",
 		"AUTH_JWKS_CACHE_TTL": "3600",
 		"TRUSTED_ORIGINS": "*.test.janovix.com,http://localhost:*",
 	},

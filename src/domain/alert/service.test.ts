@@ -155,6 +155,7 @@ describe("AlertService", () => {
 
 	const mockAlert: AlertEntity = {
 		id: "alert-123",
+		organizationId: "org-123",
 		alertRuleId: "2501",
 		clientId: "client-123",
 		status: "DETECTED",
