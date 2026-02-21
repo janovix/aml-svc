@@ -7,6 +7,7 @@ import type {
 } from "./schemas";
 import type {
 	NoticeEntity,
+	NoticeAlertDetail,
 	ListResultWithMeta,
 	NoticeWithAlertSummary,
 	NoticePeriod,
@@ -62,8 +63,8 @@ export class NoticeService {
 	}
 
 	/**
-	 * Preview alerts that would be included in a notice for a given month
-	 * Uses the SAT 17-17 period cycle
+	 * Preview alerts that would be included in a notice for a given month.
+	 * Returns both aggregate stats and individual alert details for selection.
 	 */
 	async preview(
 		organizationId: string,
@@ -72,6 +73,7 @@ export class NoticeService {
 		total: number;
 		bySeverity: Record<string, number>;
 		byStatus: Record<string, number>;
+		alerts: NoticeAlertDetail[];
 		periodStart: string;
 		periodEnd: string;
 		reportedMonth: string;
@@ -81,14 +83,22 @@ export class NoticeService {
 		const period = calculateNoticePeriod(input.year, input.month);
 		const deadline = getNoticeSubmissionDeadline(input.year, input.month);
 
-		const stats = await this.repository.countAlertsForPeriod(
-			organizationId,
-			period.start,
-			period.end,
-		);
+		const [stats, alerts] = await Promise.all([
+			this.repository.countAlertsForPeriod(
+				organizationId,
+				period.start,
+				period.end,
+			),
+			this.repository.getAlertsForPeriodDetailed(
+				organizationId,
+				period.start,
+				period.end,
+			),
+		]);
 
 		return {
 			...stats,
+			alerts,
 			periodStart: period.start.toISOString(),
 			periodEnd: period.end.toISOString(),
 			reportedMonth: period.reportedMonth,
@@ -98,10 +108,12 @@ export class NoticeService {
 	}
 
 	/**
-	 * Create a new notice
-	 * Automatically calculates the 17-17 period from year/month
-	 * Allows creating multiple notices for the same period as long as
-	 * there is no pending (DRAFT/GENERATED) notice
+	 * Create a new notice.
+	 *
+	 * Alert assignment modes based on `alertIds`:
+	 *   - `undefined`: assign ALL eligible alerts in the period (backward-compatible)
+	 *   - `[...ids]`: assign only the specified alerts
+	 *   - `[]`: empty notice (zero-activity)
 	 */
 	async create(
 		input: NoticeCreateInput,
@@ -110,8 +122,6 @@ export class NoticeService {
 	): Promise<NoticeEntity> {
 		const period = calculateNoticePeriod(input.year, input.month);
 
-		// Check if a pending notice exists for this period
-		// Only block if there's a DRAFT or GENERATED notice in progress
 		const hasPending = await this.repository.hasPendingNoticeForPeriod(
 			organizationId,
 			period.reportedMonth,
@@ -121,22 +131,38 @@ export class NoticeService {
 			throw new Error("NOTICE_ALREADY_EXISTS_FOR_PERIOD");
 		}
 
-		// Create the notice
 		const notice = await this.repository.create(
 			input,
 			organizationId,
 			createdBy,
 		);
 
-		// Assign alerts to the notice
-		const alertCount = await this.repository.assignAlertsToNotice(
-			organizationId,
-			notice.id,
-			period.start,
-			period.end,
-		);
+		let alertCount: number;
+		if (input.alertIds === undefined) {
+			alertCount = await this.repository.assignAlertsToNotice(
+				organizationId,
+				notice.id,
+				period.start,
+				period.end,
+			);
+		} else if (input.alertIds.length > 0) {
+			alertCount = await this.repository.assignSpecificAlertsToNotice(
+				organizationId,
+				notice.id,
+				input.alertIds,
+			);
+		} else {
+			alertCount = 0;
+		}
 
-		// Return updated notice with correct count
+		await this.repository.createEvent({
+			noticeId: notice.id,
+			organizationId,
+			eventType: "CREATED",
+			toStatus: "DRAFT",
+			createdBy,
+		});
+
 		return {
 			...notice,
 			recordCount: alertCount,
@@ -183,9 +209,6 @@ export class NoticeService {
 		);
 	}
 
-	/**
-	 * Mark a notice as generated with XML file URL
-	 */
 	async markAsGenerated(
 		organizationId: string,
 		id: string,
@@ -193,41 +216,93 @@ export class NoticeService {
 			xmlFileUrl?: string | null;
 			fileSize?: number | null;
 		},
+		createdBy?: string,
 	): Promise<NoticeEntity> {
-		return this.repository.markAsGenerated(organizationId, id, options);
+		return this.repository.markAsGenerated(
+			organizationId,
+			id,
+			options,
+			createdBy,
+		);
 	}
 
-	/**
-	 * Mark notice as submitted to SAT
-	 */
 	async markAsSubmitted(
 		organizationId: string,
 		id: string,
 		docSvcDocumentId: string,
-		satFolioNumber?: string,
+		createdBy?: string,
 	): Promise<NoticeEntity> {
 		return this.repository.markAsSubmitted(
 			organizationId,
 			id,
 			docSvcDocumentId,
-			satFolioNumber,
+			createdBy,
 		);
 	}
 
-	/**
-	 * Mark notice as acknowledged by SAT
-	 */
 	async markAsAcknowledged(
 		organizationId: string,
 		id: string,
-		satFolioNumber: string,
 		docSvcDocumentId: string,
+		createdBy?: string,
 	): Promise<NoticeEntity> {
 		return this.repository.markAsAcknowledged(
 			organizationId,
 			id,
-			satFolioNumber,
 			docSvcDocumentId,
+			createdBy,
+		);
+	}
+
+	async markAsRebuked(
+		organizationId: string,
+		id: string,
+		docSvcDocumentId: string,
+		notes?: string | null,
+		createdBy?: string,
+	): Promise<NoticeEntity> {
+		return this.repository.markAsRebuked(
+			organizationId,
+			id,
+			docSvcDocumentId,
+			notes,
+			createdBy,
+		);
+	}
+
+	async revertToDraft(
+		organizationId: string,
+		id: string,
+		createdBy?: string,
+	): Promise<NoticeEntity> {
+		return this.repository.revertToDraft(organizationId, id, createdBy);
+	}
+
+	async addAlerts(
+		organizationId: string,
+		noticeId: string,
+		alertIds: string[],
+		createdBy?: string,
+	): Promise<number> {
+		return this.repository.addAlertsToNotice(
+			organizationId,
+			noticeId,
+			alertIds,
+			createdBy,
+		);
+	}
+
+	async removeAlerts(
+		organizationId: string,
+		noticeId: string,
+		alertIds: string[],
+		createdBy?: string,
+	): Promise<number> {
+		return this.repository.removeAlertsFromNotice(
+			organizationId,
+			noticeId,
+			alertIds,
+			createdBy,
 		);
 	}
 

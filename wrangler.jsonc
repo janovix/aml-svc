@@ -62,6 +62,9 @@
 			},
 		],
 	},
+	"triggers": {
+		"crons": ["0 14 * * *"],
+	},
 	"vars": {
 		"ENVIRONMENT": "dev",
 		"AUTH_JWKS_CACHE_TTL": "3600",

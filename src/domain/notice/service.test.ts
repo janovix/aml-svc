@@ -178,6 +178,7 @@ describe("NoticeService", () => {
 		periodEnd: "2024-01-16T23:59:59.999Z",
 		reportedMonth: "202401",
 		recordCount: 0,
+		amendmentCycle: 0,
 		createdAt: "2024-01-15T00:00:00.000Z",
 		updatedAt: "2024-01-15T00:00:00.000Z",
 	};
@@ -190,6 +191,7 @@ describe("NoticeService", () => {
 			getNoticeStatsForPeriod: vi.fn(),
 			create: vi.fn(),
 			assignAlertsToNotice: vi.fn(),
+			assignSpecificAlertsToNotice: vi.fn(),
 			list: vi.fn(),
 			get: vi.fn(),
 			getWithAlertSummary: vi.fn(),
@@ -197,10 +199,17 @@ describe("NoticeService", () => {
 			delete: vi.fn(),
 			countAlertsForPeriod: vi.fn(),
 			getAlertsForNotice: vi.fn(),
+			getAlertsForPeriodDetailed: vi.fn(),
 			getAlertsWithTransactionsForNotice: vi.fn(),
 			markAsGenerated: vi.fn(),
 			markAsSubmitted: vi.fn(),
 			markAsAcknowledged: vi.fn(),
+			markAsRebuked: vi.fn(),
+			revertToDraft: vi.fn(),
+			addAlertsToNotice: vi.fn(),
+			removeAlertsFromNotice: vi.fn(),
+			createEvent: vi.fn().mockResolvedValue({}),
+			getEventsForNotice: vi.fn(),
 		} as unknown as NoticeRepository;
 
 		service = new NoticeService(mockRepository);

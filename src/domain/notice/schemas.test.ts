@@ -8,6 +8,9 @@ import {
 	NoticePreviewSchema,
 	NoticeSubmitSchema,
 	NoticeAcknowledgeSchema,
+	NoticeRebukeSchema,
+	NoticeAddAlertsSchema,
+	NoticeRemoveAlertsSchema,
 } from "./schemas";
 
 describe("Notice Schemas", () => {
@@ -17,6 +20,7 @@ describe("Notice Schemas", () => {
 			expect(NoticeStatusSchema.parse("GENERATED")).toBe("GENERATED");
 			expect(NoticeStatusSchema.parse("SUBMITTED")).toBe("SUBMITTED");
 			expect(NoticeStatusSchema.parse("ACKNOWLEDGED")).toBe("ACKNOWLEDGED");
+			expect(NoticeStatusSchema.parse("REBUKED")).toBe("REBUKED");
 		});
 
 		it("should reject invalid notice statuses", () => {
@@ -210,20 +214,6 @@ describe("Notice Schemas", () => {
 				notes: null,
 			});
 		});
-
-		it("should allow updating satFolioNumber", () => {
-			expect(NoticePatchSchema.parse({ satFolioNumber: "SAT-12345" })).toEqual({
-				satFolioNumber: "SAT-12345",
-			});
-		});
-
-		it("should reject satFolioNumber over 100 characters", () => {
-			expect(() =>
-				NoticePatchSchema.parse({
-					satFolioNumber: "A".repeat(101),
-				}),
-			).toThrow();
-		});
 	});
 
 	describe("NoticeFilterSchema", () => {
@@ -285,66 +275,76 @@ describe("Notice Schemas", () => {
 	});
 
 	describe("NoticeSubmitSchema", () => {
-		it("should accept optional satFolioNumber", () => {
+		it("should require docSvcDocumentId", () => {
+			expect(() => NoticeSubmitSchema.parse({})).toThrow();
+		});
+
+		it("should accept valid docSvcDocumentId", () => {
 			const result = NoticeSubmitSchema.parse({
 				docSvcDocumentId: "DOC-123",
 			});
-			expect(result.satFolioNumber).toBeUndefined();
 			expect(result.docSvcDocumentId).toBe("DOC-123");
-		});
-
-		it("should accept satFolioNumber when provided", () => {
-			const result = NoticeSubmitSchema.parse({
-				satFolioNumber: "SAT-12345-ABC",
-				docSvcDocumentId: "DOC-456",
-			});
-			expect(result.satFolioNumber).toBe("SAT-12345-ABC");
-			expect(result.docSvcDocumentId).toBe("DOC-456");
-		});
-
-		it("should reject satFolioNumber over 100 characters", () => {
-			expect(() =>
-				NoticeSubmitSchema.parse({
-					satFolioNumber: "A".repeat(101),
-					docSvcDocumentId: "DOC-789",
-				}),
-			).toThrow();
 		});
 	});
 
 	describe("NoticeAcknowledgeSchema", () => {
-		it("should require satFolioNumber", () => {
-			expect(() =>
-				NoticeAcknowledgeSchema.parse({
-					docSvcDocumentId: "DOC-123",
-				}),
-			).toThrow();
+		it("should require docSvcDocumentId", () => {
+			expect(() => NoticeAcknowledgeSchema.parse({})).toThrow();
 		});
 
-		it("should accept valid satFolioNumber", () => {
+		it("should accept valid docSvcDocumentId", () => {
 			const result = NoticeAcknowledgeSchema.parse({
-				satFolioNumber: "SAT-ACK-12345",
 				docSvcDocumentId: "DOC-ACK-123",
 			});
-			expect(result.satFolioNumber).toBe("SAT-ACK-12345");
 			expect(result.docSvcDocumentId).toBe("DOC-ACK-123");
 		});
+	});
 
-		it("should reject empty satFolioNumber", () => {
-			expect(() =>
-				NoticeAcknowledgeSchema.parse({
-					satFolioNumber: "",
-					docSvcDocumentId: "DOC-123",
-				}),
-			).toThrow();
+	describe("NoticeRebukeSchema", () => {
+		it("should require docSvcDocumentId", () => {
+			expect(() => NoticeRebukeSchema.parse({})).toThrow();
 		});
 
-		it("should reject satFolioNumber over 100 characters", () => {
-			expect(() =>
-				NoticeAcknowledgeSchema.parse({
-					satFolioNumber: "A".repeat(101),
-				}),
-			).toThrow();
+		it("should accept docSvcDocumentId with optional notes", () => {
+			const result = NoticeRebukeSchema.parse({
+				docSvcDocumentId: "DOC-REBUKE-1",
+				notes: "Errors in RFC field",
+			});
+			expect(result.docSvcDocumentId).toBe("DOC-REBUKE-1");
+			expect(result.notes).toBe("Errors in RFC field");
+		});
+
+		it("should accept without notes", () => {
+			const result = NoticeRebukeSchema.parse({
+				docSvcDocumentId: "DOC-REBUKE-2",
+			});
+			expect(result.notes).toBeUndefined();
+		});
+	});
+
+	describe("NoticeAddAlertsSchema", () => {
+		it("should require at least one alertId", () => {
+			expect(() => NoticeAddAlertsSchema.parse({ alertIds: [] })).toThrow();
+		});
+
+		it("should accept valid alertIds", () => {
+			const result = NoticeAddAlertsSchema.parse({
+				alertIds: ["ALT001", "ALT002"],
+			});
+			expect(result.alertIds).toEqual(["ALT001", "ALT002"]);
+		});
+	});
+
+	describe("NoticeRemoveAlertsSchema", () => {
+		it("should require at least one alertId", () => {
+			expect(() => NoticeRemoveAlertsSchema.parse({ alertIds: [] })).toThrow();
+		});
+
+		it("should accept valid alertIds", () => {
+			const result = NoticeRemoveAlertsSchema.parse({
+				alertIds: ["ALT001"],
+			});
+			expect(result.alertIds).toEqual(["ALT001"]);
 		});
 	});
 });

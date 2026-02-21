@@ -229,7 +229,6 @@ adminRouter.get("/notices", async (c) => {
 			alertCount: notice._count.alerts,
 			generatedAt: notice.generatedAt?.toISOString() ?? null,
 			submittedAt: notice.submittedAt?.toISOString() ?? null,
-			satFolioNumber: notice.satFolioNumber,
 			createdAt: notice.createdAt.toISOString(),
 		})),
 		pagination: {

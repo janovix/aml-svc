@@ -65,6 +65,9 @@
 			"bucket_name": "aml",
 		},
 	],
+	"triggers": {
+		"crons": ["0 14 * * *"],
+	},
 	"vars": {
 		"ENVIRONMENT": "production",
 		"AUTH_JWKS_CACHE_TTL": "3600",

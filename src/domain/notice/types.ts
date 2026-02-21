@@ -3,33 +3,72 @@
  * Handles the 17-17 period cycle for SAT compliance
  */
 
-export type NoticeStatus = "DRAFT" | "GENERATED" | "SUBMITTED" | "ACKNOWLEDGED";
+export type NoticeStatus =
+	| "DRAFT"
+	| "GENERATED"
+	| "SUBMITTED"
+	| "ACKNOWLEDGED"
+	| "REBUKED";
 
 export interface NoticeEntity {
 	id: string;
 	organizationId: string;
 	name: string;
 	status: NoticeStatus;
-	periodStart: string; // ISO datetime - Day 17 of previous month
-	periodEnd: string; // ISO datetime - Day 16 of current month
-	reportedMonth: string; // YYYYMM format for SAT
+	periodStart: string;
+	periodEnd: string;
+	reportedMonth: string;
 
 	recordCount: number;
 
-	// XML file output
 	xmlFileUrl?: string | null;
 	fileSize?: number | null;
 
 	generatedAt?: string | null;
 	submittedAt?: string | null;
-	satFolioNumber?: string | null;
-	submitPdfDocumentId?: string | null;
-	ackPdfDocumentId?: string | null;
+	amendmentCycle: number;
 	createdBy?: string | null;
 	notes?: string | null;
 
 	createdAt: string;
 	updatedAt: string;
+}
+
+export type NoticeEventType =
+	| "CREATED"
+	| "GENERATED"
+	| "SUBMITTED"
+	| "ACKNOWLEDGED"
+	| "REBUKED"
+	| "REVERTED"
+	| "ALERTS_MODIFIED";
+
+export interface NoticeEventEntity {
+	id: string;
+	noticeId: string;
+	organizationId: string;
+	eventType: NoticeEventType;
+	fromStatus?: string | null;
+	toStatus: string;
+	cycle: number;
+	pdfDocumentId?: string | null;
+	xmlFileUrl?: string | null;
+	fileSize?: number | null;
+	notes?: string | null;
+	createdBy?: string | null;
+	createdAt: string;
+}
+
+export interface NoticeAlertDetail {
+	id: string;
+	clientId: string;
+	clientName: string;
+	operationId?: string | null;
+	alertRuleName: string;
+	severity: string;
+	status: string;
+	createdAt: string;
+	activityCode?: string | null;
 }
 
 export interface NoticeWithAlertSummary extends NoticeEntity {
@@ -39,6 +78,8 @@ export interface NoticeWithAlertSummary extends NoticeEntity {
 		byStatus: Record<string, number>;
 		byRule: Array<{ ruleId: string; ruleName: string; count: number }>;
 	};
+	events: NoticeEventEntity[];
+	alerts: NoticeAlertDetail[];
 }
 
 export type {

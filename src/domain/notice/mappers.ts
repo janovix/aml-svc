@@ -1,11 +1,17 @@
 import type {
 	Notice as PrismaNoticeModel,
+	NoticeEvent as PrismaNoticeEventModel,
 	NoticeStatus as PrismaNoticeStatus,
 } from "@prisma/client";
 
 import { generateId } from "../../lib/id-generator";
 import type { NoticeCreateInput, NoticePatchInput } from "./schemas";
-import type { NoticeEntity, NoticeStatus } from "./types";
+import type {
+	NoticeEntity,
+	NoticeEventEntity,
+	NoticeEventType,
+	NoticeStatus,
+} from "./types";
 import { calculateNoticePeriod } from "./types";
 
 const _NOTICE_STATUS_TO_PRISMA: Record<NoticeStatus, PrismaNoticeStatus> = {
@@ -13,6 +19,7 @@ const _NOTICE_STATUS_TO_PRISMA: Record<NoticeStatus, PrismaNoticeStatus> = {
 	GENERATED: "GENERATED",
 	SUBMITTED: "SUBMITTED",
 	ACKNOWLEDGED: "ACKNOWLEDGED",
+	REBUKED: "REBUKED",
 };
 
 const NOTICE_STATUS_FROM_PRISMA: Record<PrismaNoticeStatus, NoticeStatus> = {
@@ -20,6 +27,7 @@ const NOTICE_STATUS_FROM_PRISMA: Record<PrismaNoticeStatus, NoticeStatus> = {
 	GENERATED: "GENERATED",
 	SUBMITTED: "SUBMITTED",
 	ACKNOWLEDGED: "ACKNOWLEDGED",
+	REBUKED: "REBUKED",
 };
 
 function mapDateTime(value: Date | string | null | undefined): string | null {
@@ -47,13 +55,31 @@ export function mapPrismaNotice(prisma: PrismaNoticeModel): NoticeEntity {
 		fileSize: prisma.fileSize,
 		generatedAt: mapDateTime(prisma.generatedAt),
 		submittedAt: mapDateTime(prisma.submittedAt),
-		satFolioNumber: prisma.satFolioNumber,
-		submitPdfDocumentId: prisma.submitPdfDocumentId,
-		ackPdfDocumentId: prisma.ackPdfDocumentId,
+		amendmentCycle: prisma.amendmentCycle,
 		createdBy: prisma.createdBy,
 		notes: prisma.notes,
 		createdAt: mapDateTime(prisma.createdAt) ?? "",
 		updatedAt: mapDateTime(prisma.updatedAt) ?? "",
+	};
+}
+
+export function mapPrismaNoticeEvent(
+	prisma: PrismaNoticeEventModel,
+): NoticeEventEntity {
+	return {
+		id: prisma.id,
+		noticeId: prisma.noticeId,
+		organizationId: prisma.organizationId,
+		eventType: prisma.eventType as NoticeEventType,
+		fromStatus: prisma.fromStatus,
+		toStatus: prisma.toStatus,
+		cycle: prisma.cycle,
+		pdfDocumentId: prisma.pdfDocumentId,
+		xmlFileUrl: prisma.xmlFileUrl,
+		fileSize: prisma.fileSize,
+		notes: prisma.notes,
+		createdBy: prisma.createdBy,
+		createdAt: mapDateTime(prisma.createdAt) ?? "",
 	};
 }
 
@@ -99,12 +125,10 @@ export function mapNoticeCreateInputToPrisma(
 export function mapNoticePatchInputToPrisma(input: NoticePatchInput): Partial<{
 	name: string;
 	notes: string | null;
-	satFolioNumber: string | null;
 }> {
 	const result: Partial<{
 		name: string;
 		notes: string | null;
-		satFolioNumber: string | null;
 	}> = {};
 
 	if (input.name !== undefined) {
@@ -112,9 +136,6 @@ export function mapNoticePatchInputToPrisma(input: NoticePatchInput): Partial<{
 	}
 	if (input.notes !== undefined) {
 		result.notes = input.notes;
-	}
-	if (input.satFolioNumber !== undefined) {
-		result.satFolioNumber = input.satFolioNumber;
 	}
 
 	return result;

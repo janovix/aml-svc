@@ -12,6 +12,9 @@ import {
 	NoticePreviewSchema,
 	NoticeSubmitSchema,
 	NoticeAcknowledgeSchema,
+	NoticeRebukeSchema,
+	NoticeAddAlertsSchema,
+	NoticeRemoveAlertsSchema,
 } from "../domain/notice";
 import { mapPrismaClient } from "../domain/client/mappers";
 import {
@@ -21,6 +24,7 @@ import {
 import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
+import type { StatusCode } from "hono/utils/http-status";
 import { createUsageRightsClient } from "../lib/usage-rights-client";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import {
@@ -62,21 +66,39 @@ function getService(
 
 function handleServiceError(error: unknown): never {
 	if (error instanceof Error) {
-		if (error.message === "NOTICE_NOT_FOUND") {
-			throw new APIError(404, "Notice not found");
-		}
-		if (error.message === "NOTICE_ALREADY_EXISTS_FOR_PERIOD") {
-			throw new APIError(409, "A notice already exists for this period");
-		}
-		if (error.message === "CANNOT_DELETE_NON_DRAFT_NOTICE") {
-			throw new APIError(400, "Only draft notices can be deleted");
-		}
-		if (error.message === "NOTICE_MUST_BE_GENERATED_BEFORE_SUBMISSION") {
-			throw new APIError(400, "Notice must be generated before submission");
-		}
-		if (error.message === "NOTICE_MUST_BE_SUBMITTED_BEFORE_ACKNOWLEDGMENT") {
-			throw new APIError(400, "Notice must be submitted before acknowledgment");
-		}
+		const map: Record<string, [number, string]> = {
+			NOTICE_NOT_FOUND: [404, "Notice not found"],
+			NOTICE_ALREADY_EXISTS_FOR_PERIOD: [
+				409,
+				"A notice already exists for this period",
+			],
+			CANNOT_DELETE_NON_DRAFT_NOTICE: [
+				400,
+				"Only draft notices can be deleted",
+			],
+			NOTICE_MUST_BE_GENERATED_BEFORE_SUBMISSION: [
+				400,
+				"Notice must be generated before submission",
+			],
+			NOTICE_MUST_BE_SUBMITTED_BEFORE_ACKNOWLEDGMENT: [
+				400,
+				"Notice must be submitted before acknowledgment",
+			],
+			NOTICE_MUST_BE_SUBMITTED_BEFORE_REBUKE: [
+				400,
+				"Notice must be submitted before it can be rebuked",
+			],
+			NOTICE_MUST_BE_REBUKED_BEFORE_REVERT: [
+				400,
+				"Notice must be rebuked before reverting to draft",
+			],
+			NOTICE_MUST_BE_DRAFT_TO_MODIFY_ALERTS: [
+				400,
+				"Alerts can only be added/removed from draft notices",
+			],
+		};
+		const entry = map[error.message];
+		if (entry) throw new APIError(entry[0] as StatusCode, entry[1]);
 	}
 	throw error;
 }
@@ -218,15 +240,8 @@ noticesRouter.post("/:id/generate", async (c) => {
 		throw new APIError(400, "Notice has already been generated");
 	}
 
-	// Get alerts with transactions/operations for XML generation
-	const alertsData = await service.getAlertsWithOperationsForNotice(
-		organizationId,
-		params.id,
-	);
-
-	if (alertsData.length === 0) {
-		throw new APIError(400, "Notice has no alerts to include");
-	}
+	const user = c.get("user");
+	const userId = user?.id;
 
 	// Get organization settings (RFC and activity code)
 	const prisma = getPrismaClient(c.env.DB);
@@ -242,88 +257,99 @@ noticesRouter.post("/:id/generate", async (c) => {
 		);
 	}
 
-	// Filter alerts that have operations with client data
-	const operationAlerts = alertsData.filter(
-		(alert) => alert.operation && alert.client,
-	);
-
-	if (operationAlerts.length === 0) {
-		throw new APIError(
-			400,
-			"No valid alerts with operations found for XML generation",
-		);
-	}
-
-	// Group operations by activity code (each activity has its own XSD)
-	const operationsByActivity = new Map<
-		ActivityCode,
-		Array<{
-			operation: OperationEntity;
-			client: ClientEntity;
-			alert: (typeof alertsData)[0];
-		}>
-	>();
-
-	for (const alert of operationAlerts) {
-		if (!alert.operation || !alert.client) continue;
-
-		// Map Prisma operation to OperationEntity
-		const operationEntity = mapOperationToEntity(
-			alert.operation as Parameters<typeof mapOperationToEntity>[0],
-		);
-		const clientEntity = mapPrismaClient(alert.client);
-
-		const activityCode = operationEntity.activityCode;
-		if (!operationsByActivity.has(activityCode)) {
-			operationsByActivity.set(activityCode, []);
-		}
-		operationsByActivity.get(activityCode)!.push({
-			operation: operationEntity,
-			client: clientEntity,
-			alert,
-		});
-	}
-
-	// For now, generate XML for the primary activity (organization's configured activity)
-	// In the future, we may need to generate separate files for different activities
 	const primaryActivityCode = orgSettings.activityKey as ActivityCode;
-	const primaryOperations = operationsByActivity.get(primaryActivityCode);
+
+	// Get alerts with transactions/operations for XML generation
+	const alertsData = await service.getAlertsWithOperationsForNotice(
+		organizationId,
+		params.id,
+	);
 
 	let xmlContent: string;
 	let alertCount = 0;
 
-	if (primaryOperations && primaryOperations.length > 0) {
-		// Build client map for the XML generator
-		const clientMap = new Map<string, ClientEntity>();
-		for (const { operation, client } of primaryOperations) {
-			clientMap.set(operation.clientId, client);
-		}
-
-		// Use the new multi-activity XML generator
-		const config: SatXmlConfig = {
-			obligatedSubjectKey: orgSettings.obligatedSubjectKey,
-		};
-
+	if (alertsData.length === 0) {
+		// Empty notice (zero-activity): generate valid empty SAT XML
 		xmlContent = generateSatMonthlyReportXml(
 			primaryActivityCode,
 			notice.reportedMonth,
 			orgSettings.obligatedSubjectKey,
-			primaryOperations.map((op) => op.operation),
-			clientMap,
-			config,
+			[],
+			new Map(),
+			{ obligatedSubjectKey: orgSettings.obligatedSubjectKey },
 		);
-		alertCount = primaryOperations.length;
 	} else {
-		throw new APIError(
-			400,
-			`No operations found for activity ${primaryActivityCode}. Operations exist for: ${Array.from(operationsByActivity.keys()).join(", ")}`,
+		const operationAlerts = alertsData.filter(
+			(alert) => alert.operation && alert.client,
 		);
+
+		if (operationAlerts.length === 0) {
+			throw new APIError(
+				400,
+				"No valid alerts with operations found for XML generation",
+			);
+		}
+
+		const operationsByActivity = new Map<
+			ActivityCode,
+			Array<{
+				operation: OperationEntity;
+				client: ClientEntity;
+				alert: (typeof alertsData)[0];
+			}>
+		>();
+
+		for (const alert of operationAlerts) {
+			if (!alert.operation || !alert.client) continue;
+
+			const operationEntity = mapOperationToEntity(
+				alert.operation as Parameters<typeof mapOperationToEntity>[0],
+			);
+			const clientEntity = mapPrismaClient(alert.client);
+
+			const activityCode = operationEntity.activityCode;
+			if (!operationsByActivity.has(activityCode)) {
+				operationsByActivity.set(activityCode, []);
+			}
+			operationsByActivity.get(activityCode)!.push({
+				operation: operationEntity,
+				client: clientEntity,
+				alert,
+			});
+		}
+
+		const primaryOperations = operationsByActivity.get(primaryActivityCode);
+
+		if (primaryOperations && primaryOperations.length > 0) {
+			const clientMap = new Map<string, ClientEntity>();
+			for (const { operation, client } of primaryOperations) {
+				clientMap.set(operation.clientId, client);
+			}
+
+			const config: SatXmlConfig = {
+				obligatedSubjectKey: orgSettings.obligatedSubjectKey,
+			};
+
+			xmlContent = generateSatMonthlyReportXml(
+				primaryActivityCode,
+				notice.reportedMonth,
+				orgSettings.obligatedSubjectKey,
+				primaryOperations.map((op) => op.operation),
+				clientMap,
+				config,
+			);
+			alertCount = primaryOperations.length;
+		} else {
+			throw new APIError(
+				400,
+				`No operations found for activity ${primaryActivityCode}. Operations exist for: ${Array.from(operationsByActivity.keys()).join(", ")}`,
+			);
+		}
 	}
 
 	const xmlBytes = new TextEncoder().encode(xmlContent);
 	const fileSize = xmlBytes.length;
 
-	// Upload to R2 if bucket is available
 	let xmlFileUrl: string | null = null;
 
 	if (c.env.R2_BUCKET) {
@@ -346,11 +372,12 @@ noticesRouter.post("/:id/generate", async (c) => {
 		xmlFileUrl = fileName;
 	}
 
-	// Mark the notice as generated with file info
-	await service.markAsGenerated(organizationId, params.id, {
-		xmlFileUrl,
-		fileSize,
-	});
+	await service.markAsGenerated(
+		organizationId,
+		params.id,
+		{ xmlFileUrl, fileSize },
+		userId,
+	);
 
 	return c.json({
 		message: "XML generation complete",
@@ -412,6 +439,7 @@ noticesRouter.post("/:id/submit", async (c) => {
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
 	const body = await c.req.json().catch(() => ({}));
 	const input = parseWithZod(NoticeSubmitSchema, body);
+	const user = c.get("user");
 
 	const service = getService(c);
 	const updated = await service
@@ -419,7 +447,7 @@ noticesRouter.post("/:id/submit", async (c) => {
 			organizationId,
 			params.id,
 			input.docSvcDocumentId,
-			input.satFolioNumber,
+			user?.id,
 		)
 		.catch(handleServiceError);
 
@@ -432,16 +460,85 @@ noticesRouter.post("/:id/acknowledge", async (c) => {
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const input = parseWithZod(NoticeAcknowledgeSchema, body);
+	const user = c.get("user");
 
 	const service = getService(c);
 	const updated = await service
 		.markAsAcknowledged(
 			organizationId,
 			params.id,
-			input.satFolioNumber,
 			input.docSvcDocumentId,
+			user?.id,
 		)
 		.catch(handleServiceError);
 
 	return c.json(updated);
+});
+
+// POST /notices/:id/rebuke - Mark notice as rebuked (rejected) by SAT
+noticesRouter.post("/:id/rebuke", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
+	const body = await c.req.json();
+	const input = parseWithZod(NoticeRebukeSchema, body);
+	const user = c.get("user");
+
+	const service = getService(c);
+	const updated = await service
+		.markAsRebuked(
+			organizationId,
+			params.id,
+			input.docSvcDocumentId,
+			input.notes,
+			user?.id,
+		)
+		.catch(handleServiceError);
+
+	return c.json(updated);
+});
+
+// POST /notices/:id/revert - Revert a rebuked notice back to draft
+noticesRouter.post("/:id/revert", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
+	const user = c.get("user");
+
+	const service = getService(c);
+	const updated = await service
+		.revertToDraft(organizationId, params.id, user?.id)
+		.catch(handleServiceError);
+
+	return c.json(updated);
+});
+
+// POST /notices/:id/alerts/add - Add alerts to a draft notice
+noticesRouter.post("/:id/alerts/add", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
+	const body = await c.req.json();
+	const input = parseWithZod(NoticeAddAlertsSchema, body);
+	const user = c.get("user");
+
+	const service = getService(c);
+	const count = await service
+		.addAlerts(organizationId, params.id, input.alertIds, user?.id)
+		.catch(handleServiceError);
+
+	return c.json({ added: count });
+});
+
+// POST /notices/:id/alerts/remove - Remove alerts from a draft notice
+noticesRouter.post("/:id/alerts/remove", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
+	const body = await c.req.json();
+	const input = parseWithZod(NoticeRemoveAlertsSchema, body);
+	const user = c.get("user");
+
+	const service = getService(c);
+	const count = await service
+		.removeAlerts(organizationId, params.id, input.alertIds, user?.id)
+		.catch(handleServiceError);
+
+	return c.json({ removed: count });
 });

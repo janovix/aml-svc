@@ -3637,7 +3637,7 @@ export const openAPISpec = {
 				tags: ["Notices"],
 				summary: "Mark notice as submitted to SAT",
 				description:
-					"Mark a GENERATED notice as submitted to SAT, optionally with a folio number.",
+					"Mark a GENERATED notice as submitted to SAT with a submission PDF document.",
 				parameters: [
 					{
 						name: "id",
@@ -3647,12 +3647,14 @@ export const openAPISpec = {
 					},
 				],
 				requestBody: {
+					required: true,
 					content: {
 						"application/json": {
 							schema: {
 								type: "object",
+								required: ["docSvcDocumentId"],
 								properties: {
-									satFolioNumber: { type: "string", maxLength: 100 },
+									docSvcDocumentId: { type: "string", minLength: 1 },
 								},
 							},
 						},
@@ -3678,7 +3680,7 @@ export const openAPISpec = {
 				tags: ["Notices"],
 				summary: "Record SAT acknowledgment",
 				description:
-					"Mark a SUBMITTED notice as acknowledged by SAT with the folio number.",
+					"Mark a SUBMITTED notice as acknowledged by SAT with an acknowledgment PDF document.",
 				parameters: [
 					{
 						name: "id",
@@ -3693,13 +3695,9 @@ export const openAPISpec = {
 						"application/json": {
 							schema: {
 								type: "object",
-								required: ["satFolioNumber"],
+								required: ["docSvcDocumentId"],
 								properties: {
-									satFolioNumber: {
-										type: "string",
-										minLength: 1,
-										maxLength: 100,
-									},
+									docSvcDocumentId: { type: "string", minLength: 1 },
 								},
 							},
 						},
@@ -6107,7 +6105,7 @@ export const openAPISpec = {
 					fileSize: { type: "integer", nullable: true },
 					generatedAt: { type: "string", format: "date-time", nullable: true },
 					submittedAt: { type: "string", format: "date-time", nullable: true },
-					satFolioNumber: { type: "string", nullable: true },
+					amendmentCycle: { type: "integer" },
 					createdBy: { type: "string", nullable: true },
 					notes: { type: "string", nullable: true },
 					createdAt: { type: "string", format: "date-time" },
@@ -6164,7 +6162,6 @@ export const openAPISpec = {
 				properties: {
 					name: { type: "string", minLength: 1, maxLength: 200 },
 					notes: { type: "string", maxLength: 1000, nullable: true },
-					satFolioNumber: { type: "string", maxLength: 100, nullable: true },
 				},
 			},
 			NoticePreviewResponse: {

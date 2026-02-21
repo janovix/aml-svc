@@ -257,18 +257,41 @@ app.onError(errorHandler);
 
 // Sentry is enabled only when SENTRY_DSN environment variable is set.
 // Configure it via wrangler secrets: `wrangler secret put SENTRY_DSN`
-export default Sentry.withSentry((env: Bindings) => {
+const sentryWrapped = Sentry.withSentry((env: Bindings) => {
 	const versionId = env.CF_VERSION_METADATA?.id;
 	return {
-		// When DSN is undefined/empty, Sentry SDK is disabled (no events sent)
 		dsn: env.SENTRY_DSN,
 		release: versionId,
 		environment: env.ENVIRONMENT,
-		// Adds request headers and IP for users, for more info visit:
-		// https://docs.sentry.io/platforms/javascript/guides/cloudflare/configuration/options/#sendDefaultPii
 		sendDefaultPii: true,
 	};
 }, app);
+
+export default {
+	fetch: sentryWrapped.fetch,
+
+	async scheduled(
+		event: ScheduledEvent,
+		env: Bindings,
+		ctx: ExecutionContext,
+	): Promise<void> {
+		const { processNoticeDeadlineNotifications } = await import(
+			"./lib/notice-deadline-notifications"
+		);
+
+		ctx.waitUntil(
+			processNoticeDeadlineNotifications(env, new Date(event.scheduledTime))
+				.then((r) =>
+					console.log(
+						`[scheduled] Notice deadline check: ${r.checked} orgs checked, ${r.notified} notified`,
+					),
+				)
+				.catch((err) =>
+					console.error("[scheduled] Notice deadline check failed:", err),
+				),
+		);
+	},
+};
 
 // Re-export types for backward compatibility
 export type { Bindings } from "./types";

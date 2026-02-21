@@ -44,6 +44,7 @@ export const ID_PREFIXES = {
 	FILE: "FIL", // File uploads to R2
 	KYC_SESSION: "KYC", // KYC Self-Service Session
 	KYC_SESSION_EVENT: "KYE", // KYC Session Event (audit trail)
+	NOTICE_EVENT: "NVE", // Notice lifecycle event
 } as const;
 
 export type EntityType = keyof typeof ID_PREFIXES;
