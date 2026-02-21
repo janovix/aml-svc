@@ -23,9 +23,14 @@ import type {
 	ImportEntity,
 	ImportRowResultEntity,
 	ImportWithResults,
-	ListResult,
+	ListResultWithMeta,
 	ImportRowStatus,
 } from "./types";
+import type { ListResult } from "../../lib/list-result";
+import {
+	buildEnumFilterMeta,
+	fromPrismaGroupBy,
+} from "../../lib/filter-metadata";
 
 export class ImportRepository {
 	constructor(private readonly prisma: PrismaClient) {}
@@ -36,22 +41,25 @@ export class ImportRepository {
 	async list(
 		organizationId: string,
 		filters: ImportFilters,
-	): Promise<ListResult<ImportEntity>> {
+	): Promise<ListResultWithMeta<ImportEntity>> {
 		const { page, limit, status, entityType } = filters;
 
-		const where: Prisma.ImportWhereInput = {
-			organizationId,
-		};
+		const baseWhere: Prisma.ImportWhereInput = { organizationId };
 
-		if (status) {
-			where.status = toPrismaImportStatus(status);
-		}
+		const where: Prisma.ImportWhereInput = { ...baseWhere };
+		if (status) where.status = toPrismaImportStatus(status);
+		if (entityType) where.entityType = toPrismaEntityType(entityType);
 
-		if (entityType) {
-			where.entityType = toPrismaEntityType(entityType);
-		}
+		// status counts: apply entityType only
+		const statusCountWhere: Prisma.ImportWhereInput = { ...baseWhere };
+		if (entityType)
+			statusCountWhere.entityType = toPrismaEntityType(entityType);
 
-		const [total, records] = await Promise.all([
+		// entityType counts: apply status only
+		const entityTypeCountWhere: Prisma.ImportWhereInput = { ...baseWhere };
+		if (status) entityTypeCountWhere.status = toPrismaImportStatus(status);
+
+		const [total, records, statusGroups, entityTypeGroups] = await Promise.all([
 			this.prisma.import.count({ where }),
 			this.prisma.import.findMany({
 				where,
@@ -59,18 +67,46 @@ export class ImportRepository {
 				take: limit,
 				orderBy: { createdAt: "desc" },
 			}),
+			this.prisma.import.groupBy({
+				by: ["status"],
+				where: statusCountWhere,
+				_count: { status: true },
+			}),
+			this.prisma.import.groupBy({
+				by: ["entityType"],
+				where: entityTypeCountWhere,
+				_count: { entityType: true },
+			}),
 		]);
 
 		const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
+		const STATUS_LABELS: Record<string, string> = {
+			PENDING: "Pendiente",
+			VALIDATING: "Validando",
+			PROCESSING: "Procesando",
+			COMPLETED: "Completado",
+			FAILED: "Fallido",
+		};
+
+		const ENTITY_TYPE_LABELS: Record<string, string> = {
+			CLIENT: "Clientes",
+			OPERATION: "Operaciones",
+		};
+
 		return {
 			data: records.map(mapPrismaImport),
-			pagination: {
-				page,
-				limit,
-				total,
-				totalPages,
-			},
+			pagination: { page, limit, total, totalPages },
+			filterMeta: [
+				buildEnumFilterMeta(
+					{ id: "status", label: "Estado", labelMap: STATUS_LABELS },
+					fromPrismaGroupBy(statusGroups, "status", "status"),
+				),
+				buildEnumFilterMeta(
+					{ id: "entityType", label: "Tipo", labelMap: ENTITY_TYPE_LABELS },
+					fromPrismaGroupBy(entityTypeGroups, "entityType", "entityType"),
+				),
+			],
 		};
 	}
 

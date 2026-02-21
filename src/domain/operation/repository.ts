@@ -1,8 +1,8 @@
 import type { PrismaClient, Prisma } from "@prisma/client";
 import type {
 	OperationEntity,
-	OperationListResult,
 	ActivityCode,
+	ListResultWithMeta,
 } from "./types";
 import type {
 	OperationFilters,
@@ -10,6 +10,11 @@ import type {
 	OperationUpdateInput,
 } from "./schemas";
 import { mapOperationToEntity } from "./mappers";
+import {
+	buildEnumFilterMeta,
+	buildRangeFilterMeta,
+	fromPrismaGroupBy,
+} from "../../lib/filter-metadata";
 import { CatalogNameResolver } from "../catalog/name-resolver";
 import type { CatalogFieldsConfig } from "../catalog/name-resolver";
 import { CatalogRepository } from "../catalog/repository";
@@ -623,61 +628,80 @@ export class OperationRepository {
 	async list(
 		organizationId: string,
 		filters: OperationFilters,
-	): Promise<OperationListResult> {
-		const where: Prisma.OperationWhereInput = {
+	): Promise<ListResultWithMeta<OperationEntity>> {
+		// Base conditions (always applied, not affected by active filters)
+		const baseWhere: Prisma.OperationWhereInput = {
 			organizationId,
 			deletedAt: null,
 		};
 
-		if (filters.clientId) {
-			where.clientId = filters.clientId;
-		}
-
-		if (filters.invoiceId) {
-			where.invoiceId = filters.invoiceId;
-		}
-
-		if (filters.activityCode) {
-			where.activityCode = filters.activityCode;
-		}
-
-		if (filters.operationTypeCode) {
-			where.operationTypeCode = filters.operationTypeCode;
-		}
-
-		if (filters.branchPostalCode) {
-			where.branchPostalCode = filters.branchPostalCode;
-		}
-
-		if (filters.alertTypeCode) {
-			where.alertTypeCode = filters.alertTypeCode;
-		}
-
-		if (filters.watchlistStatus) {
-			where.watchlistStatus = filters.watchlistStatus;
-		}
+		if (filters.clientId) baseWhere.clientId = filters.clientId;
+		if (filters.invoiceId) baseWhere.invoiceId = filters.invoiceId;
+		if (filters.operationTypeCode)
+			baseWhere.operationTypeCode = filters.operationTypeCode;
+		if (filters.branchPostalCode)
+			baseWhere.branchPostalCode = filters.branchPostalCode;
+		if (filters.alertTypeCode) baseWhere.alertTypeCode = filters.alertTypeCode;
 
 		if (filters.startDate || filters.endDate) {
-			where.operationDate = {};
-			if (filters.startDate) {
-				where.operationDate.gte = new Date(filters.startDate);
-			}
-			if (filters.endDate) {
-				where.operationDate.lte = new Date(filters.endDate);
-			}
+			baseWhere.operationDate = {};
+			if (filters.startDate)
+				(baseWhere.operationDate as Prisma.DateTimeFilter).gte = new Date(
+					filters.startDate,
+				);
+			if (filters.endDate)
+				(baseWhere.operationDate as Prisma.DateTimeFilter).lte = new Date(
+					filters.endDate,
+				);
 		}
 
 		if (filters.minAmount || filters.maxAmount) {
-			where.amount = {};
-			if (filters.minAmount) {
-				where.amount.gte = parseFloat(filters.minAmount);
-			}
-			if (filters.maxAmount) {
-				where.amount.lte = parseFloat(filters.maxAmount);
-			}
+			baseWhere.amount = {};
+			if (filters.minAmount)
+				(baseWhere.amount as Prisma.DecimalFilter).gte = parseFloat(
+					filters.minAmount,
+				);
+			if (filters.maxAmount)
+				(baseWhere.amount as Prisma.DecimalFilter).lte = parseFloat(
+					filters.maxAmount,
+				);
 		}
 
-		const [operations, total] = await Promise.all([
+		// Full data query where (includes all active enum filters)
+		const where: Prisma.OperationWhereInput = { ...baseWhere };
+		if (filters.activityCode) where.activityCode = filters.activityCode;
+		if (filters.watchlistStatus)
+			where.watchlistStatus =
+				filters.watchlistStatus as import("@prisma/client").WatchlistStatus;
+		if (filters.dataSource) where.dataSource = filters.dataSource;
+
+		// For each enum filter's counts: apply all OTHER active enum filters but not its own
+		const activityWhere: Prisma.OperationWhereInput = { ...baseWhere };
+		if (filters.watchlistStatus)
+			activityWhere.watchlistStatus =
+				filters.watchlistStatus as import("@prisma/client").WatchlistStatus;
+		if (filters.dataSource) activityWhere.dataSource = filters.dataSource;
+
+		const watchlistWhere: Prisma.OperationWhereInput = { ...baseWhere };
+		if (filters.activityCode)
+			watchlistWhere.activityCode = filters.activityCode;
+		if (filters.dataSource) watchlistWhere.dataSource = filters.dataSource;
+
+		const dataSourceWhere: Prisma.OperationWhereInput = { ...baseWhere };
+		if (filters.activityCode)
+			dataSourceWhere.activityCode = filters.activityCode;
+		if (filters.watchlistStatus)
+			dataSourceWhere.watchlistStatus =
+				filters.watchlistStatus as import("@prisma/client").WatchlistStatus;
+
+		const [
+			operations,
+			total,
+			activityGroups,
+			watchlistGroups,
+			dataSourceGroups,
+			amountAgg,
+		] = await Promise.all([
 			this.prisma.operation.findMany({
 				where,
 				include: operationInclude,
@@ -686,7 +710,43 @@ export class OperationRepository {
 				take: filters.limit,
 			}),
 			this.prisma.operation.count({ where }),
+			this.prisma.operation.groupBy({
+				by: ["activityCode"],
+				where: activityWhere,
+				_count: { activityCode: true },
+			}),
+			this.prisma.operation.groupBy({
+				by: ["watchlistStatus"],
+				where: watchlistWhere,
+				_count: { watchlistStatus: true },
+			}),
+			this.prisma.operation.groupBy({
+				by: ["dataSource"],
+				where: dataSourceWhere,
+				_count: { dataSource: true },
+			}),
+			this.prisma.operation.aggregate({
+				where: baseWhere,
+				_min: { amount: true, operationDate: true },
+				_max: { amount: true, operationDate: true },
+			}),
 		]);
+
+		const WATCHLIST_LABELS: Record<string, string> = {
+			PENDING: "Pendiente",
+			QUEUED: "En cola",
+			CHECKING: "Revisando",
+			COMPLETED: "Completado",
+			ERROR: "Error",
+			NOT_AVAILABLE: "No disponible",
+		};
+
+		const DATA_SOURCE_LABELS: Record<string, string> = {
+			MANUAL: "Manual",
+			CFDI: "CFDI",
+			IMPORT: "Importación",
+			ENRICHED: "Enriquecido",
+		};
 
 		return {
 			data: operations.map((op) => mapOperationToEntity(op)),
@@ -696,6 +756,58 @@ export class OperationRepository {
 				total,
 				totalPages: Math.ceil(total / filters.limit),
 			},
+			filterMeta: [
+				buildEnumFilterMeta(
+					{ id: "activityCode", label: "Actividad" },
+					fromPrismaGroupBy(activityGroups, "activityCode", "activityCode"),
+				),
+				buildEnumFilterMeta(
+					{ id: "dataSource", label: "Fuente", labelMap: DATA_SOURCE_LABELS },
+					fromPrismaGroupBy(dataSourceGroups, "dataSource", "dataSource"),
+				),
+				buildEnumFilterMeta(
+					{
+						id: "watchlistStatus",
+						label: "Watchlist",
+						labelMap: WATCHLIST_LABELS,
+					},
+					fromPrismaGroupBy(
+						watchlistGroups,
+						"watchlistStatus",
+						"watchlistStatus",
+					),
+				),
+				buildRangeFilterMeta(
+					{ id: "amount", label: "Monto", type: "number-range" },
+					{
+						min:
+							amountAgg._min.amount != null
+								? String(amountAgg._min.amount)
+								: null,
+						max:
+							amountAgg._max.amount != null
+								? String(amountAgg._max.amount)
+								: null,
+					},
+				),
+				buildRangeFilterMeta(
+					{
+						id: "operationDate",
+						label: "Fecha de operación",
+						type: "date-range",
+					},
+					{
+						min:
+							amountAgg._min.operationDate != null
+								? amountAgg._min.operationDate.toISOString()
+								: null,
+						max:
+							amountAgg._max.operationDate != null
+								? amountAgg._max.operationDate.toISOString()
+								: null,
+					},
+				),
+			],
 		};
 	}
 

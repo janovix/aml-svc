@@ -1,7 +1,12 @@
 import type { PrismaClient, Prisma } from "@prisma/client";
-import type { InvoiceEntity, InvoiceListResult } from "./types";
+import type { InvoiceEntity, ListResultWithMeta } from "./types";
 import type { InvoiceFilters, InvoiceCreateInput } from "./schemas";
 import { mapInvoiceToEntity } from "./mappers";
+import {
+	buildEnumFilterMeta,
+	buildRangeFilterMeta,
+	fromPrismaGroupBy,
+} from "../../lib/filter-metadata";
 
 export class InvoiceRepository {
 	constructor(private prisma: PrismaClient) {}
@@ -195,62 +200,82 @@ export class InvoiceRepository {
 	async list(
 		organizationId: string,
 		filters: InvoiceFilters,
-	): Promise<InvoiceListResult> {
-		const where: Prisma.InvoiceWhereInput = {
+	): Promise<ListResultWithMeta<InvoiceEntity>> {
+		// Base conditions (not modified by enum filters)
+		const baseWhere: Prisma.InvoiceWhereInput = {
 			organizationId,
 			deletedAt: null,
 		};
 
-		if (filters.issuerRfc) {
-			where.issuerRfc = filters.issuerRfc;
-		}
-
-		if (filters.receiverRfc) {
-			where.receiverRfc = filters.receiverRfc;
-		}
-
-		if (filters.uuid) {
-			where.uuid = filters.uuid;
-		}
-
-		if (filters.voucherTypeCode) {
-			where.voucherTypeCode = filters.voucherTypeCode;
-		}
-
-		if (filters.currencyCode) {
-			where.currencyCode = filters.currencyCode;
-		}
+		if (filters.issuerRfc) baseWhere.issuerRfc = filters.issuerRfc;
+		if (filters.receiverRfc) baseWhere.receiverRfc = filters.receiverRfc;
+		if (filters.uuid) baseWhere.uuid = filters.uuid;
 
 		if (filters.startDate || filters.endDate) {
-			where.issueDate = {};
-			if (filters.startDate) {
-				where.issueDate.gte = new Date(filters.startDate);
-			}
-			if (filters.endDate) {
-				where.issueDate.lte = new Date(filters.endDate);
-			}
+			baseWhere.issueDate = {};
+			if (filters.startDate)
+				(baseWhere.issueDate as Prisma.DateTimeFilter).gte = new Date(
+					filters.startDate,
+				);
+			if (filters.endDate)
+				(baseWhere.issueDate as Prisma.DateTimeFilter).lte = new Date(
+					filters.endDate,
+				);
 		}
 
 		if (filters.minAmount || filters.maxAmount) {
-			where.total = {};
-			if (filters.minAmount) {
-				where.total.gte = parseFloat(filters.minAmount);
-			}
-			if (filters.maxAmount) {
-				where.total.lte = parseFloat(filters.maxAmount);
-			}
+			baseWhere.total = {};
+			if (filters.minAmount)
+				(baseWhere.total as Prisma.DecimalFilter).gte = parseFloat(
+					filters.minAmount,
+				);
+			if (filters.maxAmount)
+				(baseWhere.total as Prisma.DecimalFilter).lte = parseFloat(
+					filters.maxAmount,
+				);
 		}
 
-		const [invoices, total] = await Promise.all([
-			this.prisma.invoice.findMany({
-				where,
-				include: { items: true },
-				orderBy: { issueDate: "desc" },
-				skip: (filters.page - 1) * filters.limit,
-				take: filters.limit,
-			}),
-			this.prisma.invoice.count({ where }),
-		]);
+		const where: Prisma.InvoiceWhereInput = { ...baseWhere };
+		if (filters.voucherTypeCode)
+			where.voucherTypeCode = filters.voucherTypeCode;
+		if (filters.currencyCode) where.currencyCode = filters.currencyCode;
+
+		// voucherType counts: apply currencyCode but not voucherType
+		const voucherCountWhere: Prisma.InvoiceWhereInput = { ...baseWhere };
+		if (filters.currencyCode)
+			voucherCountWhere.currencyCode = filters.currencyCode;
+
+		// currency counts: apply voucherType but not currency
+		const currencyCountWhere: Prisma.InvoiceWhereInput = { ...baseWhere };
+		if (filters.voucherTypeCode)
+			currencyCountWhere.voucherTypeCode = filters.voucherTypeCode;
+
+		const [invoices, total, voucherGroups, currencyGroups, amountAgg] =
+			await Promise.all([
+				this.prisma.invoice.findMany({
+					where,
+					include: { items: true },
+					orderBy: { issueDate: "desc" },
+					skip: (filters.page - 1) * filters.limit,
+					take: filters.limit,
+				}),
+				this.prisma.invoice.count({ where }),
+				this.prisma.invoice.groupBy({
+					by: ["voucherTypeCode"],
+					where: voucherCountWhere,
+					_count: { voucherTypeCode: true },
+				}),
+				this.prisma.invoice.groupBy({
+					by: ["currencyCode"],
+					where: currencyCountWhere,
+					_count: { currencyCode: true },
+				}),
+				this.prisma.invoice.aggregate({
+					where: baseWhere,
+					_min: { total: true, issueDate: true },
+					_max: { total: true, issueDate: true },
+				}),
+			]);
 
 		return {
 			data: invoices.map(mapInvoiceToEntity),
@@ -260,6 +285,46 @@ export class InvoiceRepository {
 				total,
 				totalPages: Math.ceil(total / filters.limit),
 			},
+			filterMeta: [
+				buildEnumFilterMeta(
+					{ id: "voucherTypeCode", label: "Tipo de comprobante" },
+					fromPrismaGroupBy(
+						voucherGroups,
+						"voucherTypeCode",
+						"voucherTypeCode",
+					),
+				),
+				buildEnumFilterMeta(
+					{ id: "currencyCode", label: "Moneda" },
+					fromPrismaGroupBy(currencyGroups, "currencyCode", "currencyCode"),
+				),
+				buildRangeFilterMeta(
+					{ id: "total", label: "Total", type: "number-range" },
+					{
+						min:
+							amountAgg._min.total != null
+								? String(amountAgg._min.total)
+								: null,
+						max:
+							amountAgg._max.total != null
+								? String(amountAgg._max.total)
+								: null,
+					},
+				),
+				buildRangeFilterMeta(
+					{ id: "issueDate", label: "Fecha de emisión", type: "date-range" },
+					{
+						min:
+							amountAgg._min.issueDate != null
+								? amountAgg._min.issueDate.toISOString()
+								: null,
+						max:
+							amountAgg._max.issueDate != null
+								? amountAgg._max.issueDate.toISOString()
+								: null,
+					},
+				),
+			],
 		};
 	}
 

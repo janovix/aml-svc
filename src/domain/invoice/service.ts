@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type {
 	InvoiceEntity,
-	InvoiceListResult,
+	ListResultWithMeta,
 	PldHintFromCfdi,
 } from "./types";
 import type {
@@ -105,7 +105,7 @@ export class InvoiceService {
 	async list(
 		organizationId: string,
 		filters: InvoiceFilters,
-	): Promise<InvoiceListResult> {
+	): Promise<ListResultWithMeta<InvoiceEntity>> {
 		return this.repository.list(organizationId, filters);
 	}
 

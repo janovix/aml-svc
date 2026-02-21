@@ -7,7 +7,7 @@ import type {
 } from "./schemas";
 import type {
 	NoticeEntity,
-	ListResult,
+	ListResultWithMeta,
 	NoticeWithAlertSummary,
 	NoticePeriod,
 } from "./types";
@@ -40,7 +40,7 @@ export class NoticeService {
 	async list(
 		organizationId: string,
 		filters: NoticeFilterInput,
-	): Promise<ListResult<NoticeEntity>> {
+	): Promise<ListResultWithMeta<NoticeEntity>> {
 		return this.repository.list(organizationId, filters);
 	}
 

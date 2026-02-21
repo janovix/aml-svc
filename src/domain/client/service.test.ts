@@ -87,6 +87,7 @@ describe("ClientService", () => {
 			vi.mocked(mockRepository.list).mockResolvedValue({
 				data: [mockClient],
 				pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+				filterMeta: [],
 			});
 
 			const result = await service.list(organizationId, filters);

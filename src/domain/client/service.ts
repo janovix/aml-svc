@@ -15,7 +15,7 @@ import type {
 	ClientAddressEntity,
 	ClientDocumentEntity,
 	ClientEntity,
-	ListResult,
+	ListResultWithMeta,
 } from "./types";
 
 export class ClientService {
@@ -24,7 +24,7 @@ export class ClientService {
 	list(
 		organizationId: string,
 		filters: ClientFilters,
-	): Promise<ListResult<ClientEntity>> {
+	): Promise<ListResultWithMeta<ClientEntity>> {
 		return this.repository.list(organizationId, filters);
 	}
 

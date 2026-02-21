@@ -481,6 +481,7 @@ export const OperationFilterSchema = z
 				"NOT_AVAILABLE",
 			])
 			.optional(),
+		dataSource: DataSourceSchema.optional(),
 		startDate: IsoDateSchema.optional(),
 		endDate: IsoDateSchema.optional(),
 		minAmount: AmountSchema.optional(),

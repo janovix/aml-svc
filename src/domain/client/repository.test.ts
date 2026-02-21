@@ -129,6 +129,7 @@ describe("ClientRepository", () => {
 				findFirst: vi.fn(),
 				findUnique: vi.fn(),
 				count: vi.fn(),
+				groupBy: vi.fn().mockResolvedValue([]),
 				create: vi.fn(),
 				update: vi.fn(),
 			},

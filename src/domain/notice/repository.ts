@@ -4,12 +4,20 @@ import type {
 	NoticePatchInput,
 	NoticeFilterInput,
 } from "./schemas";
-import type { NoticeEntity, ListResult, NoticeWithAlertSummary } from "./types";
+import type {
+	NoticeEntity,
+	ListResultWithMeta,
+	NoticeWithAlertSummary,
+} from "./types";
 import {
 	mapPrismaNotice,
 	mapNoticeCreateInputToPrisma,
 	mapNoticePatchInputToPrisma,
 } from "./mappers";
+import {
+	buildEnumFilterMeta,
+	fromPrismaGroupBy,
+} from "../../lib/filter-metadata";
 
 export class NoticeRepository {
 	constructor(private readonly prisma: PrismaClient) {}
@@ -20,29 +28,30 @@ export class NoticeRepository {
 	async list(
 		organizationId: string,
 		filters: NoticeFilterInput,
-	): Promise<ListResult<NoticeEntity>> {
+	): Promise<ListResultWithMeta<NoticeEntity>> {
 		const { page, limit, status, periodStart, periodEnd, year } = filters;
 		const skip = (page - 1) * limit;
 
-		const where: Prisma.NoticeWhereInput = {
-			organizationId,
-		};
+		const baseWhere: Prisma.NoticeWhereInput = { organizationId };
 
-		if (status) {
-			where.status = status;
-		}
-		if (periodStart) {
-			where.periodStart = { gte: new Date(periodStart) };
-		}
-		if (periodEnd) {
-			where.periodEnd = { lte: new Date(periodEnd) };
-		}
-		if (year) {
-			// Filter by year in reportedMonth (YYYYMM format)
-			where.reportedMonth = { startsWith: String(year) };
-		}
+		if (periodStart) baseWhere.periodStart = { gte: new Date(periodStart) };
+		if (periodEnd) baseWhere.periodEnd = { lte: new Date(periodEnd) };
+		if (year) baseWhere.reportedMonth = { startsWith: String(year) };
 
-		const [notices, total] = await Promise.all([
+		const where: Prisma.NoticeWhereInput = { ...baseWhere };
+		if (status) where.status = status;
+
+		// status counts: apply date/year filters but not status
+		const statusCountWhere: Prisma.NoticeWhereInput = { ...baseWhere };
+
+		// year counts: apply status but not year
+		const yearCountWhere: Prisma.NoticeWhereInput = { organizationId };
+		if (status) yearCountWhere.status = status;
+		if (periodStart)
+			yearCountWhere.periodStart = { gte: new Date(periodStart) };
+		if (periodEnd) yearCountWhere.periodEnd = { lte: new Date(periodEnd) };
+
+		const [notices, total, statusGroups, yearGroups] = await Promise.all([
 			this.prisma.notice.findMany({
 				where,
 				orderBy: { createdAt: "desc" },
@@ -50,16 +59,52 @@ export class NoticeRepository {
 				take: limit,
 			}),
 			this.prisma.notice.count({ where }),
+			this.prisma.notice.groupBy({
+				by: ["status"],
+				where: statusCountWhere,
+				_count: { status: true },
+			}),
+			this.prisma.notice.groupBy({
+				by: ["reportedMonth"],
+				where: yearCountWhere,
+				_count: { reportedMonth: true },
+			}),
 		]);
+
+		const STATUS_LABELS: Record<string, string> = {
+			DRAFT: "Borrador",
+			GENERATED: "Generado",
+			SUBMITTED: "Enviado",
+			ACKNOWLEDGED: "Acusado",
+		};
+
+		// Build year options from reportedMonth (YYYYMM → YYYY)
+		const yearMap = new Map<string, number>();
+		for (const row of yearGroups) {
+			if (row.reportedMonth) {
+				const y = row.reportedMonth.slice(0, 4);
+				yearMap.set(y, (yearMap.get(y) ?? 0) + (row._count.reportedMonth ?? 0));
+			}
+		}
+		const yearOptions = Array.from(yearMap.entries())
+			.sort((a, b) => b[0].localeCompare(a[0]))
+			.map(([y, count]) => ({ value: y, label: y, count }));
 
 		return {
 			data: notices.map(mapPrismaNotice),
-			pagination: {
-				page,
-				limit,
-				total,
-				totalPages: Math.ceil(total / limit),
-			},
+			pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+			filterMeta: [
+				buildEnumFilterMeta(
+					{ id: "status", label: "Estado", labelMap: STATUS_LABELS },
+					fromPrismaGroupBy(statusGroups, "status", "status"),
+				),
+				{
+					id: "year",
+					label: "Año",
+					type: "enum",
+					options: yearOptions,
+				},
+			],
 		};
 	}
 

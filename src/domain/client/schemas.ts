@@ -395,6 +395,7 @@ export const ClientFilterSchema = z.object({
 		)
 		.optional(),
 	personType: PersonTypeSchema.optional(),
+	stateCode: z.string().min(1).max(10).optional(),
 	page: z.coerce.number().int().min(1).default(1),
 	limit: z.coerce.number().int().min(1).max(100).default(10),
 });

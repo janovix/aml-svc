@@ -95,7 +95,11 @@ app.all("/clients/:id", async (c) => {
 app.all("/operations", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });
-// Organization settings route for service binding access from auth-svc
+// Organization settings routes for service binding access from auth-svc
+// More specific route must come before the generic one
+app.all("/organization-settings/:organizationId/self-service", async (c) => {
+	return handleServiceBindingRequest(c.req.raw, c.env);
+});
 app.all("/organization-settings/:organizationId", async (c) => {
 	return handleServiceBindingRequest(c.req.raw, c.env);
 });

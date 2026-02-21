@@ -487,16 +487,14 @@ export interface DevelopmentExtension {
 	resolvedNames: Record<string, string> | null;
 }
 
-export interface Pagination {
-	page: number;
-	limit: number;
-	total: number;
-	totalPages: number;
-}
-
-export interface ListResult<T> {
-	data: T[];
-	pagination: Pagination;
-}
+import type { ListResult } from "../../lib/list-result";
+export type {
+	Pagination,
+	ListResult,
+	ListResultWithMeta,
+	FilterMetaDef,
+	FilterMetaOption,
+	FilterType,
+} from "../../lib/list-result";
 
 export type OperationListResult = ListResult<OperationEntity>;

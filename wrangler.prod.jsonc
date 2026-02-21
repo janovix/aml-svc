@@ -23,14 +23,28 @@
 			"id": "da40a898aa9a4db3b8d819d3f384b811",
 		},
 	],
+	"r2_buckets": [
+		{
+			"binding": "R2_BUCKET",
+			"bucket_name": "aml",
+		},
+	],
 	"services": [
 		{
 			"binding": "AUTH_SERVICE",
 			"service": "auth-svc-prod",
 		},
 		{
+			"binding": "DOC_SERVICE",
+			"service": "doc-svc-prod",
+		},
+		{
+			"binding": "WATCHLIST_SERVICE",
+			"service": "watchlist-svc-prod",
+		},
+		{
 			"binding": "NOTIFICATIONS_SERVICE",
-			"service": "notifications-svc",
+			"service": "notifications-svc-prod",
 		},
 	],
 	"queues": {

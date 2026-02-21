@@ -19,6 +19,7 @@ function createMockPrisma(): PrismaClient {
 			update: vi.fn(),
 			delete: vi.fn(),
 			count: vi.fn(),
+			groupBy: vi.fn().mockResolvedValue([]),
 		},
 		alert: {
 			findMany: vi.fn(),

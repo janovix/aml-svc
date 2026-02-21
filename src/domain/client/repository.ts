@@ -31,8 +31,12 @@ import type {
 	ClientAddressEntity,
 	ClientDocumentEntity,
 	ClientEntity,
-	ListResult,
+	ListResultWithMeta,
 } from "./types";
+import {
+	buildEnumFilterMeta,
+	fromPrismaGroupBy,
+} from "../../lib/filter-metadata";
 import {
 	CatalogNameResolver,
 	type CatalogFieldsConfig,
@@ -68,25 +72,22 @@ export class ClientRepository {
 	async list(
 		organizationId: string,
 		filters: ClientFilters,
-	): Promise<ListResult<ClientEntity>> {
-		const { page, limit, search, rfc, personType } = filters;
+	): Promise<ListResultWithMeta<ClientEntity>> {
+		const { page, limit, search, rfc, personType, stateCode } = filters;
 
-		const where: Prisma.ClientWhereInput = {
+		// Base where clause – applies to data fetch AND to each filter's count query
+		const baseWhere: Prisma.ClientWhereInput = {
 			organizationId,
 			deletedAt: null,
 		};
 
-		if (personType) {
-			where.personType = toPrismaPersonType(personType);
-		}
-
 		if (rfc) {
-			where.rfc = { contains: rfc.toUpperCase() };
+			baseWhere.rfc = { contains: rfc.toUpperCase() };
 		}
 
 		if (search) {
 			const likeFilter = { contains: search };
-			where.OR = [
+			baseWhere.OR = [
 				{ firstName: likeFilter },
 				{ lastName: likeFilter },
 				{ secondLastName: likeFilter },
@@ -94,26 +95,72 @@ export class ClientRepository {
 			];
 		}
 
-		const [total, records] = await Promise.all([
-			this.prisma.client.count({ where }),
-			this.prisma.client.findMany({
-				where,
-				skip: (page - 1) * limit,
-				take: limit,
-				orderBy: { createdAt: "desc" },
-			}),
-		]);
+		// Active filter conditions for the data query
+		const where: Prisma.ClientWhereInput = { ...baseWhere };
+
+		if (personType) {
+			where.personType = toPrismaPersonType(personType);
+		}
+
+		if (stateCode) {
+			where.stateCode = stateCode;
+		}
+
+		// personType counts: apply stateCode but NOT personType (so all types show up)
+		const personTypeCountWhere: Prisma.ClientWhereInput = { ...baseWhere };
+		if (stateCode) personTypeCountWhere.stateCode = stateCode;
+
+		// stateCode counts: apply personType but NOT stateCode
+		const stateCodeCountWhere: Prisma.ClientWhereInput = { ...baseWhere };
+		if (personType)
+			stateCodeCountWhere.personType = toPrismaPersonType(personType);
+
+		const [total, records, personTypeGroups, stateCodeGroups] =
+			await Promise.all([
+				this.prisma.client.count({ where }),
+				this.prisma.client.findMany({
+					where,
+					skip: (page - 1) * limit,
+					take: limit,
+					orderBy: { createdAt: "desc" },
+				}),
+				this.prisma.client.groupBy({
+					by: ["personType"],
+					where: personTypeCountWhere,
+					_count: { personType: true },
+				}),
+				this.prisma.client.groupBy({
+					by: ["stateCode"],
+					where: stateCodeCountWhere,
+					_count: { stateCode: true },
+				}),
+			]);
 
 		const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
+		const PERSON_TYPE_LABELS: Record<string, string> = {
+			PHYSICAL: "Persona Física",
+			MORAL: "Persona Moral",
+			TRUST: "Fideicomiso",
+		};
+
 		return {
 			data: records.map(mapPrismaClient),
-			pagination: {
-				page,
-				limit,
-				total,
-				totalPages,
-			},
+			pagination: { page, limit, total, totalPages },
+			filterMeta: [
+				buildEnumFilterMeta(
+					{
+						id: "personType",
+						label: "Tipo de persona",
+						labelMap: PERSON_TYPE_LABELS,
+					},
+					fromPrismaGroupBy(personTypeGroups, "personType", "personType"),
+				),
+				buildEnumFilterMeta(
+					{ id: "stateCode", label: "Estado" },
+					fromPrismaGroupBy(stateCodeGroups, "stateCode", "stateCode"),
+				),
+			],
 		};
 	}
 

@@ -14,6 +14,7 @@ import type {
 	ImportRowResultEntity,
 	ImportWithResults,
 	ListResult,
+	ListResultWithMeta,
 } from "./types";
 
 describe("ImportService", () => {
@@ -70,7 +71,7 @@ describe("ImportService", () => {
 				limit: 10,
 			};
 
-			const expected: ListResult<ImportEntity> = {
+			const expected: ListResultWithMeta<ImportEntity> = {
 				data: [mockImport],
 				pagination: {
 					page: 1,
@@ -78,6 +79,7 @@ describe("ImportService", () => {
 					total: 1,
 					totalPages: 1,
 				},
+				filterMeta: [],
 			};
 
 			vi.mocked(mockRepository.list).mockResolvedValue(expected);

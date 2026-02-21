@@ -2,8 +2,8 @@ import type { PrismaClient } from "@prisma/client";
 import { OperationRepository } from "./repository";
 import type {
 	OperationEntity,
-	OperationListResult,
 	ActivityCode,
+	ListResultWithMeta,
 } from "./types";
 import type {
 	OperationFilters,
@@ -84,7 +84,7 @@ export class OperationService {
 	async list(
 		organizationId: string,
 		filters: OperationFilters,
-	): Promise<OperationListResult> {
+	): Promise<ListResultWithMeta<OperationEntity>> {
 		return this.repository.list(organizationId, filters);
 	}
 

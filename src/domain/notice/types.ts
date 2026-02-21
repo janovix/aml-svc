@@ -41,17 +41,14 @@ export interface NoticeWithAlertSummary extends NoticeEntity {
 	};
 }
 
-export interface Pagination {
-	page: number;
-	limit: number;
-	total: number;
-	totalPages: number;
-}
-
-export interface ListResult<T> {
-	data: T[];
-	pagination: Pagination;
-}
+export type {
+	Pagination,
+	ListResult,
+	ListResultWithMeta,
+	FilterMetaDef,
+	FilterMetaOption,
+	FilterType,
+} from "../../lib/list-result";
 
 /**
  * Represents the SAT period for a notice (17-17 cycle)

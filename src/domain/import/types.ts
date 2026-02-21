@@ -58,17 +58,14 @@ export interface ImportWithResults extends ImportEntity {
 	rowResults: ImportRowResultEntity[];
 }
 
-export interface Pagination {
-	page: number;
-	limit: number;
-	total: number;
-	totalPages: number;
-}
-
-export interface ListResult<T> {
-	data: T[];
-	pagination: Pagination;
-}
+export type {
+	Pagination,
+	ListResult,
+	ListResultWithMeta,
+	FilterMetaDef,
+	FilterMetaOption,
+	FilterType,
+} from "../../lib/list-result";
 
 /**
  * Progress update sent from import worker
