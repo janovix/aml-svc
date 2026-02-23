@@ -1,3 +1,10 @@
+# [1.7.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.6...v1.7.0-rc.7) (2026-02-23)
+
+
+### Features
+
+* update notice deletion logic to allow deletion of generated notices and enhance related tests ([f5b1ad8](https://github.com/janovix/aml-svc/commit/f5b1ad81e92d7c318fab64ca17e430dc42a09615))
+
 # [1.7.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.5...v1.7.0-rc.6) (2026-02-21)
 
 
