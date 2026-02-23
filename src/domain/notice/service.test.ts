@@ -197,7 +197,11 @@ describe("NoticeService", () => {
 			getWithAlertSummary: vi.fn(),
 			patch: vi.fn(),
 			delete: vi.fn(),
-			countAlertsForPeriod: vi.fn(),
+			countAlertsForPeriod: vi.fn().mockResolvedValue({
+				total: 0,
+				bySeverity: {},
+				byStatus: {},
+			}),
 			getAlertsForNotice: vi.fn(),
 			getAlertsForPeriodDetailed: vi.fn(),
 			getAlertsWithTransactionsForNotice: vi.fn(),

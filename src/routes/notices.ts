@@ -74,7 +74,7 @@ function handleServiceError(error: unknown): never {
 			],
 			CANNOT_DELETE_NON_DRAFT_NOTICE: [
 				400,
-				"Only draft notices can be deleted",
+				"Only draft or generated notices can be deleted",
 			],
 			NOTICE_MUST_BE_GENERATED_BEFORE_SUBMISSION: [
 				400,

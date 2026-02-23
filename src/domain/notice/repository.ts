@@ -250,12 +250,12 @@ export class NoticeRepository {
 	}
 
 	/**
-	 * Delete a notice (only DRAFT status)
+	 * Delete a notice (only DRAFT or GENERATED status)
 	 */
 	async delete(organizationId: string, id: string): Promise<void> {
 		const notice = await this.get(organizationId, id);
 
-		if (notice.status !== "DRAFT") {
+		if (notice.status !== "DRAFT" && notice.status !== "GENERATED") {
 			throw new Error("CANNOT_DELETE_NON_DRAFT_NOTICE");
 		}
 

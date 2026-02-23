@@ -343,6 +343,7 @@ export class NoticeService {
 			hasPendingNotice: boolean;
 			hasSubmittedNotice: boolean;
 			noticeCount: number;
+			availableAlertCount: number;
 		}>
 	> {
 		const now = new Date();
@@ -355,6 +356,7 @@ export class NoticeService {
 			hasPendingNotice: boolean;
 			hasSubmittedNotice: boolean;
 			noticeCount: number;
+			availableAlertCount: number;
 		}> = [];
 
 		// Determine starting offset: if we're past day 16, include next month (i = -1)
@@ -369,20 +371,31 @@ export class NoticeService {
 			const reportedMonth = `${year}${String(month).padStart(2, "0")}`;
 			const displayName = `${MONTH_NAMES_ES[month - 1]} ${year}`;
 
-			const stats = await this.repository.getNoticeStatsForPeriod(
-				organizationId,
-				reportedMonth,
-			);
+			const period = calculateNoticePeriod(year, month);
+
+			const [stats, alertStats] = await Promise.all([
+				this.repository.getNoticeStatsForPeriod(organizationId, reportedMonth),
+				this.repository.countAlertsForPeriod(
+					organizationId,
+					period.start,
+					period.end,
+				),
+			]);
+
+			// A month blocks creation only when there's already a pending notice
+			// AND no unassigned alerts remain. If alerts are still available,
+			// the user can create an additional notice for the same period.
+			const blockCreation = stats.hasPendingNotice && alertStats.total === 0;
 
 			months.push({
 				year,
 				month,
 				displayName,
-				// hasNotice now means "blocks creation" - only pending notices block
-				hasNotice: stats.hasPendingNotice,
-				hasPendingNotice: stats.hasPendingNotice,
+				hasNotice: blockCreation,
+				hasPendingNotice: blockCreation,
 				hasSubmittedNotice: stats.hasSubmittedNotice,
 				noticeCount: stats.noticeCount,
+				availableAlertCount: alertStats.total,
 			});
 		}
 

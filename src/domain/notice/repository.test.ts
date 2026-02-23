@@ -331,10 +331,22 @@ describe("NoticeRepository", () => {
 			});
 		});
 
-		it("throws error when deleting non-draft notice", async () => {
+		it("deletes a generated notice", async () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockGeneratedNotice);
+			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 0 });
+			vi.mocked(prisma.notice.delete).mockResolvedValue(mockGeneratedNotice);
 
-			await expect(repository.delete("org_123", "NTC_456")).rejects.toThrow(
+			await repository.delete("org_123", "NTC_456");
+
+			expect(prisma.notice.delete).toHaveBeenCalledWith({
+				where: { id: "NTC_456" },
+			});
+		});
+
+		it("throws error when deleting a submitted notice", async () => {
+			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockSubmittedNotice);
+
+			await expect(repository.delete("org_123", "NTC_789")).rejects.toThrow(
 				"CANNOT_DELETE_NON_DRAFT_NOTICE",
 			);
 		});
