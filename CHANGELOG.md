@@ -1,3 +1,10 @@
+# [1.7.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.7...v1.7.0-rc.8) (2026-02-23)
+
+
+### Features
+
+* add id to alert rule search filters for improved querying ([4694df7](https://github.com/janovix/aml-svc/commit/4694df773a026a7b333101590200d2145b50f443))
+
 # [1.7.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.6...v1.7.0-rc.7) (2026-02-23)
 
 
