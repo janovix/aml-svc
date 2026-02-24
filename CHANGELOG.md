@@ -1,3 +1,10 @@
+# [1.7.0-rc.12](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.11...v1.7.0-rc.12) (2026-02-24)
+
+
+### Features
+
+* update birthDate validation to use dateOnlyString for improved date handling ([43e60c9](https://github.com/janovix/aml-svc/commit/43e60c9e725268d0008f7ee350e56518d41a4eca))
+
 # [1.7.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.10...v1.7.0-rc.11) (2026-02-24)
 
 
