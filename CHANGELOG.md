@@ -1,3 +1,10 @@
+# [1.7.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.13...v1.7.0-rc.14) (2026-02-24)
+
+
+### Features
+
+* enhance obligatedSubjectKey validation in organizationSettingsCreateSchema ([999390e](https://github.com/janovix/aml-svc/commit/999390e324da7126f2f5b4bf24750497d4b4085f))
+
 # [1.7.0-rc.13](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.12...v1.7.0-rc.13) (2026-02-24)
 
 
