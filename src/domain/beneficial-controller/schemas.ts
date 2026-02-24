@@ -5,6 +5,11 @@
 
 import { z } from "zod";
 
+const dateOnlyString = z
+	.string()
+	.refine((value) => !Number.isNaN(Date.parse(value)), "Invalid date value")
+	.transform((value) => new Date(value).toISOString().split("T")[0]);
+
 export const BC_TYPE_VALUES = [
 	"SHAREHOLDER",
 	"LEGAL_REP",
@@ -83,7 +88,7 @@ export const BeneficialControllerCreateSchema = z.object({
 	firstName: z.string().min(1, "First name is required"),
 	lastName: z.string().min(1, "Last name is required"),
 	secondLastName: z.string().optional().nullable(),
-	birthDate: z.string().datetime().optional().nullable(),
+	birthDate: dateOnlyString.optional().nullable(),
 	birthCountry: z.string().optional().nullable(),
 	nationality: z.string().optional().nullable(),
 	occupation: z.string().optional().nullable(),
@@ -137,7 +142,7 @@ export const BeneficialControllerPatchSchema = z.object({
 	firstName: z.string().min(1).optional(),
 	lastName: z.string().min(1).optional(),
 	secondLastName: z.string().optional().nullable(),
-	birthDate: z.string().datetime().optional().nullable(),
+	birthDate: dateOnlyString.optional().nullable(),
 	birthCountry: z.string().optional().nullable(),
 	nationality: z.string().optional().nullable(),
 	occupation: z.string().optional().nullable(),
