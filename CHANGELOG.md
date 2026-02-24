@@ -1,3 +1,10 @@
+# [1.7.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.9...v1.7.0-rc.10) (2026-02-24)
+
+
+### Features
+
+* enhance synthetic data generation with operations coverage and edge-case handling ([4d7593c](https://github.com/janovix/aml-svc/commit/4d7593c723ec4d14872c75ee826c477e856274b6))
+
 # [1.7.0-rc.9](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.8...v1.7.0-rc.9) (2026-02-24)
 
 
