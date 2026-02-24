@@ -6,6 +6,7 @@ import * as Sentry from "@sentry/cloudflare";
 
 import {
 	OperationService,
+	DuplicateOperationError,
 	OperationCreateSchema,
 	OperationUpdateSchema,
 	OperationFilterSchema,
@@ -853,6 +854,17 @@ operationsInternalRouter.post("/", async (c) => {
 
 		return c.json(created, 201);
 	} catch (error) {
+		if (error instanceof DuplicateOperationError) {
+			return c.json(
+				{
+					error: "Duplicate",
+					message: error.message,
+					code: "DUPLICATE_OPERATION",
+				},
+				409,
+			);
+		}
+
 		Sentry.captureException(error, {
 			tags: { context: "internal-operations-post-error" },
 		});

@@ -109,6 +109,7 @@ export const ImportStatusUpdateSchema = z.object({
 	successCount: z.number().int().nonnegative().optional(),
 	warningCount: z.number().int().nonnegative().optional(),
 	errorCount: z.number().int().nonnegative().optional(),
+	skippedCount: z.number().int().nonnegative().optional(),
 	errorMessage: z.string().optional(),
 });
 

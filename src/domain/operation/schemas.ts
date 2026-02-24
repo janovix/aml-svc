@@ -82,6 +82,7 @@ const BaseOperationSchema = z.object({
 	missingFields: z.array(z.string()).optional().nullable(),
 	referenceNumber: z.string().max(100).optional().nullable(),
 	notes: z.string().max(2000).optional().nullable(),
+	importHash: z.string().max(64).optional().nullable(),
 	payments: z
 		.array(OperationPaymentSchema)
 		.min(1, "At least one payment is required"),

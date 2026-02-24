@@ -33,6 +33,7 @@ export interface ImportEntity {
 	successCount: number;
 	warningCount: number;
 	errorCount: number;
+	skippedCount: number;
 	errorMessage: string | null;
 	createdBy: string;
 	startedAt: string | null;

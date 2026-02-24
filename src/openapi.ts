@@ -6482,6 +6482,10 @@ export const openAPISpec = {
 						type: "integer",
 						description: "Number of rows that failed to import",
 					},
+					skippedCount: {
+						type: "integer",
+						description: "Number of rows skipped as duplicates",
+					},
 					errorMessage: {
 						type: "string",
 						nullable: true,

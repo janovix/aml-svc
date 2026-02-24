@@ -34,6 +34,7 @@ export function mapPrismaImport(prisma: PrismaImport): ImportEntity {
 		successCount: prisma.successCount,
 		warningCount: prisma.warningCount,
 		errorCount: prisma.errorCount,
+		skippedCount: prisma.skippedCount,
 		errorMessage: prisma.errorMessage,
 		createdBy: prisma.createdBy,
 		startedAt: prisma.startedAt?.toISOString() ?? null,

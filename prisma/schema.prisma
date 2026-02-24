@@ -638,6 +638,8 @@ model Operation {
   // Metadata
   referenceNumber    String?          @map("reference_number")
   notes              String?
+  // Import deduplication
+  importHash         String?          @map("import_hash")
   // Timestamps
   createdAt          DateTime         @default(now()) @map("created_at")
   updatedAt          DateTime         @updatedAt @map("updated_at")
@@ -679,6 +681,7 @@ model Operation {
   @@index([alertTypeCode])
   @@index([watchlistStatus])
   @@index([deletedAt])
+  @@index([organizationId, importHash])
   @@map("operations")
 }
 
@@ -1510,6 +1513,7 @@ model Import {
   successCount   Int              @default(0) @map("success_count")
   warningCount   Int              @default(0) @map("warning_count")
   errorCount     Int              @default(0) @map("error_count")
+  skippedCount   Int              @default(0) @map("skipped_count")
   errorMessage   String?          @map("error_message")
   createdBy      String           @map("created_by")
   startedAt      DateTime?        @map("started_at")

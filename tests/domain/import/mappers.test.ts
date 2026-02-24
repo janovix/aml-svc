@@ -24,6 +24,7 @@ describe("Import Mappers", () => {
 				successCount: 45,
 				warningCount: 3,
 				errorCount: 2,
+				skippedCount: 0,
 				errorMessage: null,
 				createdBy: "user-123",
 				startedAt: new Date("2025-01-15T10:00:00Z"),

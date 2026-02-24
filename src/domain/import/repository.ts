@@ -226,6 +226,9 @@ export class ImportRepository {
 		if (update.errorCount !== undefined) {
 			data.errorCount = update.errorCount;
 		}
+		if (update.skippedCount !== undefined) {
+			data.skippedCount = update.skippedCount;
+		}
 		if (update.errorMessage !== undefined) {
 			data.errorMessage = update.errorMessage;
 		}
@@ -248,6 +251,7 @@ export class ImportRepository {
 			successCount?: number;
 			warningCount?: number;
 			errorCount?: number;
+			skippedCount?: number;
 		},
 	): Promise<void> {
 		const data: Prisma.ImportUpdateInput = {};
@@ -263,6 +267,9 @@ export class ImportRepository {
 		}
 		if (counts.errorCount) {
 			data.errorCount = { increment: counts.errorCount };
+		}
+		if (counts.skippedCount) {
+			data.skippedCount = { increment: counts.skippedCount };
 		}
 
 		await this.prisma.import.update({

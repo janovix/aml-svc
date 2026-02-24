@@ -38,6 +38,7 @@ describe("ImportService", () => {
 		successCount: 0,
 		warningCount: 0,
 		errorCount: 0,
+		skippedCount: 0,
 		createdBy,
 		createdAt: "2024-01-01T00:00:00Z",
 		updatedAt: "2024-01-01T00:00:00Z",
@@ -465,7 +466,7 @@ describe("ImportService", () => {
 				mockImport.id,
 				{
 					processedRows: 1,
-					errorCount: 1,
+					skippedCount: 1,
 				},
 			);
 		});
