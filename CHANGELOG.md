@@ -1,3 +1,10 @@
+# [1.7.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.14...v1.7.0-rc.15) (2026-02-24)
+
+
+### Bug Fixes
+
+* update incorporationDate validation to use date format in shareholder schemas ([8a8bd2d](https://github.com/janovix/aml-svc/commit/8a8bd2d4defd678258ac409c0125202eea2d296c))
+
 # [1.7.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.13...v1.7.0-rc.14) (2026-02-24)
 
 
