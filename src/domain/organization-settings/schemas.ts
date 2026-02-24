@@ -6,13 +6,17 @@ export const selfServiceModeSchema = z.enum([
 	"automatic",
 ]);
 
+const MORAL_RFC_REGEX = /^[A-ZÑ&]{3}\d{6}[A-Z0-9]{3}$/;
+const PHYSICAL_RFC_REGEX = /^[A-ZÑ&]{4}\d{6}[A-Z0-9]{3}$/;
+
 export const organizationSettingsCreateSchema = z.object({
 	obligatedSubjectKey: z
 		.string()
-		.length(12, "obligatedSubjectKey must be exactly 12 characters")
-		.regex(
-			/^[A-ZÑ&]{3}\d{6}[A-Z0-9]{3}$/,
-			"obligatedSubjectKey must be a valid RFC format (12 characters)",
+		.refine(
+			(val) =>
+				(val.length === 12 && MORAL_RFC_REGEX.test(val)) ||
+				(val.length === 13 && PHYSICAL_RFC_REGEX.test(val)),
+			"obligatedSubjectKey must be a valid RFC: 12 characters for moral person or 13 characters for physical person",
 		),
 	activityKey: z
 		.string()
