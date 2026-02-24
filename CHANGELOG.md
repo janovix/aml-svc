@@ -1,3 +1,10 @@
+# [1.7.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.10...v1.7.0-rc.11) (2026-02-24)
+
+
+### Features
+
+* add import deduplication support with import_hash and skipped_count fields ([5ce9b22](https://github.com/janovix/aml-svc/commit/5ce9b22f88b81bfe0820f35d121457ba96488649))
+
 # [1.7.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.9...v1.7.0-rc.10) (2026-02-24)
 
 
