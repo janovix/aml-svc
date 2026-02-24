@@ -1,3 +1,10 @@
+# [1.7.0-rc.9](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.8...v1.7.0-rc.9) (2026-02-24)
+
+
+### Features
+
+* increase topK parameter in WatchlistSearchService to enhance search results ([eba2e4a](https://github.com/janovix/aml-svc/commit/eba2e4a6e5e30d9b0f05a9d34378dca84f9a5efb))
+
 # [1.7.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.7...v1.7.0-rc.8) (2026-02-23)
 
 
