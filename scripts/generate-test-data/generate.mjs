@@ -2185,6 +2185,146 @@ function genDIN() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// COVERAGE / BULK OPERATION GENERATION
+//
+// The scenario rows above only use ~16 named clients.  This section ensures
+// that (almost) every client from the 100-client pool appears in at least one
+// operations CSV, and bulks each activity up to 60-100+ rows for realistic
+// import testing.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Clients intentionally left WITHOUT any operations (edge-case testing)
+const NO_OPS_INDICES = [10, 11, 12];
+
+// Client indices already covered by named RFC handles in scenarios
+const SCENARIO_INDICES = new Set([
+	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 20, 21, 22, 23, 70, 95,
+]);
+
+// Extension factory per activity — reuse the ones already defined above
+const EXT_FACTORIES = {
+	VEH: vehExt,
+	INM: (s) => inmExt(s),
+	MJR: (s) => mjrExt(s),
+	AVI: (s) => aviExt(s),
+	JYS: (s) => jysExt(s),
+	ARI: (s) => ariExt(s),
+	BLI: (s) => bliExt(s),
+	DON: (s) => donExt(s),
+	MPC: (s, a) => mpcExt(s, a),
+	FEP: (s) => fepExt(s),
+	FES: (s) => fesExt(s),
+	SPR: (s) => sprExt(s),
+	CHV: () => chvExt(),
+	TSC: () => tscExt(),
+	TPP: () => tppExt(),
+	TDR: () => tdrExt(),
+	TCV: (s) => tcvExt(s),
+	OBA: (s) => obaExt(s),
+	DIN: (s) => dinExt(s),
+};
+
+const ALL_ACTIVITIES = Object.keys(EXT_FACTORIES);
+
+/**
+ * Build a mapping: activityCode → array of client indices to generate
+ * coverage operations for.  Each active, uncovered client is assigned
+ * to 2-4 random activities.  Scenario clients also get 1-2 extra
+ * activity assignments for bulk.
+ */
+function buildCoverageAssignments() {
+	const assignments = {};
+	for (const act of ALL_ACTIVITIES) assignments[act] = [];
+
+	// Deterministic but well-distributed assignment via simple hashing
+	function activitiesFor(clientIdx, count) {
+		const picks = [];
+		for (let k = 0; picks.length < count && k < ALL_ACTIVITIES.length; k++) {
+			const h = ((clientIdx + 1) * 7 + k * 31) % ALL_ACTIVITIES.length;
+			if (!picks.includes(ALL_ACTIVITIES[h])) picks.push(ALL_ACTIVITIES[h]);
+		}
+		// Fallback: fill remaining slots sequentially
+		for (let k = 0; picks.length < count; k++) {
+			const act = ALL_ACTIVITIES[k % ALL_ACTIVITIES.length];
+			if (!picks.includes(act)) picks.push(act);
+		}
+		return picks;
+	}
+
+	for (let i = 0; i < CLIENT_ROWS.length; i++) {
+		if (NO_OPS_INDICES.includes(i)) continue;
+
+		if (SCENARIO_INDICES.has(i)) {
+			// Scenario clients already appear — give them 1-2 extra activities
+			const extras = activitiesFor(i, 1 + (i % 2));
+			for (const act of extras) assignments[act].push(i);
+		} else {
+			// Uncovered clients — assign to 2-4 activities
+			const count = 2 + (i % 3); // 2, 3, or 4
+			const acts = activitiesFor(i, count);
+			for (const act of acts) assignments[act].push(i);
+		}
+	}
+
+	return assignments;
+}
+
+const COVERAGE_ASSIGNMENTS = buildCoverageAssignments();
+
+// Payment form codes used for coverage rows (rotate for variety)
+const COV_PAY_FORMS = [DEFER, CASH, WIRE, DEFER, DEFER];
+
+/**
+ * Generate coverage (bulk) rows for a given activity.
+ * Each assigned client gets 2-4 operations with varied dates and amounts.
+ */
+function generateCoverageRows(act) {
+	const clientIndices = COVERAGE_ASSIGNMENTS[act] || [];
+	const extFn = EXT_FACTORIES[act];
+	const noticeMxn = NOTICE_UMA[act] !== null ? mxn(NOTICE_UMA[act]) : null;
+	const rows = [];
+	let seq = 5000; // high base to avoid collisions with scenario ref numbers
+
+	for (const ci of clientIndices) {
+		const rfc = CLIENT_ROWS[ci].rfc;
+		const opsCount = 2 + (ci % 3); // 2, 3, or 4 operations
+
+		for (let j = 0; j < opsCount; j++) {
+			const dayOffset = -(((ci * 3 + j * 7) % 120) + 1); // -1 to -121 days
+			const date = addDays(REF, dayOffset);
+
+			// Amount: varied, generally below notice to keep these as "normal business"
+			const baseAmt =
+				noticeMxn !== null
+					? Math.round(
+							noticeMxn * (0.1 + ((ci * 7 + j * 13) % 60) / 100) * 100,
+						) / 100
+					: Math.round((5000 + ((ci * 11 + j * 17) % 200) * 500) * 100) / 100;
+
+			const payForm = COV_PAY_FORMS[(ci + j) % COV_PAY_FORMS.length];
+			const cur = "MXN";
+			const ext = extFn(`coverage_client_${ci}`, baseAmt);
+
+			rows.push(
+				op(
+					rfc,
+					date,
+					baseAmt,
+					{ form: payForm, amount: baseAmt, currency: cur },
+					ext,
+					{
+						reference_number: String(seq++),
+						notes: `coverage_client_${ci}_op_${j + 1}`,
+					},
+				),
+			);
+		}
+	}
+
+	return rows;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN
 // ─────────────────────────────────────────────────────────────────────────────
 console.log("\n═══════════════════════════════════════════════════════════");
@@ -2194,7 +2334,7 @@ console.log("══════════════════════�
 // 1. Clients
 write("clients.csv", CLIENT_HEADERS, CLIENT_ROWS);
 
-// 2. Operations per activity
+// 2. Operations per activity (scenarios + coverage bulk)
 const GENERATORS = {
 	VEH: genVEH,
 	INM: genINM,
@@ -2217,14 +2357,32 @@ const GENERATORS = {
 	DIN: genDIN,
 };
 
+// Track which clients appear in at least one activity (for summary)
+const clientsWithOps = new Set();
+let totalOps = 0;
+
 for (const [act, gen] of Object.entries(GENERATORS)) {
-	const rows = gen();
-	write(`operations_${act.toLowerCase()}.csv`, opHeaders(act), rows);
+	const scenarioRows = gen();
+	const coverageRows = generateCoverageRows(act);
+	const allRows = [...scenarioRows, ...coverageRows];
+
+	for (const row of allRows) clientsWithOps.add(row.client_rfc);
+	totalOps += allRows.length;
+
+	write(`operations_${act.toLowerCase()}.csv`, opHeaders(act), allRows);
 }
 
 console.log("\n═══════════════════════════════════════════════════════════");
 console.log(`  Done! Files written to: ${OUT}`);
 console.log("═══════════════════════════════════════════════════════════\n");
+
+console.log(`  Total clients:              ${CLIENT_ROWS.length}`);
+console.log(`  Clients with operations:    ${clientsWithOps.size}`);
+console.log(
+	`  Clients without operations: ${CLIENT_ROWS.length - clientsWithOps.size} (intentional edge cases: indices ${NO_OPS_INDICES.join(", ")})`,
+);
+console.log(`  Total operation rows:       ${totalOps}`);
+console.log();
 
 console.log("RFC handles for cross-referencing:");
 for (const [k, v] of Object.entries(RFC)) {

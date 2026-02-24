@@ -38,7 +38,8 @@ const clientsIncludeDocuments =
 	process.env.CLIENTS_INCLUDE_DOCUMENTS === "true";
 const clientsIncludeAddresses =
 	process.env.CLIENTS_INCLUDE_ADDRESSES === "true";
-const transactionsCount = parseInt(process.env.TRANSACTIONS_COUNT || "50", 10);
+// Default 0 — the generator auto-adjusts to ensure every client has at least one operation
+const transactionsCount = parseInt(process.env.TRANSACTIONS_COUNT || "0", 10);
 const transactionsPerClient = process.env.TRANSACTIONS_PER_CLIENT
 	? parseInt(process.env.TRANSACTIONS_PER_CLIENT, 10)
 	: undefined;

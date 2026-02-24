@@ -190,6 +190,11 @@ app.post("/internal/synthetic-data", async (c) => {
 				includeDocuments?: boolean;
 				includeAddresses?: boolean;
 			};
+			operations?: {
+				count: number;
+				perClient?: number;
+				skipClients?: number;
+			};
 			transactions?: {
 				count: number;
 				perClient?: number;
@@ -204,9 +209,19 @@ app.post("/internal/synthetic-data", async (c) => {
 			};
 		}
 
+		if (models.includes("operations")) {
+			// Default count of 0 — the generator auto-adjusts to cover every client
+			syntheticOptions.operations = {
+				count: options?.operations?.count ?? 0,
+				perClient: options?.operations?.perClient,
+				skipClients: options?.operations?.skipClients,
+			};
+		}
+
 		if (models.includes("transactions")) {
+			// Legacy path: map to operations with auto-adjusted count
 			syntheticOptions.transactions = {
-				count: options?.transactions?.count ?? 50,
+				count: options?.transactions?.count ?? 0,
 				perClient: options?.transactions?.perClient,
 			};
 		}

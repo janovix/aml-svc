@@ -42,6 +42,11 @@ export interface SyntheticDataOptions {
 		count: number;
 		perClient?: number; // Number of operations per client
 		activityCode?: string; // Activity code (VEH, INM, etc.) - defaults to VEH
+		/**
+		 * Number of clients intentionally left without operations (edge-case testing).
+		 * Defaults to 3. Ignored when `perClient` is explicitly set.
+		 */
+		skipClients?: number;
 	};
 	/** @deprecated Use operations instead */
 	transactions?: {
@@ -580,11 +585,24 @@ export class SyntheticDataGenerator {
 			// Get activity code - default to VEH if using legacy transactions option
 			const activityCode: string = options.operations?.activityCode ?? "VEH";
 
+			const skipClients = options.operations?.skipClients ?? 3;
+
+			// Auto-adjust count: when not using perClient, ensure there are enough
+			// operations for every active client to receive at least one.
+			let operationCount = operationsConfig.count;
+			if (!operationsConfig.perClient && clientRfcs.length > 0) {
+				const activeClientCount = Math.max(0, clientRfcs.length - skipClients);
+				if (operationCount < activeClientCount) {
+					operationCount = activeClientCount;
+				}
+			}
+
 			const operationResult = await this.generateOperations(
-				operationsConfig.count,
+				operationCount,
 				clientRfcs,
 				activityCode,
 				operationsConfig.perClient,
+				skipClients,
 			);
 			result.operations = operationResult;
 			// For backwards compatibility
@@ -684,7 +702,19 @@ export class SyntheticDataGenerator {
 	}
 
 	/**
-	 * Generates synthetic operations
+	 * Generates synthetic operations.
+	 *
+	 * Distribution strategy (when `perClient` is NOT specified):
+	 *   1. Randomly select `skipClients` clients to intentionally leave without
+	 *      operations (edge-case coverage for "client with no operations").
+	 *   2. Pass 1 – guarantee: shuffle the remaining active clients and assign
+	 *      exactly 1 operation each so every active client has coverage.
+	 *   3. Pass 2 – extras: if `count > activeClients.length`, distribute the
+	 *      remaining operations randomly across active clients.
+	 *
+	 * When `perClient` is specified the original even-distribution behaviour is
+	 * preserved for backwards compatibility.
+	 *
 	 * Currently supports VEH (Vehicle) activity. Other activities can be added.
 	 */
 	private async generateOperations(
@@ -692,6 +722,7 @@ export class SyntheticDataGenerator {
 		clientRfcs: string[],
 		activityCode: string,
 		perClient?: number,
+		skipClients = 3,
 	): Promise<{ created: number; operationIds: string[] }> {
 		const operationIds: string[] = [];
 		let created = 0;
@@ -699,6 +730,9 @@ export class SyntheticDataGenerator {
 		if (clientRfcs.length === 0) {
 			throw new Error("No clients available for operation generation");
 		}
+
+		// Currently only VEH activity is supported for synthetic data
+		const resolvedActivityCode = activityCode === "VEH" ? "VEH" : "VEH";
 
 		// Look up client IDs from RFCs
 		const clients = await this.prisma.client.findMany({
@@ -711,75 +745,126 @@ export class SyntheticDataGenerator {
 
 		const clientIdMap = new Map(clients.map((c) => [c.rfc, c.id]));
 
-		const operationsPerClient =
-			perClient || Math.ceil(count / clientRfcs.length);
+		const resolvedClientIds = clientRfcs
+			.map((rfc) => clientIdMap.get(rfc))
+			.filter((id): id is string => id !== undefined);
 
-		for (const clientRfc of clientRfcs) {
-			const clientId = clientIdMap.get(clientRfc);
-			if (!clientId) {
-				continue;
-			}
-
-			const clientOperations = Math.min(operationsPerClient, count - created);
-
-			for (let i = 0; i < clientOperations && created < count; i++) {
-				try {
-					// Currently only VEH activity is supported for synthetic data
-					if (activityCode !== "VEH") {
-						activityCode = "VEH"; // Default to VEH
+		// ── Legacy mode: explicit perClient ──────────────────────────────────────
+		if (perClient !== undefined) {
+			for (const clientId of resolvedClientIds) {
+				const clientOperations = Math.min(perClient, count - created);
+				for (let i = 0; i < clientOperations && created < count; i++) {
+					const opCreated = await this.createOneOperation(
+						clientId,
+						created,
+						resolvedActivityCode,
+					);
+					if (opCreated) {
+						operationIds.push(opCreated);
+						created++;
 					}
-
-					const operationData = generateVehicleOperation(clientId, created);
-
-					// Create operation using Prisma directly
-					const operation = await this.prisma.operation.create({
-						data: {
-							id: generateId("OPERATION"),
-							organizationId: this.organizationId,
-							clientId: operationData.clientId,
-							activityCode: "VEH",
-							operationDate: new Date(operationData.operationDate),
-							amount: operationData.amount,
-							currencyCode: operationData.currency,
-							operationTypeCode: operationData.operationType.toUpperCase(),
-							branchPostalCode: operationData.branchPostalCode,
-							// Create the VEH extension
-							vehicle: {
-								create: {
-									id: generateId("OPERATION_VEH"),
-									vehicleType: operationData.vehicleType.toUpperCase() as
-										| "LAND"
-										| "MARINE"
-										| "AIR",
-									brand: operationData.brand,
-									model: operationData.model,
-									year: operationData.year,
-									armorLevelCode: operationData.armorLevel ?? null,
-									engineNumber: operationData.engineNumber ?? null,
-									plates: operationData.plates ?? null,
-									registrationNumber: operationData.registrationNumber ?? null,
-									flagCountryCode: operationData.flagCountryId ?? null,
-								},
-							},
-						},
-					});
-
-					operationIds.push(operation.id);
-					created++;
-				} catch (error) {
-					// Log error but continue
-					Sentry.captureException(error, {
-						tags: { context: "synthetic-data-create-operation-error" },
-					});
 				}
+				if (created >= count) break;
 			}
+			return { created, operationIds };
+		}
 
-			if (created >= count) {
-				break;
+		// ── Two-pass distribution ─────────────────────────────────────────────────
+
+		// Shuffle client IDs for random assignment
+		const shuffled = [...resolvedClientIds].sort(() => Math.random() - 0.5);
+
+		// Reserve a few clients with no operations (edge-case testing)
+		const actualSkip = Math.min(skipClients, Math.max(0, shuffled.length - 1));
+		const activeClientIds = shuffled.slice(0, shuffled.length - actualSkip);
+
+		if (activeClientIds.length === 0) {
+			return { created, operationIds };
+		}
+
+		// Pass 1 – guarantee: one operation per active client
+		const guaranteedCount = Math.min(activeClientIds.length, count);
+		for (let i = 0; i < guaranteedCount; i++) {
+			const opCreated = await this.createOneOperation(
+				activeClientIds[i],
+				created,
+				resolvedActivityCode,
+			);
+			if (opCreated) {
+				operationIds.push(opCreated);
+				created++;
+			}
+		}
+
+		// Pass 2 – extras: distribute remaining operations randomly
+		const extras = count - created;
+		for (let i = 0; i < extras; i++) {
+			const clientId =
+				activeClientIds[Math.floor(Math.random() * activeClientIds.length)];
+			const opCreated = await this.createOneOperation(
+				clientId,
+				created,
+				resolvedActivityCode,
+			);
+			if (opCreated) {
+				operationIds.push(opCreated);
+				created++;
 			}
 		}
 
 		return { created, operationIds };
+	}
+
+	/**
+	 * Creates a single synthetic operation for the given client.
+	 * Returns the operation ID on success, or null if creation failed.
+	 */
+	private async createOneOperation(
+		clientId: string,
+		index: number,
+		_activityCode: string,
+	): Promise<string | null> {
+		try {
+			const operationData = generateVehicleOperation(clientId, index);
+
+			const operation = await this.prisma.operation.create({
+				data: {
+					id: generateId("OPERATION"),
+					organizationId: this.organizationId,
+					clientId: operationData.clientId,
+					activityCode: "VEH",
+					operationDate: new Date(operationData.operationDate),
+					amount: operationData.amount,
+					currencyCode: operationData.currency,
+					operationTypeCode: operationData.operationType.toUpperCase(),
+					branchPostalCode: operationData.branchPostalCode,
+					vehicle: {
+						create: {
+							id: generateId("OPERATION_VEH"),
+							vehicleType: operationData.vehicleType.toUpperCase() as
+								| "LAND"
+								| "MARINE"
+								| "AIR",
+							brand: operationData.brand,
+							model: operationData.model,
+							year: operationData.year,
+							armorLevelCode: operationData.armorLevel ?? null,
+							engineNumber: operationData.engineNumber ?? null,
+							plates: operationData.plates ?? null,
+							registrationNumber: operationData.registrationNumber ?? null,
+							flagCountryCode: operationData.flagCountryId ?? null,
+						},
+					},
+				},
+			});
+
+			return operation.id;
+		} catch (error) {
+			Sentry.captureException(error, {
+				tags: { context: "synthetic-data-create-operation-error" },
+			});
+			return null;
+		}
 	}
 
 	/**
