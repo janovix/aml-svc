@@ -82,7 +82,7 @@ export class WatchlistSearchService {
 						birthDate,
 						identifiers,
 						countries,
-						topK: 20,
+						topK: 50,
 						threshold: 0.7,
 					}),
 				},
