@@ -75,6 +75,44 @@
 
 * add endpoint to check if a client exists by RFC ([7df05f1](https://github.com/janovix/aml-svc/commit/7df05f1ff09064a388f3f39a5ac17021b2287e61))
 
+# [1.7.0](https://github.com/janovix/aml-svc/compare/v1.6.0...v1.7.0) (2026-02-21)
+
+
+### Bug Fixes
+
+* update CatalogListQuerySchema to accept single character search and adjust validation for search string length ([66f96ec](https://github.com/janovix/aml-svc/commit/66f96eca03a57e38420192bae3f9e40d28bfcea3))
+* update pageSize maximum limit in openAPI and CatalogListQuerySchema to 200 ([87ed31d](https://github.com/janovix/aml-svc/commit/87ed31d4204d62162910e50ce62f527d9591a485))
+* update ruleType in alertRules from transaction_amount_uma to operation_amount_uma for clarity ([43c4465](https://github.com/janovix/aml-svc/commit/43c446564f49d3b726ee43f5a8dfe2b6eb728ef6))
+
+
+### Features
+
+* add activity_code to imports and catalog name resolution columns ([d76eacb](https://github.com/janovix/aml-svc/commit/d76eacb088474d3664084fe73e7dd888097e1c42))
+* add currency population script and CSV data for catalog currencies ([a491199](https://github.com/janovix/aml-svc/commit/a4911998a9b817ddb13f214f93dd762ed8d89423))
+* add endpoint to retrieve client by RFC ([cbce23a](https://github.com/janovix/aml-svc/commit/cbce23a8988a5b8307dc092ad8a2637d9f048075))
+* add exchange rate functionality using CurrencyLayer API ([4f0da1c](https://github.com/janovix/aml-svc/commit/4f0da1c37bad3ec7dd0a88e79ac68a49a919ea98))
+* add getStats method to InvoiceRepository and InvoiceService, and create /invoices/stats endpoint ([b4d64c8](https://github.com/janovix/aml-svc/commit/b4d64c86531ccaee2554e636b7fe038e372c26bf))
+* add internal maintenance routes for KYC progress recalculation ([1cef456](https://github.com/janovix/aml-svc/commit/1cef456494dcd8b4d66efc76ff36443a8aba61f0))
+* add KYC progress persistence to clients table ([15b3f9c](https://github.com/janovix/aml-svc/commit/15b3f9c18ec7fcc96543f773544b2c3119d4b48d))
+* add KYC self-service module with session management and email notifications ([01b1d91](https://github.com/janovix/aml-svc/commit/01b1d91b4c90611a8659aadb71e313dc2d2547a1))
+* add notifications service integration for screening alerts ([86455da](https://github.com/janovix/aml-svc/commit/86455daad22ecc760a287439012241b22db14e5f))
+* add organizationId to AlertEntity and mapPrismaAlert function ([292bffe](https://github.com/janovix/aml-svc/commit/292bffe1d891a2c7f495ef8521b7ad7f7128167d))
+* add screening callback route for watchlist service integration ([e071a1f](https://github.com/janovix/aml-svc/commit/e071a1f42d196fcdd6406d7d51614556a0db97a3))
+* add script for importing catalog items with proper foreign key handling ([81bbbeb](https://github.com/janovix/aml-svc/commit/81bbbeb5ab3f43d492c369c51030b128938ac258))
+* add script for importing remaining catalogs from a specified index ([52b3bde](https://github.com/janovix/aml-svc/commit/52b3bde46b0719949131248b74fb6e9450a8b9e6))
+* add scripts for incremental catalog import and database state check ([ac10933](https://github.com/janovix/aml-svc/commit/ac10933cd901942ca56f92eb252220ae3019a8fa))
+* add statistics endpoint for operations and implement related repository and service methods ([96efca9](https://github.com/janovix/aml-svc/commit/96efca95bb3a635181fc7c7a47d1ff80bbb1b5d7))
+* add submit and acknowledgment PDF document ID fields to Notice model and update related functionality ([57a5bbf](https://github.com/janovix/aml-svc/commit/57a5bbfb790abc64796db547af972f089350071e))
+* add synthetic test data generation and validation scripts ([117bd7c](https://github.com/janovix/aml-svc/commit/117bd7cdfe5ee59c8b0ecb3ed3ac93202aa03683))
+* enhance client and import services with filter metadata and pagination support ([c2efa29](https://github.com/janovix/aml-svc/commit/c2efa29a87763a81913a8983e0a7e4267df769b1))
+* enhance filtering capabilities in repositories by supporting multi-value parameters ([3e94bca](https://github.com/janovix/aml-svc/commit/3e94bca55018329fa6e72f278cd6ce01b630ee07))
+* enhance import event streaming with progress counts ([f75b552](https://github.com/janovix/aml-svc/commit/f75b552d590d3d2701b9fcef251b355de769a888))
+* enhance personType filtering by normalizing input to lowercase ([d5b6bb0](https://github.com/janovix/aml-svc/commit/d5b6bb08dee7e9a0631b34d9775b1425702c8b79))
+* implement beneficial controller management and watchlist screening integration ([d940fce](https://github.com/janovix/aml-svc/commit/d940fce3338164283a6f7bf40658d400826f7fd9))
+* implement usage rights client and middleware ([e4f303a](https://github.com/janovix/aml-svc/commit/e4f303a1753fbeb7dd85a80be25cd1642257206b))
+* integrate Sentry for error handling across services ([7ff629a](https://github.com/janovix/aml-svc/commit/7ff629aacaf4d1f92ef94e361db4b78b18a3bdd0))
+* update catalog field mappings and add resolvedNames to client updates ([6ada746](https://github.com/janovix/aml-svc/commit/6ada7468c0c8e7ab25dd3b98663e905e4ba7a431))
+
 # [1.7.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.3...v1.7.0-rc.4) (2026-02-21)
 
 
