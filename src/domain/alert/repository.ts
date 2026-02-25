@@ -69,7 +69,11 @@ export class AlertRuleRepository {
 
 		if (search) {
 			const likeFilter = { contains: search };
-			where.OR = [{ name: likeFilter }, { description: likeFilter }];
+			where.OR = [
+				{ id: likeFilter },
+				{ name: likeFilter },
+				{ description: likeFilter },
+			];
 		}
 
 		const [total, records] = await Promise.all([

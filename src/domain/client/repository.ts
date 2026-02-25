@@ -55,7 +55,7 @@ const CLIENT_CATALOG_FIELDS: CatalogFieldsConfig = {
 		catalog: "economic-activities",
 		strategy: "BY_CODE",
 	},
-	nationality: { catalog: "countries", strategy: "BY_ID" },
+	nationality: { catalog: "countries", strategy: "BY_CODE" },
 };
 
 export class ClientRepository {

@@ -27,6 +27,7 @@ const EXCLUDED_MODELS = new Set([
 	"ComplianceOrganization", // User-specific configuration set via API, not seeded
 	"Import", // Created via import worker, not seeded
 	"ImportRowResult", // Created via import worker, not seeded
+	"NoticeEvent", // Created by notice operations (system-generated events), not seeded
 	// Invoice domain - created via CFDI parsing/import, not seeded
 	"Invoice",
 	"InvoiceItem",

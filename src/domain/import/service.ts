@@ -185,6 +185,7 @@ export class ImportService {
 				successCount?: number;
 				warningCount?: number;
 				errorCount?: number;
+				skippedCount?: number;
 			} = { processedRows: 1 };
 
 			switch (update.status) {
@@ -194,8 +195,10 @@ export class ImportService {
 				case "WARNING":
 					counts.warningCount = 1;
 					break;
-				case "ERROR":
 				case "SKIPPED":
+					counts.skippedCount = 1;
+					break;
+				case "ERROR":
 					counts.errorCount = 1;
 					break;
 			}

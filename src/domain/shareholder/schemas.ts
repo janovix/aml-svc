@@ -73,7 +73,7 @@ export const ShareholderCreateSchema = z.discriminatedUnion("entityType", [
 			.string()
 			.min(1, "Business name is required for company shareholders"),
 		taxId: z.string().min(1, "Tax ID is required for company shareholders"),
-		incorporationDate: z.string().datetime().optional().nullable(),
+		incorporationDate: z.string().date().optional().nullable(),
 		nationality: z.string().optional().nullable(),
 		// Anexo 4: Representative of the moral entity
 		representativeName: z.string().optional().nullable(),
@@ -120,7 +120,7 @@ export const ShareholderPatchSchema = z.discriminatedUnion("entityType", [
 		parentShareholderId: shareholderIdSchema.optional().nullable(),
 		businessName: z.string().min(1).optional(),
 		taxId: z.string().optional(),
-		incorporationDate: z.string().datetime().optional().nullable(),
+		incorporationDate: z.string().date().optional().nullable(),
 		nationality: z.string().optional().nullable(),
 		representativeName: z.string().optional().nullable(),
 		representativeCurp: curpSchema,

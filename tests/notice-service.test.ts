@@ -21,13 +21,21 @@ describe("NoticeService", () => {
 		delete: vi.fn(),
 		countAlertsForPeriod: vi.fn(),
 		assignAlertsToNotice: vi.fn(),
+		assignSpecificAlertsToNotice: vi.fn(),
 		updateFileUrl: vi.fn(),
 		markAsGenerated: vi.fn(),
 		markAsSubmitted: vi.fn(),
 		markAsAcknowledged: vi.fn(),
+		markAsRebuked: vi.fn(),
+		revertToDraft: vi.fn(),
+		addAlertsToNotice: vi.fn(),
+		removeAlertsFromNotice: vi.fn(),
 		hasPendingNoticeForPeriod: vi.fn(),
 		getNoticeStatsForPeriod: vi.fn(),
 		getAlertsForNotice: vi.fn(),
+		getAlertsForPeriodDetailed: vi.fn(),
+		createEvent: vi.fn().mockResolvedValue({}),
+		getEventsForNotice: vi.fn(),
 	} as unknown as NoticeRepository;
 
 	const organizationId = "org-123";
@@ -108,7 +116,7 @@ describe("NoticeService", () => {
 			fileSize: null,
 			generatedAt: null,
 			submittedAt: null,
-			satFolioNumber: null,
+			amendmentCycle: 0,
 			createdBy: userId,
 			notes: createInput.notes ?? null,
 			createdAt: new Date().toISOString(),
@@ -178,7 +186,7 @@ describe("NoticeService", () => {
 			fileSize: null,
 			generatedAt: null,
 			submittedAt: null,
-			satFolioNumber: null,
+			amendmentCycle: 0,
 			createdBy: null,
 			notes: null,
 			createdAt: new Date().toISOString(),
@@ -206,6 +214,7 @@ describe("NoticeService", () => {
 					xmlFileUrl: "https://example.com/file.xml",
 					fileSize: 1024,
 				},
+				undefined,
 			);
 		});
 	});
@@ -226,7 +235,7 @@ describe("NoticeService", () => {
 			fileSize: 1024,
 			generatedAt: new Date().toISOString(),
 			submittedAt: null,
-			satFolioNumber: null,
+			amendmentCycle: 0,
 			createdBy: null,
 			notes: null,
 			createdAt: new Date().toISOString(),
@@ -238,7 +247,6 @@ describe("NoticeService", () => {
 				...mockGeneratedNotice,
 				status: "SUBMITTED",
 				submittedAt: new Date().toISOString(),
-				satFolioNumber: "SAT-12345",
 			});
 
 			const service = new NoticeService(mockRepository);
@@ -246,16 +254,14 @@ describe("NoticeService", () => {
 				organizationId,
 				noticeId,
 				"DOC_submit_123",
-				"SAT-12345",
 			);
 
 			expect(result.status).toBe("SUBMITTED");
-			expect(result.satFolioNumber).toBe("SAT-12345");
 			expect(mockRepository.markAsSubmitted).toHaveBeenCalledWith(
 				organizationId,
 				noticeId,
 				"DOC_submit_123",
-				"SAT-12345",
+				undefined,
 			);
 		});
 	});
@@ -294,7 +300,7 @@ describe("NoticeService", () => {
 			fileSize: null,
 			generatedAt: null,
 			submittedAt: null,
-			satFolioNumber: null,
+			amendmentCycle: 0,
 			createdBy: null,
 			notes: null,
 			createdAt: new Date().toISOString(),
@@ -305,6 +311,8 @@ describe("NoticeService", () => {
 				byStatus: { DETECTED: 5 },
 				byRule: [],
 			},
+			events: [],
+			alerts: [],
 		};
 
 		it("should get notice with alert summary", async () => {

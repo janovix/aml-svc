@@ -1,3 +1,101 @@
+# [1.8.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.7.0...v1.8.0-rc.1) (2026-02-25)
+
+
+### Bug Fixes
+
+* update incorporationDate validation to use date format in shareholder schemas ([8a8bd2d](https://github.com/janovix/aml-svc/commit/8a8bd2d4defd678258ac409c0125202eea2d296c))
+* update nationality strategy in client repository to use BY_CODE ([dec33a1](https://github.com/janovix/aml-svc/commit/dec33a10b23c9d89b1489a2db50ea0cf6548002e))
+
+
+### Features
+
+* add endpoint to check if a client exists by RFC ([7df05f1](https://github.com/janovix/aml-svc/commit/7df05f1ff09064a388f3f39a5ac17021b2287e61))
+* add id to alert rule search filters for improved querying ([4694df7](https://github.com/janovix/aml-svc/commit/4694df773a026a7b333101590200d2145b50f443))
+* add import deduplication support with import_hash and skipped_count fields ([5ce9b22](https://github.com/janovix/aml-svc/commit/5ce9b22f88b81bfe0820f35d121457ba96488649))
+* enhance obligatedSubjectKey validation in organizationSettingsCreateSchema ([999390e](https://github.com/janovix/aml-svc/commit/999390e324da7126f2f5b4bf24750497d4b4085f))
+* enhance synthetic data generation with operations coverage and edge-case handling ([4d7593c](https://github.com/janovix/aml-svc/commit/4d7593c723ec4d14872c75ee826c477e856274b6))
+* increase topK parameter in WatchlistSearchService to enhance search results ([eba2e4a](https://github.com/janovix/aml-svc/commit/eba2e4a6e5e30d9b0f05a9d34378dca84f9a5efb))
+* overhaul notice module with amendment cycle, event tracking, and deadline notifications ([d811086](https://github.com/janovix/aml-svc/commit/d81108655617979771184ac1a63f86bb5a87044c))
+* update birthDate validation to use dateOnlyString for improved date handling ([43e60c9](https://github.com/janovix/aml-svc/commit/43e60c9e725268d0008f7ee350e56518d41a4eca))
+* update notice deletion logic to allow deletion of generated notices and enhance related tests ([f5b1ad8](https://github.com/janovix/aml-svc/commit/f5b1ad81e92d7c318fab64ca17e430dc42a09615))
+
+# [1.7.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.14...v1.7.0-rc.15) (2026-02-24)
+
+
+### Bug Fixes
+
+* update incorporationDate validation to use date format in shareholder schemas ([8a8bd2d](https://github.com/janovix/aml-svc/commit/8a8bd2d4defd678258ac409c0125202eea2d296c))
+
+# [1.7.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.13...v1.7.0-rc.14) (2026-02-24)
+
+
+### Features
+
+* enhance obligatedSubjectKey validation in organizationSettingsCreateSchema ([999390e](https://github.com/janovix/aml-svc/commit/999390e324da7126f2f5b4bf24750497d4b4085f))
+
+# [1.7.0-rc.13](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.12...v1.7.0-rc.13) (2026-02-24)
+
+
+### Bug Fixes
+
+* update nationality strategy in client repository to use BY_CODE ([dec33a1](https://github.com/janovix/aml-svc/commit/dec33a10b23c9d89b1489a2db50ea0cf6548002e))
+
+# [1.7.0-rc.12](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.11...v1.7.0-rc.12) (2026-02-24)
+
+
+### Features
+
+* update birthDate validation to use dateOnlyString for improved date handling ([43e60c9](https://github.com/janovix/aml-svc/commit/43e60c9e725268d0008f7ee350e56518d41a4eca))
+
+# [1.7.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.10...v1.7.0-rc.11) (2026-02-24)
+
+
+### Features
+
+* add import deduplication support with import_hash and skipped_count fields ([5ce9b22](https://github.com/janovix/aml-svc/commit/5ce9b22f88b81bfe0820f35d121457ba96488649))
+
+# [1.7.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.9...v1.7.0-rc.10) (2026-02-24)
+
+
+### Features
+
+* enhance synthetic data generation with operations coverage and edge-case handling ([4d7593c](https://github.com/janovix/aml-svc/commit/4d7593c723ec4d14872c75ee826c477e856274b6))
+
+# [1.7.0-rc.9](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.8...v1.7.0-rc.9) (2026-02-24)
+
+
+### Features
+
+* increase topK parameter in WatchlistSearchService to enhance search results ([eba2e4a](https://github.com/janovix/aml-svc/commit/eba2e4a6e5e30d9b0f05a9d34378dca84f9a5efb))
+
+# [1.7.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.7...v1.7.0-rc.8) (2026-02-23)
+
+
+### Features
+
+* add id to alert rule search filters for improved querying ([4694df7](https://github.com/janovix/aml-svc/commit/4694df773a026a7b333101590200d2145b50f443))
+
+# [1.7.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.6...v1.7.0-rc.7) (2026-02-23)
+
+
+### Features
+
+* update notice deletion logic to allow deletion of generated notices and enhance related tests ([f5b1ad8](https://github.com/janovix/aml-svc/commit/f5b1ad81e92d7c318fab64ca17e430dc42a09615))
+
+# [1.7.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.5...v1.7.0-rc.6) (2026-02-21)
+
+
+### Features
+
+* overhaul notice module with amendment cycle, event tracking, and deadline notifications ([d811086](https://github.com/janovix/aml-svc/commit/d81108655617979771184ac1a63f86bb5a87044c))
+
+# [1.7.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.7.0-rc.4...v1.7.0-rc.5) (2026-02-21)
+
+
+### Features
+
+* add endpoint to check if a client exists by RFC ([7df05f1](https://github.com/janovix/aml-svc/commit/7df05f1ff09064a388f3f39a5ac17021b2287e61))
+
 # [1.7.0](https://github.com/janovix/aml-svc/compare/v1.6.0...v1.7.0) (2026-02-21)
 
 

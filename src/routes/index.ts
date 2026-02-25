@@ -54,6 +54,9 @@ export function createRouter() {
 		beneficialControllersInternalRouter,
 	);
 
+	// Public catalogs (reference data — countries, economic activities, etc.)
+	router.route("/public/catalogs", catalogsRouter);
+
 	// KYC Self-Service public endpoints (no auth, token-based)
 	router.route("/public/kyc", publicKycRouter);
 

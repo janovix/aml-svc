@@ -124,6 +124,20 @@ export class OperationRepository {
 		}
 	}
 
+	async existsByImportHash(
+		organizationId: string,
+		importHash: string,
+	): Promise<boolean> {
+		const count = await this.prisma.operation.count({
+			where: {
+				organizationId,
+				importHash,
+				deletedAt: null,
+			},
+		});
+		return count > 0;
+	}
+
 	async create(
 		organizationId: string,
 		input: OperationCreateInput,
@@ -176,6 +190,7 @@ export class OperationRepository {
 				missingFields: missingFields ? JSON.stringify(missingFields) : null,
 				referenceNumber: input.referenceNumber,
 				notes: input.notes,
+				importHash: input.importHash,
 				payments: {
 					create: input.payments.map((p) => ({
 						id: crypto.randomUUID(),

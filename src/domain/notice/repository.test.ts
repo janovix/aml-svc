@@ -35,6 +35,16 @@ function createMockPrisma(): PrismaClient {
 		operation: {
 			findMany: vi.fn(),
 		},
+		noticeEvent: {
+			findMany: vi.fn().mockResolvedValue([]),
+			create: vi.fn().mockImplementation((args: Record<string, unknown>) => {
+				const data = args.data as Record<string, unknown>;
+				return Promise.resolve({
+					...data,
+					createdAt: new Date(),
+				});
+			}),
+		},
 	} as unknown as PrismaClient;
 }
 
@@ -52,9 +62,7 @@ const mockNotice: Notice = {
 	fileSize: null,
 	generatedAt: null,
 	submittedAt: null,
-	satFolioNumber: null,
-	submitPdfDocumentId: null,
-	ackPdfDocumentId: null,
+	amendmentCycle: 0,
 	createdBy: "user_123",
 	notes: null,
 	createdAt: new Date("2024-01-15"),
@@ -323,10 +331,22 @@ describe("NoticeRepository", () => {
 			});
 		});
 
-		it("throws error when deleting non-draft notice", async () => {
+		it("deletes a generated notice", async () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockGeneratedNotice);
+			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 0 });
+			vi.mocked(prisma.notice.delete).mockResolvedValue(mockGeneratedNotice);
 
-			await expect(repository.delete("org_123", "NTC_456")).rejects.toThrow(
+			await repository.delete("org_123", "NTC_456");
+
+			expect(prisma.notice.delete).toHaveBeenCalledWith({
+				where: { id: "NTC_456" },
+			});
+		});
+
+		it("throws error when deleting a submitted notice", async () => {
+			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockSubmittedNotice);
+
+			await expect(repository.delete("org_123", "NTC_789")).rejects.toThrow(
 				"CANNOT_DELETE_NON_DRAFT_NOTICE",
 			);
 		});
@@ -585,7 +605,7 @@ describe("NoticeRepository", () => {
 	});
 
 	describe("markAsSubmitted", () => {
-		it("updates notice to submitted status with folio", async () => {
+		it("updates notice to submitted status", async () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockGeneratedNotice);
 			vi.mocked(prisma.notice.update).mockResolvedValue(mockSubmittedNotice);
 			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 5 });
@@ -594,7 +614,6 @@ describe("NoticeRepository", () => {
 				"org_123",
 				"NTC_456",
 				"DOC_submit_123",
-				"SAT-2024-12345",
 			);
 
 			expect(result.status).toBe("SUBMITTED");
@@ -602,29 +621,6 @@ describe("NoticeRepository", () => {
 				expect.objectContaining({
 					data: expect.objectContaining({
 						status: "SUBMITTED",
-						submitPdfDocumentId: "DOC_submit_123",
-						satFolioNumber: "SAT-2024-12345",
-					}),
-				}),
-			);
-		});
-
-		it("marks as submitted without folio number", async () => {
-			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockGeneratedNotice);
-			vi.mocked(prisma.notice.update).mockResolvedValue({
-				...mockGeneratedNotice,
-				status: "SUBMITTED",
-				submittedAt: new Date(),
-			});
-			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 5 });
-
-			await repository.markAsSubmitted("org_123", "NTC_456", "DOC_submit_123");
-
-			expect(prisma.notice.update).toHaveBeenCalledWith(
-				expect.objectContaining({
-					data: expect.objectContaining({
-						status: "SUBMITTED",
-						submitPdfDocumentId: "DOC_submit_123",
 					}),
 				}),
 			);
@@ -652,15 +648,12 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockSubmittedNotice);
 			vi.mocked(prisma.notice.update).mockResolvedValue({
 				...mockSubmittedNotice,
-				status: "ACKNOWLEDGED",
-				satFolioNumber: "SAT-ACK-2024-99999",
+				status: "ACKNOWLEDGED" as PrismaNoticeStatus,
 			});
-			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 5 });
 
 			const result = await repository.markAsAcknowledged(
 				"org_123",
 				"NTC_789",
-				"SAT-ACK-2024-99999",
 				"DOC_ack_456",
 			);
 
@@ -669,8 +662,6 @@ describe("NoticeRepository", () => {
 				expect.objectContaining({
 					data: expect.objectContaining({
 						status: "ACKNOWLEDGED",
-						satFolioNumber: "SAT-ACK-2024-99999",
-						ackPdfDocumentId: "DOC_ack_456",
 					}),
 				}),
 			);
@@ -680,12 +671,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockGeneratedNotice);
 
 			await expect(
-				repository.markAsAcknowledged(
-					"org_123",
-					"NTC_456",
-					"SAT-ACK-123",
-					"DOC_123",
-				),
+				repository.markAsAcknowledged("org_123", "NTC_456", "DOC_123"),
 			).rejects.toThrow("NOTICE_MUST_BE_SUBMITTED_BEFORE_ACKNOWLEDGMENT");
 		});
 
@@ -693,12 +679,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(null);
 
 			await expect(
-				repository.markAsAcknowledged(
-					"org_123",
-					"NTC_999",
-					"SAT-ACK-123",
-					"DOC_123",
-				),
+				repository.markAsAcknowledged("org_123", "NTC_999", "DOC_123"),
 			).rejects.toThrow("NOTICE_NOT_FOUND");
 		});
 	});

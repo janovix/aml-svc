@@ -6,11 +6,15 @@ import type {
 } from "./schemas";
 import type {
 	NoticeEntity,
+	NoticeEventEntity,
+	NoticeEventType,
+	NoticeAlertDetail,
 	ListResultWithMeta,
 	NoticeWithAlertSummary,
 } from "./types";
 import {
 	mapPrismaNotice,
+	mapPrismaNoticeEvent,
 	mapNoticeCreateInputToPrisma,
 	mapNoticePatchInputToPrisma,
 } from "./mappers";
@@ -18,6 +22,7 @@ import {
 	buildEnumFilterMeta,
 	fromPrismaGroupBy,
 } from "../../lib/filter-metadata";
+import { generateId } from "../../lib/id-generator";
 
 export class NoticeRepository {
 	constructor(private readonly prisma: PrismaClient) {}
@@ -76,6 +81,7 @@ export class NoticeRepository {
 			GENERATED: "Generado",
 			SUBMITTED: "Enviado",
 			ACKNOWLEDGED: "Acusado",
+			REBUKED: "Rechazado",
 		};
 
 		// Build year options from reportedMonth (YYYYMM → YYYY)
@@ -124,7 +130,7 @@ export class NoticeRepository {
 	}
 
 	/**
-	 * Get a notice with alert summary
+	 * Get a notice with alert summary, events, and individual alert details
 	 */
 	async getWithAlertSummary(
 		organizationId: string,
@@ -132,25 +138,28 @@ export class NoticeRepository {
 	): Promise<NoticeWithAlertSummary> {
 		const notice = await this.get(organizationId, id);
 
-		// Get alert statistics for this notice
-		const alerts = await this.prisma.alert.findMany({
-			where: { noticeId: id, organizationId },
-			include: { alertRule: true },
-		});
+		const [alertRows, eventRows] = await Promise.all([
+			this.prisma.alert.findMany({
+				where: { noticeId: id, organizationId },
+				include: { alertRule: true, client: true },
+				orderBy: { createdAt: "asc" },
+			}),
+			this.prisma.noticeEvent.findMany({
+				where: { noticeId: id, organizationId },
+				orderBy: { createdAt: "asc" },
+			}),
+		]);
 
 		const bySeverity: Record<string, number> = {};
 		const byStatus: Record<string, number> = {};
 		const byRuleMap: Map<string, { ruleName: string; count: number }> =
 			new Map();
+		const alertDetails: NoticeAlertDetail[] = [];
 
-		for (const alert of alerts) {
-			// Count by severity
+		for (const alert of alertRows) {
 			bySeverity[alert.severity] = (bySeverity[alert.severity] || 0) + 1;
-
-			// Count by status
 			byStatus[alert.status] = (byStatus[alert.status] || 0) + 1;
 
-			// Count by rule
 			const existing = byRuleMap.get(alert.alertRuleId);
 			if (existing) {
 				existing.count++;
@@ -160,6 +169,26 @@ export class NoticeRepository {
 					count: 1,
 				});
 			}
+
+			const clientName =
+				String(alert.client?.personType).toLowerCase() === "moral"
+					? (alert.client?.businessName ?? alert.client?.lastName ?? "")
+					: `${alert.client?.firstName ?? ""} ${alert.client?.lastName ?? ""}`.trim();
+
+			alertDetails.push({
+				id: alert.id,
+				clientId: alert.clientId,
+				clientName: clientName || alert.clientId,
+				operationId: alert.operationId,
+				alertRuleName: alert.alertRule?.name || alert.alertRuleId,
+				severity: alert.severity,
+				status: alert.status,
+				createdAt:
+					alert.createdAt instanceof Date
+						? alert.createdAt.toISOString()
+						: String(alert.createdAt),
+				activityCode: alert.activityCode,
+			});
 		}
 
 		const byRule = Array.from(byRuleMap.entries()).map(
@@ -173,11 +202,13 @@ export class NoticeRepository {
 		return {
 			...notice,
 			alertSummary: {
-				total: alerts.length,
+				total: alertRows.length,
 				bySeverity,
 				byStatus,
 				byRule,
 			},
+			events: eventRows.map(mapPrismaNoticeEvent),
+			alerts: alertDetails,
 		};
 	}
 
@@ -219,12 +250,12 @@ export class NoticeRepository {
 	}
 
 	/**
-	 * Delete a notice (only DRAFT status)
+	 * Delete a notice (only DRAFT or GENERATED status)
 	 */
 	async delete(organizationId: string, id: string): Promise<void> {
 		const notice = await this.get(organizationId, id);
 
-		if (notice.status !== "DRAFT") {
+		if (notice.status !== "DRAFT" && notice.status !== "GENERATED") {
 			throw new Error("CANNOT_DELETE_NON_DRAFT_NOTICE");
 		}
 
@@ -459,12 +490,12 @@ export class NoticeRepository {
 			xmlFileUrl?: string | null;
 			fileSize?: number | null;
 		},
+		createdBy?: string,
 	): Promise<NoticeEntity> {
-		await this.ensureExists(organizationId, id);
+		const existing = await this.get(organizationId, id);
 
 		const now = new Date();
 
-		// Update the notice status
 		const notice = await this.prisma.notice.update({
 			where: { id },
 			data: {
@@ -477,7 +508,6 @@ export class NoticeRepository {
 			},
 		});
 
-		// Update all alerts in this notice to FILE_GENERATED status
 		await this.prisma.alert.updateMany({
 			where: {
 				noticeId: id,
@@ -490,6 +520,18 @@ export class NoticeRepository {
 			},
 		});
 
+		await this.createEvent({
+			noticeId: id,
+			organizationId,
+			eventType: "GENERATED",
+			fromStatus: existing.status,
+			toStatus: "GENERATED",
+			cycle: existing.amendmentCycle,
+			xmlFileUrl: options.xmlFileUrl ?? undefined,
+			fileSize: options.fileSize ?? undefined,
+			createdBy,
+		});
+
 		return mapPrismaNotice(notice);
 	}
 
@@ -500,7 +542,7 @@ export class NoticeRepository {
 		organizationId: string,
 		id: string,
 		docSvcDocumentId: string,
-		satFolioNumber?: string,
+		createdBy?: string,
 	): Promise<NoticeEntity> {
 		const notice = await this.get(organizationId, id);
 
@@ -515,12 +557,9 @@ export class NoticeRepository {
 			data: {
 				status: "SUBMITTED",
 				submittedAt: now,
-				submitPdfDocumentId: docSvcDocumentId,
-				...(satFolioNumber && { satFolioNumber }),
 			},
 		});
 
-		// Update all alerts in this notice to SUBMITTED status
 		await this.prisma.alert.updateMany({
 			where: {
 				noticeId: id,
@@ -530,8 +569,18 @@ export class NoticeRepository {
 			data: {
 				status: "SUBMITTED",
 				submittedAt: now,
-				...(satFolioNumber && { satFolioNumber }),
 			},
+		});
+
+		await this.createEvent({
+			noticeId: id,
+			organizationId,
+			eventType: "SUBMITTED",
+			fromStatus: notice.status,
+			toStatus: "SUBMITTED",
+			cycle: notice.amendmentCycle,
+			pdfDocumentId: docSvcDocumentId,
+			createdBy,
 		});
 
 		return mapPrismaNotice(updated);
@@ -543,8 +592,8 @@ export class NoticeRepository {
 	async markAsAcknowledged(
 		organizationId: string,
 		id: string,
-		satFolioNumber: string,
 		docSvcDocumentId: string,
+		createdBy?: string,
 	): Promise<NoticeEntity> {
 		const notice = await this.get(organizationId, id);
 
@@ -556,23 +605,274 @@ export class NoticeRepository {
 			where: { id },
 			data: {
 				status: "ACKNOWLEDGED",
-				satFolioNumber,
-				ackPdfDocumentId: docSvcDocumentId,
 			},
 		});
 
-		// Update all alerts with the folio number
+		await this.createEvent({
+			noticeId: id,
+			organizationId,
+			eventType: "ACKNOWLEDGED",
+			fromStatus: "SUBMITTED",
+			toStatus: "ACKNOWLEDGED",
+			cycle: notice.amendmentCycle,
+			pdfDocumentId: docSvcDocumentId,
+			createdBy,
+		});
+
+		return mapPrismaNotice(updated);
+	}
+
+	/**
+	 * Mark a notice as rebuked (rejected) by SAT.
+	 * Does NOT change alert statuses -- alerts remain SUBMITTED.
+	 */
+	async markAsRebuked(
+		organizationId: string,
+		id: string,
+		docSvcDocumentId: string,
+		notes?: string | null,
+		createdBy?: string,
+	): Promise<NoticeEntity> {
+		const notice = await this.get(organizationId, id);
+
+		if (notice.status !== "SUBMITTED") {
+			throw new Error("NOTICE_MUST_BE_SUBMITTED_BEFORE_REBUKE");
+		}
+
+		const updated = await this.prisma.notice.update({
+			where: { id },
+			data: { status: "REBUKED" },
+		});
+
+		await this.createEvent({
+			noticeId: id,
+			organizationId,
+			eventType: "REBUKED",
+			fromStatus: "SUBMITTED",
+			toStatus: "REBUKED",
+			cycle: notice.amendmentCycle,
+			pdfDocumentId: docSvcDocumentId,
+			notes: notes ?? undefined,
+			createdBy,
+		});
+
+		return mapPrismaNotice(updated);
+	}
+
+	/**
+	 * Revert a rebuked notice back to DRAFT for amendment.
+	 * Reverts alert statuses to DETECTED and clears timestamps (history in events).
+	 * Keeps noticeId set on alerts so they remain assigned.
+	 */
+	async revertToDraft(
+		organizationId: string,
+		id: string,
+		createdBy?: string,
+	): Promise<NoticeEntity> {
+		const notice = await this.get(organizationId, id);
+
+		if (notice.status !== "REBUKED") {
+			throw new Error("NOTICE_MUST_BE_REBUKED_BEFORE_REVERT");
+		}
+
 		await this.prisma.alert.updateMany({
 			where: {
 				noticeId: id,
 				organizationId,
+				status: { notIn: ["CANCELLED"] },
 			},
 			data: {
-				satFolioNumber,
+				status: "DETECTED",
+				fileGeneratedAt: null,
+				submittedAt: null,
 			},
 		});
 
+		const updated = await this.prisma.notice.update({
+			where: { id },
+			data: {
+				status: "DRAFT",
+				xmlFileUrl: null,
+				fileSize: null,
+				generatedAt: null,
+				submittedAt: null,
+				amendmentCycle: { increment: 1 },
+			},
+		});
+
+		await this.createEvent({
+			noticeId: id,
+			organizationId,
+			eventType: "REVERTED",
+			fromStatus: "REBUKED",
+			toStatus: "DRAFT",
+			cycle: updated.amendmentCycle,
+			createdBy,
+		});
+
 		return mapPrismaNotice(updated);
+	}
+
+	/**
+	 * Add specific alerts to a DRAFT notice.
+	 */
+	async addAlertsToNotice(
+		organizationId: string,
+		noticeId: string,
+		alertIds: string[],
+		createdBy?: string,
+	): Promise<number> {
+		const notice = await this.get(organizationId, noticeId);
+		if (notice.status !== "DRAFT") {
+			throw new Error("NOTICE_MUST_BE_DRAFT_TO_MODIFY_ALERTS");
+		}
+
+		const result = await this.prisma.alert.updateMany({
+			where: {
+				id: { in: alertIds },
+				organizationId,
+				noticeId: null,
+				status: { notIn: ["CANCELLED", "SUBMITTED"] },
+			},
+			data: { noticeId },
+		});
+
+		if (result.count > 0) {
+			await this.prisma.notice.update({
+				where: { id: noticeId },
+				data: { recordCount: { increment: result.count } },
+			});
+
+			await this.createEvent({
+				noticeId,
+				organizationId,
+				eventType: "ALERTS_MODIFIED",
+				fromStatus: "DRAFT",
+				toStatus: "DRAFT",
+				cycle: notice.amendmentCycle,
+				notes: `Added ${result.count} alert(s)`,
+				createdBy,
+			});
+		}
+
+		return result.count;
+	}
+
+	/**
+	 * Remove specific alerts from a DRAFT notice.
+	 * Reverts alert status to DETECTED and clears noticeId.
+	 */
+	async removeAlertsFromNotice(
+		organizationId: string,
+		noticeId: string,
+		alertIds: string[],
+		createdBy?: string,
+	): Promise<number> {
+		const notice = await this.get(organizationId, noticeId);
+		if (notice.status !== "DRAFT") {
+			throw new Error("NOTICE_MUST_BE_DRAFT_TO_MODIFY_ALERTS");
+		}
+
+		const result = await this.prisma.alert.updateMany({
+			where: {
+				id: { in: alertIds },
+				organizationId,
+				noticeId,
+			},
+			data: {
+				noticeId: null,
+				status: "DETECTED",
+				fileGeneratedAt: null,
+			},
+		});
+
+		if (result.count > 0) {
+			await this.prisma.notice.update({
+				where: { id: noticeId },
+				data: { recordCount: { decrement: result.count } },
+			});
+
+			await this.createEvent({
+				noticeId,
+				organizationId,
+				eventType: "ALERTS_MODIFIED",
+				fromStatus: "DRAFT",
+				toStatus: "DRAFT",
+				cycle: notice.amendmentCycle,
+				notes: `Removed ${result.count} alert(s)`,
+				createdBy,
+			});
+		}
+
+		return result.count;
+	}
+
+	/**
+	 * Get detailed alert info for a period (for notice preview with selection).
+	 */
+	async getAlertsForPeriodDetailed(
+		organizationId: string,
+		periodStart: Date,
+		periodEnd: Date,
+	): Promise<NoticeAlertDetail[]> {
+		const alerts = await this.prisma.alert.findMany({
+			where: {
+				organizationId,
+				createdAt: { gte: periodStart, lte: periodEnd },
+				status: { notIn: ["CANCELLED", "SUBMITTED"] },
+				noticeId: null,
+			},
+			include: { alertRule: true, client: true },
+			orderBy: { createdAt: "asc" },
+		});
+
+		return alerts.map((alert) => {
+			const clientName =
+				String(alert.client?.personType).toLowerCase() === "moral"
+					? (alert.client?.businessName ?? alert.client?.lastName ?? "")
+					: `${alert.client?.firstName ?? ""} ${alert.client?.lastName ?? ""}`.trim();
+
+			return {
+				id: alert.id,
+				clientId: alert.clientId,
+				clientName: clientName || alert.clientId,
+				operationId: alert.operationId,
+				alertRuleName: alert.alertRule?.name || alert.alertRuleId,
+				severity: alert.severity,
+				status: alert.status,
+				createdAt:
+					alert.createdAt instanceof Date
+						? alert.createdAt.toISOString()
+						: String(alert.createdAt),
+				activityCode: alert.activityCode,
+			};
+		});
+	}
+
+	/**
+	 * Assign only specific alerts (by ID) to a notice.
+	 */
+	async assignSpecificAlertsToNotice(
+		organizationId: string,
+		noticeId: string,
+		alertIds: string[],
+	): Promise<number> {
+		const result = await this.prisma.alert.updateMany({
+			where: {
+				id: { in: alertIds },
+				organizationId,
+				status: { notIn: ["CANCELLED", "SUBMITTED"] },
+				noticeId: null,
+			},
+			data: { noticeId },
+		});
+
+		await this.prisma.notice.update({
+			where: { id: noticeId },
+			data: { recordCount: result.count },
+		});
+
+		return result.count;
 	}
 
 	/**
@@ -627,6 +927,51 @@ export class NoticeRepository {
 			hasSubmittedNotice,
 			noticeCount: notices.length,
 		};
+	}
+
+	// ---- Event helpers ----
+
+	async createEvent(input: {
+		noticeId: string;
+		organizationId: string;
+		eventType: NoticeEventType;
+		fromStatus?: string;
+		toStatus: string;
+		cycle?: number;
+		pdfDocumentId?: string;
+		xmlFileUrl?: string;
+		fileSize?: number;
+		notes?: string;
+		createdBy?: string;
+	}): Promise<NoticeEventEntity> {
+		const event = await this.prisma.noticeEvent.create({
+			data: {
+				id: generateId("NOTICE_EVENT"),
+				noticeId: input.noticeId,
+				organizationId: input.organizationId,
+				eventType: input.eventType,
+				fromStatus: input.fromStatus ?? null,
+				toStatus: input.toStatus,
+				cycle: input.cycle ?? 0,
+				pdfDocumentId: input.pdfDocumentId ?? null,
+				xmlFileUrl: input.xmlFileUrl ?? null,
+				fileSize: input.fileSize ?? null,
+				notes: input.notes ?? null,
+				createdBy: input.createdBy ?? null,
+			},
+		});
+		return mapPrismaNoticeEvent(event);
+	}
+
+	async getEventsForNotice(
+		organizationId: string,
+		noticeId: string,
+	): Promise<NoticeEventEntity[]> {
+		const events = await this.prisma.noticeEvent.findMany({
+			where: { noticeId, organizationId },
+			orderBy: { createdAt: "asc" },
+		});
+		return events.map(mapPrismaNoticeEvent);
 	}
 
 	private async ensureExists(

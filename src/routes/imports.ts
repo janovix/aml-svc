@@ -227,6 +227,7 @@ importEventsRouter.get("/:id/events", async (c) => {
 				successCount: importRecord.successCount,
 				warningCount: importRecord.warningCount,
 				errorCount: importRecord.errorCount,
+				skippedCount: importRecord.skippedCount,
 				timestamp: new Date().toISOString(),
 			}),
 		});
@@ -280,6 +281,7 @@ importEventsRouter.get("/:id/events", async (c) => {
 						successCount: currentImport.successCount,
 						warningCount: currentImport.warningCount,
 						errorCount: currentImport.errorCount,
+						skippedCount: currentImport.skippedCount,
 					}),
 				});
 				currentStatus = currentImport.status;
@@ -299,6 +301,7 @@ importEventsRouter.get("/:id/events", async (c) => {
 						successCount: currentImport.successCount,
 						warningCount: currentImport.warningCount,
 						errorCount: currentImport.errorCount,
+						skippedCount: currentImport.skippedCount,
 						errorMessage: currentImport.errorMessage,
 						completedAt: currentImport.completedAt,
 					}),

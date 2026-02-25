@@ -11,6 +11,15 @@ import type {
 	OperationUpdateInput,
 } from "./schemas";
 
+export class DuplicateOperationError extends Error {
+	constructor(importHash: string) {
+		super(
+			`Operation with identical content already exists (hash: ${importHash})`,
+		);
+		this.name = "DuplicateOperationError";
+	}
+}
+
 /**
  * UMA thresholds by activity code (in UMAs) — LFPIORPI Art. 17
  *
@@ -60,6 +69,16 @@ export class OperationService {
 		organizationId: string,
 		input: OperationCreateInput,
 	): Promise<OperationEntity> {
+		if (input.importHash) {
+			const exists = await this.repository.existsByImportHash(
+				organizationId,
+				input.importHash,
+			);
+			if (exists) {
+				throw new DuplicateOperationError(input.importHash);
+			}
+		}
+
 		const umaInfo = {
 			umaValue: CURRENT_UMA,
 			umaDailyValue: CURRENT_UMA_DAILY,

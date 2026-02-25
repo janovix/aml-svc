@@ -126,6 +126,7 @@ enum NoticeStatus {
   GENERATED
   SUBMITTED
   ACKNOWLEDGED
+  REBUKED
 }
 
 enum ReportPeriodType {
@@ -637,6 +638,8 @@ model Operation {
   // Metadata
   referenceNumber    String?          @map("reference_number")
   notes              String?
+  // Import deduplication
+  importHash         String?          @map("import_hash")
   // Timestamps
   createdAt          DateTime         @default(now()) @map("created_at")
   updatedAt          DateTime         @updatedAt @map("updated_at")
@@ -678,6 +681,7 @@ model Operation {
   @@index([alertTypeCode])
   @@index([watchlistStatus])
   @@index([deletedAt])
+  @@index([organizationId, importHash])
   @@map("operations")
 }
 
@@ -1306,16 +1310,15 @@ model Notice {
   xmlFileUrl     String?      @map("xml_file_url")
   fileSize       Int?         @map("file_size")
   generatedAt    DateTime?    @map("generated_at")
-  submittedAt         DateTime?  @map("submitted_at")
-  satFolioNumber      String?    @map("sat_folio_number")
-  submitPdfDocumentId String?    @map("submit_pdf_document_id")
-  ackPdfDocumentId    String?    @map("ack_pdf_document_id")
-  createdBy           String?    @map("created_by")
+  submittedAt    DateTime?    @map("submitted_at")
+  amendmentCycle Int          @default(0) @map("amendment_cycle")
+  createdBy      String?      @map("created_by")
   notes          String?
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
   alerts Alert[]
+  events NoticeEvent[]
 
   @@index([organizationId])
   @@index([activityCode])
@@ -1324,6 +1327,29 @@ model Notice {
   @@index([periodEnd])
   @@index([reportedMonth])
   @@map("notices")
+}
+
+model NoticeEvent {
+  id             String   @id
+  noticeId       String   @map("notice_id")
+  organizationId String   @map("organization_id")
+  eventType      String   @map("event_type")
+  fromStatus     String?  @map("from_status")
+  toStatus       String   @map("to_status")
+  cycle          Int      @default(0)
+  pdfDocumentId  String?  @map("pdf_document_id")
+  xmlFileUrl     String?  @map("xml_file_url")
+  fileSize       Int?     @map("file_size")
+  notes          String?
+  createdBy      String?  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  notice Notice @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+
+  @@index([noticeId])
+  @@index([organizationId])
+  @@index([eventType])
+  @@map("notice_events")
 }
 
 // ============================================================================
@@ -1487,6 +1513,7 @@ model Import {
   successCount   Int              @default(0) @map("success_count")
   warningCount   Int              @default(0) @map("warning_count")
   errorCount     Int              @default(0) @map("error_count")
+  skippedCount   Int              @default(0) @map("skipped_count")
   errorMessage   String?          @map("error_message")
   createdBy      String           @map("created_by")
   startedAt      DateTime?        @map("started_at")

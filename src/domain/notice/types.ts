@@ -3,33 +3,72 @@
  * Handles the 17-17 period cycle for SAT compliance
  */
 
-export type NoticeStatus = "DRAFT" | "GENERATED" | "SUBMITTED" | "ACKNOWLEDGED";
+export type NoticeStatus =
+	| "DRAFT"
+	| "GENERATED"
+	| "SUBMITTED"
+	| "ACKNOWLEDGED"
+	| "REBUKED";
 
 export interface NoticeEntity {
 	id: string;
 	organizationId: string;
 	name: string;
 	status: NoticeStatus;
-	periodStart: string; // ISO datetime - Day 17 of previous month
-	periodEnd: string; // ISO datetime - Day 16 of current month
-	reportedMonth: string; // YYYYMM format for SAT
+	periodStart: string;
+	periodEnd: string;
+	reportedMonth: string;
 
 	recordCount: number;
 
-	// XML file output
 	xmlFileUrl?: string | null;
 	fileSize?: number | null;
 
 	generatedAt?: string | null;
 	submittedAt?: string | null;
-	satFolioNumber?: string | null;
-	submitPdfDocumentId?: string | null;
-	ackPdfDocumentId?: string | null;
+	amendmentCycle: number;
 	createdBy?: string | null;
 	notes?: string | null;
 
 	createdAt: string;
 	updatedAt: string;
+}
+
+export type NoticeEventType =
+	| "CREATED"
+	| "GENERATED"
+	| "SUBMITTED"
+	| "ACKNOWLEDGED"
+	| "REBUKED"
+	| "REVERTED"
+	| "ALERTS_MODIFIED";
+
+export interface NoticeEventEntity {
+	id: string;
+	noticeId: string;
+	organizationId: string;
+	eventType: NoticeEventType;
+	fromStatus?: string | null;
+	toStatus: string;
+	cycle: number;
+	pdfDocumentId?: string | null;
+	xmlFileUrl?: string | null;
+	fileSize?: number | null;
+	notes?: string | null;
+	createdBy?: string | null;
+	createdAt: string;
+}
+
+export interface NoticeAlertDetail {
+	id: string;
+	clientId: string;
+	clientName: string;
+	operationId?: string | null;
+	alertRuleName: string;
+	severity: string;
+	status: string;
+	createdAt: string;
+	activityCode?: string | null;
 }
 
 export interface NoticeWithAlertSummary extends NoticeEntity {
@@ -39,6 +78,8 @@ export interface NoticeWithAlertSummary extends NoticeEntity {
 		byStatus: Record<string, number>;
 		byRule: Array<{ ruleId: string; ruleName: string; count: number }>;
 	};
+	events: NoticeEventEntity[];
+	alerts: NoticeAlertDetail[];
 }
 
 export type {
@@ -115,23 +156,15 @@ export function calculateNoticePeriod(
 }
 
 /**
- * Get the submission deadline for a SAT notice
- * SAT requires submission by day 17 of the month following the reported period
+ * Get the submission deadline for a SAT notice.
+ * The period for month M covers (M-1) 17th through M 16th.
+ * The deadline to submit is the 17th of the reported month itself
+ * (i.e. the day after the period closes).
  *
  * @param year - The year of the reported month
  * @param month - The month (1-12) of the reported month
  * @returns The submission deadline date
  */
 export function getNoticeSubmissionDeadline(year: number, month: number): Date {
-	// Deadline is day 17 of the following month
-	let deadlineMonth = month + 1;
-	let deadlineYear = year;
-	if (deadlineMonth > 12) {
-		deadlineMonth = 1;
-		deadlineYear = year + 1;
-	}
-
-	return new Date(
-		Date.UTC(deadlineYear, deadlineMonth - 1, 17, 23, 59, 59, 999),
-	);
+	return new Date(Date.UTC(year, month - 1, 17, 23, 59, 59, 999));
 }

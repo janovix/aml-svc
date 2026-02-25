@@ -6,6 +6,7 @@ export const NOTICE_STATUS_VALUES = [
 	"GENERATED",
 	"SUBMITTED",
 	"ACKNOWLEDGED",
+	"REBUKED",
 ] as const;
 export const NoticeStatusSchema = z.enum(NOTICE_STATUS_VALUES);
 
@@ -57,6 +58,7 @@ export const NoticeCreateSchema = z.object({
 	year: z.coerce.number().int().min(2020).max(2100),
 	month: z.coerce.number().int().min(1).max(12),
 	notes: z.string().max(1000).optional().nullable(),
+	alertIds: z.array(z.string().min(1)).optional(),
 });
 
 export type NoticeCreateInput = z.infer<typeof NoticeCreateSchema>;
@@ -89,7 +91,6 @@ export type NoticeCreateWithPeriodInput = z.infer<
 export const NoticePatchSchema = z.object({
 	name: z.string().min(1).max(200).optional(),
 	notes: z.string().max(1000).optional().nullable(),
-	satFolioNumber: z.string().max(100).optional().nullable(),
 });
 
 export type NoticePatchInput = z.infer<typeof NoticePatchSchema>;
@@ -121,7 +122,6 @@ export type NoticePreviewInput = z.infer<typeof NoticePreviewSchema>;
 
 // Submit Schema - for marking notice as submitted to SAT
 export const NoticeSubmitSchema = z.object({
-	satFolioNumber: z.string().max(100).optional(),
 	docSvcDocumentId: z.string().min(1),
 });
 
@@ -129,8 +129,28 @@ export type NoticeSubmitInput = z.infer<typeof NoticeSubmitSchema>;
 
 // Acknowledge Schema - for recording SAT acknowledgment
 export const NoticeAcknowledgeSchema = z.object({
-	satFolioNumber: z.string().min(1).max(100),
 	docSvcDocumentId: z.string().min(1),
 });
 
 export type NoticeAcknowledgeInput = z.infer<typeof NoticeAcknowledgeSchema>;
+
+// Rebuke Schema - for recording SAT rejection
+export const NoticeRebukeSchema = z.object({
+	docSvcDocumentId: z.string().min(1),
+	notes: z.string().max(2000).optional().nullable(),
+});
+
+export type NoticeRebukeInput = z.infer<typeof NoticeRebukeSchema>;
+
+// Alert Add/Remove Schemas - for modifying DRAFT notices
+export const NoticeAddAlertsSchema = z.object({
+	alertIds: z.array(z.string().min(1)).min(1),
+});
+
+export type NoticeAddAlertsInput = z.infer<typeof NoticeAddAlertsSchema>;
+
+export const NoticeRemoveAlertsSchema = z.object({
+	alertIds: z.array(z.string().min(1)).min(1),
+});
+
+export type NoticeRemoveAlertsInput = z.infer<typeof NoticeRemoveAlertsSchema>;

@@ -41,6 +41,35 @@ export const publicKycRouter = new Hono<{ Bindings: Bindings }>();
 // Helpers
 // ============================================================================
 
+/**
+ * Fetch organization branding (name, logo) from auth-svc via service binding.
+ * Returns null gracefully if unavailable.
+ */
+async function fetchOrganizationBranding(
+	authService: Fetcher | undefined,
+	organizationId: string,
+): Promise<{ name: string; logo: string | null } | null> {
+	if (!authService) return null;
+	try {
+		const response = await authService.fetch(
+			new Request(
+				`https://auth-svc.internal/internal/organizations/${organizationId}`,
+				{ headers: { Accept: "application/json" } },
+			),
+		);
+		if (!response.ok) return null;
+		const result = (await response.json()) as {
+			success: boolean;
+			data?: { name: string; logo: string | null };
+		};
+		return result.success && result.data
+			? { name: result.data.name, logo: result.data.logo }
+			: null;
+	} catch {
+		return null;
+	}
+}
+
 function parseWithZod<T>(
 	schema: { parse: (input: unknown) => T },
 	payload: unknown,
@@ -198,6 +227,12 @@ publicKycRouter.get("/:token", async (c) => {
 		return safeDoc;
 	});
 
+	// Fetch org branding (non-blocking: null if unavailable)
+	const orgBranding = await fetchOrganizationBranding(
+		c.env.AUTH_SERVICE,
+		session.organizationId,
+	);
+
 	return c.json({
 		session: {
 			id: session.id,
@@ -209,6 +244,7 @@ publicKycRouter.get("/:token", async (c) => {
 			completedSections: session.completedSections,
 		},
 		client: { ...safeClient, documents: safeDocuments },
+		organization: orgBranding,
 	});
 });
 

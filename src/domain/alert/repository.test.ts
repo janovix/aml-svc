@@ -186,6 +186,7 @@ describe("AlertRuleRepository", () => {
 				expect.objectContaining({
 					where: expect.objectContaining({
 						OR: [
+							{ id: { contains: "test" } },
 							{ name: { contains: "test" } },
 							{ description: { contains: "test" } },
 						],
