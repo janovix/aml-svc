@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/janovix/aml-svc/compare/v1.8.0...v1.9.0) (2026-02-27)
+
+
+### Features
+
+* implement document ID resolution in BeneficialControllerService ([4764d44](https://github.com/janovix/aml-svc/commit/4764d44f224d175e721b7821655146871da48e9b))
+
 # [1.9.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.8.0...v1.9.0-rc.1) (2026-02-27)
 
 
