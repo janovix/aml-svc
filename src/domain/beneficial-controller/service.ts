@@ -24,11 +24,27 @@ export class ValidationError extends Error {
 	}
 }
 
+/** Fields in create/update inputs that are FK references to client_documents(id). */
+const DOC_ID_FIELDS = [
+	"idCopyDocId",
+	"curpCopyDocId",
+	"cedulaFiscalDocId",
+	"addressProofDocId",
+	"constanciaBcDocId",
+	"powerOfAttorneyDocId",
+] as const;
+
+type DocIdField = (typeof DOC_ID_FIELDS)[number];
+type WithDocIds = Partial<Record<DocIdField, string | null | undefined>>;
+
 export class BeneficialControllerService {
 	private readonly repo: BeneficialControllerRepository;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	private readonly db: PrismaClient | any;
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	constructor(db: PrismaClient | any) {
+		this.db = db;
 		this.repo = new BeneficialControllerRepository(db);
 	}
 
@@ -49,9 +65,8 @@ export class BeneficialControllerService {
 		clientId: string,
 		input: BeneficialControllerCreateInput,
 	): Promise<BeneficialControllerEntity> {
-		// Validate that all BCs are persons (schema enforces required firstName/lastName)
-		// No additional validation needed beyond schema validation
-		return this.repo.create(clientId, input);
+		const resolved = await this.resolveDocIds(clientId, input);
+		return this.repo.create(clientId, resolved);
 	}
 
 	async update(
@@ -64,7 +79,8 @@ export class BeneficialControllerService {
 			throw new ValidationError("Beneficial controller not found");
 		}
 
-		return this.repo.update(clientId, bcId, input);
+		const resolved = await this.resolveDocIds(clientId, input);
+		return this.repo.update(clientId, bcId, resolved);
 	}
 
 	async patch(
@@ -77,7 +93,62 @@ export class BeneficialControllerService {
 			throw new ValidationError("Beneficial controller not found");
 		}
 
-		return this.repo.patch(clientId, bcId, input);
+		const resolved = await this.resolveDocIds(clientId, input);
+		return this.repo.patch(clientId, bcId, resolved);
+	}
+
+	/**
+	 * Resolves doc-svc document IDs (format: `doc_xxx`) to their corresponding
+	 * internal client_documents primary keys (format: `DOCxxx`).
+	 *
+	 * When the frontend uploads a document it receives a doc-svc ID from the
+	 * blocks/doc-svc service. That ID is stored in `client_documents.docSvcDocumentId`,
+	 * not in `client_documents.id`. The beneficial_controllers table has FK constraints
+	 * pointing at `client_documents.id`, so passing the raw doc-svc ID causes a
+	 * FOREIGN KEY constraint failure. This method performs the lookup and replaces the
+	 * doc-svc IDs transparently before the DB write.
+	 *
+	 * If a doc-svc ID cannot be resolved (document not yet registered in aml-svc),
+	 * the field is set to null to avoid the FK violation.
+	 */
+	private async resolveDocIds<T extends WithDocIds>(
+		clientId: string,
+		input: T,
+	): Promise<T> {
+		const prisma = this.db as PrismaClient;
+
+		// Collect only the doc-svc IDs that need resolution (start with "doc_")
+		const docSvcIds = DOC_ID_FIELDS.map((field) => input[field]).filter(
+			(id): id is string => typeof id === "string" && id.startsWith("doc_"),
+		);
+
+		if (docSvcIds.length === 0) return input;
+
+		// Batch lookup: find all matching client_documents in one query
+		const found = await prisma.clientDocument.findMany({
+			where: {
+				clientId,
+				docSvcDocumentId: { in: docSvcIds },
+			},
+			select: { id: true, docSvcDocumentId: true },
+		});
+
+		const docSvcToInternalId = new Map(
+			found
+				.filter((d) => d.docSvcDocumentId != null)
+				.map((d) => [d.docSvcDocumentId as string, d.id]),
+		);
+
+		// Build patched input, replacing doc-svc IDs with resolved internal IDs
+		const patched = { ...input };
+		for (const field of DOC_ID_FIELDS) {
+			const value = patched[field];
+			if (typeof value === "string" && value.startsWith("doc_")) {
+				(patched as WithDocIds)[field] = docSvcToInternalId.get(value) ?? null;
+			}
+		}
+
+		return patched;
 	}
 
 	async delete(clientId: string, bcId: string): Promise<void> {
