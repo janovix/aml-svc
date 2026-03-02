@@ -1,3 +1,10 @@
+# [1.9.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.1...v1.9.0-rc.2) (2026-03-02)
+
+
+### Features
+
+* add new KYC and client management endpoints ([af5fbf4](https://github.com/janovix/aml-svc/commit/af5fbf42f33e0b74e6646661bf2c8d8e5e6b18a6))
+
 # [1.9.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.8.0...v1.9.0-rc.1) (2026-02-27)
 
 
