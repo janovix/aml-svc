@@ -1,3 +1,10 @@
+# [1.9.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.3...v1.9.0-rc.4) (2026-03-10)
+
+
+### Features
+
+* add client and transaction management methods to entrypoint ([429752f](https://github.com/janovix/aml-svc/commit/429752f714d899acfc95d42dfe230f1a796d5674))
+
 # [1.9.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.2...v1.9.0-rc.3) (2026-03-10)
 
 
