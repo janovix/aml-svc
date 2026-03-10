@@ -88,45 +88,29 @@ export async function sendScreeningFlaggedNotification(
 			`[screening-notifications] Sending ${input.hitType} hit notification for ${input.entityKind} ${input.entityId} in org ${input.organizationId}`,
 		);
 
-		const response = await notifService.fetch(
-			new Request("https://notifications-svc/internal/notify", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${env.INTERNAL_SERVICE_SECRET ?? "service-token"}`,
-				},
-				body: JSON.stringify({
-					tenantId: input.organizationId,
-					target: { kind: "org" },
-					channelSlug: "system",
-					type: "aml.screening.flagged",
-					title,
-					body,
-					payload: {
-						entityId: input.entityId,
-						entityName: input.entityName,
-						entityKind: input.entityKind,
-						hitType: input.hitType,
-					},
-					severity: "warn",
-					callbackUrl,
-					sendEmail: false,
-					sourceService: "aml-svc",
-					sourceEvent: "screening.flagged",
-				}),
-			}),
-		);
+		await notifService.notify({
+			tenantId: input.organizationId,
+			target: { kind: "org" },
+			channelSlug: "system",
+			type: "aml.screening.flagged",
+			title,
+			body,
+			payload: {
+				entityId: input.entityId,
+				entityName: input.entityName,
+				entityKind: input.entityKind,
+				hitType: input.hitType,
+			},
+			severity: "warn",
+			callbackUrl,
+			sendEmail: false,
+			sourceService: "aml-svc",
+			sourceEvent: "screening.flagged",
+		});
 
-		if (!response.ok) {
-			const text = await response.text();
-			console.error(
-				`[screening-notifications] notifications-svc returned ${response.status}: ${text}`,
-			);
-		} else {
-			console.log(
-				`[screening-notifications] Notification sent for ${input.hitType} hit on ${input.entityKind} ${input.entityId}`,
-			);
-		}
+		console.log(
+			`[screening-notifications] Notification sent for ${input.hitType} hit on ${input.entityKind} ${input.entityId}`,
+		);
 	} catch (err) {
 		console.error(
 			"[screening-notifications] Failed to send screening flagged notification:",

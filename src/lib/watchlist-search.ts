@@ -28,13 +28,39 @@ export interface TriggerSearchParams {
 }
 
 /**
+ * Minimal RPC interface matching `WatchlistEntrypoint.search`.
+ * Defined locally to avoid cross-package imports.
+ */
+interface WatchlistServiceRpc {
+	search(
+		input: {
+			q: string;
+			entityType?: string;
+			source?: string;
+			birthDate?: string;
+			countries?: string[];
+			identifiers?: string[];
+			topK?: number;
+			threshold?: number;
+		},
+		organizationId: string,
+		userId: string,
+	): Promise<{
+		queryId: string;
+		ofacCount: number;
+		unscCount: number;
+		sat69bCount: number;
+	}>;
+}
+
+/**
  * Watchlist search service client
  */
 export class WatchlistSearchService {
-	constructor(private watchlistService: Fetcher | undefined) {}
+	constructor(private watchlistService: WatchlistServiceRpc | undefined) {}
 
 	/**
-	 * Trigger a watchlist search via service binding.
+	 * Trigger a watchlist search via service binding RPC.
 	 * Returns the queryId and sync match counts if successful, null if the service is unavailable.
 	 */
 	async triggerSearch(params: TriggerSearchParams): Promise<{
@@ -66,61 +92,25 @@ export class WatchlistSearchService {
 				`[WatchlistSearch] Triggering search for "${query}" (orgId: ${organizationId}, userId: ${userId})`,
 			);
 
-			const response = await this.watchlistService.fetch(
-				"http://watchlist-svc/internal/search",
+			const result = await this.watchlistService.search(
 				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						"X-Organization-Id": organizationId,
-						"X-User-Id": userId,
-					},
-					body: JSON.stringify({
-						q: query,
-						entityType,
-						...(source ? { source } : {}),
-						birthDate,
-						identifiers,
-						countries,
-						topK: 50,
-						threshold: 0.7,
-					}),
+					q: query,
+					entityType,
+					...(source ? { source } : {}),
+					birthDate,
+					identifiers,
+					countries,
+					topK: 50,
+					threshold: 0.7,
 				},
+				organizationId,
+				userId,
 			);
 
-			if (!response.ok) {
-				const errorText = await response.text();
-				console.error(
-					`[WatchlistSearch] Search request failed: ${response.status} ${errorText}`,
-				);
-				return null;
-			}
-
-			const result = (await response.json()) as {
-				success: boolean;
-				result?: {
-					queryId: string;
-					ofac: { count: number };
-					unsc: { count: number };
-					sat69b: { count: number };
-				};
-			};
-
-			if (result.success && result.result?.queryId) {
-				const { queryId, ofac, unsc, sat69b } = result.result;
-				console.log(
-					`[WatchlistSearch] Search initiated successfully, queryId: ${queryId}, matches: OFAC=${ofac.count}, UNSC=${unsc.count}, SAT 69-B=${sat69b.count}`,
-				);
-				return {
-					queryId,
-					ofacCount: ofac.count,
-					unscCount: unsc.count,
-					sat69bCount: sat69b.count,
-				};
-			}
-
-			console.error("[WatchlistSearch] Unexpected response format:", result);
-			return null;
+			console.log(
+				`[WatchlistSearch] Search initiated, queryId: ${result.queryId}, matches: OFAC=${result.ofacCount}, UNSC=${result.unscCount}, SAT 69-B=${result.sat69bCount}`,
+			);
+			return result;
 		} catch (error) {
 			console.error(
 				"[WatchlistSearch] Failed to trigger watchlist search:",
@@ -135,7 +125,7 @@ export class WatchlistSearchService {
  * Factory function to create a WatchlistSearchService instance
  */
 export function createWatchlistSearchService(
-	watchlistService: Fetcher | undefined,
+	watchlistService: WatchlistServiceRpc | undefined,
 ): WatchlistSearchService {
 	return new WatchlistSearchService(watchlistService);
 }

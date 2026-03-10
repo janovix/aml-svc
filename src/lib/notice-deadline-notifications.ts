@@ -149,8 +149,8 @@ export async function processNoticeDeadlineNotifications(
 }
 
 async function sendDeadlineNotification(
-	env: Bindings,
-	notifService: Fetcher,
+	_env: Bindings,
+	notifService: import("../types").NotificationsRpc,
 	info: PendingOrgInfo,
 ): Promise<void> {
 	const severity = severityForDays(info.daysUntilDeadline);
@@ -167,37 +167,23 @@ async function sendDeadlineNotification(
 		`La fecha límite de presentación es el ${deadlineStr}. ` +
 		`Ingrese a la plataforma para generar y enviar su aviso antes del vencimiento.`;
 
-	const response = await notifService.fetch(
-		new Request("https://notifications-svc/internal/notify", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${env.INTERNAL_SERVICE_SECRET ?? "service-token"}`,
-			},
-			body: JSON.stringify({
-				tenantId: info.organizationId,
-				target: { kind: "org" },
-				channelSlug: "system",
-				type: "aml.notice.deadline_reminder",
-				title,
-				body,
-				payload: {
-					year: info.year,
-					month: info.month,
-					pendingAlertCount: info.pendingAlertCount,
-					daysUntilDeadline: info.daysUntilDeadline,
-					deadline: deadlineStr,
-				},
-				severity,
-				sendEmail: true,
-				sourceService: "aml-svc",
-				sourceEvent: "notice.deadline_reminder",
-			}),
-		}),
-	);
-
-	if (!response.ok) {
-		const text = await response.text();
-		console.error(`${LOG_TAG} notifications-svc ${response.status}: ${text}`);
-	}
+	await notifService.notify({
+		tenantId: info.organizationId,
+		target: { kind: "org" },
+		channelSlug: "system",
+		type: "aml.notice.deadline_reminder",
+		title,
+		body,
+		payload: {
+			year: info.year,
+			month: info.month,
+			pendingAlertCount: info.pendingAlertCount,
+			daysUntilDeadline: info.daysUntilDeadline,
+			deadline: deadlineStr,
+		},
+		severity,
+		sendEmail: true,
+		sourceService: "aml-svc",
+		sourceEvent: "notice.deadline_reminder",
+	});
 }

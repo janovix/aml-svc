@@ -315,6 +315,110 @@ describe("ClientRepository", () => {
 			expect(result.id).toBe("CLT123456789");
 			expect(mockPrisma.client.create).toHaveBeenCalled();
 		});
+
+		it("should create a MORAL client and set MORAL completeness fields", async () => {
+			const moralClient: Client = {
+				...mockClient,
+				personType: "MORAL",
+				firstName: null,
+				businessName: "ACME Corp SA de CV",
+				incorporationDate: new Date("2010-01-01"),
+				nationality: "MX",
+			};
+
+			const input: ClientCreateInput = {
+				rfc: "ACME123456XY7",
+				personType: "moral",
+				businessName: "ACME Corp SA de CV",
+				incorporationDate: "2010-01-01",
+				nationality: "MX",
+				email: "contact@acme.com",
+				phone: "+521234567890",
+				country: "MX",
+				stateCode: "DIF",
+				city: "Ciudad de México",
+				municipality: "Ciudad de México",
+				neighborhood: "Colonia Centro",
+				street: "Av. Reforma",
+				externalNumber: "1",
+				postalCode: "06600",
+			};
+
+			vi.mocked(mockPrisma.client.create).mockResolvedValue(moralClient);
+			vi.mocked(mockPrisma.client.findUnique).mockResolvedValue({
+				...moralClient,
+				documents: [],
+				beneficialControllers: [],
+				shareholders: [],
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any);
+			vi.mocked(mockPrisma.client.update).mockResolvedValue(moralClient);
+
+			const result = await repository.create("org-123", input);
+
+			expect(result.personType).toBe("moral");
+			expect(mockPrisma.client.create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						completenessStatus: expect.any(String),
+					}),
+				}),
+			);
+		});
+
+		it("should set COMPLETE status when all fields are provided", async () => {
+			const completeClient: Client = {
+				...mockClient,
+				completenessStatus: "COMPLETE",
+				economicActivityCode: "VEH",
+				sourceOfFunds: "salary",
+				gender: "M",
+				curp: "ABCD900515HDFLRN01",
+			};
+
+			const input: ClientCreateInput = {
+				rfc: "ABCD123456EF7",
+				personType: "physical",
+				firstName: "Juan",
+				lastName: "Pérez",
+				birthDate: "1990-05-15",
+				curp: "ABCD900515HDFLRN01",
+				nationality: "MX",
+				gender: "M",
+				email: "juan@example.com",
+				phone: "+521234567890",
+				country: "MX",
+				stateCode: "DIF",
+				city: "Ciudad de México",
+				municipality: "Ciudad de México",
+				neighborhood: "Colonia Centro",
+				street: "Calle Principal",
+				externalNumber: "123",
+				postalCode: "06000",
+				economicActivityCode: "VEH",
+				sourceOfFunds: "salary",
+			};
+
+			vi.mocked(mockPrisma.client.create).mockResolvedValue(completeClient);
+			vi.mocked(mockPrisma.client.findUnique).mockResolvedValue({
+				...completeClient,
+				documents: [],
+				beneficialControllers: [],
+				shareholders: [],
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any);
+			vi.mocked(mockPrisma.client.update).mockResolvedValue(completeClient);
+
+			await repository.create("org-123", input);
+
+			expect(mockPrisma.client.create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						completenessStatus: "COMPLETE",
+					}),
+				}),
+			);
+		});
 	});
 
 	describe("update", () => {
@@ -746,6 +850,15 @@ describe("ClientRepository", () => {
 				where: { id: "ADDR123456789" },
 			});
 		});
+
+		it("should throw ADDRESS_NOT_FOUND when address does not exist", async () => {
+			vi.mocked(mockPrisma.client.findFirst).mockResolvedValue(mockClient);
+			vi.mocked(mockPrisma.clientAddress.findFirst).mockResolvedValue(null);
+
+			await expect(
+				repository.deleteAddress("org-123", "CLT123456789", "ADDR_NOT_FOUND"),
+			).rejects.toThrow("ADDRESS_NOT_FOUND");
+		});
 	});
 
 	describe("getStats", () => {
@@ -753,14 +866,16 @@ describe("ClientRepository", () => {
 			vi.mocked(mockPrisma.client.count)
 				.mockResolvedValueOnce(100)
 				.mockResolvedValueOnce(60)
-				.mockResolvedValueOnce(40);
+				.mockResolvedValueOnce(30)
+				.mockResolvedValueOnce(10);
 
 			const result = await repository.getStats("org-123");
 
 			expect(result).toEqual({
 				totalClients: 100,
 				physicalClients: 60,
-				moralClients: 40,
+				moralClients: 30,
+				trustClients: 10,
 			});
 		});
 	});

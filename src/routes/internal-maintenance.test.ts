@@ -1,80 +1,60 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { maintenanceRouter } from "./internal-maintenance";
 import type { Bindings } from "../types";
 
-describe("Internal Maintenance Router", () => {
-	describe("Authentication Middleware", () => {
-		it("should return 503 when INTERNAL_SERVICE_SECRET is not configured", async () => {
-			const env: Partial<Bindings> = {
-				INTERNAL_SERVICE_SECRET: undefined,
-			};
+function makeEnv(overrides: Partial<Bindings> = {}): Bindings {
+	return {
+		INTERNAL_SERVICE_SECRET: "test-secret",
+		...overrides,
+	} as unknown as Bindings;
+}
 
-			const context = {
-				env: env as Bindings,
-				req: {
-					header: () => "Bearer some-token",
-				},
-				json: vi.fn(),
-			};
+describe("maintenanceRouter authentication middleware", () => {
+	it("returns 503 when INTERNAL_SERVICE_SECRET is not configured", async () => {
+		const env = makeEnv({ INTERNAL_SERVICE_SECRET: undefined });
 
-			// Note: Testing middleware directly is complex with Hono
-			// This is covered by integration tests in practice
-			expect(context.json).toBeDefined();
-		});
+		const res = await maintenanceRouter.request(
+			"/recalculate-kyc",
+			{ method: "POST" },
+			env,
+		);
 
-		it("should return 401 when Authorization header is missing", async () => {
-			const env: Partial<Bindings> = {
-				INTERNAL_SERVICE_SECRET: "test-secret",
-			};
-
-			const context = {
-				env: env as Bindings,
-				req: {
-					header: () => undefined,
-				},
-				json: vi.fn(),
-			};
-
-			expect(context.json).toBeDefined();
-		});
-
-		it("should return 401 when Authorization token is invalid", async () => {
-			const env: Partial<Bindings> = {
-				INTERNAL_SERVICE_SECRET: "test-secret",
-			};
-
-			const context = {
-				env: env as Bindings,
-				req: {
-					header: () => "Bearer wrong-token",
-				},
-				json: vi.fn(),
-			};
-
-			expect(context.json).toBeDefined();
-		});
-
-		it("should proceed when Authorization header matches secret", async () => {
-			const env: Partial<Bindings> = {
-				INTERNAL_SERVICE_SECRET: "test-secret",
-			};
-
-			const context = {
-				env: env as Bindings,
-				req: {
-					header: () => "Bearer test-secret",
-				},
-				json: vi.fn(),
-			};
-
-			expect(context.json).toBeDefined();
+		expect(res.status).toBe(503);
+		const body = await res.json();
+		expect(body).toMatchObject({
+			success: false,
+			error: "Service not configured",
 		});
 	});
 
-	describe("POST /recalculate-kyc endpoint", () => {
-		it("should have correct route definition", () => {
-			// The router should have a POST handler for /recalculate-kyc
-			expect(maintenanceRouter).toBeDefined();
-		});
+	it("returns 401 when Authorization header is missing", async () => {
+		const env = makeEnv();
+
+		const res = await maintenanceRouter.request(
+			"/recalculate-kyc",
+			{ method: "POST" },
+			env,
+		);
+
+		expect(res.status).toBe(401);
+		const body = await res.json();
+		expect(body).toMatchObject({ success: false, error: "Unauthorized" });
+	});
+
+	it("returns 401 when Authorization token is wrong", async () => {
+		const env = makeEnv();
+
+		const res = await maintenanceRouter.request(
+			"/recalculate-kyc",
+			{
+				method: "POST",
+				headers: { Authorization: "Bearer wrong-token" },
+			},
+			env,
+		);
+
+		expect(res.status).toBe(401);
+		const body = await res.json();
+		expect(body).toMatchObject({ success: false, error: "Unauthorized" });
 	});
 });

@@ -46,7 +46,7 @@ export const publicKycRouter = new Hono<{ Bindings: Bindings }>();
  * Returns null gracefully if unavailable.
  */
 async function fetchOrganizationBranding(
-	authService: Fetcher | undefined,
+	authService: import("../types").AuthSvcRpc | undefined,
 	organizationId: string,
 ): Promise<{ name: string; logo: string | null } | null> {
 	if (!authService) return null;

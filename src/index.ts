@@ -310,3 +310,6 @@ export default {
 
 // Re-export types for backward compatibility
 export type { Bindings } from "./types";
+
+// Export RPC entrypoint for service binding callers
+export { AmlSvcEntrypoint } from "./entrypoint";

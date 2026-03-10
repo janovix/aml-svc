@@ -41,8 +41,7 @@ export async function sendKYCInviteEmail(
 	session: KycSessionEntity,
 	options: KYCEmailOptions,
 ): Promise<boolean> {
-	const notifService = (env as Record<string, unknown>)
-		.NOTIFICATIONS_SERVICE as Fetcher | undefined;
+	const notifService = env.NOTIFICATIONS_SERVICE;
 	if (!notifService) {
 		console.warn(
 			"[kyc-email] NOTIFICATIONS_SERVICE binding not available. Skipping email.",
@@ -54,35 +53,25 @@ export async function sendKYCInviteEmail(
 	const orgName = options.organizationName ?? "Janovix";
 
 	try {
-		const response = await notifService.fetch(
-			new Request("https://internal/internal/email", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${(env as Record<string, unknown>).INTERNAL_SERVICE_SECRET ?? "internal"}`,
-				},
-				body: JSON.stringify({
-					to: {
-						email: clientEmail,
-						name: options.clientName,
-					},
-					subject: `${orgName} - Complete your KYC information`,
-					content: {
-						title: "Complete your KYC information",
-						body: `Hello ${options.clientName}, you have been invited to complete your identification information for ${orgName}. Click the button below to begin. This link will expire on ${options.expiresAt ? new Date(options.expiresAt).toLocaleDateString() : "the configured date"}.`,
-						callbackUrl: kycUrl,
-					},
-					tags: ["kyc_invite"],
-					sourceService: "aml-svc",
-					sourceEvent: "kyc_invite",
-				}),
-			}),
-		);
+		const result = await notifService.sendEmail({
+			to: {
+				email: clientEmail,
+				name: options.clientName,
+			},
+			subject: `${orgName} - Complete your KYC information`,
+			content: {
+				title: "Complete your KYC information",
+				body: `Hello ${options.clientName}, you have been invited to complete your identification information for ${orgName}. Click the button below to begin. This link will expire on ${options.expiresAt ? new Date(options.expiresAt).toLocaleDateString() : "the configured date"}.`,
+				callbackUrl: kycUrl,
+			},
+			tags: ["kyc_invite"],
+			sourceService: "aml-svc",
+			sourceEvent: "kyc_invite",
+		});
 
-		if (!response.ok) {
-			const body = await response.text();
+		if (!result.success) {
 			console.error(
-				`[kyc-email] notifications-svc returned ${response.status}: ${body}`,
+				`[kyc-email] notifications-svc sendEmail failed: ${result.error}`,
 			);
 			return false;
 		}
@@ -103,8 +92,7 @@ export async function sendKYCSubmissionNotification(
 	session: KycSessionEntity,
 	clientName: string,
 ): Promise<boolean> {
-	const notifService = (env as Record<string, unknown>)
-		.NOTIFICATIONS_SERVICE as Fetcher | undefined;
+	const notifService = env.NOTIFICATIONS_SERVICE;
 	if (!notifService) {
 		console.warn(
 			"[kyc-email] NOTIFICATIONS_SERVICE binding not available. Skipping submission notification.",
@@ -113,41 +101,24 @@ export async function sendKYCSubmissionNotification(
 	}
 
 	try {
-		const response = await notifService.fetch(
-			new Request("https://internal/internal/notify", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${(env as Record<string, unknown>).INTERNAL_SERVICE_SECRET ?? "internal"}`,
-				},
-				body: JSON.stringify({
-					tenantId: session.organizationId,
-					type: "kyc_submitted",
-					title: "KYC Session Submitted for Review",
-					body: `${clientName} has submitted their KYC information and it is ready for your review.`,
-					severity: "warning",
-					target: {
-						kind: "org",
-					},
-					payload: {
-						sessionId: session.id,
-						clientId: session.clientId,
-						clientName,
-						submittedAt: session.submittedAt,
-						identificationTier: session.identificationTier,
-					},
-					callbackUrl: null,
-				}),
-			}),
-		);
-
-		if (!response.ok) {
-			const body = await response.text();
-			console.error(
-				`[kyc-email] notifications-svc returned ${response.status} for submission notification: ${body}`,
-			);
-			return false;
-		}
+		await notifService.notify({
+			tenantId: session.organizationId,
+			type: "kyc_submitted",
+			title: "KYC Session Submitted for Review",
+			body: `${clientName} has submitted their KYC information and it is ready for your review.`,
+			severity: "warning",
+			target: { kind: "org" },
+			payload: {
+				sessionId: session.id,
+				clientId: session.clientId,
+				clientName,
+				submittedAt: session.submittedAt,
+				identificationTier: session.identificationTier,
+			},
+			callbackUrl: undefined,
+			sourceService: "aml-svc",
+			sourceEvent: "kyc_submitted",
+		});
 
 		return true;
 	} catch (err) {

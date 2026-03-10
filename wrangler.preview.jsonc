@@ -29,10 +29,12 @@
 		{
 			"binding": "AUTH_SERVICE",
 			"service": "auth-svc",
+			"entrypoint": "AuthSvcEntrypoint",
 		},
 		{
 			"binding": "NOTIFICATIONS_SERVICE",
 			"service": "notifications-svc",
+			"entrypoint": "NotificationsEntrypoint",
 		},
 	],
 	"queues": {

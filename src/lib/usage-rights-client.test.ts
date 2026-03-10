@@ -2,9 +2,10 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
 	UsageRightsClient,
 	createUsageRightsClient,
-	type UsageMetric,
+	type GateResult,
 } from "./usage-rights-client";
 import type { Bindings } from "../types";
+import type { AuthSvcRpc } from "../types";
 
 // Mock Sentry
 vi.mock("@sentry/cloudflare", () => ({
@@ -13,10 +14,20 @@ vi.mock("@sentry/cloudflare", () => ({
 }));
 
 describe("UsageRightsClient", () => {
-	const mockFetch = vi.fn();
+	const mockGate = vi.fn();
+	const mockMeter = vi.fn();
+	const mockCheck = vi.fn();
+
+	const mockAuthService: Partial<AuthSvcRpc> = {
+		gateUsageRights: mockGate,
+		meterUsageRights: mockMeter,
+		checkUsageRights: mockCheck,
+	};
+
 	const mockEnv = {
-		AUTH_SERVICE: { fetch: mockFetch },
+		AUTH_SERVICE: mockAuthService,
 	} as unknown as Bindings;
+
 	const envNoService = {} as unknown as Bindings;
 
 	let client: UsageRightsClient;
@@ -27,62 +38,42 @@ describe("UsageRightsClient", () => {
 	});
 
 	describe("gate()", () => {
-		it("returns allowed=true when AUTH_SERVICE binding returns 200", async () => {
-			mockFetch.mockResolvedValue(
-				new Response(
-					JSON.stringify({
-						allowed: true,
-						metric: "notices",
-						used: 5,
-						limit: 100,
-						remaining: 95,
-					}),
-					{
-						status: 200,
-						headers: { "Content-Type": "application/json" },
-					},
-				),
-			);
+		it("uses default count of 1 when count is not provided", async () => {
+			mockGate.mockResolvedValue({ allowed: true });
+			await client.gate("org-123", "notices");
+			expect(mockGate).toHaveBeenCalledWith("org-123", "notices", 1);
+		});
 
-			const result = await client.gate("org-123", "notices", 1);
-
-			expect(result).toEqual({
+		it("returns allowed=true when AUTH_SERVICE binding returns allowed", async () => {
+			const gateResult: GateResult = {
 				allowed: true,
 				metric: "notices",
 				used: 5,
 				limit: 100,
 				remaining: 95,
-			});
-		});
-
-		it("returns allowed=false when AUTH_SERVICE binding returns 403", async () => {
-			mockFetch.mockResolvedValue(
-				new Response(
-					JSON.stringify({
-						allowed: false,
-						metric: "notices",
-						used: 100,
-						limit: 100,
-						remaining: 0,
-						upgradeRequired: true,
-					}),
-					{
-						status: 403,
-						headers: { "Content-Type": "application/json" },
-					},
-				),
-			);
+			};
+			mockGate.mockResolvedValue(gateResult);
 
 			const result = await client.gate("org-123", "notices", 1);
 
-			expect(result).toEqual({
+			expect(result).toEqual(gateResult);
+			expect(mockGate).toHaveBeenCalledWith("org-123", "notices", 1);
+		});
+
+		it("returns allowed=false when AUTH_SERVICE binding returns not allowed", async () => {
+			const gateResult: GateResult = {
 				allowed: false,
 				metric: "notices",
 				used: 100,
 				limit: 100,
 				remaining: 0,
 				upgradeRequired: true,
-			});
+			};
+			mockGate.mockResolvedValue(gateResult);
+
+			const result = await client.gate("org-123", "notices", 1);
+
+			expect(result).toEqual(gateResult);
 		});
 
 		it("returns allowed=true (fail-open) when AUTH_SERVICE binding is not available (undefined)", async () => {
@@ -92,76 +83,45 @@ describe("UsageRightsClient", () => {
 			const result = await clientNoService.gate("org-123", "notices", 1);
 
 			expect(result).toEqual({ allowed: true });
-			expect(mockFetch).not.toHaveBeenCalled();
+			expect(mockGate).not.toHaveBeenCalled();
 			expect(warnSpy).toHaveBeenCalledWith(
 				"AUTH_SERVICE binding not available, allowing action (fail-open)",
 			);
 			warnSpy.mockRestore();
 		});
 
-		it("returns allowed=true (fail-open) when fetch throws an error", async () => {
-			mockFetch.mockRejectedValue(new Error("Network error"));
+		it("returns allowed=true (fail-open) when RPC throws an error", async () => {
+			mockGate.mockRejectedValue(new Error("Network error"));
 
 			const result = await client.gate("org-123", "notices", 1);
 
 			expect(result).toEqual({ allowed: true });
-			// Error is logged to Sentry (implementation detail, not asserted)
 		});
 
-		it("sends correct request body with organizationId, metric, count", async () => {
-			mockFetch.mockResolvedValue(
-				new Response(JSON.stringify({ allowed: true }), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				}),
-			);
+		it("calls gateUsageRights with correct arguments", async () => {
+			mockGate.mockResolvedValue({ allowed: true });
 
 			await client.gate("org-456", "reports", 3);
 
-			expect(mockFetch).toHaveBeenCalledTimes(1);
-			const request = mockFetch.mock.calls[0][0] as Request;
-			expect(request.url).toBe(
-				"https://auth-svc.internal/internal/usage-rights/gate",
-			);
-			expect(request.method).toBe("POST");
-			expect(request.headers.get("Content-Type")).toBe("application/json");
-			expect(request.headers.get("Accept")).toBe("application/json");
-			const body = (await request.json()) as {
-				organizationId: string;
-				metric: UsageMetric;
-				count: number;
-			};
-			expect(body).toEqual({
-				organizationId: "org-456",
-				metric: "reports",
-				count: 3,
-			});
+			expect(mockGate).toHaveBeenCalledTimes(1);
+			expect(mockGate).toHaveBeenCalledWith("org-456", "reports", 3);
 		});
 	});
 
 	describe("meter()", () => {
-		it("sends POST request with correct body", async () => {
-			mockFetch.mockResolvedValue(new Response(null, { status: 200 }));
+		it("uses default count of 1 when count is not provided", async () => {
+			mockMeter.mockResolvedValue(undefined);
+			await client.meter("org-123", "notices");
+			expect(mockMeter).toHaveBeenCalledWith("org-123", "notices", 1);
+		});
+
+		it("calls meterUsageRights with correct arguments", async () => {
+			mockMeter.mockResolvedValue(undefined);
 
 			await client.meter("org-789", "alerts", 2);
 
-			expect(mockFetch).toHaveBeenCalledTimes(1);
-			const request = mockFetch.mock.calls[0][0] as Request;
-			expect(request.url).toBe(
-				"https://auth-svc.internal/internal/usage-rights/meter",
-			);
-			expect(request.method).toBe("POST");
-			expect(request.headers.get("Content-Type")).toBe("application/json");
-			const body = (await request.json()) as {
-				organizationId: string;
-				metric: UsageMetric;
-				count: number;
-			};
-			expect(body).toEqual({
-				organizationId: "org-789",
-				metric: "alerts",
-				count: 2,
-			});
+			expect(mockMeter).toHaveBeenCalledTimes(1);
+			expect(mockMeter).toHaveBeenCalledWith("org-789", "alerts", 2);
 		});
 
 		it("does nothing when AUTH_SERVICE binding is not available", async () => {
@@ -169,74 +129,48 @@ describe("UsageRightsClient", () => {
 
 			await clientNoService.meter("org-123", "notices", 1);
 
-			expect(mockFetch).not.toHaveBeenCalled();
+			expect(mockMeter).not.toHaveBeenCalled();
 		});
 
-		it("logs error but does not throw when fetch fails", async () => {
-			mockFetch.mockRejectedValue(new Error("Service unavailable"));
+		it("logs error but does not throw when RPC fails", async () => {
+			mockMeter.mockRejectedValue(new Error("Service unavailable"));
 
 			await expect(
 				client.meter("org-123", "notices", 1),
 			).resolves.not.toThrow();
-			// Error is logged to Sentry (implementation detail, not asserted)
 		});
 	});
 
 	describe("check()", () => {
-		it("returns gate result when AUTH_SERVICE returns 200", async () => {
-			mockFetch.mockResolvedValue(
-				new Response(
-					JSON.stringify({
-						allowed: true,
-						metric: "notices",
-						used: 10,
-						limit: 100,
-						remaining: 90,
-					}),
-					{
-						status: 200,
-						headers: { "Content-Type": "application/json" },
-					},
-				),
-			);
-
-			const result = await client.check("org-123", "notices");
-
-			expect(result).toEqual({
+		it("returns gate result when AUTH_SERVICE RPC returns allowed", async () => {
+			const checkResult: GateResult = {
 				allowed: true,
 				metric: "notices",
 				used: 10,
 				limit: 100,
 				remaining: 90,
-			});
+			};
+			mockCheck.mockResolvedValue(checkResult);
+
+			const result = await client.check("org-123", "notices");
+
+			expect(result).toEqual(checkResult);
+			expect(mockCheck).toHaveBeenCalledWith("org-123", "notices");
 		});
 
-		it("returns allowed=false when AUTH_SERVICE returns 403", async () => {
-			mockFetch.mockResolvedValue(
-				new Response(
-					JSON.stringify({
-						allowed: false,
-						metric: "reports",
-						used: 50,
-						limit: 50,
-						remaining: 0,
-					}),
-					{
-						status: 403,
-						headers: { "Content-Type": "application/json" },
-					},
-				),
-			);
-
-			const result = await client.check("org-123", "reports");
-
-			expect(result).toEqual({
+		it("returns allowed=false result when AUTH_SERVICE RPC returns not allowed", async () => {
+			const checkResult: GateResult = {
 				allowed: false,
 				metric: "reports",
 				used: 50,
 				limit: 50,
 				remaining: 0,
-			});
+			};
+			mockCheck.mockResolvedValue(checkResult);
+
+			const result = await client.check("org-123", "reports");
+
+			expect(result).toEqual(checkResult);
 		});
 
 		it("returns null when AUTH_SERVICE is not available", async () => {
@@ -245,16 +179,15 @@ describe("UsageRightsClient", () => {
 			const result = await clientNoService.check("org-123", "notices");
 
 			expect(result).toBeNull();
-			expect(mockFetch).not.toHaveBeenCalled();
+			expect(mockCheck).not.toHaveBeenCalled();
 		});
 
-		it("returns null when fetch throws", async () => {
-			mockFetch.mockRejectedValue(new Error("Connection refused"));
+		it("returns null when RPC throws", async () => {
+			mockCheck.mockRejectedValue(new Error("Connection refused"));
 
 			const result = await client.check("org-123", "notices");
 
 			expect(result).toBeNull();
-			// Error is logged to Sentry (implementation detail, not asserted)
 		});
 	});
 

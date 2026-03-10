@@ -68,28 +68,11 @@ export class UsageRightsClient {
 		}
 
 		try {
-			const response = await authService.fetch(
-				new Request("https://auth-svc.internal/internal/usage-rights/gate", {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Accept: "application/json",
-					},
-					body: JSON.stringify({
-						organizationId: orgId,
-						metric,
-						count,
-					}),
-				}),
-			);
-
-			const { allowed: _, ...data } = (await response.json()) as GateResult;
-
-			if (response.status === 403) {
-				return { ...data, allowed: false };
-			}
-
-			return { ...data, allowed: true };
+			return (await authService.gateUsageRights(
+				orgId,
+				metric,
+				count,
+			)) as GateResult;
 		} catch (error) {
 			Sentry.captureException(error, {
 				tags: { context: "usage-rights-gate-error" },
@@ -112,17 +95,7 @@ export class UsageRightsClient {
 		if (!authService) return;
 
 		try {
-			await authService.fetch(
-				new Request("https://auth-svc.internal/internal/usage-rights/meter", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						organizationId: orgId,
-						metric,
-						count,
-					}),
-				}),
-			);
+			await authService.meterUsageRights(orgId, metric, count);
 		} catch (error) {
 			Sentry.captureException(error, {
 				tags: { context: "usage-rights-meter-error" },
@@ -139,20 +112,7 @@ export class UsageRightsClient {
 		if (!authService) return null;
 
 		try {
-			const response = await authService.fetch(
-				new Request(
-					`https://auth-svc.internal/internal/usage-rights/check?organizationId=${orgId}&metric=${metric}`,
-					{ headers: { Accept: "application/json" } },
-				),
-			);
-
-			const { allowed: _, ...data } = (await response.json()) as GateResult;
-
-			if (response.status === 403) {
-				return { ...data, allowed: false };
-			}
-
-			return { ...data, allowed: true };
+			return (await authService.checkUsageRights(orgId, metric)) as GateResult;
 		} catch (error) {
 			Sentry.captureException(error, {
 				tags: { context: "usage-rights-check-error" },
