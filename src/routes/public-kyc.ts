@@ -51,20 +51,8 @@ async function fetchOrganizationBranding(
 ): Promise<{ name: string; logo: string | null } | null> {
 	if (!authService) return null;
 	try {
-		const response = await authService.fetch(
-			new Request(
-				`https://auth-svc.internal/internal/organizations/${organizationId}`,
-				{ headers: { Accept: "application/json" } },
-			),
-		);
-		if (!response.ok) return null;
-		const result = (await response.json()) as {
-			success: boolean;
-			data?: { name: string; logo: string | null };
-		};
-		return result.success && result.data
-			? { name: result.data.name, logo: result.data.logo }
-			: null;
+		const org = await authService.getOrganization(organizationId);
+		return org ? { name: org.name, logo: org.logo } : null;
 	} catch {
 		return null;
 	}

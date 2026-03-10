@@ -71,6 +71,13 @@ export interface AuthSvcRpc {
 		count?: number,
 	): Promise<void>;
 	checkUsageRights(orgId: string, metric: string): Promise<GateResultRpc>;
+	getOrganization(id: string): Promise<{
+		id: string;
+		name: string;
+		slug: string;
+		logo: string | null;
+		metadata: Record<string, unknown> | null;
+	} | null>;
 }
 
 type NotificationsTarget =
