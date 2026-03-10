@@ -1,3 +1,10 @@
+# [1.9.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.2...v1.9.0-rc.3) (2026-03-10)
+
+
+### Features
+
+* add entrypoints for auth, notifications, and watchlist services ([0ed057d](https://github.com/janovix/aml-svc/commit/0ed057d396ee1147cd2c008c71c75615a903a259))
+
 # [1.9.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.1...v1.9.0-rc.2) (2026-03-02)
 
 
