@@ -6887,7 +6887,6 @@ export const openAPISpec = {
 					"transactionsToday",
 					"suspiciousTransactions",
 					"totalVolume",
-					"totalVehicles",
 				],
 				properties: {
 					transactionsToday: {
@@ -6907,10 +6906,17 @@ export const openAPISpec = {
 							"Total sum of all transaction amounts (string to preserve precision)",
 						example: "15000000.50",
 					},
-					totalVehicles: {
+					completeCount: {
 						type: "integer",
-						description: "Number of unique vehicles (brand + model + year)",
-						example: 120,
+						description:
+							"Number of operations with completenessStatus COMPLETE",
+						example: 50,
+					},
+					incompleteCount: {
+						type: "integer",
+						description:
+							"Number of operations with completenessStatus INCOMPLETE or MINIMUM",
+						example: 16,
 					},
 				},
 			},

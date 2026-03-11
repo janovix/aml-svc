@@ -128,15 +128,55 @@ operationsRouter.get("/", async (c) => {
 /**
  * GET /operations/stats
  * Get summary statistics for operations in the organization.
+ * Returns the API contract shape: transactionsToday, suspiciousTransactions, totalVolume,
+ * plus optional completeCount and incompleteCount for the operations page.
  * IMPORTANT: must be defined before /:id to avoid "stats" being matched as an id.
  */
 operationsRouter.get("/stats", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const service = getService(c);
-	const stats = await service
-		.getStats(organizationId)
-		.catch(handleServiceError);
-	return c.json(stats);
+	const prisma = getPrismaClient(c.env.DB);
+
+	const [rawStats, suspiciousTransactions, completeCount, incompleteCount] =
+		await Promise.all([
+			service.getStats(organizationId).catch(handleServiceError),
+			prisma.alert.count({
+				where: {
+					organizationId,
+					status: { in: ["DETECTED", "FILE_GENERATED"] },
+				},
+			}),
+			prisma.operation.count({
+				where: {
+					organizationId,
+					deletedAt: null,
+					completenessStatus: "COMPLETE",
+				},
+			}),
+			prisma.operation.count({
+				where: {
+					organizationId,
+					deletedAt: null,
+					completenessStatus: { in: ["INCOMPLETE", "MINIMUM"] },
+				},
+			}),
+		]);
+
+	const body: {
+		transactionsToday: number;
+		suspiciousTransactions: number;
+		totalVolume: string;
+		completeCount?: number;
+		incompleteCount?: number;
+	} = {
+		transactionsToday: rawStats.operationsToday,
+		suspiciousTransactions,
+		totalVolume: rawStats.totalAmountMxn,
+		completeCount,
+		incompleteCount,
+	};
+
+	return c.json(body);
 });
 
 /**
