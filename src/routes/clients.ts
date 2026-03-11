@@ -31,9 +31,6 @@ import {
 } from "../lib/route-helpers";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { APIError } from "../middleware/error";
-import { KycSessionService } from "../domain/kyc-session";
-import { OrganizationSettingsRepository } from "../domain/organization-settings";
-import { sendKYCInviteEmail } from "../lib/kyc-email";
 import { parseQueryParams } from "../lib/query-params";
 
 export const clientsRouter = new Hono<{
@@ -433,42 +430,7 @@ clientsRouter.post("/", async (c) => {
 		);
 	}
 
-	// Auto-create KYC session if self-service mode is "automatic" (non-blocking)
-	if (created.email) {
-		c.executionCtx.waitUntil(
-			(async () => {
-				try {
-					const prisma = getPrismaClient(c.env.DB);
-					const orgSettingsRepo = new OrganizationSettingsRepository(prisma);
-					const orgSettings =
-						await orgSettingsRepo.findByOrganizationId(organizationId);
-
-					if (orgSettings?.selfServiceMode === "automatic") {
-						const kycService = new KycSessionService(prisma);
-						const session = await kycService.create(
-							organizationId,
-							{ clientId: created.id, createdBy: "system" },
-							prisma,
-						);
-
-						const clientName = created.firstName
-							? `${created.firstName} ${created.lastName ?? ""}`.trim()
-							: (created.businessName ?? "Cliente");
-
-						await sendKYCInviteEmail(c.env, created.email, session, {
-							clientName,
-						});
-						await kycService.recordEmailSent(session.id);
-					}
-				} catch (err) {
-					console.error(
-						"[Client Create] Failed to auto-create KYC session:",
-						err,
-					);
-				}
-			})(),
-		);
-	}
+	// In automatic mode, KYC invite is sent only when client reaches ID threshold (see operations route).
 
 	return c.json(created, 201);
 });

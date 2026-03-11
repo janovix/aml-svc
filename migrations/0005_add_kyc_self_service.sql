@@ -8,7 +8,7 @@
 -- ============================================
 -- ORGANIZATION_SETTINGS: Add self-service fields
 -- ============================================
-ALTER TABLE organization_settings ADD COLUMN self_service_mode TEXT NOT NULL DEFAULT 'disabled';
+ALTER TABLE organization_settings ADD COLUMN self_service_mode TEXT NOT NULL DEFAULT 'automatic';
 ALTER TABLE organization_settings ADD COLUMN self_service_expiry_hours INTEGER NOT NULL DEFAULT 72;
 ALTER TABLE organization_settings ADD COLUMN self_service_required_sections TEXT;
 

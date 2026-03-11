@@ -21,7 +21,7 @@ describe("AlertRule Schemas", () => {
 				description: "Test description",
 				active: true,
 				severity: "HIGH",
-				ruleType: "transaction_amount_uma",
+				ruleType: "operation_amount_uma",
 				isManualOnly: false,
 				activityCode: "VEH",
 				metadata: { legalBasis: "LFPIORPI" },
@@ -285,15 +285,15 @@ describe("AlertRuleConfig Schemas", () => {
 
 describe("Alert Schemas", () => {
 	describe("AlertCreateSchema", () => {
-		it("validates valid alert creation with metadata and transactionId", () => {
+		it("validates valid alert creation with metadata and operationId", () => {
 			const input = {
 				alertRuleId: "2501",
 				clientId: "clt_123",
 				severity: "HIGH",
 				idempotencyKey: "idem_123",
 				contextHash: "ctx_123",
-				metadata: { transactionIds: ["tx_1", "tx_2"], amount: 100000 },
-				transactionId: "tx_001",
+				metadata: { operationIds: ["tx_1", "tx_2"], amount: 100000 },
+				operationId: "tx_001",
 				isManual: false,
 			};
 
@@ -301,7 +301,7 @@ describe("Alert Schemas", () => {
 			expect(result.success).toBe(true);
 		});
 
-		it("allows null transactionId", () => {
+		it("allows null operationId", () => {
 			const input = {
 				alertRuleId: "2501",
 				clientId: "clt_123",
@@ -309,7 +309,7 @@ describe("Alert Schemas", () => {
 				idempotencyKey: "idem_123",
 				contextHash: "ctx_123",
 				metadata: {},
-				transactionId: null,
+				operationId: null,
 				isManual: true,
 			};
 

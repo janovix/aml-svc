@@ -113,7 +113,7 @@ function getTemplateLabel(template: ReportTemplate): string {
 	const labels: Record<string, string> = {
 		EXECUTIVE_SUMMARY: "Resumen Ejecutivo",
 		COMPLIANCE_STATUS: "Estado de Cumplimiento",
-		TRANSACTION_ANALYSIS: "Análisis de Transacciones",
+		OPERATION_ANALYSIS: "Análisis de Operaciones",
 		CLIENT_RISK_PROFILE: "Perfil de Riesgo del Cliente",
 		ALERT_BREAKDOWN: "Desglose de Alertas",
 		PERIOD_COMPARISON: "Comparación de Períodos",

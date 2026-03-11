@@ -12,7 +12,7 @@ export const ReportPeriodTypeSchema = z.enum(REPORT_PERIOD_TYPE_VALUES);
 export const REPORT_TEMPLATE_VALUES = [
 	"EXECUTIVE_SUMMARY",
 	"COMPLIANCE_STATUS",
-	"TRANSACTION_ANALYSIS",
+	"OPERATION_ANALYSIS",
 	"CLIENT_RISK_PROFILE",
 	"ALERT_BREAKDOWN",
 	"PERIOD_COMPARISON",
@@ -22,7 +22,7 @@ export const ReportTemplateSchema = z.enum(REPORT_TEMPLATE_VALUES);
 
 export const REPORT_DATA_SOURCE_VALUES = [
 	"ALERTS",
-	"TRANSACTIONS",
+	"OPERATIONS",
 	"CLIENTS",
 ] as const;
 export const ReportDataSourceSchema = z.enum(REPORT_DATA_SOURCE_VALUES);
@@ -96,7 +96,7 @@ export const ReportFiltersSchema = z.object({
 	clientIds: z.array(ResourceIdSchema).optional(),
 	alertRuleIds: z.array(z.string()).optional(),
 	alertSeverities: z.array(z.string()).optional(),
-	transactionTypes: z.array(z.string()).optional(),
+	operationTypes: z.array(z.string()).optional(),
 	minAmount: z.coerce.number().min(0).optional(),
 	maxAmount: z.coerce.number().min(0).optional(),
 });

@@ -195,6 +195,7 @@ app.post("/internal/synthetic-data", async (c) => {
 				perClient?: number;
 				skipClients?: number;
 			};
+			/** @deprecated Use operations instead */
 			transactions?: {
 				count: number;
 				perClient?: number;
@@ -219,7 +220,7 @@ app.post("/internal/synthetic-data", async (c) => {
 		}
 
 		if (models.includes("transactions")) {
-			// Legacy path: map to operations with auto-adjusted count
+			// Deprecated: map to operations with auto-adjusted count
 			syntheticOptions.transactions = {
 				count: options?.transactions?.count ?? 0,
 				perClient: options?.transactions?.perClient,
@@ -235,7 +236,7 @@ app.post("/internal/synthetic-data", async (c) => {
 				generated: result,
 				summary: {
 					clientsCreated: result.clients.created,
-					transactionsCreated: result.transactions.created,
+					transactionsCreated: result.transactions.created, // deprecated: use result.operations
 				},
 			},
 			201,

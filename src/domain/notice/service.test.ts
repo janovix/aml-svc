@@ -204,7 +204,7 @@ describe("NoticeService", () => {
 			}),
 			getAlertsForNotice: vi.fn(),
 			getAlertsForPeriodDetailed: vi.fn(),
-			getAlertsWithTransactionsForNotice: vi.fn(),
+			getAlertsWithOperationsForNotice: vi.fn(),
 			markAsGenerated: vi.fn(),
 			markAsSubmitted: vi.fn(),
 			markAsAcknowledged: vi.fn(),

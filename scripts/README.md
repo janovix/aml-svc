@@ -44,7 +44,7 @@ pnpm populate:preview
 
 **When**: Dev and preview only (NEVER in production)
 
-**What**: Fake clients, transactions, alerts, reports, etc.
+**What**: Fake clients, operations, alerts, reports, etc.
 
 ```bash
 # Local development (after populating)
@@ -121,7 +121,7 @@ pnpm deploy:dev
 | Aspect           | Population                        | Seeding                      |
 | ---------------- | --------------------------------- | ---------------------------- |
 | **Purpose**      | Real reference data               | Synthetic test data          |
-| **Examples**     | Countries, CFDI codes, currencies | Fake clients, transactions   |
+| **Examples**     | Countries, CFDI codes, currencies | Fake clients, operations     |
 | **Required?**    | ✅ Yes (app won't work without)   | ❌ No (optional for testing) |
 | **Production?**  | ✅ Yes                            | ❌ No                        |
 | **Dev/Preview?** | ✅ Yes                            | ✅ Yes                       |

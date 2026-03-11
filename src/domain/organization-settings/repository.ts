@@ -37,7 +37,7 @@ export class OrganizationSettingsRepository {
 				organizationId,
 				obligatedSubjectKey: data.obligatedSubjectKey,
 				activityKey: data.activityKey,
-				selfServiceMode: data.selfServiceMode ?? "disabled",
+				selfServiceMode: data.selfServiceMode ?? "automatic",
 				selfServiceExpiryHours: data.selfServiceExpiryHours ?? 72,
 				selfServiceRequiredSections:
 					data.selfServiceRequiredSections != null
@@ -103,7 +103,7 @@ export class OrganizationSettingsRepository {
 				organizationId,
 				obligatedSubjectKey: data.obligatedSubjectKey,
 				activityKey: data.activityKey,
-				selfServiceMode: data.selfServiceMode ?? "disabled",
+				selfServiceMode: data.selfServiceMode ?? "automatic",
 				selfServiceExpiryHours: data.selfServiceExpiryHours ?? 72,
 				selfServiceRequiredSections:
 					data.selfServiceRequiredSections != null

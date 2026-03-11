@@ -76,11 +76,11 @@ export class AuditClient {
 	 * // Log a create event
 	 * await audit.log({
 	 *   eventType: "CREATE",
-	 *   entityType: "transaction",
-	 *   entityId: transaction.id,
+	 *   entityType: "operation",
+	 *   entityId: operation.id,
 	 *   actorUserId: user.id,
 	 *   actorOrganizationId: org.id,
-	 *   newState: transaction,
+	 *   newState: operation,
 	 *   metadata: { source: "manual_entry" },
 	 * });
 	 * ```

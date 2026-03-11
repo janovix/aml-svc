@@ -48,7 +48,7 @@ export interface ImportRowResultEntity {
 	rowNumber: number;
 	status: ImportRowStatus;
 	rawData: string; // JSON string of original row data
-	entityId: string | null; // Created client/transaction ID if successful
+	entityId: string | null; // Created client/operation ID if successful
 	message: string | null;
 	errors: string | null; // JSON array of validation errors
 	createdAt: string;

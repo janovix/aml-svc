@@ -1003,7 +1003,7 @@ export const openAPISpec = {
 				],
 				responses: {
 					"200": {
-						description: "Paginated list of transactions.",
+						description: "Paginated list of operations.",
 						content: {
 							"application/json": {
 								schema: {
@@ -1023,10 +1023,10 @@ export const openAPISpec = {
 				},
 			},
 			post: {
-				tags: ["Transactions"],
-				summary: "Create transaction",
+				tags: ["Operations"],
+				summary: "Create operation",
 				description:
-					"Creates a new vehicle transaction tied to an existing client.",
+					"Creates a new vehicle operation tied to an existing client.",
 				requestBody: {
 					required: true,
 					content: {
@@ -1037,7 +1037,7 @@ export const openAPISpec = {
 				},
 				responses: {
 					"201": {
-						description: "Transaction created successfully.",
+						description: "Operation created successfully.",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Operation" },
@@ -1063,7 +1063,7 @@ export const openAPISpec = {
 					"Retrieve aggregate statistics for operations including today's count, suspicious operations, total volume, and activity breakdown.",
 				responses: {
 					"200": {
-						description: "Transaction statistics",
+						description: "Operation statistics",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/OperationStats" },
@@ -1087,12 +1087,12 @@ export const openAPISpec = {
 							type: "string",
 							pattern: "^[A-Za-z0-9-]{1,64}$",
 						},
-						description: "Transaction identifier.",
+						description: "Operation identifier.",
 					},
 				],
 				responses: {
 					"200": {
-						description: "Transaction detail response.",
+						description: "Operation detail response.",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Operation" },
@@ -1100,7 +1100,7 @@ export const openAPISpec = {
 						},
 					},
 					"404": {
-						description: "Transaction not found",
+						description: "Operation not found",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
@@ -1135,7 +1135,7 @@ export const openAPISpec = {
 				},
 				responses: {
 					"200": {
-						description: "Transaction updated successfully.",
+						description: "Operation updated successfully.",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Operation" },
@@ -1151,7 +1151,7 @@ export const openAPISpec = {
 						},
 					},
 					"404": {
-						description: "Transaction not found",
+						description: "Operation not found",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
@@ -1161,9 +1161,9 @@ export const openAPISpec = {
 				},
 			},
 			delete: {
-				tags: ["Transactions"],
-				summary: "Delete transaction",
-				description: "Soft deletes a transaction by setting `deletedAt`.",
+				tags: ["Operations"],
+				summary: "Delete operation",
+				description: "Soft deletes an operation by setting `deletedAt`.",
 				parameters: [
 					{
 						name: "id",
@@ -1176,9 +1176,9 @@ export const openAPISpec = {
 					},
 				],
 				responses: {
-					"204": { description: "Transaction deleted" },
+					"204": { description: "Operation deleted" },
 					"404": {
-						description: "Transaction not found",
+						description: "Operation not found",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
@@ -2891,7 +2891,7 @@ export const openAPISpec = {
 				tags: ["Reports"],
 				summary: "Get executive summary aggregation",
 				description:
-					"Get aggregated metrics for alerts, transactions, and clients for a given period",
+					"Get aggregated metrics for alerts, operations, and clients for a given period",
 				parameters: [
 					{
 						name: "periodStart",
@@ -2977,11 +2977,11 @@ export const openAPISpec = {
 				},
 			},
 		},
-		"/api/v1/reports/aggregate/transactions": {
+		"/api/v1/reports/aggregate/operations": {
 			get: {
 				tags: ["Reports"],
-				summary: "Get transaction metrics aggregation",
-				description: "Get aggregated transaction metrics for a given period",
+				summary: "Get operation metrics aggregation",
+				description: "Get aggregated operation metrics for a given period",
 				parameters: [
 					{
 						name: "periodStart",
@@ -3006,7 +3006,7 @@ export const openAPISpec = {
 				],
 				responses: {
 					"200": {
-						description: "Aggregated transaction metrics",
+						description: "Aggregated operation metrics",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/OperationAggregation" },
@@ -3599,7 +3599,7 @@ export const openAPISpec = {
 					},
 					"400": {
 						description:
-							"Notice has already been generated, has no alerts, has no valid alerts with transactions, or organization settings not configured",
+							"Notice has already been generated, has no alerts, has no valid alerts with operations, or organization settings not configured",
 					},
 				},
 			},
@@ -3805,7 +3805,7 @@ export const openAPISpec = {
 									},
 									entityType: {
 										type: "string",
-										enum: ["CLIENT", "TRANSACTION"],
+										enum: ["CLIENT", "OPERATION"],
 										description: "Type of entities in the file",
 									},
 								},
@@ -3848,7 +3848,7 @@ export const openAPISpec = {
 						required: true,
 						schema: {
 							type: "string",
-							enum: ["client", "transaction"],
+							enum: ["client", "operation"],
 						},
 						description: "Entity type (case-insensitive)",
 					},
@@ -6575,7 +6575,7 @@ export const openAPISpec = {
 					id: {
 						type: "string",
 						pattern: "^[A-Za-z0-9-]{1,64}$",
-						description: "Transaction identifier.",
+						description: "Operation identifier.",
 					},
 					clientId: {
 						type: "string",
@@ -6622,13 +6622,13 @@ export const openAPISpec = {
 						type: "string",
 						nullable: true,
 						description:
-							"Calculated UMA value: amount / umaDailyValue for the transaction date (automatically calculated)",
+							"Calculated UMA value: amount / umaDailyValue for the operation date (automatically calculated)",
 					},
 					paymentMethods: {
 						type: "array",
 						items: { $ref: "#/components/schemas/PaymentMethod" },
 						description:
-							"Array of payment methods used for this transaction. The sum of amounts must equal the transaction amount.",
+							"Array of payment methods used for this operation. The sum of amounts must equal the operation amount.",
 					},
 					createdAt: { type: "string", format: "date-time" },
 					updatedAt: { type: "string", format: "date-time" },
@@ -6722,7 +6722,7 @@ export const openAPISpec = {
 					amount: {
 						type: "string",
 						description:
-							'Total transaction amount, stored as a string to preserve precision (e.g., "3500000.75").',
+							'Total operation amount, stored as a string to preserve precision (e.g., "3500000.75").',
 					},
 					currency: {
 						type: "string",
@@ -6747,7 +6747,7 @@ export const openAPISpec = {
 						items: { $ref: "#/components/schemas/PaymentMethodInput" },
 						minItems: 1,
 						description:
-							"Array of payment methods. The sum of payment method amounts must equal the transaction amount.",
+							"Array of payment methods. The sum of payment method amounts must equal the operation amount.",
 					},
 				},
 			},
@@ -6791,7 +6791,7 @@ export const openAPISpec = {
 					amount: {
 						type: "string",
 						description:
-							'Total transaction amount, stored as a string to preserve precision (e.g., "3500000.75").',
+							'Total operation amount, stored as a string to preserve precision (e.g., "3500000.75").',
 					},
 					currency: {
 						type: "string",
@@ -6816,7 +6816,7 @@ export const openAPISpec = {
 						items: { $ref: "#/components/schemas/PaymentMethodInput" },
 						minItems: 1,
 						description:
-							"Array of payment methods. The sum of payment method amounts must equal the transaction amount.",
+							"Array of payment methods. The sum of payment method amounts must equal the operation amount.",
 					},
 				},
 			},
@@ -6836,7 +6836,7 @@ export const openAPISpec = {
 				properties: {
 					data: {
 						type: "array",
-						items: { $ref: "#/components/schemas/Transaction" },
+						items: { $ref: "#/components/schemas/Operation" },
 					},
 					pagination: { $ref: "#/components/schemas/OperationPagination" },
 				},
@@ -6884,17 +6884,18 @@ export const openAPISpec = {
 			OperationStats: {
 				type: "object",
 				required: [
-					"transactionsToday",
-					"suspiciousTransactions",
+					"operationsToday",
+					"suspiciousOperations",
 					"totalVolume",
+					"totalOperations",
 				],
 				properties: {
-					transactionsToday: {
+					operationsToday: {
 						type: "integer",
-						description: "Number of transactions created today",
+						description: "Number of operations created today",
 						example: 25,
 					},
-					suspiciousTransactions: {
+					suspiciousOperations: {
 						type: "integer",
 						description:
 							"Number of alerts with DETECTED or FILE_GENERATED status",
@@ -6903,8 +6904,14 @@ export const openAPISpec = {
 					totalVolume: {
 						type: "string",
 						description:
-							"Total sum of all transaction amounts (string to preserve precision)",
+							"Total sum of all operation amounts (string to preserve precision)",
 						example: "15000000.50",
+					},
+					totalOperations: {
+						type: "integer",
+						description:
+							"Total count of non-deleted operations in the organization",
+						example: 47,
 					},
 					completeCount: {
 						type: "integer",
@@ -7219,19 +7226,19 @@ export const openAPISpec = {
 						type: "string",
 						maxLength: 255,
 						description:
-							"Hash of the specific data that triggered this alert (transaction IDs, amounts, dates, etc.)",
+							"Hash of the specific data that triggered this alert (operation IDs, amounts, dates, etc.)",
 					},
 					metadata: {
 						type: "object",
 						description:
-							"Alert-specific data stored as JSON (transaction IDs, amounts, dates, etc.)",
+							"Alert-specific data stored as JSON (operation IDs, amounts, dates, etc.)",
 						additionalProperties: true,
 					},
-					transactionId: {
+					operationId: {
 						type: "string",
 						nullable: true,
 						description:
-							"Optional reference to the transaction that triggered the alert",
+							"Optional reference to the operation that triggered the alert",
 					},
 					isManual: {
 						type: "boolean",
@@ -7331,15 +7338,15 @@ export const openAPISpec = {
 						minLength: 1,
 						maxLength: 255,
 						description:
-							"Hash of the specific data that triggered this alert (transaction IDs, amounts, dates, etc.)",
+							"Hash of the specific data that triggered this alert (operation IDs, amounts, dates, etc.)",
 					},
 					metadata: {
 						type: "object",
 						description:
-							"Alert-specific data stored as JSON (transaction IDs, amounts, dates, etc.)",
+							"Alert-specific data stored as JSON (operation IDs, amounts, dates, etc.)",
 						additionalProperties: true,
 					},
-					transactionId: { type: "string", nullable: true },
+					operationId: { type: "string", nullable: true },
 					isManual: {
 						type: "boolean",
 						default: false,
@@ -7973,7 +7980,7 @@ export const openAPISpec = {
 						enum: [
 							"EXECUTIVE_SUMMARY",
 							"COMPLIANCE_STATUS",
-							"TRANSACTION_ANALYSIS",
+							"OPERATION_ANALYSIS",
 							"CLIENT_RISK_PROFILE",
 							"ALERT_BREAKDOWN",
 							"PERIOD_COMPARISON",
@@ -7986,7 +7993,7 @@ export const openAPISpec = {
 						type: "array",
 						items: {
 							type: "string",
-							enum: ["ALERTS", "TRANSACTIONS", "CLIENTS"],
+							enum: ["ALERTS", "OPERATIONS", "CLIENTS"],
 						},
 					},
 					defaultCharts: {
@@ -8160,7 +8167,7 @@ export const openAPISpec = {
 				type: "object",
 				properties: {
 					alertsChange: { type: "number", description: "Percentage change" },
-					transactionsChange: {
+					operationsChange: {
 						type: "number",
 						description: "Percentage change",
 					},
@@ -8185,7 +8192,7 @@ export const openAPISpec = {
 			},
 			ReportAggregation: {
 				type: "object",
-				required: ["alerts", "transactions", "clients", "riskIndicators"],
+				required: ["alerts", "operations", "clients", "riskIndicators"],
 				properties: {
 					alerts: { $ref: "#/components/schemas/AlertAggregation" },
 					operations: { $ref: "#/components/schemas/OperationAggregation" },
@@ -8201,7 +8208,7 @@ export const openAPISpec = {
 			},
 			ImportEntityType: {
 				type: "string",
-				enum: ["CLIENT", "TRANSACTION"],
+				enum: ["CLIENT", "OPERATION"],
 				description: "Type of entities being imported",
 			},
 			ImportRowStatus: {
@@ -8311,7 +8318,7 @@ export const openAPISpec = {
 					entityId: {
 						type: "string",
 						nullable: true,
-						description: "ID of the created entity (client or transaction)",
+						description: "ID of the created entity (client or operation)",
 					},
 					message: {
 						type: "string",

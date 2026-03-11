@@ -140,7 +140,7 @@ gh workflow run populate-seed.yml \
 ```
 
 **Time**: ~1-2 minutes  
-**Creates**: Test organizations, clients, transactions, etc.  
+**Creates**: Test organizations, clients, operations, etc.  
 **⚠️ Never use in production**
 
 ---

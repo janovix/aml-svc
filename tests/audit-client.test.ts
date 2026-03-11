@@ -60,7 +60,7 @@ describe("AuditClient", () => {
 
 			const input: AuditLogInput = {
 				eventType: "CREATE",
-				entityType: "transaction",
+				entityType: "operation",
 				entityId: "tx-123",
 			};
 
@@ -81,7 +81,7 @@ describe("AuditClient", () => {
 
 			const input: AuditLogInput = {
 				eventType: "CREATE",
-				entityType: "transaction",
+				entityType: "operation",
 				entityId: "tx-123",
 				actorUserId: "user-456",
 				actorOrganizationId: "org-789",
@@ -139,7 +139,7 @@ describe("AuditClient", () => {
 
 			const result = await client.log({
 				eventType: "CREATE",
-				entityType: "transaction",
+				entityType: "operation",
 			});
 
 			expect(result).toBeNull();
@@ -168,16 +168,16 @@ describe("AuditClient", () => {
 			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 			const client = new AuditClient(env);
 
-			const newState = { name: "Test Transaction", amount: 500 };
+			const newState = { name: "Test Operation", amount: 500 };
 
-			await client.logCreate("transaction", "tx-123", newState, {
+			await client.logCreate("operation", "tx-123", newState, {
 				actorUserId: "user-456",
 			});
 
 			expect(mockAuthService.logAuditEvent).toHaveBeenCalledWith(
 				expect.objectContaining({
 					eventType: "CREATE",
-					entityType: "transaction",
+					entityType: "operation",
 					entityId: "tx-123",
 					newState,
 					actorUserId: "user-456",
@@ -302,12 +302,12 @@ describe("AuditClient", () => {
 
 			const metadata = { source: "csv_upload", rowCount: 500, errors: 3 };
 
-			await client.logImport("transactions", metadata);
+			await client.logImport("operations", metadata);
 
 			expect(mockAuthService.logAuditEvent).toHaveBeenCalledWith(
 				expect.objectContaining({
 					eventType: "IMPORT",
-					entityType: "transactions",
+					entityType: "operations",
 					metadata,
 				}),
 			);

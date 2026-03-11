@@ -67,23 +67,27 @@ describe("Operations API", () => {
 			expect(res.status).toBe(200);
 
 			const body = (await res.json()) as {
-				transactionsToday: number;
-				suspiciousTransactions: number;
+				operationsToday: number;
+				suspiciousOperations: number;
 				totalVolume: string;
+				totalOperations: number;
 				completeCount?: number;
 				incompleteCount?: number;
 			};
 
-			expect(body).toHaveProperty("transactionsToday");
-			expect(body).toHaveProperty("suspiciousTransactions");
+			expect(body).toHaveProperty("operationsToday");
+			expect(body).toHaveProperty("suspiciousOperations");
 			expect(body).toHaveProperty("totalVolume");
-			expect(typeof body.transactionsToday).toBe("number");
-			expect(typeof body.suspiciousTransactions).toBe("number");
+			expect(body).toHaveProperty("totalOperations");
+			expect(typeof body.operationsToday).toBe("number");
+			expect(typeof body.suspiciousOperations).toBe("number");
 			expect(typeof body.totalVolume).toBe("string");
+			expect(typeof body.totalOperations).toBe("number");
 
-			expect(body.transactionsToday).toBe(0);
-			expect(body.suspiciousTransactions).toBe(0);
+			expect(body.operationsToday).toBe(0);
+			expect(body.suspiciousOperations).toBe(0);
 			expect(body.totalVolume).toBe("0.00");
+			expect(body.totalOperations).toBe(0);
 			expect(body.completeCount).toBe(0);
 			expect(body.incompleteCount).toBe(0);
 		});
@@ -160,15 +164,17 @@ describe("Operations API", () => {
 			expect(res.status).toBe(200);
 
 			const body = (await res.json()) as {
-				transactionsToday: number;
-				suspiciousTransactions: number;
+				operationsToday: number;
+				suspiciousOperations: number;
 				totalVolume: string;
+				totalOperations: number;
 				completeCount?: number;
 				incompleteCount?: number;
 			};
 
-			expect(body.transactionsToday).toBeGreaterThanOrEqual(0);
+			expect(body.operationsToday).toBeGreaterThanOrEqual(0);
 			expect(typeof body.totalVolume).toBe("string");
+			expect(body.totalOperations).toBe(2);
 			expect(body.completeCount).toBe(1);
 			expect(body.incompleteCount).toBe(1);
 		});

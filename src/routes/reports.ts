@@ -142,7 +142,7 @@ reportsRouter.get("/aggregate/summary", async (c) => {
 		comparisonPeriodEnd: query.comparisonPeriodEnd
 			? new Date(query.comparisonPeriodEnd)
 			: undefined,
-		dataSources: ["ALERTS", "TRANSACTIONS", "CLIENTS"],
+		dataSources: ["ALERTS", "OPERATIONS", "CLIENTS"],
 		clientId: query.clientId,
 	});
 

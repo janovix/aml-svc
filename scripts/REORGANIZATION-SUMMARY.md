@@ -8,12 +8,12 @@ The populate and seed scripts have been completely reorganized for clarity, perf
 
 ### 1. **Clear Separation: Population vs Seeding**
 
-| Aspect     | Population                     | Seeding                    |
-| ---------- | ------------------------------ | -------------------------- |
-| Purpose    | Real reference data (catalogs) | Synthetic test data        |
-| Required   | ✅ Yes                         | ❌ No (optional)           |
-| Production | ✅ Yes                         | ❌ No                      |
-| Examples   | Countries, CFDI codes          | Fake clients, transactions |
+| Aspect     | Population                     | Seeding                  |
+| ---------- | ------------------------------ | ------------------------ |
+| Purpose    | Real reference data (catalogs) | Synthetic test data      |
+| Required   | ✅ Yes                         | ❌ No (optional)         |
+| Production | ✅ Yes                         | ❌ No                    |
+| Examples   | Countries, CFDI codes          | Fake clients, operations |
 
 ### 2. **Large Catalogs Separated**
 

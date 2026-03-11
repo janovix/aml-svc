@@ -162,12 +162,51 @@ const AddressSchema = z.object({
 	reference: z.string().max(200).optional().nullable(),
 });
 
+/** Optional address for minimal client create (RFC, names, email). Defaults used for DB NOT NULL. */
+const OptionalAddressSchema = z.object({
+	country: z
+		.string()
+		.optional()
+		.transform((value) => {
+			const trimmed = (value ?? "MX").trim();
+			if (trimmed.length === 2) return trimmed.toUpperCase();
+			const normalized = trimmed.toLowerCase();
+			return COUNTRY_NAME_TO_CODE[normalized] || "MX";
+		}),
+	stateCode: z
+		.string()
+		.max(10)
+		.optional()
+		.default("")
+		.transform((v) => (v ?? "").toUpperCase()),
+	city: z.string().optional().default(""),
+	municipality: z.string().optional().default(""),
+	neighborhood: z.string().optional().default(""),
+	street: z.string().optional().default(""),
+	externalNumber: z.string().optional().default(""),
+	internalNumber: z.string().max(20).optional().nullable(),
+	postalCode: z.string().optional().default(""),
+	reference: z.string().max(200).optional().nullable(),
+});
+
 const ContactSchema = z.object({
 	email: z
 		.string()
 		.email()
 		.transform((value) => value.toLowerCase()),
 	phone: z.string().regex(PHONE_REGEX, "Invalid phone format"),
+});
+
+/** Optional contact for minimal create: email required, phone optional (default ""). */
+const OptionalContactSchema = z.object({
+	email: z
+		.string()
+		.email()
+		.transform((value) => value.toLowerCase()),
+	phone: z
+		.union([z.literal(""), z.string().regex(PHONE_REGEX)])
+		.optional()
+		.default(""),
 });
 
 // RFC validation function based on person type
@@ -284,6 +323,75 @@ const TrustDetailsSchema = z.object({
 	curp: z.string().optional().nullable(),
 });
 
+// --- Minimal create schemas (only RFC, names, email required; rest optional for KYC onboarding) ---
+
+const MinimalPhysicalDetailsSchema = z
+	.object({
+		personType: z.literal("physical"),
+		firstName: z.string().min(1),
+		lastName: z.string().min(1),
+		secondLastName: z.string().optional().nullable(),
+		birthDate: dateOnlyString.optional().nullable(),
+		curp: z
+			.string()
+			.regex(CURP_REGEX, "Invalid CURP")
+			.transform((value) => value.toUpperCase())
+			.optional()
+			.nullable(),
+		businessName: z.string().optional().nullable(),
+		incorporationDate: isoString.optional().nullable(),
+	})
+	.merge(EnhancedKYCFieldsSchema);
+
+const MinimalMoralDetailsSchema = z.object({
+	personType: z.literal("moral"),
+	businessName: z.string().min(3),
+	incorporationDate: isoString.optional().nullable(),
+	firstName: z.string().optional().nullable(),
+	lastName: z.string().optional().nullable(),
+	secondLastName: z.string().optional().nullable(),
+	birthDate: dateOnlyString.optional().nullable(),
+	curp: z.string().optional().nullable(),
+});
+
+const MinimalTrustDetailsSchema = z.object({
+	personType: z.literal("trust"),
+	businessName: z.string().min(3),
+	incorporationDate: isoString.optional().nullable(),
+	firstName: z.string().optional().nullable(),
+	lastName: z.string().optional().nullable(),
+	secondLastName: z.string().optional().nullable(),
+	birthDate: dateOnlyString.optional().nullable(),
+	curp: z.string().optional().nullable(),
+});
+
+const MinimalCommonBase = z
+	.object({
+		rfc: z.string(),
+		nationality: z
+			.union([
+				z.string().min(2, "Nationality must be at least 2 characters"),
+				z.null(),
+			])
+			.optional(),
+		notes: z.string().max(500).optional().nullable(),
+		countryCode: z.string().optional().nullable(),
+		economicActivityCode: z.string().optional().nullable(),
+	})
+	.merge(OptionalAddressSchema)
+	.merge(OptionalContactSchema);
+
+const MinimalCommonPhysical = z
+	.object({
+		rfc: z.string(),
+		nationality: z.string().min(2).optional(),
+		notes: z.string().max(500).optional().nullable(),
+		countryCode: z.string().optional().nullable(),
+		economicActivityCode: z.string().optional().nullable(),
+	})
+	.merge(OptionalAddressSchema)
+	.merge(OptionalContactSchema);
+
 // Base schemas without RFC validation (for updates)
 const ClientPhysicalBaseSchema = CommonSchemaPhysical.merge(
 	PhysicalDetailsSchema,
@@ -310,19 +418,57 @@ export const ClientTrustSchema = ClientTrustBaseSchema.merge(
 	}),
 );
 
+// Minimal create schemas (only RFC, names, email required; address/phone/curp/birthDate/incorporationDate optional)
+const ClientCreatePhysicalSchema = MinimalCommonPhysical.merge(
+	MinimalPhysicalDetailsSchema,
+).merge(z.object({ rfc: validateRFC("physical") }));
+
+const ClientCreateMoralSchema = MinimalCommonBase.merge(
+	MinimalMoralDetailsSchema,
+).merge(z.object({ rfc: validateRFC("moral") }));
+
+const ClientCreateTrustSchema = MinimalCommonBase.merge(
+	MinimalTrustDetailsSchema,
+).merge(z.object({ rfc: validateRFC("trust") }));
+
 // Use discriminated union for better error messages and type discrimination
 export const ClientCreateSchema = z.discriminatedUnion("personType", [
-	ClientPhysicalSchema,
-	ClientMoralSchema,
-	ClientTrustSchema,
+	ClientCreatePhysicalSchema,
+	ClientCreateMoralSchema,
+	ClientCreateTrustSchema,
 ]);
 
-// Update schema: RFC cannot be changed, so we omit it from base schemas
-// Use discriminated union for better error messages
+// Update common schemas (optional address/contact like create; RFC not in update)
+const UpdateCommonBase = z
+	.object({
+		nationality: z
+			.union([
+				z.string().min(2, "Nationality must be at least 2 characters"),
+				z.null(),
+			])
+			.optional(),
+		notes: z.string().max(500).optional().nullable(),
+		countryCode: z.string().optional().nullable(),
+		economicActivityCode: z.string().optional().nullable(),
+	})
+	.merge(OptionalAddressSchema)
+	.merge(OptionalContactSchema);
+
+const UpdateCommonPhysical = z
+	.object({
+		nationality: z.string().min(2).optional(),
+		notes: z.string().max(500).optional().nullable(),
+		countryCode: z.string().optional().nullable(),
+		economicActivityCode: z.string().optional().nullable(),
+	})
+	.merge(OptionalAddressSchema)
+	.merge(OptionalContactSchema);
+
+// Update schema: only RFC, names, email required; address/phone etc. optional
 export const ClientUpdateSchema = z.discriminatedUnion("personType", [
-	ClientPhysicalBaseSchema.omit({ rfc: true }),
-	ClientMoralBaseSchema.omit({ rfc: true }),
-	ClientTrustBaseSchema.omit({ rfc: true }),
+	UpdateCommonPhysical.merge(MinimalPhysicalDetailsSchema),
+	UpdateCommonBase.merge(MinimalMoralDetailsSchema),
+	UpdateCommonBase.merge(MinimalTrustDetailsSchema),
 ]);
 
 // Patch schema: RFC cannot be changed, so we omit it

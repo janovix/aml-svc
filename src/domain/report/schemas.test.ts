@@ -20,8 +20,8 @@ describe("Report Schemas", () => {
 			expect(ReportTemplateSchema.parse("COMPLIANCE_STATUS")).toBe(
 				"COMPLIANCE_STATUS",
 			);
-			expect(ReportTemplateSchema.parse("TRANSACTION_ANALYSIS")).toBe(
-				"TRANSACTION_ANALYSIS",
+			expect(ReportTemplateSchema.parse("OPERATION_ANALYSIS")).toBe(
+				"OPERATION_ANALYSIS",
 			);
 			expect(ReportTemplateSchema.parse("CLIENT_RISK_PROFILE")).toBe(
 				"CLIENT_RISK_PROFILE",
@@ -75,7 +75,7 @@ describe("Report Schemas", () => {
 	describe("ReportDataSourceSchema", () => {
 		it("should accept valid data sources", () => {
 			expect(ReportDataSourceSchema.parse("ALERTS")).toBe("ALERTS");
-			expect(ReportDataSourceSchema.parse("TRANSACTIONS")).toBe("TRANSACTIONS");
+			expect(ReportDataSourceSchema.parse("OPERATIONS")).toBe("OPERATIONS");
 			expect(ReportDataSourceSchema.parse("CLIENTS")).toBe("CLIENTS");
 		});
 
@@ -108,7 +108,7 @@ describe("Report Schemas", () => {
 				periodType: "QUARTERLY",
 				periodStart: "2024-10-01T00:00:00Z",
 				periodEnd: "2024-12-31T23:59:59Z",
-				dataSources: ["ALERTS", "TRANSACTIONS"],
+				dataSources: ["ALERTS", "OPERATIONS"],
 				notes: "Quarterly executive summary",
 			};
 

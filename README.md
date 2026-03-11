@@ -2,17 +2,17 @@
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/janovix/aml-svc)
 
-KYC/AML core API service built with Hono on Cloudflare Workers, using D1 database and Prisma ORM. This service provides comprehensive client management, transaction tracking, alert detection, and SAT (Mexican tax authority) compliance features.
+KYC/AML core API service built with Hono on Cloudflare Workers, using D1 database and Prisma ORM. This service provides comprehensive client management, operation tracking, alert detection, and SAT (Mexican tax authority) compliance features.
 
 ## Features
 
 - **Client Management**: Complete KYC data management for physical persons, legal entities (moral), and trusts
-- **Transaction Tracking**: Vehicle transaction management (land, marine, air) with UMA value calculations
+- **Operation Tracking**: Vehicle operation management (land, marine, air) with UMA value calculations
 - **Alert System**: Dynamic alert rule engine with SAT file generation and submission tracking
 - **Catalog Management**: Flexible catalog system for countries, states, currencies, vehicle brands, and more
 - **Multi-tenant**: Organization-based data isolation
 - **SAT Compliance**: XML file generation for Mexican tax authority submissions
-- **UMA Values**: Unidad de Medida y Actualización (UMA) value management for transaction calculations
+- **UMA Values**: Unidad de Medida y Actualización (UMA) value management for operation calculations
 
 ## ID Generation System
 
@@ -26,8 +26,8 @@ The service uses a custom ID generation system that produces human-readable, typ
   - `ADR` - Client Address
   - `CAT` - Catalog
   - `CIT` - Catalog Item
-  - `TRN` - Transaction
-  - `PMT` - Transaction Payment Method
+  - `TRN` - Operation (formerly Transaction)
+  - `PMT` - Operation Payment Method
   - `ARL` - Alert Rule
   - `ALT` - Alert
   - `UMA` - UMA Value
@@ -200,7 +200,7 @@ aml-svc/
 ├── src/
 │   ├── domain/           # Domain logic organized by entity
 │   │   ├── client/       # Client management
-│   │   ├── transaction/  # Transaction management
+│   │   ├── operation/    # Operation management
 │   │   ├── alert/        # Alert system
 │   │   ├── catalog/      # Catalog management
 │   │   ├── uma/          # UMA value management
@@ -233,7 +233,7 @@ Once deployed, the API documentation is available at:
 The service uses Prisma with SQLite (D1). Key entities:
 
 - **Client**: KYC data for individuals and entities
-- **Transaction**: Vehicle transactions with payment methods
+- **Operation**: Vehicle operations with payment methods
 - **Alert**: Compliance alerts with SAT submission tracking
 - **AlertRule**: Dynamic alert detection rules
 - **Catalog/CatalogItem**: Flexible catalog system
@@ -287,14 +287,14 @@ Each client has:
 - Contact information and address
 - Documents and addresses (one-to-many relationships)
 
-### Transaction Management
+### Operation Management
 
-Transactions track vehicle operations:
+Operations track vehicle activity:
 
 - **Operation Types**: Purchase or Sale
 - **Vehicle Types**: Land, Marine, or Air
-- **Payment Methods**: Multiple payment methods per transaction
-- **UMA Calculation**: Automatic UMA value calculation based on transaction date
+- **Payment Methods**: Multiple payment methods per operation
+- **UMA Calculation**: Automatic UMA value calculation based on operation date
 
 ### Alert System
 

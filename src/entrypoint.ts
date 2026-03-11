@@ -333,10 +333,10 @@ export class AmlSvcEntrypoint extends WorkerEntrypoint<Bindings> {
 	}
 
 	/**
-	 * Create a transaction (operation) for a client (called by aml-import-worker).
+	 * Create an operation for a client (called by aml-import-worker).
 	 * Delegates to POST /api/v1/internal/operations.
 	 */
-	async createTransaction(
+	async createOperation(
 		organizationId: string,
 		data: unknown,
 	): Promise<{ id: string; [key: string]: unknown }> {
@@ -356,7 +356,7 @@ export class AmlSvcEntrypoint extends WorkerEntrypoint<Bindings> {
 		if (!response.ok) {
 			const error = (await response.json()) as { message?: string };
 			throw new Error(
-				error.message ?? `createTransaction failed: ${response.status}`,
+				error.message ?? `createOperation failed: ${response.status}`,
 			);
 		}
 		return response.json<{ id: string; [key: string]: unknown }>();

@@ -21,7 +21,7 @@ export function mapPrismaOrganizationSettings(
 		organizationId: prisma.organizationId,
 		obligatedSubjectKey: prisma.obligatedSubjectKey,
 		activityKey: prisma.activityKey,
-		selfServiceMode: (prisma.selfServiceMode as SelfServiceMode) ?? "disabled",
+		selfServiceMode: (prisma.selfServiceMode as SelfServiceMode) ?? "automatic",
 		selfServiceExpiryHours: prisma.selfServiceExpiryHours ?? 72,
 		selfServiceRequiredSections,
 		createdAt: prisma.createdAt.toISOString(),

@@ -128,7 +128,7 @@ operationsRouter.get("/", async (c) => {
 /**
  * GET /operations/stats
  * Get summary statistics for operations in the organization.
- * Returns the API contract shape: transactionsToday, suspiciousTransactions, totalVolume,
+ * Returns the API contract shape: operationsToday, suspiciousOperations, totalVolume,
  * plus optional completeCount and incompleteCount for the operations page.
  * IMPORTANT: must be defined before /:id to avoid "stats" being matched as an id.
  */
@@ -137,7 +137,7 @@ operationsRouter.get("/stats", async (c) => {
 	const service = getService(c);
 	const prisma = getPrismaClient(c.env.DB);
 
-	const [rawStats, suspiciousTransactions, completeCount, incompleteCount] =
+	const [rawStats, suspiciousOperations, completeCount, incompleteCount] =
 		await Promise.all([
 			service.getStats(organizationId).catch(handleServiceError),
 			prisma.alert.count({
@@ -163,15 +163,17 @@ operationsRouter.get("/stats", async (c) => {
 		]);
 
 	const body: {
-		transactionsToday: number;
-		suspiciousTransactions: number;
+		operationsToday: number;
+		suspiciousOperations: number;
 		totalVolume: string;
+		totalOperations: number;
 		completeCount?: number;
 		incompleteCount?: number;
 	} = {
-		transactionsToday: rawStats.operationsToday,
-		suspiciousTransactions,
+		operationsToday: rawStats.operationsToday,
+		suspiciousOperations,
 		totalVolume: rawStats.totalAmountMxn,
+		totalOperations: rawStats.totalOperations,
 		completeCount,
 		incompleteCount,
 	};
@@ -405,7 +407,7 @@ operationsRouter.get("/activities/:code/fields", async (c) => {
 			},
 			{
 				name: "blockchainTxHash",
-				label: "Transaction hash",
+				label: "Operation hash",
 				type: "string",
 				required: false,
 				cfdiExtractable: true,

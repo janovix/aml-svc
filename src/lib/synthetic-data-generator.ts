@@ -571,7 +571,7 @@ export class SyntheticDataGenerator {
 			result.clients = clientResult;
 		}
 
-		// Generate operations if requested (or use legacy transactions option)
+		// Generate operations if requested (or use deprecated transactions option)
 		const operationsConfig = options.operations || options.transactions;
 		if (operationsConfig && operationsConfig.count > 0) {
 			// If we have clients, use them; otherwise generate new ones
@@ -582,7 +582,7 @@ export class SyntheticDataGenerator {
 							operationsConfig.perClient || 1,
 						);
 
-			// Get activity code - default to VEH if using legacy transactions option
+			// Get activity code - default to VEH if using deprecated transactions option
 			const activityCode: string = options.operations?.activityCode ?? "VEH";
 
 			const skipClients = options.operations?.skipClients ?? 3;
