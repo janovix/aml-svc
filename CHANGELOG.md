@@ -1,3 +1,10 @@
+# [1.9.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.4...v1.9.0-rc.5) (2026-03-11)
+
+
+### Bug Fixes
+
+* allow empty document number in self-service schema ([1b3bea8](https://github.com/janovix/aml-svc/commit/1b3bea813738be4b080aab67aff275c75275ff35))
+
 # [1.9.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.3...v1.9.0-rc.4) (2026-03-10)
 
 
