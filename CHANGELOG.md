@@ -1,3 +1,10 @@
+# [1.9.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.6...v1.9.0-rc.7) (2026-03-11)
+
+
+### Features
+
+* update operations stats endpoint to include completeCount and incompleteCount ([61e9380](https://github.com/janovix/aml-svc/commit/61e938060ecb793aa6c46998d672a0afe009542b))
+
 # [1.9.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.5...v1.9.0-rc.6) (2026-03-11)
 
 
