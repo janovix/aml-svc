@@ -1,3 +1,10 @@
+# [1.9.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.5...v1.9.0-rc.6) (2026-03-11)
+
+
+### Features
+
+* enhance KYC progress calculation with new section fields and tests ([22de57c](https://github.com/janovix/aml-svc/commit/22de57c9611e6dd04ad26a7af75850bf3604ef06))
+
 # [1.9.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.4...v1.9.0-rc.5) (2026-03-11)
 
 
