@@ -159,7 +159,8 @@ export const selfServiceDocumentSchema = z.object({
 		"CORPORATE_BYLAWS",
 		"OTHER",
 	]),
-	documentNumber: z.string().min(1).max(100),
+	// Empty string allowed: document number is often filled later or N/A for some types (e.g. ACTA_CONSTITUTIVA)
+	documentNumber: z.string().max(100),
 	issuingCountry: z.string().max(10).optional().nullable(),
 	issueDate: dateOnlyString.optional().nullable(),
 	expiryDate: dateOnlyString.optional().nullable(),
