@@ -108,4 +108,87 @@ describe("recalculateKycProgress", () => {
 		};
 		expect(updateCall.data.documentsComplete).toBe(1);
 	});
+
+	it("returns kycCompletionPct 100 when PHYSICAL client has all sections complete", async () => {
+		const fullPhysical = {
+			...BASE_CLIENT,
+			personType: "PHYSICAL" as PersonType,
+			secondLastName: "López",
+			birthDate: "1990-01-15",
+			curp: "PELJ900115HDFRRN01",
+			nationality: "MX",
+			countryCode: "MX",
+			economicActivityCode: "123",
+			gender: "M",
+			occupation: "Engineer",
+			maritalStatus: "single",
+			sourceOfFunds: "employment",
+			screeningResult: "clear",
+			screenedAt: new Date("2025-01-01"),
+			documents: [
+				{ documentType: "NATIONAL_ID" },
+				{ documentType: "PROOF_OF_ADDRESS" },
+				{ documentType: "TAX_ID" },
+			],
+		};
+		const prisma = makeMockPrisma(fullPhysical);
+		await recalculateKycProgress(prisma, "c-1");
+		const updateCall = vi.mocked(prisma.client.update).mock.calls[0][0] as {
+			data: { kycCompletionPct: number };
+		};
+		expect(updateCall.data.kycCompletionPct).toBe(100);
+	});
+
+	it("returns kycCompletionPct 100 when MORAL client has all sections complete", async () => {
+		const fullMoral = {
+			...BASE_CLIENT,
+			personType: "MORAL" as PersonType,
+			firstName: null,
+			lastName: null,
+			businessName: "Empresa SA de CV",
+			incorporationDate: "2020-06-01",
+			countryCode: "MX",
+			economicActivityCode: "456",
+			screeningResult: "clear",
+			screenedAt: new Date("2025-01-01"),
+			documents: [
+				{ documentType: "ACTA_CONSTITUTIVA" },
+				{ documentType: "PODER_NOTARIAL" },
+				{ documentType: "TAX_ID" },
+				{ documentType: "PROOF_OF_ADDRESS" },
+			],
+			beneficialControllers: [{ id: "bc-1" }],
+		};
+		const prisma = makeMockPrisma(fullMoral);
+		await recalculateKycProgress(prisma, "c-1");
+		const updateCall = vi.mocked(prisma.client.update).mock.calls[0][0] as {
+			data: { kycCompletionPct: number };
+		};
+		expect(updateCall.data.kycCompletionPct).toBe(100);
+	});
+
+	it("returns partial kycCompletionPct when PHYSICAL client has only some sections filled", async () => {
+		const partialPhysical = {
+			...BASE_CLIENT,
+			secondLastName: null,
+			birthDate: null,
+			curp: null,
+			nationality: null,
+			economicActivityCode: null,
+			gender: null,
+			occupation: null,
+			maritalStatus: null,
+			sourceOfFunds: null,
+			screeningResult: null,
+			screenedAt: null,
+			documents: [],
+		};
+		const prisma = makeMockPrisma(partialPhysical);
+		await recalculateKycProgress(prisma, "c-1");
+		const updateCall = vi.mocked(prisma.client.update).mock.calls[0][0] as {
+			data: { kycCompletionPct: number };
+		};
+		expect(updateCall.data.kycCompletionPct).toBeGreaterThan(0);
+		expect(updateCall.data.kycCompletionPct).toBeLessThan(100);
+	});
 });
