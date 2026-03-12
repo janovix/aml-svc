@@ -1,3 +1,10 @@
+# [1.9.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.7...v1.9.0-rc.8) (2026-03-12)
+
+
+### Features
+
+* enhance RFC and CURP generation functions with new name-letter helpers and state code mapping ([e1a7c9b](https://github.com/janovix/aml-svc/commit/e1a7c9b97f10467f234a531dcac9243007fb8b8f))
+
 # [1.9.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.6...v1.9.0-rc.7) (2026-03-11)
 
 
