@@ -230,6 +230,7 @@ publicKycRouter.get("/:token", async (c) => {
 			identificationTier: session.identificationTier,
 			thresholdAmountMxn: session.thresholdAmountMxn,
 			completedSections: session.completedSections,
+			organizationId: session.organizationId,
 		},
 		client: { ...safeClient, documents: safeDocuments },
 		organization: orgBranding,
