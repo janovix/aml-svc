@@ -1,3 +1,10 @@
+# [1.9.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.9...v1.9.0-rc.10) (2026-03-12)
+
+
+### Features
+
+* update watchlist screening threshold and user identification for CSV imports ([1878b0a](https://github.com/janovix/aml-svc/commit/1878b0a1e7a29f978f87df23e2b5ad43aa1ecbab))
+
 # [1.9.0-rc.9](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.8...v1.9.0-rc.9) (2026-03-12)
 
 
