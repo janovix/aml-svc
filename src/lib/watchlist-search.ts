@@ -101,7 +101,7 @@ export class WatchlistSearchService {
 					identifiers,
 					countries,
 					topK: 50,
-					threshold: 0.7,
+					threshold: 0.875,
 				},
 				organizationId,
 				userId,

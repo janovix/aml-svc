@@ -853,7 +853,8 @@ clientsInternalRouter.post("/", async (c) => {
 		const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 		await alertQueue.queueClientCreated(created.id);
 
-		// Trigger watchlist screening (non-blocking) — mirrors the public POST /clients
+		// Trigger watchlist screening (non-blocking) — CSV import: use csv_import + user who triggered import
+		const importUserId = c.req.header("X-User-Id") ?? "import-worker";
 		const watchlistSearch = createWatchlistSearchService(
 			c.env.WATCHLIST_SERVICE,
 		);
@@ -866,8 +867,8 @@ clientsInternalRouter.post("/", async (c) => {
 						entityType:
 							created.personType === "physical" ? "person" : "organization",
 						organizationId,
-						userId: "import-worker",
-						source: "import",
+						userId: importUserId,
+						source: "csv_import",
 						birthDate: created.birthDate || undefined,
 						identifiers: created.rfc ? [created.rfc] : undefined,
 						countries: created.nationality ? [created.nationality] : undefined,
