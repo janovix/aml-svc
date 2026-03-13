@@ -25,6 +25,7 @@ import type {
 	ImportWithResults,
 	ListResultWithMeta,
 	ImportRowStatus,
+	ColumnMapping,
 } from "./types";
 import type { ListResult } from "../../lib/list-result";
 import {
@@ -238,6 +239,27 @@ export class ImportRepository {
 			data,
 		});
 
+		return mapPrismaImport(updated);
+	}
+
+	/**
+	 * Update column mapping for an import (org-scoped).
+	 */
+	async updateColumnMapping(
+		importId: string,
+		organizationId: string,
+		columnMapping: ColumnMapping,
+	): Promise<ImportEntity> {
+		const existing = await this.prisma.import.findFirst({
+			where: { id: importId, organizationId },
+		});
+		if (!existing) {
+			throw new Error("IMPORT_NOT_FOUND");
+		}
+		const updated = await this.prisma.import.update({
+			where: { id: importId },
+			data: { columnMapping: columnMapping as Prisma.InputJsonValue },
+		});
 		return mapPrismaImport(updated);
 	}
 

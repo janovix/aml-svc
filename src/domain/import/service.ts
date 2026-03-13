@@ -20,6 +20,7 @@ import type {
 	ImportRowStatus,
 	ImportJob,
 } from "./types";
+import type { ImportStartInput } from "./schemas";
 
 export class ImportService {
 	constructor(private readonly repository: ImportRepository) {}
@@ -90,6 +91,36 @@ export class ImportService {
 		};
 
 		return { import: importRecord, job };
+	}
+
+	/**
+	 * Start import: persist column mapping and return job payload for the queue.
+	 * Caller (route) must send the job to IMPORT_PROCESSING_QUEUE.
+	 */
+	async startImport(
+		organizationId: string,
+		importId: string,
+		input: ImportStartInput,
+	): Promise<{ import: ImportEntity; job: ImportJob }> {
+		const importRecord = await this.get(organizationId, importId);
+		if (importRecord.status !== "PENDING") {
+			throw new Error("IMPORT_NOT_PENDING");
+		}
+		const updated = await this.repository.updateColumnMapping(
+			importId,
+			organizationId,
+			input.columnMapping,
+		);
+		const job: ImportJob = {
+			importId: updated.id,
+			organizationId,
+			entityType: updated.entityType,
+			activityCode: updated.activityCode ?? undefined,
+			fileUrl: updated.fileUrl,
+			createdBy: updated.createdBy,
+			columnMapping: input.columnMapping,
+		};
+		return { import: updated, job };
 	}
 
 	/**

@@ -1515,6 +1515,7 @@ model Import {
   errorCount     Int              @default(0) @map("error_count")
   skippedCount   Int              @default(0) @map("skipped_count")
   errorMessage   String?          @map("error_message")
+  columnMapping  Json?            @map("column_mapping")
   createdBy      String           @map("created_by")
   startedAt      DateTime?        @map("started_at")
   completedAt    DateTime?        @map("completed_at")

@@ -19,8 +19,10 @@ import {
 	ImportProgressUpdateSchema,
 	ImportStatusUpdateSchema,
 	ImportBulkRowCreateSchema,
+	ImportStartSchema,
 	type ImportEntity,
 } from "../domain/import";
+import { parseCsvPreview } from "../lib/csv";
 import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
 import {
@@ -33,6 +35,7 @@ import { generateImportFileKey } from "../lib/r2-upload";
 import { APIError } from "../middleware/error";
 import {
 	getActivityColumns,
+	getRequiredColumns,
 	ACTIVITY_EXTENSION_COLUMNS,
 	type ActivityCode,
 } from "../domain/import/template-columns";
@@ -354,6 +357,9 @@ function handleServiceError(error: unknown): never {
 		if (error.message === "IMPORT_NOT_FOUND") {
 			throw new APIError(404, "Import not found");
 		}
+		if (error.message === "IMPORT_NOT_PENDING") {
+			throw new APIError(400, "Import has already started or completed");
+		}
 	}
 	throw error;
 }
@@ -377,6 +383,136 @@ importsRouter.get("/", async (c) => {
 		.catch(handleServiceError);
 
 	return c.json(result);
+});
+
+/** Target field options for column mapping (value, label, required) */
+const CLIENT_TARGET_FIELDS: {
+	value: string;
+	label: string;
+	required: boolean;
+}[] = [
+	{ value: "person_type", label: "Person type", required: true },
+	{ value: "rfc", label: "RFC", required: true },
+	{ value: "first_name", label: "First name", required: false },
+	{ value: "last_name", label: "Last name", required: false },
+	{ value: "second_last_name", label: "Second last name", required: false },
+	{ value: "birth_date", label: "Birth date", required: false },
+	{ value: "curp", label: "CURP", required: false },
+	{ value: "business_name", label: "Business name", required: false },
+	{ value: "incorporation_date", label: "Incorporation date", required: false },
+	{ value: "nationality", label: "Nationality", required: false },
+	{ value: "email", label: "Email", required: true },
+	{ value: "phone", label: "Phone", required: false },
+	{ value: "country", label: "Country", required: false },
+	{ value: "state_code", label: "State code", required: false },
+	{ value: "city", label: "City", required: false },
+	{ value: "municipality", label: "Municipality", required: false },
+	{ value: "neighborhood", label: "Neighborhood", required: false },
+	{ value: "street", label: "Street", required: false },
+	{ value: "external_number", label: "External number", required: false },
+	{ value: "internal_number", label: "Internal number", required: false },
+	{ value: "postal_code", label: "Postal code", required: false },
+	{ value: "reference", label: "Reference", required: false },
+	{ value: "notes", label: "Notes", required: false },
+	{ value: "country_code", label: "Country code", required: false },
+	{
+		value: "economic_activity_code",
+		label: "Economic activity code",
+		required: false,
+	},
+	{ value: "gender", label: "Gender", required: false },
+	{ value: "occupation", label: "Occupation", required: false },
+	{ value: "marital_status", label: "Marital status", required: false },
+	{ value: "source_of_funds", label: "Source of funds", required: false },
+	{ value: "source_of_wealth", label: "Source of wealth", required: false },
+];
+
+/**
+ * GET /imports/target-fields
+ * List target fields for column mapping (entityType + activityCode for operations)
+ */
+importsRouter.get("/target-fields", async (c) => {
+	const entityType = c.req.query("entityType");
+	const activityCode = c.req.query("activityCode");
+
+	if (!entityType || (entityType !== "CLIENT" && entityType !== "OPERATION")) {
+		throw new APIError(
+			400,
+			"entityType is required and must be CLIENT or OPERATION",
+		);
+	}
+	if (entityType === "OPERATION" && !activityCode) {
+		throw new APIError(
+			400,
+			"activityCode is required when entityType is OPERATION",
+		);
+	}
+
+	if (entityType === "CLIENT") {
+		return c.json({ fields: CLIENT_TARGET_FIELDS });
+	}
+
+	const act = activityCode!.toUpperCase() as ActivityCode;
+	if (!ACTIVITY_EXTENSION_COLUMNS[act]) {
+		throw new APIError(400, `Invalid activity code: ${activityCode}`);
+	}
+	const columns = getActivityColumns(act);
+	const requiredSet = new Set(getRequiredColumns(act));
+	const fields = columns.map((value) => ({
+		value,
+		label: value.replace(/_/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase()),
+		required: requiredSet.has(value),
+	}));
+	return c.json({ fields });
+});
+
+/**
+ * GET /imports/:id/preview
+ * CSV headers + sample rows for column mapping (PENDING imports only)
+ */
+importsRouter.get("/:id/preview", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const params = parseWithZod(ImportIdParamSchema, c.req.param());
+	const service = getService(c);
+	const importRecord = await service
+		.get(organizationId, params.id)
+		.catch(handleServiceError);
+	if (importRecord.status !== "PENDING") {
+		throw new APIError(
+			400,
+			"Preview is only available for imports that have not started",
+		);
+	}
+	if (!c.env.R2_BUCKET) {
+		throw new APIError(503, "File storage not configured");
+	}
+	const object = await c.env.R2_BUCKET.get(importRecord.fileUrl);
+	if (!object) {
+		throw new APIError(404, "Import file not found");
+	}
+	const arrayBuffer = await object.arrayBuffer();
+	const text = new TextDecoder("utf-8").decode(arrayBuffer);
+	const { headers, sampleRows } = parseCsvPreview(text, 5);
+	return c.json({ headers, sampleRows });
+});
+
+/**
+ * POST /imports/:id/start
+ * Save column mapping and send job to queue to start processing
+ */
+importsRouter.post("/:id/start", async (c) => {
+	const organizationId = getOrganizationId(c);
+	const params = parseWithZod(ImportIdParamSchema, c.req.param());
+	const body = await c.req.json();
+	const input = parseWithZod(ImportStartSchema, body);
+	const service = getService(c);
+	const { import: importRecord, job } = await service
+		.startImport(organizationId, params.id, input)
+		.catch(handleServiceError);
+	if (c.env.IMPORT_PROCESSING_QUEUE) {
+		await c.env.IMPORT_PROCESSING_QUEUE.send(job);
+	}
+	return c.json({ success: true, data: importRecord });
 });
 
 /**
@@ -499,19 +635,14 @@ importsRouter.post("/", async (c) => {
 		},
 	});
 
-	// Create import record
+	// Create import record (do not send job yet; user will map columns then start)
 	const service = getService(c);
-	const { import: importRecord, job } = await service.create(
+	const { import: importRecord } = await service.create(
 		organizationId,
 		user.id,
 		input,
 		fileKey,
 	);
-
-	// Queue the import job
-	if (c.env.IMPORT_PROCESSING_QUEUE) {
-		await c.env.IMPORT_PROCESSING_QUEUE.send(job);
-	}
 
 	return c.json(
 		{

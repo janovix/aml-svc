@@ -31,6 +31,7 @@ describe("Import Mappers", () => {
 				completedAt: null,
 				createdAt: new Date("2025-01-15T09:00:00Z"),
 				updatedAt: new Date("2025-01-15T10:30:00Z"),
+				columnMapping: null,
 			};
 
 			const result = mapPrismaImport(prismaImport);

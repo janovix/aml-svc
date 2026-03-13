@@ -45,6 +45,7 @@ describe("ImportService", () => {
 		startedAt: null,
 		completedAt: null,
 		errorMessage: null,
+		columnMapping: null,
 	};
 
 	beforeEach(() => {

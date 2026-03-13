@@ -15,6 +15,7 @@ export type {
 	ListResult,
 	ImportProgressUpdate,
 	ImportJob,
+	ColumnMapping,
 	ImportSSEEventType,
 	ImportSSEEvent,
 } from "./types";

@@ -14,7 +14,18 @@ import type {
 	ImportEntityType,
 	ImportStatus,
 	ImportRowStatus,
+	ColumnMapping,
 } from "./types";
+
+function parseColumnMapping(value: unknown): ColumnMapping | null {
+	if (value == null) return null;
+	if (typeof value !== "object" || Array.isArray(value)) return null;
+	const obj = value as Record<string, unknown>;
+	for (const k of Object.keys(obj)) {
+		if (typeof obj[k] !== "string") return null;
+	}
+	return obj as ColumnMapping;
+}
 
 /**
  * Maps Prisma Import to domain ImportEntity
@@ -36,6 +47,7 @@ export function mapPrismaImport(prisma: PrismaImport): ImportEntity {
 		errorCount: prisma.errorCount,
 		skippedCount: prisma.skippedCount,
 		errorMessage: prisma.errorMessage,
+		columnMapping: parseColumnMapping(prisma.columnMapping),
 		createdBy: prisma.createdBy,
 		startedAt: prisma.startedAt?.toISOString() ?? null,
 		completedAt: prisma.completedAt?.toISOString() ?? null,
