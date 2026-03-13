@@ -1,3 +1,10 @@
+# [1.9.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.10...v1.9.0-rc.11) (2026-03-13)
+
+
+### Features
+
+* add column mapping support to import functionality ([1232ec6](https://github.com/janovix/aml-svc/commit/1232ec65d5ef648df43f1a7e526bb3186a4cd42d))
+
 # [1.9.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.9...v1.9.0-rc.10) (2026-03-12)
 
 
