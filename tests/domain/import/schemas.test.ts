@@ -7,6 +7,8 @@ import {
 	ImportStatusUpdateSchema,
 	ImportBulkRowCreateSchema,
 	ImportIdParamSchema,
+	ColumnMappingSchema,
+	ImportStartSchema,
 } from "../../../src/domain/import/schemas";
 
 describe("Import Schemas", () => {
@@ -225,6 +227,49 @@ describe("Import Schemas", () => {
 		it("should reject row with invalid row number", () => {
 			const result = ImportBulkRowCreateSchema.safeParse({
 				rows: [{ rowNumber: 0, rawData: "{}" }],
+			});
+			expect(result.success).toBe(false);
+		});
+	});
+
+	describe("ColumnMappingSchema", () => {
+		it("should accept non-empty record of string to string", () => {
+			const result = ColumnMappingSchema.safeParse({
+				"CSV Col": "name",
+				RFC: "rfc",
+			});
+			expect(result.success).toBe(true);
+		});
+
+		it("should reject empty object (refine: at least one column)", () => {
+			const result = ColumnMappingSchema.safeParse({});
+			expect(result.success).toBe(false);
+			if (!result.success) {
+				expect(
+					result.error.issues.some((i) =>
+						i.message?.includes("At least one column"),
+					),
+				).toBe(true);
+			}
+		});
+
+		it("should reject empty string values", () => {
+			const result = ColumnMappingSchema.safeParse({ A: "" });
+			expect(result.success).toBe(false);
+		});
+	});
+
+	describe("ImportStartSchema", () => {
+		it("should accept valid column mapping", () => {
+			const result = ImportStartSchema.safeParse({
+				columnMapping: { "Col A": "name", "Col B": "rfc" },
+			});
+			expect(result.success).toBe(true);
+		});
+
+		it("should reject empty column mapping", () => {
+			const result = ImportStartSchema.safeParse({
+				columnMapping: {},
 			});
 			expect(result.success).toBe(false);
 		});
