@@ -1,3 +1,10 @@
+# [1.9.0-rc.12](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.11...v1.9.0-rc.12) (2026-03-13)
+
+
+### Features
+
+* enhance generate.mjs to support column mapping with alternate headers for testing ([5e68050](https://github.com/janovix/aml-svc/commit/5e6805066363a77127d2f119fc5714bd704bb676))
+
 # [1.9.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.10...v1.9.0-rc.11) (2026-03-13)
 
 
