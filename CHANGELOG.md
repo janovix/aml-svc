@@ -1,3 +1,10 @@
+# [1.9.0-rc.13](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.12...v1.9.0-rc.13) (2026-03-13)
+
+
+### Features
+
+* add tests for column mapping and import functionality ([16b3129](https://github.com/janovix/aml-svc/commit/16b3129cd445b268e81d3ded7b9c0fc221501a32))
+
 # [1.9.0-rc.12](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.11...v1.9.0-rc.12) (2026-03-13)
 
 
