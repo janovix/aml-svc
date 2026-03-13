@@ -20,7 +20,12 @@
  *   - Profile mismatch — amount >> average (profile_mismatch seeker)
  *   - Activity-specific extras (minor, new-client, multiple cards, etc.)
  *
- * Usage: node generate.mjs
+ * Usage: node generate.mjs [--for-mapping]
+ *
+ *   --for-mapping   Also write CSVs with alternate column headers (e.g. Spanish)
+ *                   into output/column-mapping/ for testing the column-mapping
+ *                   import UI. Same row data; headers use aliases so users can
+ *                   map "Nombre" -> first_name, "Monto" -> amount, etc.
  */
 
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -31,6 +36,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const OUT = join(__dirname, "output");
 mkdirSync(OUT, { recursive: true });
+
+const FOR_MAPPING = process.argv.includes("--for-mapping");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // THRESHOLDS  (UMA units; null = ALWAYS — every operation triggers that level)
@@ -918,6 +925,126 @@ function write(filename, headers, rows) {
 	writeFileSync(path, toCsv(headers, rows), "utf-8");
 	console.log(`  ✓ ${filename}  (${rows.length} rows)`);
 }
+
+/**
+ * Write CSV with alternate headers (for column-mapping UI tests).
+ * canonicalHeaders: array of target property keys (e.g. first_name, rfc).
+ * aliasMap: object canonicalKey -> display header (e.g. { first_name: "Nombre" }).
+ * rows: array of objects keyed by canonical keys.
+ */
+function toCsvWithAliases(canonicalHeaders, aliasMap, rows) {
+	const headerLine = canonicalHeaders
+		.map((h) => csvCell(aliasMap[h] ?? h))
+		.join(",");
+	const lines = [headerLine];
+	for (const row of rows) {
+		lines.push(canonicalHeaders.map((h) => csvCell(row[h] ?? "")).join(","));
+	}
+	return lines.join("\r\n") + "\r\n";
+}
+
+function writeForMapping(dir, filename, canonicalHeaders, aliasMap, rows) {
+	const path = join(dir, filename);
+	writeFileSync(
+		path,
+		toCsvWithAliases(canonicalHeaders, aliasMap, rows),
+		"utf-8",
+	);
+	console.log(`  ✓ column-mapping/${filename}  (${rows.length} rows)`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COLUMN MAPPING ALIASES (alternate headers for --for-mapping)
+// Same data; headers use Spanish/alternate names so mapper can be tested.
+// ─────────────────────────────────────────────────────────────────────────────
+const CLIENT_HEADER_ALIASES = {
+	person_type: "Tipo de persona",
+	rfc: "RFC",
+	first_name: "Nombre",
+	last_name: "Apellido paterno",
+	second_last_name: "Apellido materno",
+	birth_date: "Fecha de nacimiento",
+	curp: "CURP",
+	business_name: "Razón social",
+	incorporation_date: "Fecha de constitución",
+	nationality: "Nacionalidad",
+	email: "Correo electrónico",
+	phone: "Teléfono",
+	country: "País",
+	state_code: "Estado",
+	city: "Ciudad",
+	municipality: "Municipio",
+	neighborhood: "Colonia",
+	street: "Calle",
+	external_number: "Número exterior",
+	internal_number: "Número interior",
+	postal_code: "Código postal",
+	reference: "Referencia",
+	notes: "Notas",
+	country_code: "Código país",
+	economic_activity_code: "Actividad económica",
+	gender: "Género",
+	occupation: "Ocupación",
+	marital_status: "Estado civil",
+	source_of_funds: "Origen de fondos",
+	source_of_wealth: "Origen de riqueza",
+};
+
+// Core operation + payment columns (shared)
+const OP_HEADER_ALIASES_CORE = {
+	client_rfc: "RFC del cliente",
+	operation_date: "Fecha de operación",
+	operation_type_code: "Tipo de operación",
+	branch_postal_code: "CP sucursal",
+	amount: "Monto",
+	currency: "Moneda",
+	exchange_rate: "Tipo de cambio",
+	alert_type_code: "Tipo de alerta",
+	reference_number: "Número de referencia",
+	notes: "Notas",
+	payment_date_1: "Fecha pago 1",
+	payment_form_code_1: "Forma de pago 1",
+	payment_amount_1: "Monto pago 1",
+	payment_currency_1: "Moneda pago 1",
+	payment_exchange_rate_1: "Tipo cambio pago 1",
+	payment_date_2: "Fecha pago 2",
+	payment_form_code_2: "Forma de pago 2",
+	payment_amount_2: "Monto pago 2",
+	payment_currency_2: "Moneda pago 2",
+	payment_exchange_rate_2: "Tipo cambio pago 2",
+	payment_date_3: "Fecha pago 3",
+	payment_form_code_3: "Forma de pago 3",
+	payment_amount_3: "Monto pago 3",
+	payment_currency_3: "Moneda pago 3",
+	payment_exchange_rate_3: "Tipo cambio pago 3",
+	payment_date_4: "Fecha pago 4",
+	payment_form_code_4: "Forma de pago 4",
+	payment_amount_4: "Monto pago 4",
+	payment_currency_4: "Moneda pago 4",
+	payment_exchange_rate_4: "Tipo cambio pago 4",
+	payment_date_5: "Fecha pago 5",
+	payment_form_code_5: "Forma de pago 5",
+	payment_amount_5: "Monto pago 5",
+	payment_currency_5: "Moneda pago 5",
+	payment_exchange_rate_5: "Tipo cambio pago 5",
+};
+
+const OP_HEADER_ALIASES_VEH = {
+	...OP_HEADER_ALIASES_CORE,
+	vehicle_type: "Tipo de vehículo",
+	brand: "Marca",
+	model: "Modelo",
+	year: "Año",
+	vin: "VIN",
+	repuve: "REPUVE",
+	plates: "Placas",
+	serial_number: "Número de serie",
+	flag_country_code: "País bandera",
+	registration_number: "Número de registro",
+	armor_level_code: "Nivel de blindaje",
+	engine_number: "Número de motor",
+	description: "Descripción",
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CLIENT CSV
@@ -2458,6 +2585,29 @@ for (const [act, gen] of Object.entries(GENERATORS)) {
 	totalOps += allRows.length;
 
 	write(`operations_${act.toLowerCase()}.csv`, opHeaders(act), allRows);
+}
+
+// Column-mapping test files: same data, alternate headers (e.g. Spanish)
+if (FOR_MAPPING) {
+	const mappingOut = join(OUT, "column-mapping");
+	mkdirSync(mappingOut, { recursive: true });
+	console.log("\n  Column-mapping test files:");
+	writeForMapping(
+		mappingOut,
+		"clients_for_mapping.csv",
+		CLIENT_HEADERS,
+		CLIENT_HEADER_ALIASES,
+		CLIENT_ROWS,
+	);
+	const vehScenarioRows = GENERATORS.VEH();
+	const vehCoverageRows = generateCoverageRows("VEH");
+	writeForMapping(
+		mappingOut,
+		"operations_veh_for_mapping.csv",
+		opHeaders("VEH"),
+		OP_HEADER_ALIASES_VEH,
+		[...vehScenarioRows, ...vehCoverageRows],
+	);
 }
 
 console.log("\n═══════════════════════════════════════════════════════════");
