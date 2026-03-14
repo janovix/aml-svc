@@ -1,3 +1,10 @@
+# [1.9.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.13...v1.9.0-rc.14) (2026-03-14)
+
+
+### Bug Fixes
+
+* convert names to uppercase in generate.mjs for consistency in test data generation ([1c38ba5](https://github.com/janovix/aml-svc/commit/1c38ba5a11860680b54163b44e3297b5565bd667))
+
 # [1.9.0-rc.13](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.12...v1.9.0-rc.13) (2026-03-13)
 
 
