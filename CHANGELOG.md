@@ -1,3 +1,10 @@
+# [1.9.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.14...v1.9.0-rc.15) (2026-03-18)
+
+
+### Bug Fixes
+
+* update terminology and improve error handling in import and synthetic data generation ([2e92fcf](https://github.com/janovix/aml-svc/commit/2e92fcffcc552cdc76b1b6efeb80bae823b5f945))
+
 # [1.9.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.13...v1.9.0-rc.14) (2026-03-14)
 
 
