@@ -11,14 +11,12 @@
  * Environment Variables:
  *   USER_ID - User ID for which to generate data (required)
  *   ORGANIZATION_ID - Organization ID for which to generate data (required)
- *   MODELS - Comma-separated list of models: clients,operations (preferred) or clients,transactions (deprecated)
+ *   MODELS - Comma-separated list of models: clients,operations
  *   CLIENTS_COUNT - Number of clients to generate (default: 10)
  *   CLIENTS_INCLUDE_DOCUMENTS - Include documents for clients (default: false)
  *   CLIENTS_INCLUDE_ADDRESSES - Include addresses for clients (default: false)
  *   OPERATIONS_COUNT - Number of operations to generate (default: 0; use with MODELS=clients,operations)
  *   OPERATIONS_PER_CLIENT - Number of operations per client (optional)
- *   TRANSACTIONS_COUNT - (Deprecated) Use OPERATIONS_COUNT. Number of operations to generate (default: 0)
- *   TRANSACTIONS_PER_CLIENT - (Deprecated) Use OPERATIONS_PER_CLIENT. Operations per client (optional)
  *   WRANGLER_CONFIG - Wrangler config file (optional, auto-detected based on environment)
  *   CLOUDFLARE_API_TOKEN - Cloudflare API token for D1 access (required for remote)
  *   CLOUDFLARE_ACCOUNT_ID - Cloudflare account ID (required for remote)
@@ -41,15 +39,10 @@ const clientsIncludeDocuments =
 const clientsIncludeAddresses =
 	process.env.CLIENTS_INCLUDE_ADDRESSES === "true";
 // Default 0 — the generator auto-adjusts to ensure every client has at least one operation
-const operationsCount = parseInt(
-	process.env.OPERATIONS_COUNT || process.env.TRANSACTIONS_COUNT || "0",
-	10,
-);
+const operationsCount = parseInt(process.env.OPERATIONS_COUNT || "0", 10);
 const operationsPerClient = process.env.OPERATIONS_PER_CLIENT
 	? parseInt(process.env.OPERATIONS_PER_CLIENT, 10)
-	: process.env.TRANSACTIONS_PER_CLIENT
-		? parseInt(process.env.TRANSACTIONS_PER_CLIENT, 10)
-		: undefined;
+	: undefined;
 let wranglerConfigFile = process.env.WRANGLER_CONFIG;
 if (!wranglerConfigFile) {
 	if (
@@ -84,7 +77,7 @@ if (!modelsStr) {
 }
 
 const models = modelsStr.split(",").map((m) => m.trim().toLowerCase());
-const validModels = ["clients", "operations", "transactions"]; // "transactions" deprecated
+const validModels = ["clients", "operations"];
 const invalidModels = models.filter((m) => !validModels.includes(m));
 
 if (invalidModels.length > 0) {
@@ -428,16 +421,6 @@ async function generateSyntheticData() {
 		};
 		console.log(
 			`   Operations: ${operationsCount}${operationsPerClient ? ` (${operationsPerClient} per client)` : ""}`,
-		);
-	}
-	if (models.includes("transactions")) {
-		// Deprecated: prefer MODELS=clients,operations
-		options.transactions = {
-			count: operationsCount,
-			perClient: operationsPerClient,
-		};
-		console.log(
-			`   Transactions (deprecated): ${operationsCount}${operationsPerClient ? ` (${operationsPerClient} per client)` : ""}`,
 		);
 	}
 	console.log("");

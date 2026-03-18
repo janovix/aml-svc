@@ -166,11 +166,19 @@ export async function recalculateKycProgress(
 	const uploadedDocTypes = new Set(
 		client.documents.map((d) => d.documentType as string),
 	);
-	const missingDocs = requiredDocTypes.filter((d) => !uploadedDocTypes.has(d));
-	const docsCompleted = requiredDocTypes.length - missingDocs.length;
-	const documentsComplete = missingDocs.length === 0 ? 1 : 0;
-	fieldWeight +=
-		(docsCompleted / requiredDocTypes.length) * SECTION_WEIGHTS.documents;
+	let documentsComplete: 0 | 1;
+	if (requiredDocTypes.length === 0) {
+		documentsComplete = 1;
+		fieldWeight += SECTION_WEIGHTS.documents;
+	} else {
+		const missingDocs = requiredDocTypes.filter(
+			(d) => !uploadedDocTypes.has(d),
+		);
+		const docsCompleted = requiredDocTypes.length - missingDocs.length;
+		documentsComplete = missingDocs.length === 0 ? 1 : 0;
+		fieldWeight +=
+			(docsCompleted / requiredDocTypes.length) * SECTION_WEIGHTS.documents;
+	}
 
 	// 3. BENEFICIAL CONTROLLERS (MORAL/TRUST only)
 	if (client.personType === "MORAL" || client.personType === "TRUST") {

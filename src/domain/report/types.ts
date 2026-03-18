@@ -28,7 +28,7 @@ export type ReportStatus = "DRAFT" | "GENERATED";
 export interface ReportChartConfig {
 	type: ChartType;
 	title: string;
-	dataKey: string; // e.g., "alertsBySeverity", "transactionsByMonth"
+	dataKey: string; // e.g., "alertsBySeverity", "operationsByMonth"
 	showLegend: boolean;
 }
 
@@ -37,8 +37,6 @@ export interface ReportFilters {
 	alertRuleIds?: string[]; // Filter by alert rules
 	alertSeverities?: string[]; // Filter by severity levels
 	activityCodes?: string[]; // Filter by activity code (VEH, INM, etc.)
-	/** @deprecated Use activityCodes instead */
-	transactionTypes?: string[]; // Legacy filter
 	operationTypes?: string[]; // Filter by operation type
 	minAmount?: number; // Minimum operation amount
 	maxAmount?: number; // Maximum operation amount

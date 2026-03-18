@@ -17,10 +17,10 @@ on:
         required: true
         type: string
       models:
-        description: "Models to generate (comma-separated: clients,transactions)"
+        description: "Models to generate (comma-separated: clients,operations)"
         required: true
         type: string
-        default: "clients,transactions"
+        default: "clients,operations"
       clients_count:
         description: "Number of clients to generate"
         required: false
@@ -36,13 +36,13 @@ on:
         required: false
         type: boolean
         default: false
-      transactions_count:
-        description: "Number of transactions to generate"
+      operations_count:
+        description: "Number of operations to generate"
         required: false
         type: number
         default: 50
-      transactions_per_client:
-        description: "Number of transactions per client (optional)"
+      operations_per_client:
+        description: "Number of operations per client (optional)"
         required: false
         type: number
 
@@ -103,8 +103,8 @@ jobs:
           CLIENTS_COUNT: ${{ inputs.clients_count }}
           CLIENTS_INCLUDE_DOCUMENTS: ${{ inputs.clients_include_documents }}
           CLIENTS_INCLUDE_ADDRESSES: ${{ inputs.clients_include_addresses }}
-          TRANSACTIONS_COUNT: ${{ inputs.transactions_count }}
-          TRANSACTIONS_PER_CLIENT: ${{ inputs.transactions_per_client }}
+          OPERATIONS_COUNT: ${{ inputs.operations_count }}
+          OPERATIONS_PER_CLIENT: ${{ inputs.operations_per_client }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_CONFIG: ${{ steps.config.outputs.wrangler_config }}

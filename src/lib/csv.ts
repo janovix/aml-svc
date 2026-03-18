@@ -49,9 +49,17 @@ export function parseCsvPreview(
 	}
 
 	const headerCells = parseCsvLine(lines[0].trim());
-	const headers = headerCells.map(
-		(h) => h.trim() || `column_${headerCells.indexOf(h)}`,
-	);
+	const seen = new Set<string>();
+	const headers = headerCells.map((h, i) => {
+		const name = h.trim() || `column_${i}`;
+		if (seen.has(name)) {
+			const unique = `${name}_${i}`;
+			seen.add(unique);
+			return unique;
+		}
+		seen.add(name);
+		return name;
+	});
 
 	const sampleRows: Record<string, string>[] = [];
 	for (let i = 1; i < lines.length && sampleRows.length < maxSampleRows; i++) {

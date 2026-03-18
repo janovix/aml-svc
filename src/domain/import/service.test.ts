@@ -56,6 +56,7 @@ describe("ImportService", () => {
 			create: vi.fn(),
 			updateStatus: vi.fn(),
 			updateColumnMapping: vi.fn(),
+			updateColumnMappingIfPending: vi.fn(),
 			incrementCounts: vi.fn(),
 			createRowResults: vi.fn(),
 			updateRowResult: vi.fn(),
@@ -235,17 +236,20 @@ describe("ImportService", () => {
 
 	describe("startImport", () => {
 		it("should throw IMPORT_NOT_PENDING when import status is not PENDING", async () => {
-			vi.mocked(mockRepository.getById).mockResolvedValue({
-				...mockImport,
-				status: "PROCESSING",
-			});
+			vi.mocked(mockRepository.updateColumnMappingIfPending).mockResolvedValue(
+				null,
+			);
 
 			await expect(
 				service.startImport(organizationId, mockImport.id, {
 					columnMapping: { "Col A": "name" },
 				}),
 			).rejects.toThrow("IMPORT_NOT_PENDING");
-			expect(mockRepository.updateColumnMapping).not.toHaveBeenCalled();
+			expect(mockRepository.updateColumnMappingIfPending).toHaveBeenCalledWith(
+				mockImport.id,
+				organizationId,
+				{ "Col A": "name" },
+			);
 		});
 
 		it("should persist column mapping and return import and job when status is PENDING", async () => {
@@ -255,8 +259,7 @@ describe("ImportService", () => {
 				columnMapping,
 				fileUrl: "https://example.com/test.csv",
 			};
-			vi.mocked(mockRepository.getById).mockResolvedValue(mockImport);
-			vi.mocked(mockRepository.updateColumnMapping).mockResolvedValue(
+			vi.mocked(mockRepository.updateColumnMappingIfPending).mockResolvedValue(
 				updatedImport,
 			);
 
@@ -274,7 +277,7 @@ describe("ImportService", () => {
 				createdBy: updatedImport.createdBy,
 				columnMapping,
 			});
-			expect(mockRepository.updateColumnMapping).toHaveBeenCalledWith(
+			expect(mockRepository.updateColumnMappingIfPending).toHaveBeenCalledWith(
 				mockImport.id,
 				organizationId,
 				columnMapping,

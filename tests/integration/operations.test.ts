@@ -33,11 +33,19 @@ describe("Operations API", () => {
 		clearJWKSCache();
 
 		const prisma = getPrismaClient(env.DB);
-		await prisma.alert.deleteMany({});
-		await prisma.operationVehicle.deleteMany({});
-		await prisma.operationPayment.deleteMany({});
-		await prisma.operation.deleteMany({});
-		await prisma.client.deleteMany({});
+		await prisma.alert.deleteMany({ where: { organizationId: testOrgId } });
+		await prisma.operationVehicle.deleteMany({
+			where: { operation: { organizationId: testOrgId } },
+		});
+		await prisma.operationPayment.deleteMany({
+			where: { operation: { organizationId: testOrgId } },
+		});
+		await prisma.operation.deleteMany({
+			where: { organizationId: testOrgId },
+		});
+		await prisma.client.deleteMany({
+			where: { organizationId: testOrgId },
+		});
 	});
 
 	afterEach(() => {

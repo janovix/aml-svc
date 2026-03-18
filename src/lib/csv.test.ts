@@ -61,13 +61,14 @@ describe("parseCsvPreview", () => {
 		expect(result.sampleRows).toEqual([{ a: "1" }, { a: "2" }, { a: "3" }]);
 	});
 
-	it("assigns column_N for empty header cells (by first occurrence index)", () => {
+	it("assigns unique column_N for empty header cells and deduplicates headers", () => {
 		const result = parseCsvPreview(",b,\n1,2,3");
-		// Implementation uses headerCells.indexOf(h), so both empty cells get index 0
-		expect(result.headers).toEqual(["column_0", "b", "column_0"]);
+		// Empty at index 0 -> column_0, at index 2 -> column_2; each position gets a distinct key
+		expect(result.headers).toEqual(["column_0", "b", "column_2"]);
 		expect(result.sampleRows[0]).toEqual({
-			column_0: "3", // last key "column_0" wins when building row
+			column_0: "1",
 			b: "2",
+			column_2: "3",
 		});
 	});
 

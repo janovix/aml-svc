@@ -237,7 +237,7 @@ The service uses Prisma with SQLite (D1). Key entities:
 - **Alert**: Compliance alerts with SAT submission tracking
 - **AlertRule**: Dynamic alert detection rules
 - **Catalog/CatalogItem**: Flexible catalog system
-- **UmaValue**: UMA values for transaction calculations
+- **UmaValue**: UMA values for operation calculations
 - **OrganizationSettings**: Organization-specific compliance settings
 
 ## Catalog Population

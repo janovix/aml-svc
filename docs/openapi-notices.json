@@ -138,7 +138,7 @@
 			},
 			"ReportDataSource": {
 				"type": "string",
-				"enum": ["ALERTS", "TRANSACTIONS", "CLIENTS", "ALL"]
+				"enum": ["ALERTS", "OPERATIONS", "CLIENTS", "ALL"]
 			},
 			"ReportPeriodType": {
 				"type": "string",

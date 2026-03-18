@@ -102,15 +102,14 @@ export class ImportService {
 		importId: string,
 		input: ImportStartInput,
 	): Promise<{ import: ImportEntity; job: ImportJob }> {
-		const importRecord = await this.get(organizationId, importId);
-		if (importRecord.status !== "PENDING") {
-			throw new Error("IMPORT_NOT_PENDING");
-		}
-		const updated = await this.repository.updateColumnMapping(
+		const updated = await this.repository.updateColumnMappingIfPending(
 			importId,
 			organizationId,
 			input.columnMapping,
 		);
+		if (!updated) {
+			throw new Error("IMPORT_NOT_PENDING");
+		}
 		const job: ImportJob = {
 			importId: updated.id,
 			organizationId,

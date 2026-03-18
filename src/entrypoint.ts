@@ -142,10 +142,16 @@ export class AmlSvcEntrypoint extends WorkerEntrypoint<Bindings> {
 			orgId,
 		);
 		const json = (await response.json()) as {
-			success: boolean;
-			data: { configured: boolean; settings: unknown };
+			success?: boolean;
+			data?: { configured: boolean; settings: unknown };
+			error?: string;
 		};
-		return json.data;
+		if (!response.ok) {
+			throw new Error(
+				json.error ?? `${response.status} ${response.statusText}`,
+			);
+		}
+		return json.data!;
 	}
 
 	async updateOrganizationSettings(orgId: string, data: unknown) {
@@ -159,15 +165,15 @@ export class AmlSvcEntrypoint extends WorkerEntrypoint<Bindings> {
 			this.env,
 			orgId,
 		);
-		if (!response.ok) {
-			const error = (await response.json()) as { error?: string };
-			throw new Error(error.error ?? "Failed to update organization settings");
-		}
 		const json = (await response.json()) as {
-			success: boolean;
-			data: { configured: boolean; settings: unknown };
+			success?: boolean;
+			data?: { configured: boolean; settings: unknown };
+			error?: string;
 		};
-		return json.data;
+		if (!response.ok) {
+			throw new Error(json.error ?? "Failed to update organization settings");
+		}
+		return json.data!;
 	}
 
 	async patchOrganizationSettings(orgId: string, data: unknown) {
@@ -181,15 +187,15 @@ export class AmlSvcEntrypoint extends WorkerEntrypoint<Bindings> {
 			this.env,
 			orgId,
 		);
-		if (!response.ok) {
-			const error = (await response.json()) as { error?: string };
-			throw new Error(error.error ?? "Failed to patch organization settings");
-		}
 		const json = (await response.json()) as {
-			success: boolean;
-			data: { configured: boolean; settings: unknown };
+			success?: boolean;
+			data?: { configured: boolean; settings: unknown };
+			error?: string;
 		};
-		return json.data;
+		if (!response.ok) {
+			throw new Error(json.error ?? "Failed to patch organization settings");
+		}
+		return json.data!;
 	}
 
 	async patchSelfServiceSettings(orgId: string, data: unknown) {
@@ -206,15 +212,15 @@ export class AmlSvcEntrypoint extends WorkerEntrypoint<Bindings> {
 			this.env,
 			orgId,
 		);
-		if (!response.ok) {
-			const error = (await response.json()) as { error?: string };
-			throw new Error(error.error ?? "Failed to patch self-service settings");
-		}
 		const json = (await response.json()) as {
-			success: boolean;
-			data: { configured: boolean; settings: unknown };
+			success?: boolean;
+			data?: { configured: boolean; settings: unknown };
+			error?: string;
 		};
-		return json.data;
+		if (!response.ok) {
+			throw new Error(json.error ?? "Failed to patch self-service settings");
+		}
+		return json.data!;
 	}
 
 	// ===========================================================================
@@ -232,10 +238,16 @@ export class AmlSvcEntrypoint extends WorkerEntrypoint<Bindings> {
 			`clients/stale-screening`,
 		);
 		const json = (await response.json()) as {
-			success: boolean;
-			data: unknown[];
+			success?: boolean;
+			data?: unknown[];
+			error?: string;
 		};
-		return json.data;
+		if (!response.ok) {
+			throw new Error(
+				json.error ?? `${response.status} ${response.statusText}`,
+			);
+		}
+		return json.data ?? [];
 	}
 
 	async patchClientWatchlistQuery(
@@ -250,11 +262,17 @@ export class AmlSvcEntrypoint extends WorkerEntrypoint<Bindings> {
 				body: JSON.stringify(data),
 			},
 		);
-		await handleInternalScreeningRequest(
+		const response = await handleInternalScreeningRequest(
 			req,
 			this.env,
 			`clients/${clientId}/watchlist-query`,
 		);
+		if (!response.ok) {
+			const json = (await response.json()) as { error?: string };
+			throw new Error(
+				json.error ?? `${response.status} ${response.statusText}`,
+			);
+		}
 	}
 
 	async processScreeningCallback(data: ScreeningCallbackData): Promise<void> {

@@ -501,6 +501,9 @@ importsRouter.get("/:id/preview", async (c) => {
  * Save column mapping and send job to queue to start processing
  */
 importsRouter.post("/:id/start", async (c) => {
+	if (!c.env.IMPORT_PROCESSING_QUEUE) {
+		throw new APIError(503, "Import processing queue not configured");
+	}
 	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ImportIdParamSchema, c.req.param());
 	const body = await c.req.json();
@@ -509,9 +512,7 @@ importsRouter.post("/:id/start", async (c) => {
 	const { import: importRecord, job } = await service
 		.startImport(organizationId, params.id, input)
 		.catch(handleServiceError);
-	if (c.env.IMPORT_PROCESSING_QUEUE) {
-		await c.env.IMPORT_PROCESSING_QUEUE.send(job);
-	}
+	await c.env.IMPORT_PROCESSING_QUEUE.send(job);
 	return c.json({ success: true, data: importRecord });
 });
 

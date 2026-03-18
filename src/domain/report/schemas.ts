@@ -91,15 +91,21 @@ export const ReportChartConfigSchema = z.object({
 
 export type ReportChartConfig = z.infer<typeof ReportChartConfigSchema>;
 
-// Report filters schema
-export const ReportFiltersSchema = z.object({
-	clientIds: z.array(ResourceIdSchema).optional(),
-	alertRuleIds: z.array(z.string()).optional(),
-	alertSeverities: z.array(z.string()).optional(),
-	operationTypes: z.array(z.string()).optional(),
-	minAmount: z.coerce.number().min(0).optional(),
-	maxAmount: z.coerce.number().min(0).optional(),
-});
+// Report filters schema. activityCodes is used by the aggregator; operationTypes is copied to activityCodes when absent.
+export const ReportFiltersSchema = z
+	.object({
+		clientIds: z.array(ResourceIdSchema).optional(),
+		alertRuleIds: z.array(z.string()).optional(),
+		alertSeverities: z.array(z.string()).optional(),
+		activityCodes: z.array(z.string()).optional(),
+		operationTypes: z.array(z.string()).optional(),
+		minAmount: z.coerce.number().min(0).optional(),
+		maxAmount: z.coerce.number().min(0).optional(),
+	})
+	.transform((data) => ({
+		...data,
+		activityCodes: data.activityCodes ?? data.operationTypes ?? undefined,
+	}));
 
 export type ReportFiltersInput = z.infer<typeof ReportFiltersSchema>;
 

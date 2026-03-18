@@ -264,6 +264,30 @@ export class ImportRepository {
 	}
 
 	/**
+	 * Update column mapping only when import status is PENDING (atomic).
+	 * Returns the updated entity or null if no row matched (e.g. wrong status).
+	 */
+	async updateColumnMappingIfPending(
+		importId: string,
+		organizationId: string,
+		columnMapping: ColumnMapping,
+	): Promise<ImportEntity | null> {
+		const { count } = await this.prisma.import.updateMany({
+			where: {
+				id: importId,
+				organizationId,
+				status: "PENDING",
+			},
+			data: { columnMapping: columnMapping as Prisma.InputJsonValue },
+		});
+		if (count === 0) return null;
+		const updated = await this.prisma.import.findUnique({
+			where: { id: importId },
+		});
+		return updated ? mapPrismaImport(updated) : null;
+	}
+
+	/**
 	 * Increment counts atomically
 	 */
 	async incrementCounts(

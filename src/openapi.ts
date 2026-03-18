@@ -6567,7 +6567,7 @@ export const openAPISpec = {
 					"branchPostalCode",
 					"amount",
 					"currencyCode",
-					"payments",
+					"paymentMethods",
 					"createdAt",
 					"updatedAt",
 				],
@@ -7687,6 +7687,22 @@ export const openAPISpec = {
 						maxLength: 10,
 						description:
 							"Vulnerable activity code (e.g., 'VEH') - reference to vulnerable-activities catalog",
+					},
+				},
+			},
+			OrganizationSettingsPatchRequest: {
+				type: "object",
+				properties: {
+					obligatedSubjectKey: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$",
+						minLength: 12,
+						maxLength: 12,
+					},
+					activityKey: {
+						type: "string",
+						minLength: 1,
+						maxLength: 10,
 					},
 				},
 			},

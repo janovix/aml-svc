@@ -53,21 +53,18 @@ describe("multiEnum", () => {
 	const schema = multiEnum(z.enum(["A", "B", "C"]));
 
 	it("returns undefined when value is undefined", () => {
-		const result = schema.safeParse(undefined);
-		expect(result.success).toBe(true);
-		expect(result.data).toBeUndefined();
+		const data = schema.parse(undefined);
+		expect(data).toBeUndefined();
 	});
 
 	it("wraps a single string value in an array", () => {
-		const result = schema.safeParse("A");
-		expect(result.success).toBe(true);
-		expect(result.data).toEqual(["A"]);
+		const data = schema.parse("A");
+		expect(data).toEqual(["A"]);
 	});
 
 	it("passes through an array value unchanged", () => {
-		const result = schema.safeParse(["A", "B"]);
-		expect(result.success).toBe(true);
-		expect(result.data).toEqual(["A", "B"]);
+		const data = schema.parse(["A", "B"]);
+		expect(data).toEqual(["A", "B"]);
 	});
 
 	it("fails validation when single value is not in enum", () => {
@@ -81,8 +78,7 @@ describe("multiEnum", () => {
 	});
 
 	it("returns empty array when passed empty array", () => {
-		const result = schema.safeParse([]);
-		expect(result.success).toBe(true);
-		expect(result.data).toEqual([]);
+		const data = schema.parse([]);
+		expect(data).toEqual([]);
 	});
 });
