@@ -1,3 +1,27 @@
+# [1.10.0](https://github.com/janovix/aml-svc/compare/v1.9.0...v1.10.0) (2026-03-26)
+
+
+### Bug Fixes
+
+* allow empty document number in self-service schema ([1b3bea8](https://github.com/janovix/aml-svc/commit/1b3bea813738be4b080aab67aff275c75275ff35))
+* convert names to uppercase in generate.mjs for consistency in test data generation ([1c38ba5](https://github.com/janovix/aml-svc/commit/1c38ba5a11860680b54163b44e3297b5565bd667))
+* update terminology and improve error handling in import and synthetic data generation ([2e92fcf](https://github.com/janovix/aml-svc/commit/2e92fcffcc552cdc76b1b6efeb80bae823b5f945))
+
+
+### Features
+
+* add client and transaction management methods to entrypoint ([429752f](https://github.com/janovix/aml-svc/commit/429752f714d899acfc95d42dfe230f1a796d5674))
+* add column mapping support to import functionality ([1232ec6](https://github.com/janovix/aml-svc/commit/1232ec65d5ef648df43f1a7e526bb3186a4cd42d))
+* add entrypoints for auth, notifications, and watchlist services ([0ed057d](https://github.com/janovix/aml-svc/commit/0ed057d396ee1147cd2c008c71c75615a903a259))
+* add new KYC and client management endpoints ([af5fbf4](https://github.com/janovix/aml-svc/commit/af5fbf42f33e0b74e6646661bf2c8d8e5e6b18a6))
+* add tests for column mapping and import functionality ([16b3129](https://github.com/janovix/aml-svc/commit/16b3129cd445b268e81d3ded7b9c0fc221501a32))
+* enhance generate.mjs to support column mapping with alternate headers for testing ([5e68050](https://github.com/janovix/aml-svc/commit/5e6805066363a77127d2f119fc5714bd704bb676))
+* enhance KYC progress calculation with new section fields and tests ([22de57c](https://github.com/janovix/aml-svc/commit/22de57c9611e6dd04ad26a7af75850bf3604ef06))
+* enhance RFC and CURP generation functions with new name-letter helpers and state code mapping ([e1a7c9b](https://github.com/janovix/aml-svc/commit/e1a7c9b97f10467f234a531dcac9243007fb8b8f))
+* include organizationId in KYC session response ([99c011e](https://github.com/janovix/aml-svc/commit/99c011ecf6127d1298d3dacc85e9bc1855647160))
+* update operations stats endpoint to include completeCount and incompleteCount ([61e9380](https://github.com/janovix/aml-svc/commit/61e938060ecb793aa6c46998d672a0afe009542b))
+* update watchlist screening threshold and user identification for CSV imports ([1878b0a](https://github.com/janovix/aml-svc/commit/1878b0a1e7a29f978f87df23e2b5ad43aa1ecbab))
+
 # [1.10.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.9.0...v1.10.0-rc.1) (2026-03-26)
 
 
