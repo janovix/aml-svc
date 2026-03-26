@@ -1,3 +1,11 @@
+# [1.9.0](https://github.com/janovix/aml-svc/compare/v1.8.0...v1.9.0) (2026-02-27)
+
+
+### Features
+
+* add new KYC and client management endpoints ([af5fbf4](https://github.com/janovix/aml-svc/commit/af5fbf42f33e0b74e6646661bf2c8d8e5e6b18a6))
+* implement document ID resolution in BeneficialControllerService ([4764d44](https://github.com/janovix/aml-svc/commit/4764d44f224d175e721b7821655146871da48e9b))
+
 # [1.9.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.9.0-rc.14...v1.9.0-rc.15) (2026-03-18)
 
 
@@ -95,6 +103,8 @@
 ### Features
 
 * add new KYC and client management endpoints ([af5fbf4](https://github.com/janovix/aml-svc/commit/af5fbf42f33e0b74e6646661bf2c8d8e5e6b18a6))
+* implement document ID resolution in BeneficialControllerService ([4764d44](https://github.com/janovix/aml-svc/commit/4764d44f224d175e721b7821655146871da48e9b))
+
 
 # [1.9.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.8.0...v1.9.0-rc.1) (2026-02-27)
 
