@@ -80,12 +80,12 @@ const ResourceIdSchema = z
 const dateOnlyString = z
 	.string()
 	.refine((value) => !Number.isNaN(Date.parse(value)), "Invalid date value")
-	.transform((value) => new Date(value).toISOString().split("T")[0]);
+	.transform((value: string) => new Date(value).toISOString().split("T")[0]);
 
 // More flexible ISO datetime that accepts partial formats
 const isoString = z
 	.string()
-	.transform((value) => {
+	.transform((value: string) => {
 		// Handle partial datetime formats like "2025-09-19T14:06"
 		if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
 			return `${value}:00Z`;
@@ -111,7 +111,7 @@ const isoString = z
 		},
 		{ message: "Invalid ISO datetime" },
 	)
-	.transform((value) => {
+	.transform((value: string) => {
 		// Ensure it's a valid ISO string
 		const date = new Date(value);
 		return date.toISOString();
@@ -133,7 +133,7 @@ const AddressSchema = z.object({
 	country: z
 		.string()
 		.min(2)
-		.transform((value) => {
+		.transform((value: string) => {
 			const trimmed = value.trim();
 			// If it's already a 2-character code, return it uppercase
 			if (trimmed.length === 2) {
@@ -151,7 +151,7 @@ const AddressSchema = z.object({
 		.string()
 		.min(2)
 		.max(10)
-		.transform((value) => value.toUpperCase()),
+		.transform((value: string) => value.toUpperCase()),
 	city: z.string().min(2),
 	municipality: z.string().min(2),
 	neighborhood: z.string().min(2),
@@ -162,12 +162,61 @@ const AddressSchema = z.object({
 	reference: z.string().max(200).optional().nullable(),
 });
 
+/** Optional address for minimal client create (RFC, names, email). Defaults used for DB NOT NULL. */
+const OptionalAddressSchema = z.object({
+	country: z
+		.string()
+		.optional()
+		.transform((value: string | undefined) => {
+			const trimmed = (value ?? "").trim();
+			if (trimmed === "") return "MX";
+			if (trimmed.length === 2) return trimmed.toUpperCase();
+			const normalized = trimmed.toLowerCase();
+			const code = COUNTRY_NAME_TO_CODE[normalized];
+			if (code) return code;
+			throw new Error(`Unknown country: ${value}`);
+		}),
+	stateCode: z
+		.string()
+		.max(10)
+		.optional()
+		.default("")
+		.transform((v: string) => (v ?? "").toUpperCase()),
+	city: z.string().optional().default(""),
+	municipality: z.string().optional().default(""),
+	neighborhood: z.string().optional().default(""),
+	street: z.string().optional().default(""),
+	externalNumber: z.string().optional().default(""),
+	internalNumber: z.string().max(20).optional().nullable(),
+	postalCode: z
+		.string()
+		.optional()
+		.default("")
+		.refine(
+			(v) => v === "" || POSTAL_CODE_REGEX.test(v),
+			"Invalid postal code",
+		),
+	reference: z.string().max(200).optional().nullable(),
+});
+
 const ContactSchema = z.object({
 	email: z
 		.string()
 		.email()
-		.transform((value) => value.toLowerCase()),
+		.transform((value: string) => value.toLowerCase()),
 	phone: z.string().regex(PHONE_REGEX, "Invalid phone format"),
+});
+
+/** Optional contact for minimal create: email required, phone optional (default ""). */
+const OptionalContactSchema = z.object({
+	email: z
+		.string()
+		.email()
+		.transform((value: string) => value.toLowerCase()),
+	phone: z
+		.union([z.literal(""), z.string().regex(PHONE_REGEX)])
+		.optional()
+		.default(""),
 });
 
 // RFC validation function based on person type
@@ -183,8 +232,8 @@ const validateRFC = (personType: "physical" | "moral" | "trust") => {
 
 	return z
 		.string()
-		.transform((value) => value.toUpperCase())
-		.superRefine((value, ctx) => {
+		.transform((value: string) => value.toUpperCase())
+		.superRefine((value: string, ctx: z.RefinementCtx) => {
 			const actualLength = value.length;
 			const isValidLength = actualLength === expectedLength;
 			const isValidFormat =
@@ -256,7 +305,7 @@ const PhysicalDetailsSchema = z
 		curp: z
 			.string()
 			.regex(CURP_REGEX, "Invalid CURP")
-			.transform((value) => value.toUpperCase()),
+			.transform((value: string) => value.toUpperCase()),
 		businessName: z.string().optional().nullable(),
 		incorporationDate: isoString.optional().nullable(),
 	})
@@ -284,6 +333,75 @@ const TrustDetailsSchema = z.object({
 	curp: z.string().optional().nullable(),
 });
 
+// --- Minimal create schemas (only RFC, names, email required; rest optional for KYC onboarding) ---
+
+const MinimalPhysicalDetailsSchema = z
+	.object({
+		personType: z.literal("physical"),
+		firstName: z.string().min(1),
+		lastName: z.string().min(1),
+		secondLastName: z.string().optional().nullable(),
+		birthDate: dateOnlyString.optional().nullable(),
+		curp: z
+			.string()
+			.regex(CURP_REGEX, "Invalid CURP")
+			.transform((value: string) => value.toUpperCase())
+			.optional()
+			.nullable(),
+		businessName: z.string().optional().nullable(),
+		incorporationDate: isoString.optional().nullable(),
+	})
+	.merge(EnhancedKYCFieldsSchema);
+
+const MinimalMoralDetailsSchema = z.object({
+	personType: z.literal("moral"),
+	businessName: z.string().min(3),
+	incorporationDate: isoString.optional().nullable(),
+	firstName: z.string().optional().nullable(),
+	lastName: z.string().optional().nullable(),
+	secondLastName: z.string().optional().nullable(),
+	birthDate: dateOnlyString.optional().nullable(),
+	curp: z.string().optional().nullable(),
+});
+
+const MinimalTrustDetailsSchema = z.object({
+	personType: z.literal("trust"),
+	businessName: z.string().min(3),
+	incorporationDate: isoString.optional().nullable(),
+	firstName: z.string().optional().nullable(),
+	lastName: z.string().optional().nullable(),
+	secondLastName: z.string().optional().nullable(),
+	birthDate: dateOnlyString.optional().nullable(),
+	curp: z.string().optional().nullable(),
+});
+
+const MinimalCommonBase = z
+	.object({
+		rfc: z.string(),
+		nationality: z
+			.union([
+				z.string().min(2, "Nationality must be at least 2 characters"),
+				z.null(),
+			])
+			.optional(),
+		notes: z.string().max(500).optional().nullable(),
+		countryCode: z.string().optional().nullable(),
+		economicActivityCode: z.string().optional().nullable(),
+	})
+	.merge(OptionalAddressSchema)
+	.merge(OptionalContactSchema);
+
+const MinimalCommonPhysical = z
+	.object({
+		rfc: z.string(),
+		nationality: z.string().min(2).optional(),
+		notes: z.string().max(500).optional().nullable(),
+		countryCode: z.string().optional().nullable(),
+		economicActivityCode: z.string().optional().nullable(),
+	})
+	.merge(OptionalAddressSchema)
+	.merge(OptionalContactSchema);
+
 // Base schemas without RFC validation (for updates)
 const ClientPhysicalBaseSchema = CommonSchemaPhysical.merge(
 	PhysicalDetailsSchema,
@@ -310,19 +428,57 @@ export const ClientTrustSchema = ClientTrustBaseSchema.merge(
 	}),
 );
 
+// Minimal create schemas (only RFC, names, email required; address/phone/curp/birthDate/incorporationDate optional)
+const ClientCreatePhysicalSchema = MinimalCommonPhysical.merge(
+	MinimalPhysicalDetailsSchema,
+).merge(z.object({ rfc: validateRFC("physical") }));
+
+const ClientCreateMoralSchema = MinimalCommonBase.merge(
+	MinimalMoralDetailsSchema,
+).merge(z.object({ rfc: validateRFC("moral") }));
+
+const ClientCreateTrustSchema = MinimalCommonBase.merge(
+	MinimalTrustDetailsSchema,
+).merge(z.object({ rfc: validateRFC("trust") }));
+
 // Use discriminated union for better error messages and type discrimination
 export const ClientCreateSchema = z.discriminatedUnion("personType", [
-	ClientPhysicalSchema,
-	ClientMoralSchema,
-	ClientTrustSchema,
+	ClientCreatePhysicalSchema,
+	ClientCreateMoralSchema,
+	ClientCreateTrustSchema,
 ]);
 
-// Update schema: RFC cannot be changed, so we omit it from base schemas
-// Use discriminated union for better error messages
+// Update common schemas (optional address/contact like create; RFC not in update)
+const UpdateCommonBase = z
+	.object({
+		nationality: z
+			.union([
+				z.string().min(2, "Nationality must be at least 2 characters"),
+				z.null(),
+			])
+			.optional(),
+		notes: z.string().max(500).optional().nullable(),
+		countryCode: z.string().optional().nullable(),
+		economicActivityCode: z.string().optional().nullable(),
+	})
+	.merge(OptionalAddressSchema)
+	.merge(OptionalContactSchema);
+
+const UpdateCommonPhysical = z
+	.object({
+		nationality: z.string().min(2).optional(),
+		notes: z.string().max(500).optional().nullable(),
+		countryCode: z.string().optional().nullable(),
+		economicActivityCode: z.string().optional().nullable(),
+	})
+	.merge(OptionalAddressSchema)
+	.merge(OptionalContactSchema);
+
+// Update schema: only RFC, names, email required; address/phone etc. optional
 export const ClientUpdateSchema = z.discriminatedUnion("personType", [
-	ClientPhysicalBaseSchema.omit({ rfc: true }),
-	ClientMoralBaseSchema.omit({ rfc: true }),
-	ClientTrustBaseSchema.omit({ rfc: true }),
+	UpdateCommonPhysical.merge(MinimalPhysicalDetailsSchema),
+	UpdateCommonBase.merge(MinimalMoralDetailsSchema),
+	UpdateCommonBase.merge(MinimalTrustDetailsSchema),
 ]);
 
 // Patch schema: RFC cannot be changed, so we omit it
@@ -340,7 +496,7 @@ export const ClientPatchSchema = z.object({
 	curp: z
 		.string()
 		.regex(CURP_REGEX, "Invalid CURP")
-		.transform((value) => value.toUpperCase())
+		.transform((value: string) => value.toUpperCase())
 		.optional(),
 	businessName: z.string().min(3).optional().nullable(),
 	incorporationDate: isoString.optional().nullable(),
@@ -354,20 +510,20 @@ export const ClientPatchSchema = z.object({
 	email: z
 		.string()
 		.email()
-		.transform((value) => value.toLowerCase())
+		.transform((value: string) => value.toLowerCase())
 		.optional(),
 	phone: z.string().regex(PHONE_REGEX).optional(),
 	country: z
 		.string()
 		.min(2)
 		.max(2)
-		.transform((value) => value.toUpperCase())
+		.transform((value: string) => value.toUpperCase())
 		.optional(),
 	stateCode: z
 		.string()
 		.min(2)
 		.max(10)
-		.transform((value) => value.toUpperCase())
+		.transform((value: string) => value.toUpperCase())
 		.optional(),
 	city: z.string().min(2).optional(),
 	municipality: z.string().min(2).optional(),
@@ -464,7 +620,7 @@ export const ClientDocumentCreateSchema = z.object({
 		.string()
 		.min(2)
 		.max(2)
-		.transform((value) => value.toUpperCase())
+		.transform((value: string) => value.toUpperCase())
 		.optional()
 		.nullable(),
 	issueDate: isoString.optional().nullable(),
@@ -491,7 +647,7 @@ export const ClientDocumentPatchSchema = z
 			.string()
 			.min(2)
 			.max(2)
-			.transform((value) => value.toUpperCase())
+			.transform((value: string) => value.toUpperCase())
 			.optional()
 			.nullable(),
 		issueDate: isoString.optional().nullable(),
@@ -526,7 +682,7 @@ export const ClientAddressCreateSchema = z.object({
 		.string()
 		.min(2)
 		.max(2)
-		.transform((value) => value.toUpperCase()),
+		.transform((value: string) => value.toUpperCase()),
 	isPrimary: z.boolean().default(false),
 	verifiedAt: isoString.optional().nullable(),
 	reference: z.string().max(200).optional().nullable(),
@@ -548,7 +704,7 @@ export const ClientAddressPatchSchema = z
 			.string()
 			.min(2)
 			.max(2)
-			.transform((value) => value.toUpperCase())
+			.transform((value: string) => value.toUpperCase())
 			.optional(),
 		isPrimary: z.boolean().optional(),
 		verifiedAt: isoString.optional().nullable(),

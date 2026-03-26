@@ -122,6 +122,18 @@ export const ImportBulkRowCreateSchema = z.object({
 	),
 });
 
+/** CSV column name -> target property key; keys and values non-empty strings */
+export const ColumnMappingSchema = z
+	.record(z.string().min(1), z.string().min(1))
+	.refine(
+		(m) => Object.keys(m).length > 0,
+		"At least one column must be mapped",
+	);
+
+export const ImportStartSchema = z.object({
+	columnMapping: ColumnMappingSchema,
+});
+
 // Type exports
 export type ImportStatus = z.infer<typeof ImportStatusSchema>;
 export type ImportEntityType = z.infer<typeof ImportEntityTypeSchema>;
@@ -136,3 +148,5 @@ export type ImportStatusUpdateInput = z.infer<typeof ImportStatusUpdateSchema>;
 export type ImportBulkRowCreateInput = z.infer<
 	typeof ImportBulkRowCreateSchema
 >;
+export type ColumnMappingInput = z.infer<typeof ColumnMappingSchema>;
+export type ImportStartInput = z.infer<typeof ImportStartSchema>;

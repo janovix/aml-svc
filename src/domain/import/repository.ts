@@ -25,6 +25,7 @@ import type {
 	ImportWithResults,
 	ListResultWithMeta,
 	ImportRowStatus,
+	ColumnMapping,
 } from "./types";
 import type { ListResult } from "../../lib/list-result";
 import {
@@ -239,6 +240,51 @@ export class ImportRepository {
 		});
 
 		return mapPrismaImport(updated);
+	}
+
+	/**
+	 * Update column mapping for an import (org-scoped).
+	 */
+	async updateColumnMapping(
+		importId: string,
+		organizationId: string,
+		columnMapping: ColumnMapping,
+	): Promise<ImportEntity> {
+		const existing = await this.prisma.import.findFirst({
+			where: { id: importId, organizationId },
+		});
+		if (!existing) {
+			throw new Error("IMPORT_NOT_FOUND");
+		}
+		const updated = await this.prisma.import.update({
+			where: { id: importId },
+			data: { columnMapping: columnMapping as Prisma.InputJsonValue },
+		});
+		return mapPrismaImport(updated);
+	}
+
+	/**
+	 * Update column mapping only when import status is PENDING (atomic).
+	 * Returns the updated entity or null if no row matched (e.g. wrong status).
+	 */
+	async updateColumnMappingIfPending(
+		importId: string,
+		organizationId: string,
+		columnMapping: ColumnMapping,
+	): Promise<ImportEntity | null> {
+		const { count } = await this.prisma.import.updateMany({
+			where: {
+				id: importId,
+				organizationId,
+				status: "PENDING",
+			},
+			data: { columnMapping: columnMapping as Prisma.InputJsonValue },
+		});
+		if (count === 0) return null;
+		const updated = await this.prisma.import.findUnique({
+			where: { id: importId },
+		});
+		return updated ? mapPrismaImport(updated) : null;
 	}
 
 	/**

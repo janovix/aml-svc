@@ -49,7 +49,7 @@ async function createTestJWT(
 describe("Multi-Tenant Security", () => {
 	let keyPair: KeyPairResult;
 	let jwks: JSONWebKeySet;
-	let mockAuthService: Fetcher;
+	let mockAuthService: { getJwks: () => Promise<JSONWebKeySet> };
 
 	beforeEach(async () => {
 		clearJWKSCache();
@@ -58,20 +58,10 @@ describe("Multi-Tenant Security", () => {
 		const publicJWK = await publicKeyToJWK(keyPair.publicKey);
 		jwks = { keys: [publicJWK] };
 
-		// Mock AUTH_SERVICE binding for JWKS endpoint
+		// Mock AUTH_SERVICE binding for JWKS via RPC
 		mockAuthService = {
-			fetch: vi.fn().mockImplementation(async (url: string | Request) => {
-				const urlStr = typeof url === "string" ? url : url.url;
-				if (urlStr.includes("/api/auth/jwks")) {
-					return new Response(JSON.stringify(jwks), {
-						status: 200,
-						headers: { "Content-Type": "application/json" },
-					});
-				}
-				return new Response("Not Found", { status: 404 });
-			}),
-			connect: vi.fn(),
-		} as unknown as Fetcher;
+			getJwks: vi.fn().mockResolvedValue(jwks),
+		};
 	});
 
 	afterEach(() => {

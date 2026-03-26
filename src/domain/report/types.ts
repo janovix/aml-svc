@@ -10,18 +10,14 @@ export type ReportPeriodType = "MONTHLY" | "QUARTERLY" | "ANNUAL" | "CUSTOM";
 export type ReportTemplate =
 	| "EXECUTIVE_SUMMARY" // High-level compliance overview
 	| "COMPLIANCE_STATUS" // Audit-ready compliance report
-	| "TRANSACTION_ANALYSIS" // Transaction volume & patterns
+	| "OPERATION_ANALYSIS" // Operation volume & patterns
 	| "CLIENT_RISK_PROFILE" // Deep-dive on specific client
 	| "ALERT_BREAKDOWN" // Alert management metrics
 	| "PERIOD_COMPARISON" // Trend analysis
 	| "CUSTOM"; // User-defined report
 
 // Data sources that can be included
-export type ReportDataSource =
-	| "ALERTS"
-	| "OPERATIONS"
-	| "CLIENTS"
-	| "TRANSACTIONS"; // @deprecated Use OPERATIONS
+export type ReportDataSource = "ALERTS" | "OPERATIONS" | "CLIENTS";
 
 // Chart types available for visualization
 export type ChartType = "PIE" | "BAR" | "LINE" | "DONUT" | "STACKED_BAR";
@@ -32,7 +28,7 @@ export type ReportStatus = "DRAFT" | "GENERATED";
 export interface ReportChartConfig {
 	type: ChartType;
 	title: string;
-	dataKey: string; // e.g., "alertsBySeverity", "transactionsByMonth"
+	dataKey: string; // e.g., "alertsBySeverity", "operationsByMonth"
 	showLegend: boolean;
 }
 
@@ -41,8 +37,7 @@ export interface ReportFilters {
 	alertRuleIds?: string[]; // Filter by alert rules
 	alertSeverities?: string[]; // Filter by severity levels
 	activityCodes?: string[]; // Filter by activity code (VEH, INM, etc.)
-	/** @deprecated Use activityCodes instead */
-	transactionTypes?: string[]; // Legacy filter
+	operationTypes?: string[]; // Filter by operation type
 	minAmount?: number; // Minimum operation amount
 	maxAmount?: number; // Maximum operation amount
 }
@@ -168,7 +163,7 @@ export function getTemplateConfigs(): ReportTemplateConfig[] {
 			requiresClientId: false,
 		},
 		{
-			template: "TRANSACTION_ANALYSIS",
+			template: "OPERATION_ANALYSIS",
 			name: "Operations Analysis",
 			description: "Operations volume and pattern analysis",
 			dataSources: ["OPERATIONS"],

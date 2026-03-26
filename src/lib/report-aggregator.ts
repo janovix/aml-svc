@@ -107,7 +107,7 @@ export class ReportAggregator {
 						clientId,
 					)
 				: this.emptyAlertAggregation(),
-			dataSources.includes("TRANSACTIONS") || dataSources.includes("OPERATIONS")
+			dataSources.includes("OPERATIONS")
 				? this.aggregateOperations(
 						organizationId,
 						periodStart,

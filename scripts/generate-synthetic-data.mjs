@@ -2,7 +2,7 @@
 /**
  * Generate Synthetic Data
  *
- * Generates synthetic data (clients, transactions, etc.) for a user account.
+ * Generates synthetic data (clients, operations, etc.) for a user account.
  * This script can be run locally or from GitHub Actions.
  *
  * Usage:
@@ -11,12 +11,12 @@
  * Environment Variables:
  *   USER_ID - User ID for which to generate data (required)
  *   ORGANIZATION_ID - Organization ID for which to generate data (required)
- *   MODELS - Comma-separated list of models to generate: clients,transactions (required)
+ *   MODELS - Comma-separated list of models: clients,operations
  *   CLIENTS_COUNT - Number of clients to generate (default: 10)
  *   CLIENTS_INCLUDE_DOCUMENTS - Include documents for clients (default: false)
  *   CLIENTS_INCLUDE_ADDRESSES - Include addresses for clients (default: false)
- *   TRANSACTIONS_COUNT - Number of transactions to generate (default: 50)
- *   TRANSACTIONS_PER_CLIENT - Number of transactions per client (optional)
+ *   OPERATIONS_COUNT - Number of operations to generate (default: 0; use with MODELS=clients,operations)
+ *   OPERATIONS_PER_CLIENT - Number of operations per client (optional)
  *   WRANGLER_CONFIG - Wrangler config file (optional, auto-detected based on environment)
  *   CLOUDFLARE_API_TOKEN - Cloudflare API token for D1 access (required for remote)
  *   CLOUDFLARE_ACCOUNT_ID - Cloudflare account ID (required for remote)
@@ -39,9 +39,9 @@ const clientsIncludeDocuments =
 const clientsIncludeAddresses =
 	process.env.CLIENTS_INCLUDE_ADDRESSES === "true";
 // Default 0 — the generator auto-adjusts to ensure every client has at least one operation
-const transactionsCount = parseInt(process.env.TRANSACTIONS_COUNT || "0", 10);
-const transactionsPerClient = process.env.TRANSACTIONS_PER_CLIENT
-	? parseInt(process.env.TRANSACTIONS_PER_CLIENT, 10)
+const operationsCount = parseInt(process.env.OPERATIONS_COUNT || "0", 10);
+const operationsPerClient = process.env.OPERATIONS_PER_CLIENT
+	? parseInt(process.env.OPERATIONS_PER_CLIENT, 10)
 	: undefined;
 let wranglerConfigFile = process.env.WRANGLER_CONFIG;
 if (!wranglerConfigFile) {
@@ -72,12 +72,12 @@ if (!organizationId) {
 
 if (!modelsStr) {
 	console.error("❌ Error: MODELS environment variable is required");
-	console.error("   Example: MODELS=clients,transactions");
+	console.error("   Example: MODELS=clients,operations");
 	process.exit(1);
 }
 
 const models = modelsStr.split(",").map((m) => m.trim().toLowerCase());
-const validModels = ["clients", "transactions"];
+const validModels = ["clients", "operations"];
 const invalidModels = models.filter((m) => !validModels.includes(m));
 
 if (invalidModels.length > 0) {
@@ -414,13 +414,13 @@ async function generateSyntheticData() {
 			`   Clients: ${clientsCount} (documents: ${clientsIncludeDocuments}, addresses: ${clientsIncludeAddresses})`,
 		);
 	}
-	if (models.includes("transactions")) {
-		options.transactions = {
-			count: transactionsCount,
-			perClient: transactionsPerClient,
+	if (models.includes("operations")) {
+		options.operations = {
+			count: operationsCount,
+			perClient: operationsPerClient,
 		};
 		console.log(
-			`   Transactions: ${transactionsCount}${transactionsPerClient ? ` (${transactionsPerClient} per client)` : ""}`,
+			`   Operations: ${operationsCount}${operationsPerClient ? ` (${operationsPerClient} per client)` : ""}`,
 		);
 	}
 	console.log("");
@@ -445,7 +445,7 @@ async function generateSyntheticData() {
 
 		console.log("✅ Synthetic data generation completed!");
 		console.log(`   Clients created: ${result.clients.created}`);
-		console.log(`   Transactions created: ${result.transactions.created}`);
+		console.log(`   Operations created: ${result.operations.created}`);
 
 		process.exit(0);
 	} catch (error) {

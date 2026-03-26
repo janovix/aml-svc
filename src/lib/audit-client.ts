@@ -76,11 +76,11 @@ export class AuditClient {
 	 * // Log a create event
 	 * await audit.log({
 	 *   eventType: "CREATE",
-	 *   entityType: "transaction",
-	 *   entityId: transaction.id,
+	 *   entityType: "operation",
+	 *   entityId: operation.id,
 	 *   actorUserId: user.id,
 	 *   actorOrganizationId: org.id,
-	 *   newState: transaction,
+	 *   newState: operation,
 	 *   metadata: { source: "manual_entry" },
 	 * });
 	 * ```
@@ -92,48 +92,11 @@ export class AuditClient {
 		}
 
 		try {
-			const response = await authService.fetch(
-				new Request("https://auth-svc.internal/internal/audit/log", {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Accept: "application/json",
-					},
-					body: JSON.stringify({
-						...input,
-						sourceService: this.sourceService,
-					}),
-				}),
-			);
-
-			if (!response.ok) {
-				Sentry.captureMessage(
-					`Failed to create audit log: ${response.status}`,
-					{
-						level: "error",
-						tags: { context: "audit-log-creation-failed" },
-						extra: { status: response.status, statusText: response.statusText },
-					},
-				);
-				return null;
-			}
-
-			const result = (await response.json()) as {
-				success: boolean;
-				data: AuditLogResult;
-				error?: string;
-			};
-
-			if (!result.success) {
-				Sentry.captureMessage("Audit log creation failed", {
-					level: "error",
-					tags: { context: "audit-log-result-error" },
-					extra: { error: result.error },
-				});
-				return null;
-			}
-
-			return result.data;
+			const result = await authService.logAuditEvent({
+				...input,
+				sourceService: this.sourceService,
+			});
+			return result;
 		} catch (error) {
 			Sentry.captureException(error, {
 				tags: { context: "audit-log-exception" },

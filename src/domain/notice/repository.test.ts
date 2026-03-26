@@ -846,4 +846,300 @@ describe("NoticeRepository", () => {
 			});
 		});
 	});
+
+	describe("addAlertsToNotice", () => {
+		it("adds alerts and creates event when alerts are updated", async () => {
+			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockNotice);
+			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 3 });
+			vi.mocked(prisma.notice.update).mockResolvedValue(mockNotice);
+
+			const result = await repository.addAlertsToNotice(
+				"org_123",
+				"NTC_123",
+				["ALT_1", "ALT_2", "ALT_3"],
+				"user_123",
+			);
+
+			expect(result).toBe(3);
+			expect(prisma.notice.update).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({ recordCount: { increment: 3 } }),
+				}),
+			);
+			expect(prisma.noticeEvent.create).toHaveBeenCalled();
+		});
+
+		it("does not update notice or create event when no alerts are updated", async () => {
+			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockNotice);
+			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 0 });
+
+			const result = await repository.addAlertsToNotice("org_123", "NTC_123", [
+				"ALT_already_assigned",
+			]);
+
+			expect(result).toBe(0);
+			expect(prisma.notice.update).not.toHaveBeenCalled();
+		});
+
+		it("throws when notice is not in DRAFT status", async () => {
+			vi.mocked(prisma.notice.findFirst).mockResolvedValue({
+				...mockNotice,
+				status: "GENERATED" as PrismaNoticeStatus,
+			});
+
+			await expect(
+				repository.addAlertsToNotice("org_123", "NTC_123", ["ALT_1"]),
+			).rejects.toThrow("NOTICE_MUST_BE_DRAFT_TO_MODIFY_ALERTS");
+		});
+	});
+
+	describe("removeAlertsFromNotice", () => {
+		it("removes alerts and creates event when alerts are updated", async () => {
+			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockNotice);
+			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 2 });
+			vi.mocked(prisma.notice.update).mockResolvedValue(mockNotice);
+
+			const result = await repository.removeAlertsFromNotice(
+				"org_123",
+				"NTC_123",
+				["ALT_1", "ALT_2"],
+				"user_123",
+			);
+
+			expect(result).toBe(2);
+			expect(prisma.notice.update).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({ recordCount: { decrement: 2 } }),
+				}),
+			);
+			expect(prisma.noticeEvent.create).toHaveBeenCalled();
+		});
+
+		it("does not update notice or create event when no alerts are removed", async () => {
+			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockNotice);
+			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 0 });
+
+			const result = await repository.removeAlertsFromNotice(
+				"org_123",
+				"NTC_123",
+				["ALT_not_found"],
+			);
+
+			expect(result).toBe(0);
+			expect(prisma.notice.update).not.toHaveBeenCalled();
+		});
+
+		it("throws when notice is not in DRAFT status", async () => {
+			vi.mocked(prisma.notice.findFirst).mockResolvedValue({
+				...mockNotice,
+				status: "SUBMITTED" as PrismaNoticeStatus,
+			});
+
+			await expect(
+				repository.removeAlertsFromNotice("org_123", "NTC_123", ["ALT_1"]),
+			).rejects.toThrow("NOTICE_MUST_BE_DRAFT_TO_MODIFY_ALERTS");
+		});
+	});
+
+	describe("getAlertsForPeriodDetailed", () => {
+		const baseAlert = {
+			id: "ALT_1",
+			clientId: "CLT_1",
+			operationId: null,
+			alertRuleId: "RULE_1",
+			alertRule: { name: "High Value" } as AlertRule,
+			severity: "HIGH",
+			status: "DETECTED",
+			activityCode: "VEH",
+			createdAt: new Date("2024-01-10"),
+		} as Alert & {
+			alertRule: AlertRule | null;
+			client: {
+				personType: string;
+				businessName: string | null;
+				firstName: string | null;
+				lastName: string | null;
+			} | null;
+		};
+
+		it("returns alerts with physical client name", async () => {
+			vi.mocked(prisma.alert.findMany).mockResolvedValue([
+				{
+					...baseAlert,
+					client: {
+						personType: "PHYSICAL",
+						businessName: null,
+						firstName: "Juan",
+						lastName: "Pérez",
+					},
+				},
+			] as unknown as Alert[]);
+
+			const result = await repository.getAlertsForPeriodDetailed(
+				"org_123",
+				new Date("2024-01-01"),
+				new Date("2024-01-31"),
+			);
+
+			expect(result).toHaveLength(1);
+			expect(result[0].clientName).toBe("Juan Pérez");
+		});
+
+		it("returns alerts with moral client name using businessName", async () => {
+			vi.mocked(prisma.alert.findMany).mockResolvedValue([
+				{
+					...baseAlert,
+					client: {
+						personType: "MORAL",
+						businessName: "ACME Corp",
+						firstName: null,
+						lastName: null,
+					},
+				},
+			] as unknown as Alert[]);
+
+			const result = await repository.getAlertsForPeriodDetailed(
+				"org_123",
+				new Date("2024-01-01"),
+				new Date("2024-01-31"),
+			);
+
+			expect(result[0].clientName).toBe("ACME Corp");
+		});
+
+		it("falls back to clientId when client name is empty", async () => {
+			vi.mocked(prisma.alert.findMany).mockResolvedValue([
+				{
+					...baseAlert,
+					clientId: "CLT_fallback",
+					client: {
+						personType: "PHYSICAL",
+						businessName: null,
+						firstName: "",
+						lastName: "",
+					},
+				},
+			] as unknown as Alert[]);
+
+			const result = await repository.getAlertsForPeriodDetailed(
+				"org_123",
+				new Date("2024-01-01"),
+				new Date("2024-01-31"),
+			);
+
+			expect(result[0].clientName).toBe("CLT_fallback");
+		});
+
+		it("handles createdAt as string", async () => {
+			vi.mocked(prisma.alert.findMany).mockResolvedValue([
+				{
+					...baseAlert,
+					createdAt: "2024-01-10T00:00:00.000Z" as unknown as Date,
+					client: {
+						personType: "PHYSICAL",
+						businessName: null,
+						firstName: "Ana",
+						lastName: "López",
+					},
+				},
+			] as unknown as Alert[]);
+
+			const result = await repository.getAlertsForPeriodDetailed(
+				"org_123",
+				new Date("2024-01-01"),
+				new Date("2024-01-31"),
+			);
+
+			expect(result[0].createdAt).toBe("2024-01-10T00:00:00.000Z");
+		});
+
+		it("uses alertRuleId as fallback when alertRule is null", async () => {
+			vi.mocked(prisma.alert.findMany).mockResolvedValue([
+				{
+					...baseAlert,
+					alertRule: null,
+					client: {
+						personType: "PHYSICAL",
+						businessName: null,
+						firstName: "Ana",
+						lastName: "López",
+					},
+				},
+			] as unknown as Alert[]);
+
+			const result = await repository.getAlertsForPeriodDetailed(
+				"org_123",
+				new Date("2024-01-01"),
+				new Date("2024-01-31"),
+			);
+
+			expect(result[0].alertRuleName).toBe("RULE_1");
+		});
+	});
+
+	describe("assignSpecificAlertsToNotice", () => {
+		it("assigns alerts and updates record count", async () => {
+			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 5 });
+			vi.mocked(prisma.notice.update).mockResolvedValue(mockNotice);
+
+			const result = await repository.assignSpecificAlertsToNotice(
+				"org_123",
+				"NTC_123",
+				["ALT_1", "ALT_2", "ALT_3", "ALT_4", "ALT_5"],
+			);
+
+			expect(result).toBe(5);
+			expect(prisma.notice.update).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({ recordCount: 5 }),
+				}),
+			);
+		});
+	});
+
+	describe("getEventsForNotice", () => {
+		it("returns events for a notice ordered by createdAt", async () => {
+			const mockEvents = [
+				{
+					id: "EVT_1",
+					noticeId: "NTC_123",
+					organizationId: "org_123",
+					eventType: "CREATED",
+					fromStatus: null,
+					toStatus: "DRAFT",
+					cycle: 0,
+					pdfDocumentId: null,
+					xmlFileUrl: null,
+					fileSize: null,
+					notes: null,
+					createdBy: "user_123",
+					createdAt: new Date("2024-01-15"),
+				},
+			];
+			vi.mocked(prisma.noticeEvent.findMany).mockResolvedValue(
+				mockEvents as Parameters<
+					typeof prisma.noticeEvent.findMany
+				>[0] extends undefined
+					? never
+					: Awaited<ReturnType<typeof prisma.noticeEvent.findMany>>,
+			);
+
+			const result = await repository.getEventsForNotice("org_123", "NTC_123");
+
+			expect(result).toHaveLength(1);
+			expect(result[0].noticeId).toBe("NTC_123");
+			expect(prisma.noticeEvent.findMany).toHaveBeenCalledWith({
+				where: { noticeId: "NTC_123", organizationId: "org_123" },
+				orderBy: { createdAt: "asc" },
+			});
+		});
+
+		it("returns empty array when no events exist", async () => {
+			vi.mocked(prisma.noticeEvent.findMany).mockResolvedValue([]);
+
+			const result = await repository.getEventsForNotice("org_123", "NTC_999");
+
+			expect(result).toEqual([]);
+		});
+	});
 });

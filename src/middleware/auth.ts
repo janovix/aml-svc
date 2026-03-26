@@ -49,8 +49,6 @@ export interface AuthOrganization {
  */
 export type AuthBindings = Bindings & {
 	AUTH_JWKS_CACHE_TTL?: string;
-	/** Service binding to auth-svc for direct worker-to-worker communication */
-	AUTH_SERVICE: Fetcher;
 	/** Environment name (used to bypass auth in test environment) */
 	ENVIRONMENT?: string;
 };
@@ -75,46 +73,31 @@ let cachedJWKS: jose.JSONWebKeySet | null = null;
 let cachedJWKSExpiry: number = 0;
 
 /**
- * Fetches JWKS from auth-svc with in-memory caching
- * Uses service binding for direct worker-to-worker communication
+ * Fetches JWKS from auth-svc via RPC with in-memory caching.
  */
 async function getJWKS(
 	cacheTtl: number,
-	authServiceBinding: Fetcher,
+	authServiceBinding: import("../types").AuthSvcRpc,
 ): Promise<jose.JSONWebKeySet> {
 	const now = Date.now();
 
-	// Check in-memory cache
 	if (cachedJWKS && cachedJWKSExpiry > now) {
 		return cachedJWKS;
 	}
 
-	// Construct JWKS URL with internal hostname
-	// When using service binding, the hostname doesn't affect routing but is used for Host header
-	const jwksUrl = "http://internal/api/auth/jwks";
-
-	// Use service binding for direct worker-to-worker communication
-	// The hostname in the URL is used for the Host header but routing is handled by the binding
-	const response = await authServiceBinding.fetch(
-		new Request(jwksUrl, {
-			headers: { Accept: "application/json" },
-		}),
-	);
-
-	if (!response.ok) {
+	let jwks: jose.JSONWebKeySet;
+	try {
+		jwks = (await authServiceBinding.getJwks()) as jose.JSONWebKeySet;
+	} catch (error) {
 		throw new Error(
-			`Failed to fetch JWKS from service binding: ${response.status} ${response.statusText}`,
+			`Failed to fetch JWKS from auth service: ${error instanceof Error ? error.message : String(error)}`,
 		);
 	}
 
-	const jwks = (await response.json()) as jose.JSONWebKeySet;
-
-	// Validate JWKS structure
 	if (!jwks.keys || !Array.isArray(jwks.keys) || jwks.keys.length === 0) {
 		throw new Error("Invalid JWKS: no keys found");
 	}
 
-	// Update in-memory cache
 	cachedJWKS = jwks;
 	cachedJWKSExpiry = now + cacheTtl * 1000;
 
@@ -122,13 +105,13 @@ async function getJWKS(
 }
 
 /**
- * Verifies a JWT using JWKS from auth-svc
- * Exported for use in SSE endpoints where EventSource can't send headers
+ * Verifies a JWT using JWKS from auth-svc via RPC.
+ * Exported for use in SSE endpoints where EventSource can't send headers.
  */
 export async function verifyToken(
 	token: string,
 	cacheTtl: number,
-	authServiceBinding: Fetcher,
+	authServiceBinding: import("../types").AuthSvcRpc,
 ): Promise<AuthTokenPayload> {
 	const jwks = await getJWKS(cacheTtl, authServiceBinding);
 

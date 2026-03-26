@@ -159,7 +159,14 @@ export const selfServiceDocumentSchema = z.object({
 		"CORPORATE_BYLAWS",
 		"OTHER",
 	]),
-	documentNumber: z.string().min(1).max(100),
+	// Empty string allowed for some doc types (e.g. ACTA_CONSTITUTIVA); otherwise min 3 chars to match ClientDocumentCreateSchema
+	documentNumber: z
+		.string()
+		.max(100)
+		.refine(
+			(v) => v === "" || v.length >= 3,
+			"Document number must be empty or at least 3 characters",
+		),
 	issuingCountry: z.string().max(10).optional().nullable(),
 	issueDate: dateOnlyString.optional().nullable(),
 	expiryDate: dateOnlyString.optional().nullable(),

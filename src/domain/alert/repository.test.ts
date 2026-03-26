@@ -44,7 +44,7 @@ const mockAlertRule = {
 	description: "Test description",
 	active: true,
 	severity: "HIGH",
-	ruleType: "transaction_amount_uma",
+	ruleType: "operation_amount_uma",
 	isManualOnly: false,
 	activityCode: "VEH",
 	metadata: '{"legalBasis": "LFPIORPI"}',
@@ -80,8 +80,8 @@ const mockAlert = {
 	severity: "HIGH",
 	idempotencyKey: "idem_key_123",
 	contextHash: "ctx_hash_123",
-	metadata: '{"transactionIds": ["tx_1", "tx_2"]}',
-	transactionId: "tx_001",
+	metadata: '{"operationIds": ["tx_1", "tx_2"]}',
+	operationId: "tx_001",
 	isManual: false,
 	submissionDeadline: new Date("2024-02-17"),
 	fileGeneratedAt: null,
@@ -226,12 +226,12 @@ describe("AlertRuleRepository", () => {
 				mockAlertRule as never,
 			);
 
-			const result = await repository.getByRuleType("transaction_amount_uma");
+			const result = await repository.getByRuleType("operation_amount_uma");
 
 			expect(result).toBeDefined();
-			expect(result?.ruleType).toBe("transaction_amount_uma");
+			expect(result?.ruleType).toBe("operation_amount_uma");
 			expect(mockPrisma.alertRule.findFirst).toHaveBeenCalledWith({
-				where: { ruleType: "transaction_amount_uma", active: true },
+				where: { ruleType: "operation_amount_uma", active: true },
 			});
 		});
 	});
@@ -485,7 +485,7 @@ describe("AlertRepository", () => {
 					severity: "HIGH",
 					idempotencyKey: "idem_key_123",
 					contextHash: "ctx_hash_123",
-					metadata: { transactionIds: [] },
+					metadata: { operationIds: [] },
 					isManual: false,
 				},
 				"org_123",
@@ -565,7 +565,7 @@ describe("AlertRepository", () => {
 			expect(mockPrisma.alert.create).toHaveBeenCalled();
 		});
 
-		it("creates alert with metadata and transactionId", async () => {
+		it("creates alert with metadata and operationId", async () => {
 			vi.mocked(mockPrisma.alert.findUnique).mockResolvedValue(null);
 			vi.mocked(mockPrisma.alertRule.findUnique).mockResolvedValue(
 				mockAlertRule as never,

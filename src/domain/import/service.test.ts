@@ -45,6 +45,7 @@ describe("ImportService", () => {
 		startedAt: null,
 		completedAt: null,
 		errorMessage: null,
+		columnMapping: null,
 	};
 
 	beforeEach(() => {
@@ -54,6 +55,8 @@ describe("ImportService", () => {
 			getWithResults: vi.fn(),
 			create: vi.fn(),
 			updateStatus: vi.fn(),
+			updateColumnMapping: vi.fn(),
+			updateColumnMappingIfPending: vi.fn(),
 			incrementCounts: vi.fn(),
 			createRowResults: vi.fn(),
 			updateRowResult: vi.fn(),
@@ -227,6 +230,57 @@ describe("ImportService", () => {
 			expect(mockRepository.updateStatus).toHaveBeenCalledWith(
 				mockImport.id,
 				update,
+			);
+		});
+	});
+
+	describe("startImport", () => {
+		it("should throw IMPORT_NOT_PENDING when import status is not PENDING", async () => {
+			vi.mocked(mockRepository.updateColumnMappingIfPending).mockResolvedValue(
+				null,
+			);
+
+			await expect(
+				service.startImport(organizationId, mockImport.id, {
+					columnMapping: { "Col A": "name" },
+				}),
+			).rejects.toThrow("IMPORT_NOT_PENDING");
+			expect(mockRepository.updateColumnMappingIfPending).toHaveBeenCalledWith(
+				mockImport.id,
+				organizationId,
+				{ "Col A": "name" },
+			);
+		});
+
+		it("should persist column mapping and return import and job when status is PENDING", async () => {
+			const columnMapping = { "CSV Name": "name", "CSV RFC": "rfc" };
+			const updatedImport = {
+				...mockImport,
+				columnMapping,
+				fileUrl: "https://example.com/test.csv",
+			};
+			vi.mocked(mockRepository.updateColumnMappingIfPending).mockResolvedValue(
+				updatedImport,
+			);
+
+			const result = await service.startImport(organizationId, mockImport.id, {
+				columnMapping,
+			});
+
+			expect(result.import).toEqual(updatedImport);
+			expect(result.job).toEqual({
+				importId: updatedImport.id,
+				organizationId,
+				entityType: updatedImport.entityType,
+				activityCode: undefined,
+				fileUrl: updatedImport.fileUrl,
+				createdBy: updatedImport.createdBy,
+				columnMapping,
+			});
+			expect(mockRepository.updateColumnMappingIfPending).toHaveBeenCalledWith(
+				mockImport.id,
+				organizationId,
+				columnMapping,
 			);
 		});
 	});

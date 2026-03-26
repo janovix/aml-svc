@@ -139,7 +139,7 @@ enum ReportPeriodType {
 enum ReportTemplate {
   EXECUTIVE_SUMMARY
   COMPLIANCE_STATUS
-  TRANSACTION_ANALYSIS
+  OPERATION_ANALYSIS
   CLIENT_RISK_PROFILE
   ALERT_BREAKDOWN
   PERIOD_COMPARISON
@@ -1223,7 +1223,7 @@ model OrganizationSettings {
   obligatedSubjectKey         String   @map("obligated_subject_key")
   activityKey                 String   @map("activity_key")
   // KYC Self-Service settings
-  selfServiceMode             String   @default("disabled") @map("self_service_mode")
+  selfServiceMode             String   @default("automatic") @map("self_service_mode")
   selfServiceExpiryHours      Int      @default(72) @map("self_service_expiry_hours")
   selfServiceRequiredSections String?  @map("self_service_required_sections") // JSON array
   createdAt                   DateTime @default(now()) @map("created_at")
@@ -1515,6 +1515,7 @@ model Import {
   errorCount     Int              @default(0) @map("error_count")
   skippedCount   Int              @default(0) @map("skipped_count")
   errorMessage   String?          @map("error_message")
+  columnMapping  Json?            @map("column_mapping")
   createdBy      String           @map("created_by")
   startedAt      DateTime?        @map("started_at")
   completedAt    DateTime?        @map("completed_at")

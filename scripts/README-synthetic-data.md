@@ -60,7 +60,7 @@ jobs:
           USER_ID: ${{ inputs.user_id }}
           MODELS: ${{ inputs.models }}
           CLIENTS_COUNT: ${{ inputs.clients_count }}
-          TRANSACTIONS_COUNT: ${{ inputs.transactions_count }}
+          OPERATIONS_COUNT: ${{ inputs.operations_count }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_CONFIG: wrangler.preview.jsonc
@@ -82,9 +82,9 @@ For local development, you can either:
    ```bash
    cd aml-svc
    USER_ID=user-123 \
-   MODELS=clients,transactions \
+   MODELS=clients,operations \
    CLIENTS_COUNT=10 \
-   TRANSACTIONS_COUNT=50 \
+   OPERATIONS_COUNT=50 \
    node scripts/generate-synthetic-data.mjs
    ```
 
@@ -101,10 +101,10 @@ For local development, you can either:
      -H "X-Synthetic-Data-Secret: your-secret-token" \
      -d '{
        "userId": "user-123",
-       "models": ["clients", "transactions"],
+       "models": ["clients", "operations"],
        "options": {
          "clients": { "count": 10 },
-         "transactions": { "count": 50 }
+         "operations": { "count": 50 }
        }
      }'
    ```
@@ -114,12 +114,12 @@ For local development, you can either:
 | Variable                    | Required     | Description                                            | Default                |
 | --------------------------- | ------------ | ------------------------------------------------------ | ---------------------- |
 | `USER_ID`                   | Yes          | User ID for which to generate data                     | -                      |
-| `MODELS`                    | Yes          | Comma-separated list of models: `clients,transactions` | -                      |
+| `MODELS`                    | Yes          | Comma-separated list of models: `clients,operations`   | -                      |
 | `CLIENTS_COUNT`             | No           | Number of clients to generate                          | 10                     |
 | `CLIENTS_INCLUDE_DOCUMENTS` | No           | Include documents for clients                          | false                  |
 | `CLIENTS_INCLUDE_ADDRESSES` | No           | Include addresses for clients                          | false                  |
-| `TRANSACTIONS_COUNT`        | No           | Number of transactions to generate                     | 50                     |
-| `TRANSACTIONS_PER_CLIENT`   | No           | Number of transactions per client                      | -                      |
+| `OPERATIONS_COUNT`          | No           | Number of operations to generate                       | 50                     |
+| `OPERATIONS_PER_CLIENT`     | No           | Number of operations per client                        | -                      |
 | `CLOUDFLARE_API_TOKEN`      | Yes (remote) | Cloudflare API token for D1 access                     | -                      |
 | `CLOUDFLARE_ACCOUNT_ID`     | Yes (remote) | Cloudflare account ID                                  | -                      |
 | `WRANGLER_CONFIG`           | No           | Wrangler config file                                   | wrangler.preview.jsonc |

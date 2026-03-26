@@ -54,7 +54,7 @@ async function createTestJWT(
 describe("Admin Routes", () => {
 	let testKeyPair: KeyPairResult;
 	let testJWKS: JSONWebKeySet;
-	let mockAuthService: Fetcher;
+	let mockAuthService: { getJwks: () => Promise<JSONWebKeySet> };
 	let app: Hono<{
 		Bindings: AdminAuthBindings & { DB: D1Database };
 		Variables: AdminAuthVariables;
@@ -69,29 +69,10 @@ describe("Admin Routes", () => {
 		const publicJWK = await publicKeyToJWK(testKeyPair.publicKey);
 		testJWKS = { keys: [publicJWK] };
 
-		// Mock AUTH_SERVICE binding for JWKS endpoint
-		// This simulates the service binding to auth-svc
+		// Mock AUTH_SERVICE binding for JWKS via RPC
 		mockAuthService = {
-			fetch: vi.fn().mockImplementation(async (url: string | Request) => {
-				let urlStr: string;
-				if (typeof url === "string") {
-					urlStr = url;
-				} else if (url instanceof Request) {
-					urlStr = url.url;
-				} else {
-					urlStr = String(url);
-				}
-
-				if (urlStr.includes("/api/auth/jwks")) {
-					return new Response(JSON.stringify(testJWKS), {
-						status: 200,
-						headers: { "Content-Type": "application/json" },
-					});
-				}
-				return new Response("Not Found", { status: 404 });
-			}),
-			connect: vi.fn(),
-		} as unknown as Fetcher;
+			getJwks: vi.fn().mockResolvedValue(testJWKS),
+		};
 
 		// Create test app
 		app = new Hono<{

@@ -36,6 +36,7 @@
 		{
 			"binding": "AUTH_SERVICE",
 			"service": "auth-svc",
+			"entrypoint": "AuthSvcEntrypoint",
 		},
 		{
 			"binding": "DOC_SERVICE",
@@ -44,10 +45,12 @@
 		{
 			"binding": "WATCHLIST_SERVICE",
 			"service": "watchlist-svc",
+			"entrypoint": "WatchlistEntrypoint",
 		},
 		{
 			"binding": "NOTIFICATIONS_SERVICE",
 			"service": "notifications-svc",
+			"entrypoint": "NotificationsEntrypoint",
 		},
 	],
 	"queues": {

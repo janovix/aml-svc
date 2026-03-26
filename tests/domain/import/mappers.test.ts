@@ -31,6 +31,7 @@ describe("Import Mappers", () => {
 				completedAt: null,
 				createdAt: new Date("2025-01-15T09:00:00Z"),
 				updatedAt: new Date("2025-01-15T10:30:00Z"),
+				columnMapping: null,
 			};
 
 			const result = mapPrismaImport(prismaImport);
@@ -44,6 +45,93 @@ describe("Import Mappers", () => {
 			expect(result.processedRows).toBe(50);
 			expect(result.startedAt).toBe("2025-01-15T10:00:00.000Z");
 			expect(result.completedAt).toBeNull();
+		});
+
+		it("should map columnMapping when valid object with string values", () => {
+			const prismaImport = {
+				id: "IMP123",
+				organizationId: "org-1",
+				entityType: "CLIENT" as const,
+				activityCode: null,
+				fileName: "f.csv",
+				fileUrl: "url",
+				fileSize: 0,
+				status: "PENDING" as const,
+				totalRows: 0,
+				processedRows: 0,
+				successCount: 0,
+				warningCount: 0,
+				errorCount: 0,
+				skippedCount: 0,
+				errorMessage: null,
+				createdBy: "u",
+				startedAt: null,
+				completedAt: null,
+				createdAt: new Date("2025-01-01T00:00:00Z"),
+				updatedAt: new Date("2025-01-01T00:00:00Z"),
+				columnMapping: { "CSV Col": "name" },
+			};
+
+			const result = mapPrismaImport(prismaImport);
+			expect(result.columnMapping).toEqual({ "CSV Col": "name" });
+		});
+
+		it("should map columnMapping to null when value is non-null but has non-string values", () => {
+			const prismaImport = {
+				id: "IMP123",
+				organizationId: "org-1",
+				entityType: "CLIENT" as const,
+				activityCode: null,
+				fileName: "f.csv",
+				fileUrl: "url",
+				fileSize: 0,
+				status: "PENDING" as const,
+				totalRows: 0,
+				processedRows: 0,
+				successCount: 0,
+				warningCount: 0,
+				errorCount: 0,
+				skippedCount: 0,
+				errorMessage: null,
+				createdBy: "u",
+				startedAt: null,
+				completedAt: null,
+				createdAt: new Date("2025-01-01T00:00:00Z"),
+				updatedAt: new Date("2025-01-01T00:00:00Z"),
+				columnMapping: { a: 1 } as unknown as Record<string, string>,
+			};
+
+			const result = mapPrismaImport(prismaImport);
+			expect(result.columnMapping).toBeNull();
+		});
+
+		it("should map columnMapping to null when value is array", () => {
+			const prismaImport = {
+				id: "IMP123",
+				organizationId: "org-1",
+				entityType: "CLIENT" as const,
+				activityCode: null,
+				fileName: "f.csv",
+				fileUrl: "url",
+				fileSize: 0,
+				status: "PENDING" as const,
+				totalRows: 0,
+				processedRows: 0,
+				successCount: 0,
+				warningCount: 0,
+				errorCount: 0,
+				skippedCount: 0,
+				errorMessage: null,
+				createdBy: "u",
+				startedAt: null,
+				completedAt: null,
+				createdAt: new Date("2025-01-01T00:00:00Z"),
+				updatedAt: new Date("2025-01-01T00:00:00Z"),
+				columnMapping: ["a", "b"] as unknown as Record<string, string>,
+			};
+
+			const result = mapPrismaImport(prismaImport);
+			expect(result.columnMapping).toBeNull();
 		});
 	});
 

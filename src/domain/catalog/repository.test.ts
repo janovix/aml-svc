@@ -584,4 +584,78 @@ describe("CatalogRepository", () => {
 			);
 		});
 	});
+
+	describe("findItemByNormalizedName", () => {
+		it("returns item when found by normalized name", async () => {
+			const mockItem = {
+				id: "item-1",
+				catalogId: "catalog-1",
+				name: "Toyota",
+				normalizedName: "toyota",
+				active: true,
+				metadata: null,
+				createdAt: new Date("2024-01-01"),
+				updatedAt: new Date("2024-01-01"),
+			};
+			vi.mocked(mockPrisma.catalogItem.findFirst).mockResolvedValue(mockItem);
+
+			const result = await repository.findItemByNormalizedName(
+				"catalog-1",
+				"toyota",
+			);
+
+			expect(result).toMatchObject({ id: "item-1", name: "Toyota" });
+			expect(mockPrisma.catalogItem.findFirst).toHaveBeenCalledWith({
+				where: { catalogId: "catalog-1", normalizedName: "toyota" },
+			});
+		});
+
+		it("returns null when item not found by normalized name", async () => {
+			vi.mocked(mockPrisma.catalogItem.findFirst).mockResolvedValue(null);
+
+			const result = await repository.findItemByNormalizedName(
+				"catalog-1",
+				"nonexistent",
+			);
+
+			expect(result).toBeNull();
+		});
+	});
+
+	describe("createItem", () => {
+		it("creates a catalog item and returns the entity", async () => {
+			const mockCreatedItem = {
+				id: "CATALOG_ITEM_abc123",
+				catalogId: "catalog-1",
+				name: "Honda",
+				normalizedName: "honda",
+				active: true,
+				metadata: null,
+				createdAt: new Date("2024-01-01"),
+				updatedAt: new Date("2024-01-01"),
+			};
+			vi.mocked(mockPrisma.catalogItem.create).mockResolvedValue(
+				mockCreatedItem,
+			);
+
+			const result = await repository.createItem("catalog-1", "Honda");
+
+			expect(result).toMatchObject({
+				catalogId: "catalog-1",
+				name: "Honda",
+				normalizedName: "honda",
+				active: true,
+			});
+			expect(mockPrisma.catalogItem.create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						catalogId: "catalog-1",
+						name: "Honda",
+						normalizedName: "honda",
+						active: true,
+					}),
+				}),
+			);
+		});
+	});
 });

@@ -461,7 +461,7 @@ CREATE TABLE operation_virtual_assets (
     operation_id TEXT NOT NULL UNIQUE,
     asset_type_code TEXT NOT NULL, -- tipo_activo_virtual
     asset_name TEXT, -- nombre del activo (Bitcoin, Ethereum, etc.)
-    -- Transaction details
+    -- Operation details
     wallet_address_origin TEXT,
     wallet_address_destination TEXT,
     exchange_name TEXT, -- nombre del exchange
@@ -703,8 +703,8 @@ CREATE TABLE operation_cards (
     -- Issuer
     issuer_name TEXT,
     credit_limit NUMERIC,
-    -- Transaction
-    transaction_type TEXT, -- compra, retiro, pago
+    -- Card transaction type (compra, retiro, pago)
+    transaction_type TEXT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (operation_id) REFERENCES operations(id) ON DELETE CASCADE
@@ -853,7 +853,7 @@ CREATE TABLE reports (
     id TEXT PRIMARY KEY NOT NULL,
     organization_id TEXT NOT NULL,
     name TEXT NOT NULL,
-    template TEXT NOT NULL DEFAULT 'CUSTOM' CHECK(template IN ('EXECUTIVE_SUMMARY','COMPLIANCE_STATUS','TRANSACTION_ANALYSIS','CLIENT_RISK_PROFILE','ALERT_BREAKDOWN','PERIOD_COMPARISON','CUSTOM')),
+    template TEXT NOT NULL DEFAULT 'CUSTOM' CHECK(template IN ('EXECUTIVE_SUMMARY','COMPLIANCE_STATUS','OPERATION_ANALYSIS','CLIENT_RISK_PROFILE','ALERT_BREAKDOWN','PERIOD_COMPARISON','CUSTOM')),
     period_type TEXT NOT NULL DEFAULT 'CUSTOM' CHECK(period_type IN ('MONTHLY','QUARTERLY','ANNUAL','CUSTOM')),
     period_start DATETIME NOT NULL,
     period_end DATETIME NOT NULL,

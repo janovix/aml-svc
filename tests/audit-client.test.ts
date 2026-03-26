@@ -6,20 +6,28 @@ import {
 	type AuditLogResult,
 } from "../src/lib/audit-client";
 import type { Bindings } from "../src/index";
+import type { AuthSvcRpc } from "../src/types";
 
-// Type for parsed request body in tests
-type RequestBody = Record<string, unknown>;
-
-// Helper to create a mock fetcher
-function createMockFetcher(
-	response: Response | (() => Response | Promise<Response>),
-): Fetcher {
+// Helper to create a mock AUTH_SERVICE with logAuditEvent RPC
+function createMockAuthService(
+	result:
+		| AuditLogResult
+		| null
+		| (() => AuditLogResult | null | Promise<AuditLogResult | null>),
+): AuthSvcRpc {
 	return {
-		fetch: vi.fn().mockImplementation(async () => {
-			return typeof response === "function" ? response() : response;
-		}),
-		connect: vi.fn(),
-	};
+		fetch: vi.fn(),
+		getJwks: vi.fn(),
+		getResolvedSettings: vi.fn(),
+		logAuditEvent: vi
+			.fn()
+			.mockImplementation(async () =>
+				typeof result === "function" ? result() : result,
+			),
+		gateUsageRights: vi.fn(),
+		meterUsageRights: vi.fn(),
+		checkUsageRights: vi.fn(),
+	} as unknown as AuthSvcRpc;
 }
 
 describe("AuditClient", () => {
@@ -34,7 +42,6 @@ describe("AuditClient", () => {
 			const env = { ...defaultEnv } as Bindings;
 			const client = new AuditClient(env);
 
-			// Verify by checking the request body sent
 			expect(client).toBeDefined();
 		});
 
@@ -53,7 +60,7 @@ describe("AuditClient", () => {
 
 			const input: AuditLogInput = {
 				eventType: "CREATE",
-				entityType: "transaction",
+				entityType: "operation",
 				entityId: "tx-123",
 			};
 
@@ -68,19 +75,13 @@ describe("AuditClient", () => {
 				signature: "sig-abc",
 			};
 
-			const mockFetcher = createMockFetcher(
-				new Response(JSON.stringify({ success: true, data: mockResult }), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				}),
-			);
-
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+			const mockAuthService = createMockAuthService(mockResult);
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 			const client = new AuditClient(env);
 
 			const input: AuditLogInput = {
 				eventType: "CREATE",
-				entityType: "transaction",
+				entityType: "operation",
 				entityId: "tx-123",
 				actorUserId: "user-456",
 				actorOrganizationId: "org-789",
@@ -91,36 +92,32 @@ describe("AuditClient", () => {
 			const result = await client.log(input);
 
 			expect(result).toEqual(mockResult);
-			expect(mockFetcher.fetch).toHaveBeenCalledTimes(1);
-
-			// Verify the request structure
-			const fetchCall = vi.mocked(mockFetcher.fetch).mock.calls[0];
-			const request = fetchCall[0] as Request;
-
-			expect(request.method).toBe("POST");
-			expect(request.url).toBe("https://auth-svc.internal/internal/audit/log");
-			expect(request.headers.get("Content-Type")).toBe("application/json");
-			expect(request.headers.get("Accept")).toBe("application/json");
-
-			const body = await request.clone().json();
-			expect(body).toEqual({
+			expect(mockAuthService.logAuditEvent).toHaveBeenCalledTimes(1);
+			expect(mockAuthService.logAuditEvent).toHaveBeenCalledWith({
 				...input,
 				sourceService: "aml-svc",
 			});
 		});
 
-		it("should use custom source service in request body", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response(
-					JSON.stringify({
-						success: true,
-						data: { id: "audit-123", signature: "sig" },
-					}),
-					{ status: 200, headers: { "Content-Type": "application/json" } },
-				),
-			);
+		it("should return null when logAuditEvent returns null", async () => {
+			const mockAuthService = createMockAuthService(null);
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
+			const client = new AuditClient(env);
 
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+			const result = await client.log({
+				eventType: "CREATE",
+				entityType: "tx",
+			});
+
+			expect(result).toBeNull();
+		});
+
+		it("should use custom source service in request body", async () => {
+			const mockAuthService = createMockAuthService({
+				id: "audit-123",
+				signature: "sig",
+			});
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 			const client = new AuditClient(env, "import-svc");
 
 			await client.log({
@@ -128,63 +125,21 @@ describe("AuditClient", () => {
 				entityType: "batch",
 			});
 
-			const fetchCall = vi.mocked(mockFetcher.fetch).mock.calls[0];
-			const request = fetchCall[0] as Request;
-			const body = (await request.clone().json()) as RequestBody;
-
-			expect(body.sourceService).toBe("import-svc");
-		});
-
-		it("should return null on non-OK response", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response("Internal Server Error", {
-					status: 500,
-					statusText: "Internal Server Error",
-				}),
+			expect(mockAuthService.logAuditEvent).toHaveBeenCalledWith(
+				expect.objectContaining({ sourceService: "import-svc" }),
 			);
-
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
-			const client = new AuditClient(env);
-
-			const result = await client.log({
-				eventType: "CREATE",
-				entityType: "transaction",
-			});
-
-			expect(result).toBeNull();
 		});
 
-		it("should return null when response indicates failure", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response(
-					JSON.stringify({ success: false, error: "Validation failed" }),
-					{ status: 200, headers: { "Content-Type": "application/json" } },
-				),
-			);
-
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
-			const client = new AuditClient(env);
-
-			const result = await client.log({
-				eventType: "CREATE",
-				entityType: "transaction",
+		it("should return null on exception", async () => {
+			const mockAuthService = createMockAuthService(() => {
+				throw new Error("Network error");
 			});
-
-			expect(result).toBeNull();
-		});
-
-		it("should return null on fetch exception", async () => {
-			const mockFetcher: Fetcher = {
-				fetch: vi.fn().mockRejectedValue(new Error("Network error")),
-				connect: vi.fn(),
-			};
-
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 			const client = new AuditClient(env);
 
 			const result = await client.log({
 				eventType: "CREATE",
-				entityType: "transaction",
+				entityType: "operation",
 			});
 
 			expect(result).toBeNull();
@@ -192,51 +147,65 @@ describe("AuditClient", () => {
 	});
 
 	describe("logCreate", () => {
-		it("should call log with CREATE event type", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response(
-					JSON.stringify({
-						success: true,
-						data: { id: "audit-123", signature: "sig" },
-					}),
-					{ status: 200, headers: { "Content-Type": "application/json" } },
-				),
+		it("should work without options (uses default empty options)", async () => {
+			const mockAuthService = createMockAuthService({
+				id: "audit-1",
+				signature: "s",
+			});
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
+			const client = new AuditClient(env);
+			await client.logCreate("client", "c-1", { name: "Test" });
+			expect(mockAuthService.logAuditEvent).toHaveBeenCalledWith(
+				expect.objectContaining({ eventType: "CREATE" }),
 			);
+		});
 
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+		it("should call log with CREATE event type", async () => {
+			const mockAuthService = createMockAuthService({
+				id: "audit-123",
+				signature: "sig",
+			});
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 			const client = new AuditClient(env);
 
-			const newState = { name: "Test Transaction", amount: 500 };
+			const newState = { name: "Test Operation", amount: 500 };
 
-			await client.logCreate("transaction", "tx-123", newState, {
+			await client.logCreate("operation", "tx-123", newState, {
 				actorUserId: "user-456",
 			});
 
-			const fetchCall = vi.mocked(mockFetcher.fetch).mock.calls[0];
-			const request = fetchCall[0] as Request;
-			const body = (await request.clone().json()) as RequestBody;
-
-			expect(body.eventType).toBe("CREATE");
-			expect(body.entityType).toBe("transaction");
-			expect(body.entityId).toBe("tx-123");
-			expect(body.newState).toEqual(newState);
-			expect(body.actorUserId).toBe("user-456");
+			expect(mockAuthService.logAuditEvent).toHaveBeenCalledWith(
+				expect.objectContaining({
+					eventType: "CREATE",
+					entityType: "operation",
+					entityId: "tx-123",
+					newState,
+					actorUserId: "user-456",
+				}),
+			);
 		});
 	});
 
 	describe("logUpdate", () => {
-		it("should call log with UPDATE event type and both states", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response(
-					JSON.stringify({
-						success: true,
-						data: { id: "audit-123", signature: "sig" },
-					}),
-					{ status: 200, headers: { "Content-Type": "application/json" } },
-				),
+		it("should work without options (uses default empty options)", async () => {
+			const mockAuthService = createMockAuthService({
+				id: "audit-1",
+				signature: "s",
+			});
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
+			const client = new AuditClient(env);
+			await client.logUpdate("client", "c-1", { old: true }, { new: true });
+			expect(mockAuthService.logAuditEvent).toHaveBeenCalledWith(
+				expect.objectContaining({ eventType: "UPDATE" }),
 			);
+		});
 
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+		it("should call log with UPDATE event type and both states", async () => {
+			const mockAuthService = createMockAuthService({
+				id: "audit-123",
+				signature: "sig",
+			});
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 			const client = new AuditClient(env);
 
 			const previousState = { status: "DRAFT" };
@@ -246,62 +215,63 @@ describe("AuditClient", () => {
 				metadata: { reason: "review_complete" },
 			});
 
-			const fetchCall = vi.mocked(mockFetcher.fetch).mock.calls[0];
-			const request = fetchCall[0] as Request;
-			const body = (await request.clone().json()) as RequestBody;
-
-			expect(body.eventType).toBe("UPDATE");
-			expect(body.entityType).toBe("alert");
-			expect(body.entityId).toBe("alert-123");
-			expect(body.previousState).toEqual(previousState);
-			expect(body.newState).toEqual(newState);
-			expect(body.metadata).toEqual({ reason: "review_complete" });
+			expect(mockAuthService.logAuditEvent).toHaveBeenCalledWith(
+				expect.objectContaining({
+					eventType: "UPDATE",
+					entityType: "alert",
+					entityId: "alert-123",
+					previousState,
+					newState,
+					metadata: { reason: "review_complete" },
+				}),
+			);
 		});
 	});
 
 	describe("logDelete", () => {
 		it("should call log with DELETE event type", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response(
-					JSON.stringify({
-						success: true,
-						data: { id: "audit-123", signature: "sig" },
-					}),
-					{ status: 200, headers: { "Content-Type": "application/json" } },
-				),
-			);
-
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+			const mockAuthService = createMockAuthService({
+				id: "audit-123",
+				signature: "sig",
+			});
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 			const client = new AuditClient(env);
 
 			const previousState = { id: "notice-123", name: "January 2024 Notice" };
 
 			await client.logDelete("notice", "notice-123", previousState);
 
-			const fetchCall = vi.mocked(mockFetcher.fetch).mock.calls[0];
-			const request = fetchCall[0] as Request;
-			const body = (await request.clone().json()) as RequestBody;
-
-			expect(body.eventType).toBe("DELETE");
-			expect(body.entityType).toBe("notice");
-			expect(body.entityId).toBe("notice-123");
-			expect(body.previousState).toEqual(previousState);
+			expect(mockAuthService.logAuditEvent).toHaveBeenCalledWith(
+				expect.objectContaining({
+					eventType: "DELETE",
+					entityType: "notice",
+					entityId: "notice-123",
+					previousState,
+				}),
+			);
 		});
 	});
 
 	describe("logExport", () => {
-		it("should call log with EXPORT event type", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response(
-					JSON.stringify({
-						success: true,
-						data: { id: "audit-123", signature: "sig" },
-					}),
-					{ status: 200, headers: { "Content-Type": "application/json" } },
-				),
+		it("should work without options (uses default empty options)", async () => {
+			const mockAuthService = createMockAuthService({
+				id: "audit-1",
+				signature: "s",
+			});
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
+			const client = new AuditClient(env);
+			await client.logExport("client", { format: "csv" });
+			expect(mockAuthService.logAuditEvent).toHaveBeenCalledWith(
+				expect.objectContaining({ eventType: "EXPORT" }),
 			);
+		});
 
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+		it("should call log with EXPORT event type", async () => {
+			const mockAuthService = createMockAuthService({
+				id: "audit-123",
+				signature: "sig",
+			});
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 			const client = new AuditClient(env);
 
 			const metadata = { format: "xml", recordCount: 150 };
@@ -310,43 +280,37 @@ describe("AuditClient", () => {
 				actorOrganizationId: "org-789",
 			});
 
-			const fetchCall = vi.mocked(mockFetcher.fetch).mock.calls[0];
-			const request = fetchCall[0] as Request;
-			const body = (await request.clone().json()) as RequestBody;
-
-			expect(body.eventType).toBe("EXPORT");
-			expect(body.entityType).toBe("notice");
-			expect(body.metadata).toEqual(metadata);
-			expect(body.actorOrganizationId).toBe("org-789");
+			expect(mockAuthService.logAuditEvent).toHaveBeenCalledWith(
+				expect.objectContaining({
+					eventType: "EXPORT",
+					entityType: "notice",
+					metadata,
+					actorOrganizationId: "org-789",
+				}),
+			);
 		});
 	});
 
 	describe("logImport", () => {
 		it("should call log with IMPORT event type", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response(
-					JSON.stringify({
-						success: true,
-						data: { id: "audit-123", signature: "sig" },
-					}),
-					{ status: 200, headers: { "Content-Type": "application/json" } },
-				),
-			);
-
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+			const mockAuthService = createMockAuthService({
+				id: "audit-123",
+				signature: "sig",
+			});
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 			const client = new AuditClient(env);
 
 			const metadata = { source: "csv_upload", rowCount: 500, errors: 3 };
 
-			await client.logImport("transactions", metadata);
+			await client.logImport("operations", metadata);
 
-			const fetchCall = vi.mocked(mockFetcher.fetch).mock.calls[0];
-			const request = fetchCall[0] as Request;
-			const body = (await request.clone().json()) as RequestBody;
-
-			expect(body.eventType).toBe("IMPORT");
-			expect(body.entityType).toBe("transactions");
-			expect(body.metadata).toEqual(metadata);
+			expect(mockAuthService.logAuditEvent).toHaveBeenCalledWith(
+				expect.objectContaining({
+					eventType: "IMPORT",
+					entityType: "operations",
+					metadata,
+				}),
+			);
 		});
 	});
 });

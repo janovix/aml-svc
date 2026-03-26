@@ -32,7 +32,6 @@ export interface AdminUser {
  */
 export type AdminAuthBindings = Bindings & {
 	AUTH_JWKS_CACHE_TTL?: string;
-	AUTH_SERVICE: Fetcher;
 };
 
 /**
@@ -58,7 +57,7 @@ export function clearJWKSCache(): void {
 
 async function getJWKS(
 	cacheTtl: number,
-	authServiceBinding: Fetcher,
+	authServiceBinding: import("../types").AuthSvcRpc,
 ): Promise<jose.JSONWebKeySet> {
 	const now = Date.now();
 
@@ -66,25 +65,14 @@ async function getJWKS(
 		return cachedJWKS;
 	}
 
-	// Construct JWKS URL with internal hostname
-	// When using service binding, the hostname doesn't affect routing but is used for Host header
-	const jwksUrl = "http://internal/api/auth/jwks";
-
-	// Use service binding for direct worker-to-worker communication
-	// The hostname in the URL is used for the Host header but routing is handled by the binding
-	const response = await authServiceBinding.fetch(
-		new Request(jwksUrl, {
-			headers: { Accept: "application/json" },
-		}),
-	);
-
-	if (!response.ok) {
+	let jwks: jose.JSONWebKeySet;
+	try {
+		jwks = (await authServiceBinding.getJwks()) as jose.JSONWebKeySet;
+	} catch (error) {
 		throw new Error(
-			`Failed to fetch JWKS from service binding: ${response.status} ${response.statusText}`,
+			`Failed to fetch JWKS from auth service: ${error instanceof Error ? error.message : String(error)}`,
 		);
 	}
-
-	const jwks = (await response.json()) as jose.JSONWebKeySet;
 
 	if (!jwks.keys || !Array.isArray(jwks.keys) || jwks.keys.length === 0) {
 		throw new Error("Invalid JWKS: no keys found");
@@ -99,7 +87,7 @@ async function getJWKS(
 async function verifyToken(
 	token: string,
 	cacheTtl: number,
-	authServiceBinding: Fetcher,
+	authServiceBinding: import("../types").AuthSvcRpc,
 ): Promise<AdminTokenPayload> {
 	const jwks = await getJWKS(cacheTtl, authServiceBinding);
 	const jwksInstance = jose.createLocalJWKSet(jwks);

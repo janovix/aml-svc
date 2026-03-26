@@ -28,12 +28,12 @@ These workflows can be triggered manually from the GitHub Actions tab.
 
 **Operations**:
 
-| Operation            | Description                 | Includes                                  |
-| -------------------- | --------------------------- | ----------------------------------------- |
-| `populate-all`       | **Complete reference data** | Core + CFDI + PLD + Activities + UMA      |
-| `populate-catalogs`  | **Core catalogs only**      | Core + CFDI + PLD + Activities (no UMA)   |
-| `populate-zip-codes` | **Zip codes only**          | ~140K+ postal codes                       |
-| `seed`               | **Synthetic test data**     | Test organizations, clients, transactions |
+| Operation            | Description                 | Includes                                |
+| -------------------- | --------------------------- | --------------------------------------- |
+| `populate-all`       | **Complete reference data** | Core + CFDI + PLD + Activities + UMA    |
+| `populate-catalogs`  | **Core catalogs only**      | Core + CFDI + PLD + Activities (no UMA) |
+| `populate-zip-codes` | **Zip codes only**          | ~140K+ postal codes                     |
+| `seed`               | **Synthetic test data**     | Test organizations, clients, operations |
 
 **Environments**: `dev`, `prod`, `preview`
 
@@ -140,7 +140,7 @@ These workflows can be triggered manually from the GitHub Actions tab.
 
 - Test organizations
 - Test clients
-- Test transactions
+- Test operations
 - Test notices
 - Test reports
 - Test alert rules

@@ -7,17 +7,28 @@ import {
 	type BrowserHints,
 } from "../src/lib/auth-settings";
 import type { Bindings } from "../src/index";
+import type { AuthSvcRpc } from "../src/types";
 
-// Helper to create a mock fetcher
-function createMockFetcher(
-	response: Response | (() => Response | Promise<Response>),
-): Fetcher {
+// Helper to create a mock AUTH_SERVICE with getResolvedSettings RPC
+function createMockAuthService(
+	result:
+		| ResolvedSettings
+		| null
+		| (() => ResolvedSettings | null | Promise<ResolvedSettings | null>),
+): AuthSvcRpc {
 	return {
-		fetch: vi.fn().mockImplementation(async () => {
-			return typeof response === "function" ? response() : response;
-		}),
-		connect: vi.fn(),
-	};
+		fetch: vi.fn(),
+		getJwks: vi.fn(),
+		getResolvedSettings: vi
+			.fn()
+			.mockImplementation(async () =>
+				typeof result === "function" ? result() : result,
+			),
+		logAuditEvent: vi.fn(),
+		gateUsageRights: vi.fn(),
+		meterUsageRights: vi.fn(),
+		checkUsageRights: vi.fn(),
+	} as unknown as AuthSvcRpc;
 }
 
 describe("auth-settings", () => {
@@ -58,57 +69,36 @@ describe("auth-settings", () => {
 		});
 
 		it("should return resolved settings on successful request", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response(JSON.stringify({ success: true, data: mockSettings }), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				}),
-			);
-
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+			const mockAuthService = createMockAuthService(mockSettings);
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 
 			const result = await getResolvedSettings(env, "user-123");
 
 			expect(result).toEqual(mockSettings);
-			expect(mockFetcher.fetch).toHaveBeenCalledTimes(1);
-
-			// Verify the request URL contains userId
-			const fetchCall = vi.mocked(mockFetcher.fetch).mock.calls[0];
-			const request = fetchCall[0] as Request;
-
-			expect(request.url).toContain("userId=user-123");
-			expect(request.headers.get("Accept")).toBe("application/json");
+			expect(mockAuthService.getResolvedSettings).toHaveBeenCalledTimes(1);
+			expect(mockAuthService.getResolvedSettings).toHaveBeenCalledWith(
+				"user-123",
+				undefined,
+				undefined,
+			);
 		});
 
 		it("should include orgId in request when provided", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response(JSON.stringify({ success: true, data: mockSettings }), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				}),
-			);
-
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+			const mockAuthService = createMockAuthService(mockSettings);
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 
 			await getResolvedSettings(env, "user-123", "org-456");
 
-			const fetchCall = vi.mocked(mockFetcher.fetch).mock.calls[0];
-			const request = fetchCall[0] as Request;
-			const url = new URL(request.url);
-
-			expect(url.searchParams.get("userId")).toBe("user-123");
-			expect(url.searchParams.get("orgId")).toBe("org-456");
+			expect(mockAuthService.getResolvedSettings).toHaveBeenCalledWith(
+				"user-123",
+				"org-456",
+				undefined,
+			);
 		});
 
 		it("should include browser hints as base64 encoded headers param", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response(JSON.stringify({ success: true, data: mockSettings }), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				}),
-			);
-
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+			const mockAuthService = createMockAuthService(mockSettings);
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 			const browserHints: BrowserHints = {
 				"accept-language": "es-MX,es;q=0.9,en;q=0.8",
 				"x-timezone": "America/Mexico_City",
@@ -117,95 +107,79 @@ describe("auth-settings", () => {
 
 			await getResolvedSettings(env, "user-123", undefined, browserHints);
 
-			const fetchCall = vi.mocked(mockFetcher.fetch).mock.calls[0];
-			const request = fetchCall[0] as Request;
-			const url = new URL(request.url);
-
-			const headersParam = url.searchParams.get("headers");
-			expect(headersParam).not.toBeNull();
+			expect(mockAuthService.getResolvedSettings).toHaveBeenCalledTimes(1);
+			const [, , encodedHints] = vi.mocked(mockAuthService.getResolvedSettings)
+				.mock.calls[0];
+			expect(encodedHints).toBeDefined();
 
 			// Decode and verify the browser hints
-			const decoded = JSON.parse(atob(headersParam!));
+			const decoded = JSON.parse(atob(encodedHints!));
 			expect(decoded).toEqual(browserHints);
 		});
 
 		it("should not include headers param when browser hints are not provided", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response(JSON.stringify({ success: true, data: mockSettings }), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				}),
-			);
-
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+			const mockAuthService = createMockAuthService(mockSettings);
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 
 			await getResolvedSettings(env, "user-123");
 
-			const fetchCall = vi.mocked(mockFetcher.fetch).mock.calls[0];
-			const request = fetchCall[0] as Request;
-			const url = new URL(request.url);
-
-			expect(url.searchParams.has("headers")).toBe(false);
+			const [, , encodedHints] = vi.mocked(mockAuthService.getResolvedSettings)
+				.mock.calls[0];
+			expect(encodedHints).toBeUndefined();
 		});
 
-		it("should return null on non-OK response", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response("Not Found", { status: 404, statusText: "Not Found" }),
-			);
+		it("should handle wrapped { success: true, data: ... } response", async () => {
+			const mockAuthService = createMockAuthService({
+				success: true,
+				data: mockSettings,
+			} as unknown as ResolvedSettings);
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+			const result = await getResolvedSettings(env, "user-123");
+
+			expect(result).toEqual(mockSettings);
+		});
+
+		it("should return null for wrapped { success: false } response", async () => {
+			const mockAuthService = createMockAuthService({
+				success: false,
+			} as unknown as ResolvedSettings);
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 
 			const result = await getResolvedSettings(env, "user-123");
 
 			expect(result).toBeNull();
 		});
 
-		it("should return null when response indicates failure", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response(JSON.stringify({ success: false }), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				}),
-			);
-
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+		it("should return null when RPC returns null", async () => {
+			const mockAuthService = createMockAuthService(null);
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 
 			const result = await getResolvedSettings(env, "user-123");
 
 			expect(result).toBeNull();
 		});
 
-		it("should return null on fetch exception", async () => {
-			const mockFetcher: Fetcher = {
-				fetch: vi.fn().mockRejectedValue(new Error("Connection refused")),
-				connect: vi.fn(),
-			};
-
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+		it("should return null on exception", async () => {
+			const mockAuthService = createMockAuthService(() => {
+				throw new Error("Connection refused");
+			});
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 
 			const result = await getResolvedSettings(env, "user-123");
 
 			expect(result).toBeNull();
 		});
 
-		it("should construct correct base URL for auth-svc internal endpoint", async () => {
-			const mockFetcher = createMockFetcher(
-				new Response(JSON.stringify({ success: true, data: mockSettings }), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				}),
-			);
-
-			const env = { AUTH_SERVICE: mockFetcher } as Bindings;
+		it("should construct correct RPC call with userId", async () => {
+			const mockAuthService = createMockAuthService(mockSettings);
+			const env = { AUTH_SERVICE: mockAuthService } as unknown as Bindings;
 
 			await getResolvedSettings(env, "user-123");
 
-			const fetchCall = vi.mocked(mockFetcher.fetch).mock.calls[0];
-			const request = fetchCall[0] as Request;
-			const url = new URL(request.url);
-
-			expect(url.origin).toBe("https://auth-svc.internal");
-			expect(url.pathname).toBe("/internal/settings/resolved");
+			const [userId] = vi.mocked(mockAuthService.getResolvedSettings).mock
+				.calls[0];
+			expect(userId).toBe("user-123");
 		});
 	});
 

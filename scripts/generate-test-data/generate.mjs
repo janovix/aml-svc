@@ -20,7 +20,12 @@
  *   - Profile mismatch — amount >> average (profile_mismatch seeker)
  *   - Activity-specific extras (minor, new-client, multiple cards, etc.)
  *
- * Usage: node generate.mjs
+ * Usage: node generate.mjs [--for-mapping]
+ *
+ *   --for-mapping   Also write CSVs with alternate column headers (e.g. Spanish)
+ *                   into output/column-mapping/ for testing the column-mapping
+ *                   import UI. Same row data; headers use aliases so users can
+ *                   map "Nombre" -> first_name, "Monto" -> amount, etc.
  */
 
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -31,6 +36,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const OUT = join(__dirname, "output");
 mkdirSync(OUT, { recursive: true });
+
+const FOR_MAPPING = process.argv.includes("--for-mapping");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // THRESHOLDS  (UMA units; null = ALWAYS — every operation triggers that level)
@@ -381,10 +388,8 @@ const REF = "2026-02-10"; // Base date for most operations
 // ─────────────────────────────────────────────────────────────────────────────
 // RFC / CURP GENERATORS
 // ─────────────────────────────────────────────────────────────────────────────
-// Letters safe for RFC/CURP generation (no I, no Ñ, keeps things ASCII-safe)
-const ALPHA = "ABCDFGHJKLMNPQRSTVWXYZ"; // 22 letters (no E/I/O/U/Ñ)
-const ALL24 = "ABCDFGHJKLMNPQRSTVWXYZ"; // same set, used for CURP non-vowel positions
-const VX = "AEIOUX"; // valid CURP position-2 chars
+// Homoclave alphabet (no I/O/U/Ñ to stay ASCII-safe and regex-compliant)
+const ALPHA = "ABCDFGHJKLMNPQRSTVWXYZ"; // 22 letters — used for homoclave only
 
 const pick = (arr, idx) => arr[((idx % arr.length) + arr.length) % arr.length];
 const pickN = (n, idx) => pick(ALPHA, idx * n + n);
@@ -394,68 +399,149 @@ function ymd6(dateStr) {
 	return y.slice(2) + m + d;
 }
 
-// Physical RFC: [A-Z]{4}\d{6}[A-Z0-9]{3}  →  13 chars
-function physRFC(idx, bdate) {
+// ── Name-letter helpers (aligned with kyc/src/lib/validation.ts) ─────────────
+
+// Returns the first uppercase letter of `name`, normalising Ñ → N.
+function nameFirstLetter(name) {
+	if (!name || name.trim().length === 0) return "X";
+	return name.trim().toUpperCase().charAt(0).replace("Ñ", "N");
+}
+
+// Returns the first internal vowel (index ≥ 1) of `name`, or "X" if none.
+function nameFirstInternalVowel(name) {
+	if (!name || name.trim().length < 2) return "X";
+	const s = name.trim().toUpperCase();
+	for (let i = 1; i < s.length; i++) {
+		if (/[AEIOU]/.test(s[i])) return s[i];
+	}
+	return "X";
+}
+
+// Returns the first internal consonant (index ≥ 1) of `name`, or "X" if none.
+// Ñ is normalised to N for CURP/RFC compatibility.
+function nameFirstInternalConsonant(name) {
+	if (!name || name.trim().length < 2) return "X";
+	const s = name.trim().toUpperCase();
+	for (let i = 1; i < s.length; i++) {
+		if (/[BCDFGHJKLMN\u00d1PQRSTVWXYZ]/.test(s[i])) {
+			return s[i] === "Ñ" ? "N" : s[i];
+		}
+	}
+	return "X";
+}
+
+// ── State code → 2-letter CURP state code map ────────────────────────────────
+const STATE_TO_CURP = {
+	CMX: "CM", // Ciudad de México
+	JAL: "JC", // Jalisco
+	NLE: "NL", // Nuevo León
+	PUE: "PL", // Puebla
+	BCN: "BC", // Baja California
+	GTO: "GT", // Guanajuato
+	YUC: "YN", // Yucatán
+	ROO: "QR", // Quintana Roo
+	VER: "VZ", // Veracruz
+	SIN: "SL", // Sinaloa
+};
+const DEFAULT_CURP_STATE = "NE"; // "Nacido en el Extranjero" — safe fallback
+
+// ── Physical RFC: [A-Z]{4}\d{6}[A-Z0-9]{3}  →  13 chars ────────────────────
+// Prefix derived from: paternal-surname, maternal-surname, first-name per SAT/RFC rules.
+// Homoclave (positions 11-13) is deterministic from idx to guarantee uniqueness.
+function physRFCFromName(ln1, ln2, fn, bdate, idx) {
+	const p1 = nameFirstLetter(ln1); // first letter of paternal surname
+	const p2 = nameFirstInternalVowel(ln1); // first internal vowel of paternal surname
+	const p3 = nameFirstLetter(ln2); // first letter of maternal surname
+	const p4 = nameFirstLetter(fn); // first letter of first name
 	const d = ymd6(bdate);
-	const a = pickN(1, idx),
-		b = pickN(7, idx),
-		c = pickN(11, idx),
-		e = pickN(13, idx);
 	const h1 = pickN(17, idx),
 		h2 = pickN(19, idx),
 		h3 = idx % 10;
-	return `${a}${b}${c}${e}${d}${h1}${h2}${h3}`;
+	return `${p1}${p2}${p3}${p4}${d}${h1}${h2}${h3}`;
 }
 
-// Moral/trust RFC: [A-Z]{3}\d{6}[A-Z0-9]{3}  →  12 chars
-function moralRFC(idx, idate) {
-	const d = ymd6(idate);
-	const a = pickN(1, idx),
-		b = pickN(7, idx),
-		c = pickN(11, idx);
-	const h1 = pickN(17, idx),
-		h2 = pickN(19, idx),
-		h3 = idx % 10;
-	return `${a}${b}${c}${d}${h1}${h2}${h3}`;
-}
-
-// CURP: [A-Z][AEIOUX][A-Z]{2}\d{6}[HM][A-Z]{5}[A-Z0-9]{2}  →  18 chars
-const STATES_CURP = [
-	"CM",
-	"JA",
-	"NL",
-	"VZ",
-	"PL",
-	"GT",
-	"YN",
-	"BC",
-	"SL",
-	"SO",
-	"CH",
-	"DG",
-	"ZS",
-	"AG",
-	"QR",
-	"TC",
-	"MN",
-	"HG",
-	"OC",
-	"CP",
-];
-function genCURP(idx, bdate, gender) {
+// ── Physical CURP: [A-Z][AEIOUX][A-Z]{2}\d{6}[HM][A-Z]{5}[A-Z0-9]{2}  →  18 chars ──
+// Matches the validation in kyc/src/lib/validation.ts (validateCURPNameMatch):
+//   pos 0   = first letter of paternal surname
+//   pos 1   = first internal vowel of paternal surname  (must be [AEIOUX])
+//   pos 2   = first letter of maternal surname
+//   pos 3   = first letter of first name
+//   pos 4-9 = YYMMDD birth date
+//   pos 10  = sex (H/M)
+//   pos 11-12 = 2-letter CURP state code
+//   pos 13  = first internal consonant of paternal surname
+//   pos 14  = first internal consonant of maternal surname
+//   pos 15  = first internal consonant of first name
+//   pos 16-17 = deterministic homoclave (letter + digit)
+function genCURPFromName(ln1, ln2, fn, bdate, gender, stateCode, idx) {
+	const p1 = nameFirstLetter(ln1);
+	const p2 = nameFirstInternalVowel(ln1); // already [AEIOUX] or X
+	const p3 = nameFirstLetter(ln2);
+	const p4 = nameFirstLetter(fn);
 	const d = ymd6(bdate);
 	const sex = gender === "M" ? "H" : "M";
-	const st = STATES_CURP[idx % STATES_CURP.length];
-	const p1 = pick(ALL24, idx);
-	const p2 = pick(VX, idx);
-	const p3 = pick(ALL24, idx * 3 + 1);
-	const p4 = pick(ALL24, idx * 7 + 2);
-	const c1 = pick(ALL24, idx * 11);
-	const c2 = pick(ALL24, idx * 13 + 3);
-	const c3 = pick(ALL24, idx * 17 + 5);
-	const hm = pick(ALL24, idx * 19);
-	const hn = idx % 10;
+	const st = STATE_TO_CURP[stateCode] ?? DEFAULT_CURP_STATE;
+	const c1 = nameFirstInternalConsonant(ln1);
+	const c2 = nameFirstInternalConsonant(ln2);
+	const c3 = nameFirstInternalConsonant(fn);
+	const hm = pickN(19, idx); // letter homoclave
+	const hn = idx % 10; // digit homoclave
 	return `${p1}${p2}${p3}${p4}${d}${sex}${st}${c1}${c2}${c3}${hm}${hn}`;
+}
+
+// ── Moral/trust RFC: [A-Z]{3}\d{6}[A-Z0-9]{3}  →  12 chars ─────────────────
+// 3-letter prefix derived from businessName per SAT rules:
+//   - strip known society suffixes and stop-words
+//   - take first letter of each of the first 3 significant words
+//   - if fewer than 3 words remain, pad with first letters of the first word
+// Homoclave (positions 10-12) is deterministic from idx.
+const MORAL_SUFFIXES =
+	/\b(S\.?A\.?\s*DE\s*C\.?V\.?|SAPI\s*DE\s*C\.?V\.?|S\.?C\.?|S\.?R\.?L\.?|A\.?C\.?|I\.?A\.?P\.?|S\.?A\.?S\.?)\s*$/i;
+const STOP_WORDS = new Set([
+	"DE",
+	"Y",
+	"LA",
+	"EL",
+	"LOS",
+	"LAS",
+	"DEL",
+	"E",
+	"A",
+]);
+
+function moralRFCFromName(businessName, idate, idx) {
+	// Strip trailing society suffix then tokenize
+	const cleaned = businessName.replace(MORAL_SUFFIXES, "").trim();
+	const words = cleaned
+		.toUpperCase()
+		.split(/\s+/)
+		.filter((w) => w.length > 0 && !STOP_WORDS.has(w));
+
+	let prefix;
+	if (words.length === 0) {
+		prefix = "XXX";
+	} else if (words.length === 1) {
+		prefix = words[0]
+			.replace(/[^A-ZÑ]/g, "")
+			.substring(0, 3)
+			.padEnd(3, "X");
+	} else if (words.length === 2) {
+		const a = words[0].replace(/[^A-ZÑ]/g, "")[0] ?? "X";
+		const b = words[1].replace(/[^A-ZÑ]/g, "")[0] ?? "X";
+		const c = words[0].replace(/[^A-ZÑ]/g, "")[1] ?? "X";
+		prefix = `${a}${b}${c}`;
+	} else {
+		const a = words[0].replace(/[^A-ZÑ]/g, "")[0] ?? "X";
+		const b = words[1].replace(/[^A-ZÑ]/g, "")[0] ?? "X";
+		const c = words[2].replace(/[^A-ZÑ]/g, "")[0] ?? "X";
+		prefix = `${a}${b}${c}`;
+	}
+
+	const d = ymd6(idate);
+	const h1 = pickN(17, idx),
+		h2 = pickN(19, idx),
+		h3 = idx % 10;
+	return `${prefix}${d}${h1}${h2}${h3}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -661,24 +747,32 @@ function buildPhysical(i) {
 	const noEcoAct = i >= 15 && i < 20;
 	const bdate = isMinor ? minorBirth(i) : adultBirth(i);
 	const gender = i % 2 === 0 ? "M" : "F";
-	const rfc = physRFC(i, bdate);
-	const curp = genCURP(i, bdate, gender);
 	const loc = isSharedAddr ? SHARED_ADDR : CITIES[i % CITIES.length];
 	const fn = FIRST[i % FIRST.length];
 	const ln1 = LAST[i % LAST.length];
 	const ln2 = LAST[(i + 10) % LAST.length];
+	const rfc = physRFCFromName(ln1, ln2, fn, bdate, i);
+	const curp = genCURPFromName(
+		ln1,
+		ln2,
+		fn,
+		bdate,
+		gender,
+		loc.state || loc.state_code,
+		i,
+	);
 	return {
 		person_type: "physical",
 		rfc,
-		first_name: fn,
-		last_name: ln1,
-		second_last_name: ln2,
+		first_name: fn.toUpperCase(),
+		last_name: ln1.toUpperCase(),
+		second_last_name: ln2.toUpperCase(),
 		birth_date: bdate,
 		curp,
 		business_name: "",
 		incorporation_date: "",
 		nationality: "MX",
-		email: `user${i}@testjanovix.com`,
+		email: `user${i}@synth.janovix.com`,
 		phone: `+5255${String(10000000 + i * 7).padStart(8, "0")}`,
 		country: "MX",
 		state_code: loc.state || loc.state_code,
@@ -704,9 +798,9 @@ function buildPhysical(i) {
 function buildMoral(i) {
 	const idx = 70 + i;
 	const idate = incorpDate(i);
-	const rfc = moralRFC(idx, idate);
 	const loc = CITIES[idx % CITIES.length];
 	const bname = `${BIZ[i % BIZ.length]} ${LAST[i % LAST.length]} ${BIZ_SFX[i % BIZ_SFX.length]}`;
+	const rfc = moralRFCFromName(bname, idate, idx);
 	return {
 		person_type: "moral",
 		rfc,
@@ -715,10 +809,10 @@ function buildMoral(i) {
 		second_last_name: "",
 		birth_date: "",
 		curp: "",
-		business_name: bname,
+		business_name: bname.toUpperCase(),
 		incorporation_date: idate,
 		nationality: "",
-		email: `empresa${idx}@testjanovix.com`,
+		email: `empresa${idx}@synth.janovix.com`,
 		phone: `+5255${String(20000000 + i * 7).padStart(8, "0")}`,
 		country: "MX",
 		state_code: loc.state,
@@ -744,8 +838,9 @@ function buildMoral(i) {
 function buildTrust(i) {
 	const idx = 95 + i;
 	const idate = incorpDate(idx);
-	const rfc = moralRFC(idx, idate);
 	const loc = CITIES[idx % CITIES.length];
+	const bname = `Fideicomiso ${LAST[idx % LAST.length]} ${idx}`;
+	const rfc = moralRFCFromName(bname, idate, idx);
 	return {
 		person_type: "trust",
 		rfc,
@@ -754,10 +849,10 @@ function buildTrust(i) {
 		second_last_name: "",
 		birth_date: "",
 		curp: "",
-		business_name: `Fideicomiso ${LAST[idx % LAST.length]} ${idx}`,
+		business_name: bname.toUpperCase(),
 		incorporation_date: idate,
 		nationality: "",
-		email: `fideicomiso${idx}@testjanovix.com`,
+		email: `fideicomiso${idx}@synth.janovix.com`,
 		phone: `+5255${String(30000000 + i * 7).padStart(8, "0")}`,
 		country: "MX",
 		state_code: loc.state,
@@ -830,6 +925,126 @@ function write(filename, headers, rows) {
 	writeFileSync(path, toCsv(headers, rows), "utf-8");
 	console.log(`  ✓ ${filename}  (${rows.length} rows)`);
 }
+
+/**
+ * Write CSV with alternate headers (for column-mapping UI tests).
+ * canonicalHeaders: array of target property keys (e.g. first_name, rfc).
+ * aliasMap: object canonicalKey -> display header (e.g. { first_name: "Nombre" }).
+ * rows: array of objects keyed by canonical keys.
+ */
+function toCsvWithAliases(canonicalHeaders, aliasMap, rows) {
+	const headerLine = canonicalHeaders
+		.map((h) => csvCell(aliasMap[h] ?? h))
+		.join(",");
+	const lines = [headerLine];
+	for (const row of rows) {
+		lines.push(canonicalHeaders.map((h) => csvCell(row[h] ?? "")).join(","));
+	}
+	return lines.join("\r\n") + "\r\n";
+}
+
+function writeForMapping(dir, filename, canonicalHeaders, aliasMap, rows) {
+	const path = join(dir, filename);
+	writeFileSync(
+		path,
+		toCsvWithAliases(canonicalHeaders, aliasMap, rows),
+		"utf-8",
+	);
+	console.log(`  ✓ column-mapping/${filename}  (${rows.length} rows)`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COLUMN MAPPING ALIASES (alternate headers for --for-mapping)
+// Same data; headers use Spanish/alternate names so mapper can be tested.
+// ─────────────────────────────────────────────────────────────────────────────
+const CLIENT_HEADER_ALIASES = {
+	person_type: "Tipo de persona",
+	rfc: "RFC",
+	first_name: "Nombre",
+	last_name: "Apellido paterno",
+	second_last_name: "Apellido materno",
+	birth_date: "Fecha de nacimiento",
+	curp: "CURP",
+	business_name: "Razón social",
+	incorporation_date: "Fecha de constitución",
+	nationality: "Nacionalidad",
+	email: "Correo electrónico",
+	phone: "Teléfono",
+	country: "País",
+	state_code: "Estado",
+	city: "Ciudad",
+	municipality: "Municipio",
+	neighborhood: "Colonia",
+	street: "Calle",
+	external_number: "Número exterior",
+	internal_number: "Número interior",
+	postal_code: "Código postal",
+	reference: "Referencia",
+	notes: "Notas",
+	country_code: "Código país",
+	economic_activity_code: "Actividad económica",
+	gender: "Género",
+	occupation: "Ocupación",
+	marital_status: "Estado civil",
+	source_of_funds: "Origen de fondos",
+	source_of_wealth: "Origen de riqueza",
+};
+
+// Core operation + payment columns (shared)
+const OP_HEADER_ALIASES_CORE = {
+	client_rfc: "RFC del cliente",
+	operation_date: "Fecha de operación",
+	operation_type_code: "Tipo de operación",
+	branch_postal_code: "CP sucursal",
+	amount: "Monto",
+	currency: "Moneda",
+	exchange_rate: "Tipo de cambio",
+	alert_type_code: "Tipo de alerta",
+	reference_number: "Número de referencia",
+	notes: "Notas",
+	payment_date_1: "Fecha pago 1",
+	payment_form_code_1: "Forma de pago 1",
+	payment_amount_1: "Monto pago 1",
+	payment_currency_1: "Moneda pago 1",
+	payment_exchange_rate_1: "Tipo cambio pago 1",
+	payment_date_2: "Fecha pago 2",
+	payment_form_code_2: "Forma de pago 2",
+	payment_amount_2: "Monto pago 2",
+	payment_currency_2: "Moneda pago 2",
+	payment_exchange_rate_2: "Tipo cambio pago 2",
+	payment_date_3: "Fecha pago 3",
+	payment_form_code_3: "Forma de pago 3",
+	payment_amount_3: "Monto pago 3",
+	payment_currency_3: "Moneda pago 3",
+	payment_exchange_rate_3: "Tipo cambio pago 3",
+	payment_date_4: "Fecha pago 4",
+	payment_form_code_4: "Forma de pago 4",
+	payment_amount_4: "Monto pago 4",
+	payment_currency_4: "Moneda pago 4",
+	payment_exchange_rate_4: "Tipo cambio pago 4",
+	payment_date_5: "Fecha pago 5",
+	payment_form_code_5: "Forma de pago 5",
+	payment_amount_5: "Monto pago 5",
+	payment_currency_5: "Moneda pago 5",
+	payment_exchange_rate_5: "Tipo cambio pago 5",
+};
+
+const OP_HEADER_ALIASES_VEH = {
+	...OP_HEADER_ALIASES_CORE,
+	vehicle_type: "Tipo de vehículo",
+	brand: "Marca",
+	model: "Modelo",
+	year: "Año",
+	vin: "VIN",
+	repuve: "REPUVE",
+	plates: "Placas",
+	serial_number: "Número de serie",
+	flag_country_code: "País bandera",
+	registration_number: "Número de registro",
+	armor_level_code: "Nivel de blindaje",
+	engine_number: "Número de motor",
+	description: "Descripción",
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CLIENT CSV
@@ -2370,6 +2585,29 @@ for (const [act, gen] of Object.entries(GENERATORS)) {
 	totalOps += allRows.length;
 
 	write(`operations_${act.toLowerCase()}.csv`, opHeaders(act), allRows);
+}
+
+// Column-mapping test files: same data, alternate headers (e.g. Spanish)
+if (FOR_MAPPING) {
+	const mappingOut = join(OUT, "column-mapping");
+	mkdirSync(mappingOut, { recursive: true });
+	console.log("\n  Column-mapping test files:");
+	writeForMapping(
+		mappingOut,
+		"clients_for_mapping.csv",
+		CLIENT_HEADERS,
+		CLIENT_HEADER_ALIASES,
+		CLIENT_ROWS,
+	);
+	const vehScenarioRows = GENERATORS.VEH();
+	const vehCoverageRows = generateCoverageRows("VEH");
+	writeForMapping(
+		mappingOut,
+		"operations_veh_for_mapping.csv",
+		opHeaders("VEH"),
+		OP_HEADER_ALIASES_VEH,
+		[...vehScenarioRows, ...vehCoverageRows],
+	);
 }
 
 console.log("\n═══════════════════════════════════════════════════════════");

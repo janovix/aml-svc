@@ -100,39 +100,29 @@ export async function getResolvedSettings(
 	}
 
 	try {
-		const params = new URLSearchParams();
-		params.set("userId", userId);
-		if (orgId) {
-			params.set("orgId", orgId);
-		}
-		if (browserHints) {
-			params.set("headers", encodeBrowserHints(browserHints));
-		}
+		const encodedHints = browserHints
+			? encodeBrowserHints(browserHints)
+			: undefined;
+		const result = (await authService.getResolvedSettings(
+			userId,
+			orgId,
+			encodedHints,
+		)) as
+			| { success: boolean; data: ResolvedSettings }
+			| ResolvedSettings
+			| null;
 
-		const response = await authService.fetch(
-			new Request(
-				`https://auth-svc.internal/internal/settings/resolved?${params}`,
-				{
-					headers: { Accept: "application/json" },
-				},
-			),
-		);
+		if (!result) return null;
 
-		if (!response.ok) {
-			Sentry.captureMessage(`Failed to fetch settings: ${response.status}`, {
-				level: "error",
-				tags: { context: "fetch-settings-failed" },
-				extra: { status: response.status, statusText: response.statusText },
-			});
-			return null;
+		if (
+			"success" in (result as object) &&
+			typeof (result as Record<string, unknown>).success === "boolean"
+		) {
+			const typed = result as { success: boolean; data: ResolvedSettings };
+			return typed.success ? typed.data : null;
 		}
 
-		const result = (await response.json()) as {
-			success: boolean;
-			data: ResolvedSettings;
-		};
-
-		return result.success ? result.data : null;
+		return result as ResolvedSettings;
 	} catch (error) {
 		Sentry.captureException(error, {
 			tags: { context: "fetch-settings-exception" },

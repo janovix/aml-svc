@@ -92,6 +92,21 @@ export const openAPISpec = {
 			description:
 				"Beneficial Controller (Beneficiario Controlador) management endpoints per Mexican law (LFPIORPI/CFF 32-B). Tracks natural persons who ultimately benefit from or control the client entity. Includes Anexo 3 compliance and automated watchlist screening.",
 		},
+		{
+			name: "Exchange Rates",
+			description:
+				"Currency exchange rate endpoints using cached CurrencyLayer rates (1h TTL).",
+		},
+		{
+			name: "KYC Sessions",
+			description:
+				"KYC session management for client onboarding. Create sessions, send invites, approve/reject submissions.",
+		},
+		{
+			name: "Public KYC",
+			description:
+				"Token-based KYC self-service endpoints. Clients access via invite link to update personal info, documents, shareholders, beneficial controllers, and submit for review.",
+		},
 	],
 	paths: {
 		"/healthz": {
@@ -988,7 +1003,7 @@ export const openAPISpec = {
 				],
 				responses: {
 					"200": {
-						description: "Paginated list of transactions.",
+						description: "Paginated list of operations.",
 						content: {
 							"application/json": {
 								schema: {
@@ -1008,10 +1023,10 @@ export const openAPISpec = {
 				},
 			},
 			post: {
-				tags: ["Transactions"],
-				summary: "Create transaction",
+				tags: ["Operations"],
+				summary: "Create operation",
 				description:
-					"Creates a new vehicle transaction tied to an existing client.",
+					"Creates a new vehicle operation tied to an existing client.",
 				requestBody: {
 					required: true,
 					content: {
@@ -1022,7 +1037,7 @@ export const openAPISpec = {
 				},
 				responses: {
 					"201": {
-						description: "Transaction created successfully.",
+						description: "Operation created successfully.",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Operation" },
@@ -1048,7 +1063,7 @@ export const openAPISpec = {
 					"Retrieve aggregate statistics for operations including today's count, suspicious operations, total volume, and activity breakdown.",
 				responses: {
 					"200": {
-						description: "Transaction statistics",
+						description: "Operation statistics",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/OperationStats" },
@@ -1072,12 +1087,12 @@ export const openAPISpec = {
 							type: "string",
 							pattern: "^[A-Za-z0-9-]{1,64}$",
 						},
-						description: "Transaction identifier.",
+						description: "Operation identifier.",
 					},
 				],
 				responses: {
 					"200": {
-						description: "Transaction detail response.",
+						description: "Operation detail response.",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Operation" },
@@ -1085,7 +1100,7 @@ export const openAPISpec = {
 						},
 					},
 					"404": {
-						description: "Transaction not found",
+						description: "Operation not found",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
@@ -1120,7 +1135,7 @@ export const openAPISpec = {
 				},
 				responses: {
 					"200": {
-						description: "Transaction updated successfully.",
+						description: "Operation updated successfully.",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Operation" },
@@ -1136,7 +1151,7 @@ export const openAPISpec = {
 						},
 					},
 					"404": {
-						description: "Transaction not found",
+						description: "Operation not found",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
@@ -1146,9 +1161,9 @@ export const openAPISpec = {
 				},
 			},
 			delete: {
-				tags: ["Transactions"],
-				summary: "Delete transaction",
-				description: "Soft deletes a transaction by setting `deletedAt`.",
+				tags: ["Operations"],
+				summary: "Delete operation",
+				description: "Soft deletes an operation by setting `deletedAt`.",
 				parameters: [
 					{
 						name: "id",
@@ -1161,9 +1176,9 @@ export const openAPISpec = {
 					},
 				],
 				responses: {
-					"204": { description: "Transaction deleted" },
+					"204": { description: "Operation deleted" },
 					"404": {
-						description: "Transaction not found",
+						description: "Operation not found",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
@@ -2876,7 +2891,7 @@ export const openAPISpec = {
 				tags: ["Reports"],
 				summary: "Get executive summary aggregation",
 				description:
-					"Get aggregated metrics for alerts, transactions, and clients for a given period",
+					"Get aggregated metrics for alerts, operations, and clients for a given period",
 				parameters: [
 					{
 						name: "periodStart",
@@ -2962,11 +2977,11 @@ export const openAPISpec = {
 				},
 			},
 		},
-		"/api/v1/reports/aggregate/transactions": {
+		"/api/v1/reports/aggregate/operations": {
 			get: {
 				tags: ["Reports"],
-				summary: "Get transaction metrics aggregation",
-				description: "Get aggregated transaction metrics for a given period",
+				summary: "Get operation metrics aggregation",
+				description: "Get aggregated operation metrics for a given period",
 				parameters: [
 					{
 						name: "periodStart",
@@ -2991,7 +3006,7 @@ export const openAPISpec = {
 				],
 				responses: {
 					"200": {
-						description: "Aggregated transaction metrics",
+						description: "Aggregated operation metrics",
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/OperationAggregation" },
@@ -3584,7 +3599,7 @@ export const openAPISpec = {
 					},
 					"400": {
 						description:
-							"Notice has already been generated, has no alerts, has no valid alerts with transactions, or organization settings not configured",
+							"Notice has already been generated, has no alerts, has no valid alerts with operations, or organization settings not configured",
 					},
 				},
 			},
@@ -3790,7 +3805,7 @@ export const openAPISpec = {
 									},
 									entityType: {
 										type: "string",
-										enum: ["CLIENT", "TRANSACTION"],
+										enum: ["CLIENT", "OPERATION"],
 										description: "Type of entities in the file",
 									},
 								},
@@ -3833,7 +3848,7 @@ export const openAPISpec = {
 						required: true,
 						schema: {
 							type: "string",
-							enum: ["client", "transaction"],
+							enum: ["client", "operation"],
 						},
 						description: "Entity type (case-insensitive)",
 					},
@@ -4206,6 +4221,1655 @@ export const openAPISpec = {
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/clients/check-rfc/{rfc}": {
+			get: {
+				tags: ["Clients"],
+				summary: "Check if client exists by RFC",
+				description:
+					"Check whether a client with the given RFC already exists in the organization.",
+				parameters: [
+					{
+						name: "rfc",
+						in: "path",
+						required: true,
+						schema: { type: "string", minLength: 12, maxLength: 13 },
+					},
+				],
+				responses: {
+					"200": {
+						description: "RFC check result",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										exists: { type: "boolean" },
+										clientId: { type: "string", nullable: true },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/clients/{id}/kyc-status": {
+			get: {
+				tags: ["Clients"],
+				summary: "Get client KYC status",
+				description:
+					"Retrieve KYC completion status, progress, and missing fields for a client.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "KYC status",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										kycStatus: { type: "string" },
+										completenessStatus: { type: "string" },
+										missingFields: {
+											type: "array",
+											items: { type: "string" },
+										},
+										kycCompletedAt: {
+											type: "string",
+											format: "date-time",
+											nullable: true,
+										},
+									},
+								},
+							},
+						},
+					},
+					"404": { description: "Client not found" },
+				},
+			},
+		},
+		"/api/v1/clients/{clientId}/shareholders": {
+			get: {
+				tags: ["Shareholders"],
+				summary: "List shareholders",
+				description: "List all shareholders for a client.",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "parentShareholderId",
+						in: "query",
+						schema: { type: "string" },
+					},
+					{
+						name: "entityType",
+						in: "query",
+						schema: { type: "string", enum: ["PERSON", "COMPANY"] },
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of shareholders",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/Shareholder" },
+										},
+										total: { type: "integer" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Shareholders"],
+				summary: "Create shareholder",
+				description: "Add a shareholder (person or company) to a client.",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/ShareholderCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Shareholder created",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Shareholder" },
+							},
+						},
+					},
+					"400": { description: "Validation failed" },
+					"404": { description: "Client not found" },
+				},
+			},
+		},
+		"/api/v1/clients/{clientId}/shareholders/{shareholderId}": {
+			get: {
+				tags: ["Shareholders"],
+				summary: "Get shareholder",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "shareholderId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Shareholder details",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Shareholder" },
+							},
+						},
+					},
+					"404": { description: "Shareholder not found" },
+				},
+			},
+			put: {
+				tags: ["Shareholders"],
+				summary: "Update shareholder",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "shareholderId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/ShareholderUpdateRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Shareholder updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Shareholder" },
+							},
+						},
+					},
+					"404": { description: "Shareholder not found" },
+				},
+			},
+			patch: {
+				tags: ["Shareholders"],
+				summary: "Patch shareholder",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "shareholderId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/ShareholderPatchRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Shareholder updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Shareholder" },
+							},
+						},
+					},
+					"404": { description: "Shareholder not found" },
+				},
+			},
+			delete: {
+				tags: ["Shareholders"],
+				summary: "Delete shareholder",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "shareholderId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": { description: "Shareholder deleted" },
+					"404": { description: "Shareholder not found" },
+				},
+			},
+		},
+		"/api/v1/clients/{clientId}/shareholders/{shareholderId}/children": {
+			get: {
+				tags: ["Shareholders"],
+				summary: "List child shareholders",
+				description: "List direct child shareholders of a parent shareholder.",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "shareholderId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of child shareholders",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/Shareholder" },
+										},
+										total: { type: "integer" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/clients/{clientId}/beneficial-controllers": {
+			get: {
+				tags: ["Beneficial Controllers"],
+				summary: "List beneficial controllers",
+				description: "List beneficial controllers for a client.",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "bcType",
+						in: "query",
+						schema: {
+							type: "string",
+							enum: [
+								"SHAREHOLDER",
+								"LEGAL_REP",
+								"TRUSTEE",
+								"SETTLOR",
+								"TRUST_BENEFICIARY",
+								"DIRECTOR",
+							],
+						},
+					},
+					{
+						name: "identificationCriteria",
+						in: "query",
+						schema: {
+							type: "string",
+							enum: ["BENEFIT", "CONTROL", "FALLBACK"],
+						},
+					},
+					{ name: "shareholderId", in: "query", schema: { type: "string" } },
+				],
+				responses: {
+					"200": {
+						description: "List of beneficial controllers",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: {
+												$ref: "#/components/schemas/BeneficialController",
+											},
+										},
+										total: { type: "integer" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["Beneficial Controllers"],
+				summary: "Create beneficial controller",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								$ref: "#/components/schemas/BeneficialControllerCreateRequest",
+							},
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Beneficial controller created",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/BeneficialController" },
+							},
+						},
+					},
+					"400": { description: "Validation failed" },
+					"404": { description: "Client not found" },
+				},
+			},
+		},
+		"/api/v1/clients/{clientId}/beneficial-controllers/{bcId}": {
+			get: {
+				tags: ["Beneficial Controllers"],
+				summary: "Get beneficial controller",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "bcId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Beneficial controller details",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/BeneficialController" },
+							},
+						},
+					},
+					"404": { description: "Beneficial controller not found" },
+				},
+			},
+			put: {
+				tags: ["Beneficial Controllers"],
+				summary: "Update beneficial controller",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "bcId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								$ref: "#/components/schemas/BeneficialControllerUpdateRequest",
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Beneficial controller updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/BeneficialController" },
+							},
+						},
+					},
+					"404": { description: "Beneficial controller not found" },
+				},
+			},
+			patch: {
+				tags: ["Beneficial Controllers"],
+				summary: "Patch beneficial controller",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "bcId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: {
+								$ref: "#/components/schemas/BeneficialControllerPatchRequest",
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Beneficial controller updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/BeneficialController" },
+							},
+						},
+					},
+					"404": { description: "Beneficial controller not found" },
+				},
+			},
+			delete: {
+				tags: ["Beneficial Controllers"],
+				summary: "Delete beneficial controller",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "bcId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"204": { description: "Beneficial controller deleted" },
+					"404": { description: "Beneficial controller not found" },
+				},
+			},
+		},
+		"/api/v1/exchange-rates": {
+			get: {
+				tags: ["Exchange Rates"],
+				summary: "Get exchange rate",
+				description:
+					"Get exchange rate between two currencies. Query params: from, to (3-letter ISO codes). Returns cached CurrencyLayer rates (1h TTL).",
+				parameters: [
+					{
+						name: "from",
+						in: "query",
+						required: true,
+						schema: { type: "string", minLength: 3, maxLength: 3 },
+					},
+					{
+						name: "to",
+						in: "query",
+						required: true,
+						schema: { type: "string", minLength: 3, maxLength: 3 },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Exchange rate",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										from: { type: "string" },
+										to: { type: "string" },
+										rate: { type: "number" },
+										date: { type: "string" },
+									},
+								},
+							},
+						},
+					},
+					"503": {
+						description: "Exchange rate service unavailable",
+					},
+				},
+			},
+		},
+		"/api/v1/kyc-sessions": {
+			get: {
+				tags: ["KYC Sessions"],
+				summary: "List KYC sessions",
+				description:
+					"List KYC sessions for the organization with optional filters.",
+				parameters: [
+					{ name: "clientId", in: "query", schema: { type: "string" } },
+					{
+						name: "status",
+						in: "query",
+						schema: {
+							type: "string",
+							enum: [
+								"ACTIVE",
+								"IN_PROGRESS",
+								"SUBMITTED",
+								"APPROVED",
+								"REJECTED",
+								"REVOKED",
+								"EXPIRED",
+							],
+						},
+					},
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", default: 20 },
+					},
+				],
+				responses: {
+					"200": {
+						description: "List of KYC sessions",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: {
+											type: "array",
+											items: { $ref: "#/components/schemas/KycSession" },
+										},
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			post: {
+				tags: ["KYC Sessions"],
+				summary: "Create KYC session",
+				description: "Create a KYC session for a client and send invite email.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/KycSessionCreateRequest" },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "KYC session created",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										session: { $ref: "#/components/schemas/KycSession" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/kyc-sessions/{id}": {
+			get: {
+				tags: ["KYC Sessions"],
+				summary: "Get KYC session",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "KYC session details",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										session: { $ref: "#/components/schemas/KycSession" },
+									},
+								},
+							},
+						},
+					},
+					"404": { description: "Session not found" },
+				},
+			},
+		},
+		"/api/v1/kyc-sessions/{id}/events": {
+			get: {
+				tags: ["KYC Sessions"],
+				summary: "Get session audit trail",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Audit events for the session",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										events: { type: "array", items: { type: "object" } },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/kyc-sessions/{id}/resend-email": {
+			post: {
+				tags: ["KYC Sessions"],
+				summary: "Resend KYC invite email",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Email queued for delivery",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										success: { type: "boolean" },
+										message: { type: "string" },
+									},
+								},
+							},
+						},
+					},
+					"400": { description: "Cannot resend for inactive session" },
+				},
+			},
+		},
+		"/api/v1/kyc-sessions/{id}/approve": {
+			post: {
+				tags: ["KYC Sessions"],
+				summary: "Approve KYC session",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Session approved",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										session: { $ref: "#/components/schemas/KycSession" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/kyc-sessions/{id}/reject": {
+			post: {
+				tags: ["KYC Sessions"],
+				summary: "Reject KYC session",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								properties: {
+									reason: { type: "string" },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Session rejected",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										session: { $ref: "#/components/schemas/KycSession" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/kyc-sessions/{id}/revoke": {
+			post: {
+				tags: ["KYC Sessions"],
+				summary: "Revoke KYC session",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Session revoked",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										session: { $ref: "#/components/schemas/KycSession" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/public/kyc/{token}": {
+			get: {
+				tags: ["Public KYC"],
+				summary: "Get KYC session and client data",
+				description:
+					"Token-based access. Returns session info, pre-filled client data, and org branding. No auth required.",
+				parameters: [
+					{
+						name: "token",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				security: [],
+				responses: {
+					"200": {
+						description: "Session and client data",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										session: { type: "object" },
+										client: { type: "object" },
+										organization: { type: "object", nullable: true },
+									},
+								},
+							},
+						},
+					},
+					"410": { description: "Session expired or revoked" },
+				},
+			},
+		},
+		"/api/v1/public/kyc/{token}/personal-info": {
+			patch: {
+				tags: ["Public KYC"],
+				summary: "Update personal info",
+				parameters: [
+					{
+						name: "token",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				security: [],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: { type: "object", additionalProperties: true },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Client updated",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										success: { type: "boolean" },
+										client: { type: "object" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/public/kyc/{token}/documents": {
+			post: {
+				tags: ["Public KYC"],
+				summary: "Add document",
+				parameters: [
+					{
+						name: "token",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				security: [],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: { type: "object", additionalProperties: true },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Document created",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										document: { type: "object" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/public/kyc/{token}/shareholders": {
+			post: {
+				tags: ["Public KYC"],
+				summary: "Add shareholder",
+				parameters: [
+					{
+						name: "token",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				security: [],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: { type: "object", additionalProperties: true },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Shareholder created",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										shareholder: { type: "object" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/public/kyc/{token}/shareholders/{sid}": {
+			put: {
+				tags: ["Public KYC"],
+				summary: "Update shareholder",
+				parameters: [
+					{
+						name: "token",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "sid",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				security: [],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: { type: "object", additionalProperties: true },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Shareholder updated",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										shareholder: { type: "object" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/public/kyc/{token}/beneficial-controllers": {
+			post: {
+				tags: ["Public KYC"],
+				summary: "Add beneficial controller",
+				parameters: [
+					{
+						name: "token",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				security: [],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: { type: "object", additionalProperties: true },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Beneficial controller created",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										beneficialController: { type: "object" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/public/kyc/{token}/beneficial-controllers/{bcId}": {
+			put: {
+				tags: ["Public KYC"],
+				summary: "Update beneficial controller",
+				parameters: [
+					{
+						name: "token",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "bcId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				security: [],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: { type: "object", additionalProperties: true },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Beneficial controller updated",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										beneficialController: { type: "object" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/public/kyc/{token}/addresses": {
+			post: {
+				tags: ["Public KYC"],
+				summary: "Add address",
+				parameters: [
+					{
+						name: "token",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				security: [],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: { type: "object", additionalProperties: true },
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "Address created",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										address: { type: "object" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/public/kyc/{token}/submit": {
+			post: {
+				tags: ["Public KYC"],
+				summary: "Submit KYC for review",
+				parameters: [
+					{
+						name: "token",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				security: [],
+				responses: {
+					"200": {
+						description: "Submitted for compliance review",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										success: { type: "boolean" },
+										message: { type: "string" },
+										session: { type: "object" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/public/kyc/{token}/catalogs/{catalogKey}": {
+			get: {
+				tags: ["Public KYC"],
+				summary: "Get catalog for form dropdowns",
+				parameters: [
+					{
+						name: "token",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+					{
+						name: "catalogKey",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				security: [],
+				responses: {
+					"200": {
+						description: "Catalog items",
+						content: {
+							"application/json": {
+								schema: { type: "object" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/notices/{id}/rebuke": {
+			post: {
+				tags: ["Notices"],
+				summary: "Record SAT rebuke",
+				description:
+					"Record a rebuke (observación) from SAT for a submitted notice.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								required: ["docSvcDocumentId"],
+								properties: {
+									docSvcDocumentId: { type: "string", minLength: 1 },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Rebuke recorded",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Notice" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/notices/{id}/revert": {
+			post: {
+				tags: ["Notices"],
+				summary: "Revert notice to draft",
+				description: "Revert a generated notice back to draft for amendments.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Notice reverted to draft",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Notice" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/notices/{id}/alerts/add": {
+			post: {
+				tags: ["Notices"],
+				summary: "Add alerts to notice",
+				description: "Add alerts to a notice (e.g. after amendment).",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								required: ["alertIds"],
+								properties: {
+									alertIds: {
+										type: "array",
+										items: { type: "string" },
+									},
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alerts added",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Notice" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/notices/{id}/alerts/remove": {
+			post: {
+				tags: ["Notices"],
+				summary: "Remove alerts from notice",
+				description: "Remove alerts from a notice (e.g. during amendment).",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								required: ["alertIds"],
+								properties: {
+									alertIds: {
+										type: "array",
+										items: { type: "string" },
+									},
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Alerts removed",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/Notice" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/organization-settings/self-service": {
+			patch: {
+				tags: ["Organization Settings"],
+				summary: "Update self-service KYC settings",
+				description:
+					"Update organization settings for KYC self-service (editable sections, identification tier, etc.).",
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: {
+								type: "object",
+								properties: {
+									editableSections: {
+										type: "array",
+										items: { type: "string" },
+									},
+									identificationTier: { type: "string" },
+									thresholdAmountMxn: { type: "number" },
+								},
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Settings updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/OrganizationSettings" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/admin/stats": {
+			get: {
+				tags: ["Admin"],
+				summary: "Platform stats",
+				description:
+					"Cross-organization stats (alerts, notices, orgs). Requires admin role.",
+				responses: {
+					"200": {
+						description: "Platform statistics",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										organizations: { type: "integer" },
+										alerts: { type: "integer" },
+										notices: { type: "integer" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/admin/alerts": {
+			get: {
+				tags: ["Admin"],
+				summary: "List alerts across orgs",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", default: 20 },
+					},
+					{ name: "organizationId", in: "query", schema: { type: "string" } },
+				],
+				responses: {
+					"200": {
+						description: "Paginated alerts",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: { type: "array" },
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/admin/notices": {
+			get: {
+				tags: ["Admin"],
+				summary: "List notices across orgs",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", default: 20 },
+					},
+					{ name: "organizationId", in: "query", schema: { type: "string" } },
+				],
+				responses: {
+					"200": {
+						description: "Paginated notices",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: { type: "array" },
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/admin/organizations": {
+			get: {
+				tags: ["Admin"],
+				summary: "List organizations",
+				parameters: [
+					{
+						name: "page",
+						in: "query",
+						schema: { type: "integer", default: 1 },
+					},
+					{
+						name: "limit",
+						in: "query",
+						schema: { type: "integer", default: 20 },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Paginated organizations",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: { type: "array" },
+										pagination: { $ref: "#/components/schemas/Pagination" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/admin/organizations/{id}": {
+			get: {
+				tags: ["Admin"],
+				summary: "Get organization",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Organization details",
+						content: {
+							"application/json": {
+								schema: { type: "object" },
+							},
+						},
+					},
+					"404": { description: "Organization not found" },
+				},
+			},
+		},
+		"/api/v1/admin/organization-settings/{orgId}": {
+			get: {
+				tags: ["Admin"],
+				summary: "Get org settings",
+				parameters: [
+					{
+						name: "orgId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Organization settings",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/OrganizationSettings" },
+							},
+						},
+					},
+				},
+			},
+			put: {
+				tags: ["Admin"],
+				summary: "Update org settings",
+				parameters: [
+					{
+						name: "orgId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/OrganizationSettings" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Settings updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/OrganizationSettings" },
+							},
+						},
+					},
+				},
+			},
+			patch: {
+				tags: ["Admin"],
+				summary: "Patch org settings",
+				parameters: [
+					{
+						name: "orgId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					content: {
+						"application/json": {
+							schema: {
+								$ref: "#/components/schemas/OrganizationSettingsPatchRequest",
+							},
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Settings updated",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/OrganizationSettings" },
 							},
 						},
 					},
@@ -4903,7 +6567,7 @@ export const openAPISpec = {
 					"branchPostalCode",
 					"amount",
 					"currencyCode",
-					"payments",
+					"paymentMethods",
 					"createdAt",
 					"updatedAt",
 				],
@@ -4911,7 +6575,7 @@ export const openAPISpec = {
 					id: {
 						type: "string",
 						pattern: "^[A-Za-z0-9-]{1,64}$",
-						description: "Transaction identifier.",
+						description: "Operation identifier.",
 					},
 					clientId: {
 						type: "string",
@@ -4958,13 +6622,13 @@ export const openAPISpec = {
 						type: "string",
 						nullable: true,
 						description:
-							"Calculated UMA value: amount / umaDailyValue for the transaction date (automatically calculated)",
+							"Calculated UMA value: amount / umaDailyValue for the operation date (automatically calculated)",
 					},
 					paymentMethods: {
 						type: "array",
 						items: { $ref: "#/components/schemas/PaymentMethod" },
 						description:
-							"Array of payment methods used for this transaction. The sum of amounts must equal the transaction amount.",
+							"Array of payment methods used for this operation. The sum of amounts must equal the operation amount.",
 					},
 					createdAt: { type: "string", format: "date-time" },
 					updatedAt: { type: "string", format: "date-time" },
@@ -5058,7 +6722,7 @@ export const openAPISpec = {
 					amount: {
 						type: "string",
 						description:
-							'Total transaction amount, stored as a string to preserve precision (e.g., "3500000.75").',
+							'Total operation amount, stored as a string to preserve precision (e.g., "3500000.75").',
 					},
 					currency: {
 						type: "string",
@@ -5083,7 +6747,7 @@ export const openAPISpec = {
 						items: { $ref: "#/components/schemas/PaymentMethodInput" },
 						minItems: 1,
 						description:
-							"Array of payment methods. The sum of payment method amounts must equal the transaction amount.",
+							"Array of payment methods. The sum of payment method amounts must equal the operation amount.",
 					},
 				},
 			},
@@ -5127,7 +6791,7 @@ export const openAPISpec = {
 					amount: {
 						type: "string",
 						description:
-							'Total transaction amount, stored as a string to preserve precision (e.g., "3500000.75").',
+							'Total operation amount, stored as a string to preserve precision (e.g., "3500000.75").',
 					},
 					currency: {
 						type: "string",
@@ -5152,7 +6816,7 @@ export const openAPISpec = {
 						items: { $ref: "#/components/schemas/PaymentMethodInput" },
 						minItems: 1,
 						description:
-							"Array of payment methods. The sum of payment method amounts must equal the transaction amount.",
+							"Array of payment methods. The sum of payment method amounts must equal the operation amount.",
 					},
 				},
 			},
@@ -5172,7 +6836,7 @@ export const openAPISpec = {
 				properties: {
 					data: {
 						type: "array",
-						items: { $ref: "#/components/schemas/Transaction" },
+						items: { $ref: "#/components/schemas/Operation" },
 					},
 					pagination: { $ref: "#/components/schemas/OperationPagination" },
 				},
@@ -5220,18 +6884,18 @@ export const openAPISpec = {
 			OperationStats: {
 				type: "object",
 				required: [
-					"transactionsToday",
-					"suspiciousTransactions",
+					"operationsToday",
+					"suspiciousOperations",
 					"totalVolume",
-					"totalVehicles",
+					"totalOperations",
 				],
 				properties: {
-					transactionsToday: {
+					operationsToday: {
 						type: "integer",
-						description: "Number of transactions created today",
+						description: "Number of operations created today",
 						example: 25,
 					},
-					suspiciousTransactions: {
+					suspiciousOperations: {
 						type: "integer",
 						description:
 							"Number of alerts with DETECTED or FILE_GENERATED status",
@@ -5240,13 +6904,26 @@ export const openAPISpec = {
 					totalVolume: {
 						type: "string",
 						description:
-							"Total sum of all transaction amounts (string to preserve precision)",
+							"Total sum of all operation amounts (string to preserve precision)",
 						example: "15000000.50",
 					},
-					totalVehicles: {
+					totalOperations: {
 						type: "integer",
-						description: "Number of unique vehicles (brand + model + year)",
-						example: 120,
+						description:
+							"Total count of non-deleted operations in the organization",
+						example: 47,
+					},
+					completeCount: {
+						type: "integer",
+						description:
+							"Number of operations with completenessStatus COMPLETE",
+						example: 50,
+					},
+					incompleteCount: {
+						type: "integer",
+						description:
+							"Number of operations with completenessStatus INCOMPLETE or MINIMUM",
+						example: 16,
 					},
 				},
 			},
@@ -5257,6 +6934,110 @@ export const openAPISpec = {
 					error: { type: "string" },
 					message: { type: "string" },
 					details: { type: "object" },
+				},
+			},
+			Shareholder: {
+				type: "object",
+				properties: {
+					id: { type: "string" },
+					clientId: { type: "string" },
+					entityType: { type: "string", enum: ["PERSON", "COMPANY"] },
+					firstName: { type: "string", nullable: true },
+					lastName: { type: "string", nullable: true },
+					businessName: { type: "string", nullable: true },
+					ownershipPercentage: { type: "number" },
+					parentShareholderId: { type: "string", nullable: true },
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			ShareholderCreateRequest: {
+				type: "object",
+				description:
+					"Discriminated union: entityType PERSON or COMPANY with respective fields",
+				additionalProperties: true,
+			},
+			ShareholderUpdateRequest: {
+				type: "object",
+				additionalProperties: true,
+			},
+			ShareholderPatchRequest: {
+				type: "object",
+				additionalProperties: true,
+			},
+			BeneficialController: {
+				type: "object",
+				properties: {
+					id: { type: "string" },
+					clientId: { type: "string" },
+					bcType: {
+						type: "string",
+						enum: [
+							"SHAREHOLDER",
+							"LEGAL_REP",
+							"TRUSTEE",
+							"SETTLOR",
+							"TRUST_BENEFICIARY",
+							"DIRECTOR",
+						],
+					},
+					firstName: { type: "string" },
+					lastName: { type: "string" },
+					identificationCriteria: {
+						type: "string",
+						enum: ["BENEFIT", "CONTROL", "FALLBACK"],
+					},
+					shareholderId: { type: "string", nullable: true },
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			BeneficialControllerCreateRequest: {
+				type: "object",
+				additionalProperties: true,
+			},
+			BeneficialControllerUpdateRequest: {
+				type: "object",
+				additionalProperties: true,
+			},
+			BeneficialControllerPatchRequest: {
+				type: "object",
+				additionalProperties: true,
+			},
+			KycSession: {
+				type: "object",
+				properties: {
+					id: { type: "string" },
+					clientId: { type: "string" },
+					organizationId: { type: "string" },
+					status: {
+						type: "string",
+						enum: [
+							"ACTIVE",
+							"IN_PROGRESS",
+							"SUBMITTED",
+							"APPROVED",
+							"REJECTED",
+							"REVOKED",
+							"EXPIRED",
+						],
+					},
+					token: { type: "string" },
+					expiresAt: { type: "string", format: "date-time" },
+					editableSections: { type: "array", items: { type: "string" } },
+					createdAt: { type: "string", format: "date-time" },
+					updatedAt: { type: "string", format: "date-time" },
+				},
+			},
+			KycSessionCreateRequest: {
+				type: "object",
+				required: ["clientId"],
+				properties: {
+					clientId: { type: "string" },
+					expiresInDays: { type: "integer" },
+					editableSections: { type: "array", items: { type: "string" } },
+					identificationTier: { type: "string" },
+					thresholdAmountMxn: { type: "number" },
 				},
 			},
 			AlertSeverity: {
@@ -5445,19 +7226,19 @@ export const openAPISpec = {
 						type: "string",
 						maxLength: 255,
 						description:
-							"Hash of the specific data that triggered this alert (transaction IDs, amounts, dates, etc.)",
+							"Hash of the specific data that triggered this alert (operation IDs, amounts, dates, etc.)",
 					},
 					metadata: {
 						type: "object",
 						description:
-							"Alert-specific data stored as JSON (transaction IDs, amounts, dates, etc.)",
+							"Alert-specific data stored as JSON (operation IDs, amounts, dates, etc.)",
 						additionalProperties: true,
 					},
-					transactionId: {
+					operationId: {
 						type: "string",
 						nullable: true,
 						description:
-							"Optional reference to the transaction that triggered the alert",
+							"Optional reference to the operation that triggered the alert",
 					},
 					isManual: {
 						type: "boolean",
@@ -5557,15 +7338,15 @@ export const openAPISpec = {
 						minLength: 1,
 						maxLength: 255,
 						description:
-							"Hash of the specific data that triggered this alert (transaction IDs, amounts, dates, etc.)",
+							"Hash of the specific data that triggered this alert (operation IDs, amounts, dates, etc.)",
 					},
 					metadata: {
 						type: "object",
 						description:
-							"Alert-specific data stored as JSON (transaction IDs, amounts, dates, etc.)",
+							"Alert-specific data stored as JSON (operation IDs, amounts, dates, etc.)",
 						additionalProperties: true,
 					},
-					transactionId: { type: "string", nullable: true },
+					operationId: { type: "string", nullable: true },
 					isManual: {
 						type: "boolean",
 						default: false,
@@ -5909,6 +7690,22 @@ export const openAPISpec = {
 					},
 				},
 			},
+			OrganizationSettingsPatchRequest: {
+				type: "object",
+				properties: {
+					obligatedSubjectKey: {
+						type: "string",
+						pattern: "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$",
+						minLength: 12,
+						maxLength: 12,
+					},
+					activityKey: {
+						type: "string",
+						minLength: 1,
+						maxLength: 10,
+					},
+				},
+			},
 			ReportType: {
 				type: "string",
 				enum: ["MONTHLY", "QUARTERLY", "ANNUAL", "CUSTOM"],
@@ -6199,7 +7996,7 @@ export const openAPISpec = {
 						enum: [
 							"EXECUTIVE_SUMMARY",
 							"COMPLIANCE_STATUS",
-							"TRANSACTION_ANALYSIS",
+							"OPERATION_ANALYSIS",
 							"CLIENT_RISK_PROFILE",
 							"ALERT_BREAKDOWN",
 							"PERIOD_COMPARISON",
@@ -6212,7 +8009,7 @@ export const openAPISpec = {
 						type: "array",
 						items: {
 							type: "string",
-							enum: ["ALERTS", "TRANSACTIONS", "CLIENTS"],
+							enum: ["ALERTS", "OPERATIONS", "CLIENTS"],
 						},
 					},
 					defaultCharts: {
@@ -6386,7 +8183,7 @@ export const openAPISpec = {
 				type: "object",
 				properties: {
 					alertsChange: { type: "number", description: "Percentage change" },
-					transactionsChange: {
+					operationsChange: {
 						type: "number",
 						description: "Percentage change",
 					},
@@ -6411,7 +8208,7 @@ export const openAPISpec = {
 			},
 			ReportAggregation: {
 				type: "object",
-				required: ["alerts", "transactions", "clients", "riskIndicators"],
+				required: ["alerts", "operations", "clients", "riskIndicators"],
 				properties: {
 					alerts: { $ref: "#/components/schemas/AlertAggregation" },
 					operations: { $ref: "#/components/schemas/OperationAggregation" },
@@ -6427,7 +8224,7 @@ export const openAPISpec = {
 			},
 			ImportEntityType: {
 				type: "string",
-				enum: ["CLIENT", "TRANSACTION"],
+				enum: ["CLIENT", "OPERATION"],
 				description: "Type of entities being imported",
 			},
 			ImportRowStatus: {
@@ -6537,7 +8334,7 @@ export const openAPISpec = {
 					entityId: {
 						type: "string",
 						nullable: true,
-						description: "ID of the created entity (client or transaction)",
+						description: "ID of the created entity (client or operation)",
 					},
 					message: {
 						type: "string",

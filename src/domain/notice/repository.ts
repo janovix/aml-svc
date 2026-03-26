@@ -365,13 +365,13 @@ export class NoticeRepository {
 	}
 
 	/**
-	 * Get all alerts for a notice with their transactions/operations (for XML generation)
-	 * Fetches alerts with client, alertRule, and their linked transactions or operations
+	 * Get all alerts for a notice with their operations (for XML generation)
+	 * Fetches alerts with client, alertRule, and their linked operations
 	 *
 	 * Uses batch fetching to avoid D1/SQLite's ~999 variable limit in IN clauses.
 	 * Instead of using Prisma includes (which generate large IN queries), we:
 	 * 1. Fetch alerts without includes
-	 * 2. Batch fetch related entities (clients, alertRules, transactions/operations) separately
+	 * 2. Batch fetch related entities (clients, alertRules, operations) separately
 	 * 3. Manually join the data
 	 */
 	async getAlertsWithOperationsForNotice(

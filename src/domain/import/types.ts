@@ -19,6 +19,9 @@ export type ImportRowStatus =
 	| "ERROR"
 	| "SKIPPED";
 
+/** CSV column name -> target property key (e.g. rfc, first_name, client_rfc, amount) */
+export type ColumnMapping = Record<string, string>;
+
 export interface ImportEntity {
 	id: string;
 	organizationId: string;
@@ -35,6 +38,7 @@ export interface ImportEntity {
 	errorCount: number;
 	skippedCount: number;
 	errorMessage: string | null;
+	columnMapping: ColumnMapping | null;
 	createdBy: string;
 	startedAt: string | null;
 	completedAt: string | null;
@@ -48,7 +52,7 @@ export interface ImportRowResultEntity {
 	rowNumber: number;
 	status: ImportRowStatus;
 	rawData: string; // JSON string of original row data
-	entityId: string | null; // Created client/transaction ID if successful
+	entityId: string | null; // Created client/operation ID if successful
 	message: string | null;
 	errors: string | null; // JSON array of validation errors
 	createdAt: string;
@@ -90,6 +94,8 @@ export interface ImportJob {
 	activityCode?: string; // Required when entityType is OPERATION
 	fileUrl: string;
 	createdBy: string;
+	/** When present, worker maps CSV columns to entity fields using this; when absent, use template column names */
+	columnMapping?: ColumnMapping;
 }
 
 /**

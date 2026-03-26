@@ -53,7 +53,7 @@ async function createTestJWT(
 describe("Auth Middleware", () => {
 	let testKeyPair: KeyPairResult;
 	let testJWKS: JSONWebKeySet;
-	let mockAuthService: Fetcher;
+	let mockAuthService: { getJwks: () => Promise<JSONWebKeySet> };
 
 	beforeEach(async () => {
 		// Generate fresh key pair for each test
@@ -64,21 +64,10 @@ describe("Auth Middleware", () => {
 		// Clear JWKS cache before each test
 		clearJWKSCache();
 
-		// Mock AUTH_SERVICE binding for JWKS endpoint
-		// This simulates the service binding to auth-svc
+		// Mock AUTH_SERVICE binding for JWKS via RPC
 		mockAuthService = {
-			fetch: vi.fn().mockImplementation(async (url: string | Request) => {
-				const urlStr = typeof url === "string" ? url : url.url;
-				if (urlStr.includes("/api/auth/jwks")) {
-					return new Response(JSON.stringify(testJWKS), {
-						status: 200,
-						headers: { "Content-Type": "application/json" },
-					});
-				}
-				return new Response("Not Found", { status: 404 });
-			}),
-			connect: vi.fn(),
-		} as unknown as Fetcher;
+			getJwks: vi.fn().mockResolvedValue(testJWKS),
+		};
 	});
 
 	afterEach(() => {
@@ -285,7 +274,7 @@ describe("Auth Middleware", () => {
 	});
 
 	describe("JWKS Fetching", () => {
-		it("should fetch JWKS from auth service", async () => {
+		it("should fetch JWKS from auth service via RPC", async () => {
 			const app = createTestApp();
 			const token = await createTestJWT(testKeyPair.privateKey, {
 				sub: "user-123",
@@ -299,11 +288,7 @@ describe("Auth Middleware", () => {
 				{ AUTH_SERVICE: mockAuthService } as AuthBindings,
 			);
 
-			expect(mockAuthService.fetch).toHaveBeenCalledWith(
-				expect.objectContaining({
-					url: expect.stringContaining("/api/auth/jwks"),
-				}),
-			);
+			expect(mockAuthService.getJwks).toHaveBeenCalledTimes(1);
 		});
 
 		it("should cache JWKS in memory", async () => {
@@ -331,16 +316,13 @@ describe("Auth Middleware", () => {
 			);
 
 			// JWKS should only be fetched once due to caching
-			expect(mockAuthService.fetch).toHaveBeenCalledTimes(1);
+			expect(mockAuthService.getJwks).toHaveBeenCalledTimes(1);
 		});
 
-		it("should return 503 when JWKS fetch fails", async () => {
+		it("should return 503 when JWKS RPC call fails", async () => {
 			const failingAuthService = {
-				fetch: vi.fn().mockImplementation(async () => {
-					return new Response("Service Unavailable", { status: 503 });
-				}),
-				connect: vi.fn(),
-			} as unknown as Fetcher;
+				getJwks: vi.fn().mockRejectedValue(new Error("Service Unavailable")),
+			};
 
 			const app = createTestApp();
 			const token = await createTestJWT(testKeyPair.privateKey, {
@@ -352,7 +334,7 @@ describe("Auth Middleware", () => {
 				{
 					headers: { Authorization: `Bearer ${token}` },
 				},
-				{ AUTH_SERVICE: failingAuthService } as AuthBindings,
+				{ AUTH_SERVICE: failingAuthService } as unknown as AuthBindings,
 			);
 
 			expect(res.status).toBe(503);

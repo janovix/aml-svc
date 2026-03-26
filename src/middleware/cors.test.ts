@@ -284,34 +284,81 @@ describe("CORS Middleware", () => {
 	});
 
 	describe("corsMiddleware", () => {
-		it("should deny CORS when no trusted patterns are configured", async () => {
+		it("returns a middleware function", async () => {
 			const { corsMiddleware } = await import("./cors");
-
-			// corsMiddleware creates a Hono middleware that requires proper context
-			// For now, we can verify it returns a function
 			const middleware = corsMiddleware();
 			expect(typeof middleware).toBe("function");
 		});
 
-		it("should allow CORS when trusted patterns match", async () => {
+		it("denies CORS when no trusted origins are configured (empty TRUSTED_ORIGINS)", async () => {
+			const { Hono } = await import("hono");
 			const { corsMiddleware } = await import("./cors");
 
-			const middleware = corsMiddleware();
-			expect(typeof middleware).toBe("function");
+			const app = new Hono<{ Bindings: { TRUSTED_ORIGINS?: string } }>();
+			app.use("*", corsMiddleware());
+			app.get("/test", (c) => c.text("ok"));
+
+			const res = await app.request(
+				"/test",
+				{ headers: { Origin: "https://evil.com" } },
+				{ TRUSTED_ORIGINS: "" },
+			);
+			// When TRUSTED_ORIGINS is empty, origin is denied (no CORS header set)
+			expect(res.headers.get("access-control-allow-origin")).toBeNull();
 		});
 
-		it("should handle empty TRUSTED_ORIGINS environment variable", async () => {
+		it("allows CORS when origin matches trusted pattern", async () => {
+			const { Hono } = await import("hono");
 			const { corsMiddleware } = await import("./cors");
 
-			const middleware = corsMiddleware();
-			expect(typeof middleware).toBe("function");
+			const app = new Hono<{ Bindings: { TRUSTED_ORIGINS?: string } }>();
+			app.use("*", corsMiddleware());
+			app.get("/test", (c) => c.text("ok"));
+
+			const res = await app.request(
+				"/test",
+				{ headers: { Origin: "https://aml.janovix.workers.dev" } },
+				{ TRUSTED_ORIGINS: "*.janovix.workers.dev" },
+			);
+			expect(res.headers.get("access-control-allow-origin")).toBe(
+				"https://aml.janovix.workers.dev",
+			);
 		});
 
-		it("should parse comma-separated TRUSTED_ORIGINS correctly", async () => {
+		it("allows request without Origin header (same-origin)", async () => {
+			const { Hono } = await import("hono");
 			const { corsMiddleware } = await import("./cors");
 
-			const middleware = corsMiddleware();
-			expect(typeof middleware).toBe("function");
+			const app = new Hono<{ Bindings: { TRUSTED_ORIGINS?: string } }>();
+			app.use("*", corsMiddleware());
+			app.get("/test", (c) => c.text("ok"));
+
+			const res = await app.request(
+				"/test",
+				{},
+				{ TRUSTED_ORIGINS: "*.janovix.workers.dev" },
+			);
+			expect(res.status).toBe(200);
+		});
+
+		it("parses comma-separated TRUSTED_ORIGINS correctly", async () => {
+			const { Hono } = await import("hono");
+			const { corsMiddleware } = await import("./cors");
+
+			const app = new Hono<{ Bindings: { TRUSTED_ORIGINS?: string } }>();
+			app.use("*", corsMiddleware());
+			app.get("/test", (c) => c.text("ok"));
+
+			const trusted =
+				"*.janovix.workers.dev,https://janovix.com,http://localhost:*";
+			const res = await app.request(
+				"/test",
+				{ headers: { Origin: "https://janovix.com" } },
+				{ TRUSTED_ORIGINS: trusted },
+			);
+			expect(res.headers.get("access-control-allow-origin")).toBe(
+				"https://janovix.com",
+			);
 		});
 	});
 });
