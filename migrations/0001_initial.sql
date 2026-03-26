@@ -1,3 +1,52 @@
+-- Tear down existing objects (FK order; OFF avoids ordering mistakes on complex graphs)
+PRAGMA foreign_keys = OFF;
+
+DROP TABLE IF EXISTS "import_row_results";
+DROP TABLE IF EXISTS "imports";
+DROP TABLE IF EXISTS "alerts";
+DROP TABLE IF EXISTS "alert_rule_config";
+DROP TABLE IF EXISTS "alert_rules";
+DROP TABLE IF EXISTS "reports";
+DROP TABLE IF EXISTS "notice_events";
+DROP TABLE IF EXISTS "notices";
+DROP TABLE IF EXISTS "kyc_session_events";
+DROP TABLE IF EXISTS "kyc_sessions";
+DROP TABLE IF EXISTS "organization_settings";
+DROP TABLE IF EXISTS "uma_values";
+DROP TABLE IF EXISTS "operation_development";
+DROP TABLE IF EXISTS "operation_art";
+DROP TABLE IF EXISTS "operation_valuables";
+DROP TABLE IF EXISTS "operation_rewards";
+DROP TABLE IF EXISTS "operation_prepaid";
+DROP TABLE IF EXISTS "operation_cards";
+DROP TABLE IF EXISTS "operation_traveler_checks";
+DROP TABLE IF EXISTS "operation_professional";
+DROP TABLE IF EXISTS "operation_notary";
+DROP TABLE IF EXISTS "operation_officials";
+DROP TABLE IF EXISTS "operation_loans";
+DROP TABLE IF EXISTS "operation_donations";
+DROP TABLE IF EXISTS "operation_armoring";
+DROP TABLE IF EXISTS "operation_rentals";
+DROP TABLE IF EXISTS "operation_gambling";
+DROP TABLE IF EXISTS "operation_virtual_assets";
+DROP TABLE IF EXISTS "operation_jewelry";
+DROP TABLE IF EXISTS "operation_real_estate";
+DROP TABLE IF EXISTS "operation_vehicles";
+DROP TABLE IF EXISTS "operation_payments";
+DROP TABLE IF EXISTS "operations";
+DROP TABLE IF EXISTS "invoice_items";
+DROP TABLE IF EXISTS "invoices";
+DROP TABLE IF EXISTS "catalog_items";
+DROP TABLE IF EXISTS "catalogs";
+DROP TABLE IF EXISTS "beneficial_controllers";
+DROP TABLE IF EXISTS "shareholders";
+DROP TABLE IF EXISTS "client_addresses";
+DROP TABLE IF EXISTS "client_documents";
+DROP TABLE IF EXISTS "upload_links";
+DROP TABLE IF EXISTS "clients";
+
+PRAGMA foreign_keys = ON;
+
 -- CreateTable
 CREATE TABLE "clients" (
     "id" TEXT NOT NULL PRIMARY KEY,
