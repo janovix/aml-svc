@@ -1,3 +1,10 @@
+# [1.10.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.10.0-rc.1...v1.10.0-rc.2) (2026-03-31)
+
+
+### Bug Fixes
+
+* **auth:** enhance JWT verification with cache busting on key rotation ([fbe4583](https://github.com/janovix/aml-svc/commit/fbe45832329e08cb481c86b2f7541d3a9d8d6f44))
+
 # [1.10.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.9.0...v1.10.0-rc.1) (2026-03-26)
 
 
