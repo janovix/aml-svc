@@ -25,7 +25,10 @@ import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import type { StatusCode } from "hono/utils/http-status";
-import { createUsageRightsClient } from "../lib/usage-rights-client";
+import {
+	buildGateDenialBody,
+	createUsageRightsClient,
+} from "../lib/usage-rights-client";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import {
 	generateSatMonthlyReportXml,
@@ -166,21 +169,7 @@ noticesRouter.post("/", async (c) => {
 	const usageRights = createUsageRightsClient(c.env);
 	const gateResult = await usageRights.gate(organizationId, "notices");
 	if (!gateResult.allowed) {
-		return c.json(
-			{
-				success: false,
-				error: gateResult.error ?? "usage_limit_exceeded",
-				code: "USAGE_LIMIT_EXCEEDED",
-				upgradeRequired: true,
-				metric: "notices",
-				used: gateResult.used,
-				limit: gateResult.limit,
-				entitlementType: gateResult.entitlementType,
-				message:
-					"You have reached the limit for notices. Please upgrade your plan or contact your administrator.",
-			},
-			403,
-		);
+		return c.json(buildGateDenialBody("notices", gateResult), 403);
 	}
 
 	const user = c.get("user");

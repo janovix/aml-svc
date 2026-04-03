@@ -27,7 +27,10 @@ import {
 	type AlertSummaryForPdf,
 } from "../lib/pdf-report-generator";
 import { generateReportFileKey } from "../lib/r2-upload";
-import { createUsageRightsClient } from "../lib/usage-rights-client";
+import {
+	buildGateDenialBody,
+	createUsageRightsClient,
+} from "../lib/usage-rights-client";
 import { parseQueryParams } from "../lib/query-params";
 
 export const reportsRouter = new Hono<{
@@ -226,21 +229,7 @@ reportsRouter.post("/", async (c) => {
 	const usageRights = createUsageRightsClient(c.env);
 	const gateResult = await usageRights.gate(organizationId, "reports");
 	if (!gateResult.allowed) {
-		return c.json(
-			{
-				success: false,
-				error: gateResult.error ?? "usage_limit_exceeded",
-				code: "USAGE_LIMIT_EXCEEDED",
-				upgradeRequired: true,
-				metric: "reports",
-				used: gateResult.used,
-				limit: gateResult.limit,
-				entitlementType: gateResult.entitlementType,
-				message:
-					"You have reached the limit for reports. Please upgrade your plan or contact your administrator.",
-			},
-			403,
-		);
+		return c.json(buildGateDenialBody("reports", gateResult), 403);
 	}
 
 	const user = c.get("user");

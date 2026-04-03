@@ -63,18 +63,22 @@ export function requireUsageRight(
 		const result = await client.gate(organization.id, metric, count);
 
 		if (!result.allowed) {
+			const code = result.code ?? "USAGE_LIMIT_EXCEEDED";
+			const isArchived = code === "ORGANIZATION_ARCHIVED";
 			return c.json(
 				{
 					success: false,
 					error: result.error ?? "usage_limit_exceeded",
-					code: "USAGE_LIMIT_EXCEEDED",
-					upgradeRequired: true,
-					metric: result.metric,
+					code,
+					upgradeRequired: result.upgradeRequired ?? !isArchived,
+					metric: result.metric ?? metric,
 					used: result.used,
 					limit: result.limit,
-					remaining: 0,
+					remaining: result.remaining ?? 0,
 					entitlementType: result.entitlementType,
-					message: `You have reached the limit for ${metric}. Please upgrade your plan or contact your administrator.`,
+					message: isArchived
+						? "This organization is archived. Restore it from account settings to make changes."
+						: `You have reached the limit for ${metric}. Please upgrade your plan or contact your administrator.`,
 				},
 				403,
 			);
@@ -101,6 +105,12 @@ export function requireUsageRight(
 		}
 		if (result.entitlementType) {
 			c.header("X-Entitlement-Type", result.entitlementType);
+		}
+		if (result.overageWarning) {
+			c.header("X-Usage-Overage-Warning", "1");
+		}
+		if (result.overageUnits !== undefined) {
+			c.header("X-Usage-Overage-Units", String(result.overageUnits));
 		}
 
 		return next();

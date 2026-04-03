@@ -40,6 +40,52 @@ export interface GateResult {
 	entitlementType?: EntitlementType;
 	error?: string;
 	upgradeRequired?: boolean;
+	/** From auth-svc (e.g. ORGANIZATION_ARCHIVED, SPEND_LIMIT_EXCEEDED) */
+	code?: string;
+	overageWarning?: boolean;
+	overageUnits?: number;
+	overageEnabled?: boolean;
+	spendLimitRemaining?: number | null;
+}
+
+function metricHumanLabel(metric: UsageMetric): string {
+	const labels: Partial<Record<UsageMetric, string>> = {
+		reports: "reports",
+		notices: "notices",
+		alerts: "alerts",
+		operations: "operations",
+		clients: "clients",
+		users: "users",
+		watchlistQueries: "watchlist queries",
+		organizations: "organizations",
+	};
+	return labels[metric] ?? metric;
+}
+
+/**
+ * JSON body for 403 when {@link UsageRightsClient.gate} returns allowed=false.
+ */
+export function buildGateDenialBody(
+	metric: UsageMetric,
+	result: GateResult,
+): Record<string, unknown> {
+	const code = result.code ?? "USAGE_LIMIT_EXCEEDED";
+	const isArchived = code === "ORGANIZATION_ARCHIVED";
+	const label = metricHumanLabel(metric);
+	return {
+		success: false,
+		error: result.error ?? "usage_limit_exceeded",
+		code,
+		upgradeRequired: result.upgradeRequired ?? !isArchived,
+		metric: result.metric ?? metric,
+		used: result.used,
+		limit: result.limit,
+		remaining: result.remaining ?? 0,
+		entitlementType: result.entitlementType,
+		message: isArchived
+			? "This organization is archived. Restore it from account settings to make changes."
+			: `You have reached the limit for ${label}. Please upgrade your plan or contact your administrator.`,
+	};
 }
 
 /**

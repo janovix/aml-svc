@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import type { Bindings } from "../types";
 import { authMiddleware, type AuthVariables } from "../middleware/auth";
+import { requireActiveOrganization } from "../middleware/organization-active";
 import { type AdminAuthVariables } from "../middleware/admin-auth";
 import { adminRouter } from "./admin";
 import { alertRulesRouter } from "./alert-rules";
@@ -63,6 +64,8 @@ export function createRouter() {
 	// KYC sessions routes (authenticated, org-scoped)
 	router.use("/kyc-sessions/*", authMiddleware({ requireOrganization: true }));
 	router.use("/kyc-sessions", authMiddleware({ requireOrganization: true }));
+	router.use("/kyc-sessions/*", requireActiveOrganization());
+	router.use("/kyc-sessions", requireActiveOrganization());
 
 	// Apply auth middleware with organization requirement for tenant-scoped routes
 	// These routes require an active organization to be selected
@@ -73,16 +76,27 @@ export function createRouter() {
 	router.use("/alerts/*", authMiddleware({ requireOrganization: true }));
 	router.use("/notices/*", authMiddleware({ requireOrganization: true }));
 	router.use("/reports/*", authMiddleware({ requireOrganization: true }));
+	router.use("/clients/*", requireActiveOrganization());
+	router.use("/operations/*", requireActiveOrganization());
+	router.use("/invoices/*", requireActiveOrganization());
+	router.use("/alert-rules/*", requireActiveOrganization());
+	router.use("/alerts/*", requireActiveOrganization());
+	router.use("/notices/*", requireActiveOrganization());
+	router.use("/reports/*", requireActiveOrganization());
 	// Note: /imports/templates and /imports/:id/events are public, handled separately above
 	router.use("/imports", authMiddleware({ requireOrganization: true }));
 	router.use("/imports/:id", authMiddleware({ requireOrganization: true }));
 	router.use("/imports/:id/*", authMiddleware({ requireOrganization: true }));
+	router.use("/imports", requireActiveOrganization());
+	router.use("/imports/:id", requireActiveOrganization());
+	router.use("/imports/:id/*", requireActiveOrganization());
 
 	// Organization settings requires auth and organization context
 	router.use(
 		"/organization-settings/*",
 		authMiddleware({ requireOrganization: true }),
 	);
+	router.use("/organization-settings/*", requireActiveOrganization());
 
 	// Exchange rates are global utility - auth required but no org
 	router.use("/exchange-rates/*", authMiddleware());

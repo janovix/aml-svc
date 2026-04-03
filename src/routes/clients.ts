@@ -20,7 +20,10 @@ import {
 	ClientRepository,
 } from "../domain/client";
 import type { Bindings } from "../types";
-import { createUsageRightsClient } from "../lib/usage-rights-client";
+import {
+	buildGateDenialBody,
+	createUsageRightsClient,
+} from "../lib/usage-rights-client";
 import { createAlertQueueService } from "../lib/alert-queue";
 import { createWatchlistSearchService } from "../lib/watchlist-search";
 import { getPrismaClient } from "../lib/prisma";
@@ -357,21 +360,7 @@ clientsRouter.post("/", async (c) => {
 	const usageRights = createUsageRightsClient(c.env);
 	const gateResult = await usageRights.gate(organizationId, "clients");
 	if (!gateResult.allowed) {
-		return c.json(
-			{
-				success: false,
-				error: gateResult.error ?? "usage_limit_exceeded",
-				code: "USAGE_LIMIT_EXCEEDED",
-				upgradeRequired: true,
-				metric: "clients",
-				used: gateResult.used,
-				limit: gateResult.limit,
-				entitlementType: gateResult.entitlementType,
-				message:
-					"You have reached the limit for clients. Please upgrade your plan or contact your administrator.",
-			},
-			403,
-		);
+		return c.json(buildGateDenialBody("clients", gateResult), 403);
 	}
 
 	const body = await c.req.json();

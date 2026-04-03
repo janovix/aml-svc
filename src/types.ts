@@ -26,6 +26,11 @@ type GateResultRpc = {
 	entitlementType?: string;
 	error?: string;
 	upgradeRequired?: boolean;
+	code?: string;
+	overageWarning?: boolean;
+	overageUnits?: number;
+	overageEnabled?: boolean;
+	spendLimitRemaining?: number | null;
 };
 
 type AuditLogRpcInput = {
@@ -77,6 +82,7 @@ export interface AuthSvcRpc {
 		slug: string;
 		logo: string | null;
 		metadata: Record<string, unknown> | null;
+		status: string;
 	} | null>;
 }
 

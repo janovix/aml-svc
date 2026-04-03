@@ -399,10 +399,14 @@ export function getAuthOrganization(
 /**
  * Helper to get the organization context from JWT, or null if not set
  */
-export function getAuthOrganizationOrNull(
-	c: Context<{ Variables: Partial<AuthVariables> }>,
-): AuthOrganization | null {
-	return c.get("organization") ?? null;
+export function getAuthOrganizationOrNull<
+	E extends { Variables?: Partial<AuthVariables> | AuthVariables },
+>(c: Context<E>): AuthOrganization | null {
+	return (
+		(c as unknown as Context<{ Variables: Partial<AuthVariables> }>).get(
+			"organization",
+		) ?? null
+	);
 }
 
 /**
@@ -426,9 +430,9 @@ export function getOrganizationId<
 /**
  * Helper to get the organization ID from context, or null if not set
  */
-export function getOrganizationIdOrNull(
-	c: Context<{ Variables: Partial<AuthVariables> }>,
-): string | null {
+export function getOrganizationIdOrNull<
+	E extends { Variables?: Partial<AuthVariables> | AuthVariables },
+>(c: Context<E>): string | null {
 	return getAuthOrganizationOrNull(c)?.id ?? null;
 }
 
