@@ -14,7 +14,10 @@ import {
 } from "../domain/alert";
 import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
-import { createUsageRightsClient } from "../lib/usage-rights-client";
+import {
+	buildGateDenialBody,
+	createUsageRightsClient,
+} from "../lib/usage-rights-client";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { parseQueryParams } from "../lib/query-params";
@@ -118,21 +121,7 @@ alertsRouter.post("/", async (c) => {
 	const usageRights = createUsageRightsClient(c.env);
 	const gateResult = await usageRights.gate(organizationId, "alerts");
 	if (!gateResult.allowed) {
-		return c.json(
-			{
-				success: false,
-				error: gateResult.error ?? "usage_limit_exceeded",
-				code: "USAGE_LIMIT_EXCEEDED",
-				upgradeRequired: true,
-				metric: "alerts",
-				used: gateResult.used,
-				limit: gateResult.limit,
-				entitlementType: gateResult.entitlementType,
-				message:
-					"You have reached the limit for alerts. Please upgrade your plan or contact your administrator.",
-			},
-			403,
-		);
+		return c.json(buildGateDenialBody("alerts", gateResult), 403);
 	}
 
 	const body = await c.req.json();

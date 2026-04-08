@@ -20,7 +20,10 @@ import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { createAlertQueueService } from "../lib/alert-queue";
-import { createUsageRightsClient } from "../lib/usage-rights-client";
+import {
+	buildGateDenialBody,
+	createUsageRightsClient,
+} from "../lib/usage-rights-client";
 import { KycSessionService } from "../domain/kyc-session";
 import { OrganizationSettingsRepository } from "../domain/organization-settings";
 import { UmaValueRepository } from "../domain/uma/repository";
@@ -471,6 +474,16 @@ operationsRouter.post("/", async (c) => {
 	const body = await c.req.json();
 	const payload = parseWithZod(OperationCreateSchema, body);
 
+	const usageRightsClient = createUsageRightsClient(c.env);
+	const gateResult = await usageRightsClient.gate(
+		organizationId,
+		"operations",
+		1,
+	);
+	if (!gateResult.allowed) {
+		return c.json(buildGateDenialBody("operations", gateResult), 403);
+	}
+
 	const service = getService(c);
 	const created = await service
 		.create(organizationId, payload)
@@ -479,15 +492,6 @@ operationsRouter.post("/", async (c) => {
 	// Queue alert detection job for new operation
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
 	await alertQueue.queueOperationCreated(created.clientId, created.id);
-
-	// Report operation usage to auth-svc for metered billing
-	const usageRightsClient = createUsageRightsClient(c.env);
-	usageRightsClient.meter(organizationId, "operations", 1).catch((err) => {
-		Sentry.captureException(err, {
-			tags: { context: "operation-usage-reporting-failed" },
-			extra: { organizationId },
-		});
-	});
 
 	// Threshold-crossing KYC trigger (non-blocking, Art. 17 LFPIORPI)
 	// If this operation pushes a client above the identification or notice threshold,
@@ -648,6 +652,25 @@ operationsRouter.post("/bulk-import", async (c) => {
 		const op = input.operations[i] as BulkOperationItemInput;
 
 		try {
+			const gateOne = await usageRightsClient.gate(
+				organizationId,
+				"operations",
+				1,
+			);
+			if (!gateOne.allowed) {
+				errorCount++;
+				results.push({
+					index: i,
+					status: "error",
+					error:
+						(gateOne.error as string | undefined) ?? "Operation quota exceeded",
+				});
+				if (input.stopOnError) {
+					break;
+				}
+				continue;
+			}
+
 			const warnings: string[] = [];
 
 			// Check payment amount mismatch (soft validation - warn instead of reject)
@@ -716,18 +739,6 @@ operationsRouter.post("/bulk-import", async (c) => {
 				break;
 			}
 		}
-	}
-
-	// Report usage for all successfully created operations
-	if (successCount + warningCount > 0) {
-		usageRightsClient
-			.meter(organizationId, "operations", successCount + warningCount)
-			.catch((err) => {
-				Sentry.captureException(err, {
-					tags: { context: "bulk-import-usage-reporting-failed" },
-					extra: { organizationId, count: successCount + warningCount },
-				});
-			});
 	}
 
 	const httpStatus =
@@ -886,6 +897,16 @@ operationsInternalRouter.post("/", async (c) => {
 	try {
 		const body = await c.req.json();
 		const payload = parseWithZod(OperationCreateSchema, body);
+
+		const usageRightsClient = createUsageRightsClient(c.env);
+		const gateResult = await usageRightsClient.gate(
+			organizationId,
+			"operations",
+			1,
+		);
+		if (!gateResult.allowed) {
+			return c.json(buildGateDenialBody("operations", gateResult), 403);
+		}
 
 		const service = getInternalService(c);
 		const created = await service.create(organizationId, payload);

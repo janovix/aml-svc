@@ -399,22 +399,19 @@ export function getAuthOrganization(
 /**
  * Helper to get the organization context from JWT, or null if not set
  */
-export function getAuthOrganizationOrNull(
-	c: Context<{ Variables: Partial<AuthVariables> }>,
-): AuthOrganization | null {
-	return c.get("organization") ?? null;
+export function getAuthOrganizationOrNull(c: Context): AuthOrganization | null {
+	return (c.get("organization") as AuthOrganization | undefined | null) ?? null;
 }
 
 /**
  * Helper to get the organization ID from context
  * Throws if organization is not set
  */
-export function getOrganizationId<
-	E extends { Variables?: Partial<AuthVariables> | AuthVariables },
->(c: Context<E>): string {
-	const organization = (
-		c as unknown as Context<{ Variables: Partial<AuthVariables> }>
-	).get("organization");
+export function getOrganizationId(c: Context): string {
+	const organization = c.get("organization") as
+		| AuthOrganization
+		| undefined
+		| null;
 	if (!organization) {
 		throw new Error(
 			"Organization not set. User must select an active organization.",
@@ -426,9 +423,7 @@ export function getOrganizationId<
 /**
  * Helper to get the organization ID from context, or null if not set
  */
-export function getOrganizationIdOrNull(
-	c: Context<{ Variables: Partial<AuthVariables> }>,
-): string | null {
+export function getOrganizationIdOrNull(c: Context): string | null {
 	return getAuthOrganizationOrNull(c)?.id ?? null;
 }
 
