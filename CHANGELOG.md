@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/janovix/aml-svc/compare/v1.10.1...v1.11.0) (2026-04-08)
+
+
+### Features
+
+* enhance usage rights and organization middleware ([08780dd](https://github.com/janovix/aml-svc/commit/08780ddb21cdf376e4dd0ab2353cf2f37046986e))
+
 # [1.11.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.10.1...v1.11.0-rc.1) (2026-04-03)
 
 
