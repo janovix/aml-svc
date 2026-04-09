@@ -1,3 +1,10 @@
+# [1.11.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.1...v1.11.0-rc.2) (2026-04-09)
+
+
+### Features
+
+* **risk:** implement risk assessment features and reference data ([68c64df](https://github.com/janovix/aml-svc/commit/68c64df05a9ea77c465e50211b4d6d3a939c4b59))
+
 # [1.11.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.10.1...v1.11.0-rc.1) (2026-04-03)
 
 
