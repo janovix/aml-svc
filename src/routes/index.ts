@@ -31,6 +31,7 @@ import { exchangeRatesRouter } from "./exchange-rates";
 import { kycSessionsRouter } from "./kyc-sessions";
 import { publicKycRouter } from "./public-kyc";
 import { maintenanceRouter } from "./internal-maintenance";
+import { riskRouter } from "./risk";
 
 export function createRouter() {
 	const router = new Hono<{
@@ -98,6 +99,10 @@ export function createRouter() {
 	);
 	router.use("/organization-settings/*", requireActiveOrganization());
 
+	// Risk routes require auth and organization context
+	router.use("/risk/*", authMiddleware({ requireOrganization: true }));
+	router.use("/risk/*", requireActiveOrganization());
+
 	// Exchange rates are global utility - auth required but no org
 	router.use("/exchange-rates/*", authMiddleware());
 
@@ -124,6 +129,7 @@ export function createRouter() {
 	router.route("/organization-settings", organizationSettingsRouter);
 	router.route("/imports", importsRouter);
 	router.route("/kyc-sessions", kycSessionsRouter);
+	router.route("/risk", riskRouter);
 
 	return router;
 }

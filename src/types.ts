@@ -188,6 +188,8 @@ export type Bindings = Omit<
 	TRUSTED_ORIGINS?: string;
 	/** Queue for import processing jobs */
 	IMPORT_PROCESSING_QUEUE?: Queue<import("./domain/import").ImportJob>;
+	/** Queue for risk assessment jobs (consumed by aml-svc itself) */
+	RISK_ASSESSMENT_QUEUE?: Queue<import("./lib/risk-queue").RiskJob>;
 	/**
 	 * Auth service binding via `AuthSvcEntrypoint`.
 	 * Caller wrangler config must include `"entrypoint": "AuthSvcEntrypoint"`.

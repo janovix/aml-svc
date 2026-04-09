@@ -7,6 +7,7 @@ import { getPrismaClient } from "../lib/prisma";
 import type { Bindings } from "../types";
 import { createHash } from "crypto";
 import { sendScreeningFlaggedNotification } from "../lib/screening-notifications";
+import { createRiskQueueService, type RiskJob } from "../lib/risk-queue";
 
 /**
  * Calculate segment for an entity ID using deterministic hash modulo 7
@@ -479,6 +480,25 @@ export async function handleInternalScreeningRequest(
 							),
 						);
 				}
+			}
+
+			// Trigger risk reassessment after screening data changes
+			if (client) {
+				const riskQueue = createRiskQueueService(
+					env.RISK_ASSESSMENT_QUEUE as Queue<RiskJob> | undefined,
+				);
+				riskQueue
+					.queueScreeningRiskUpdate(
+						client.organizationId,
+						client.id,
+						`screening_callback_${body.type}`,
+					)
+					.catch((err) =>
+						console.error(
+							"[InternalScreening] Failed to queue risk reassessment:",
+							err,
+						),
+					);
 			}
 
 			return new Response(

@@ -47,8 +47,8 @@ export default defineWorkersConfig({
 				"src/lib/sat-xml-generator.ts",
 				"src/lib/sat-xml-generator/**",
 				"src/lib/pdf-report-generator.ts",
+				// Large aggregation module; smoke-tested in report-aggregator.test.ts, full paths via integration
 				"src/lib/report-aggregator.ts",
-				"src/lib/route-helpers.ts",
 				// Service bindings and search clients (complex integration, tested via integration tests)
 				"src/lib/watchlist-search.ts",
 				"src/lib/kyc-email.ts",

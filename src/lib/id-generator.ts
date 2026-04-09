@@ -45,6 +45,11 @@ export const ID_PREFIXES = {
 	KYC_SESSION: "KYC", // KYC Self-Service Session
 	KYC_SESSION_EVENT: "KYE", // KYC Session Event (audit trail)
 	NOTICE_EVENT: "NVE", // Notice lifecycle event
+	// Risk-Based Approach (EBR)
+	ORG_RISK_ASSESSMENT: "ORA",
+	ORG_RISK_ELEMENT: "ORE",
+	ORG_MITIGANT: "OMG",
+	CLIENT_RISK_ASSESSMENT: "CRA",
 } as const;
 
 export type EntityType = keyof typeof ID_PREFIXES;

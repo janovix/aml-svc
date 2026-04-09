@@ -63,6 +63,17 @@
 				"binding": "IMPORT_PROCESSING_QUEUE",
 				"queue": "aml-imports-dev",
 			},
+			{
+				"binding": "RISK_ASSESSMENT_QUEUE",
+				"queue": "aml-risk-assessment-dev",
+			},
+		],
+		"consumers": [
+			{
+				"queue": "aml-risk-assessment-dev",
+				"max_batch_size": 10,
+				"max_retries": 3,
+			},
 		],
 	},
 	"triggers": {

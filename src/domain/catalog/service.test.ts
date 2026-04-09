@@ -175,4 +175,90 @@ describe("CatalogQueryService", () => {
 			);
 		});
 	});
+
+	describe("list", () => {
+		const mockCatalog: CatalogEntity = {
+			id: "catalog-1",
+			key: "countries",
+			name: "Countries",
+			active: true,
+			allowNewItems: false,
+			createdAt: "2024-01-01T00:00:00Z",
+			updatedAt: "2024-01-01T00:00:00Z",
+		};
+
+		it("returns paginated items when catalog exists", async () => {
+			vi.mocked(mockRepository.findByKey).mockResolvedValue(mockCatalog);
+			vi.mocked(mockRepository.listItems).mockResolvedValue({
+				data: [],
+				pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+			});
+
+			const result = await service.list("countries", {
+				page: 1,
+				pageSize: 20,
+			});
+
+			expect(result.catalog.key).toBe("countries");
+			expect(mockRepository.listItems).toHaveBeenCalled();
+		});
+
+		it("throws CATALOG_NOT_FOUND when missing", async () => {
+			vi.mocked(mockRepository.findByKey).mockResolvedValue(null);
+
+			await expect(
+				service.list("missing", { page: 1, pageSize: 20 }),
+			).rejects.toThrow("CATALOG_NOT_FOUND");
+		});
+	});
+
+	describe("createItem", () => {
+		const mockCatalog: CatalogEntity = {
+			id: "cat-open",
+			key: "open-cat",
+			name: "Open",
+			active: true,
+			allowNewItems: true,
+			createdAt: "2024-01-01T00:00:00Z",
+			updatedAt: "2024-01-01T00:00:00Z",
+		};
+
+		const mockItem: CatalogItemEntity = {
+			id: "new-item",
+			catalogId: "cat-open",
+			name: "New",
+			normalizedName: "new",
+			active: true,
+			metadata: null,
+			createdAt: "2024-01-01T00:00:00Z",
+			updatedAt: "2024-01-01T00:00:00Z",
+		};
+
+		it("creates when catalog allows new items", async () => {
+			vi.mocked(mockRepository.findByKey).mockResolvedValue(mockCatalog);
+			vi.mocked(mockRepository.findItemByNormalizedName).mockResolvedValue(
+				null,
+			);
+			vi.mocked(mockRepository.createItem).mockResolvedValue(mockItem);
+
+			const result = await service.createItem("open-cat", "  New  ");
+
+			expect(result.name).toBe("New");
+			expect(mockRepository.createItem).toHaveBeenCalledWith(
+				"cat-open",
+				"  New  ",
+			);
+		});
+
+		it("throws CATALOG_NOT_OPEN when catalog disallows new items", async () => {
+			vi.mocked(mockRepository.findByKey).mockResolvedValue({
+				...mockCatalog,
+				allowNewItems: false,
+			});
+
+			await expect(service.createItem("open-cat", "X")).rejects.toThrow(
+				"CATALOG_NOT_OPEN",
+			);
+		});
+	});
 });

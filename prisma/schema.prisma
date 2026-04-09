@@ -143,6 +143,8 @@ enum ReportTemplate {
   CLIENT_RISK_PROFILE
   ALERT_BREAKDOWN
   PERIOD_COMPARISON
+  MANUAL_POLITICAS_INTERNAS
+  EBR_RESULTS
   CUSTOM
 }
 
@@ -244,14 +246,21 @@ model Client {
   updatedAt            DateTime   @updatedAt @map("updated_at")
   deletedAt            DateTime?  @map("deleted_at")
 
-  documents             ClientDocument[]
-  addresses             ClientAddress[]
-  operations            Operation[]
-  alerts                Alert[]
-  reports               Report[]
-  shareholders          Shareholder[]
-  beneficialControllers BeneficialController[]
-  uploadLinks           UploadLink[]
+  // Risk-Based Approach (Art. 18-VII LFPIORPI)
+  riskLevel              String?   @map("risk_level")
+  dueDiligenceLevel      String?   @map("due_diligence_level")
+  lastRiskAssessment     DateTime? @map("last_risk_assessment")
+  nextRiskReview         DateTime? @map("next_risk_review")
+
+  documents              ClientDocument[]
+  addresses              ClientAddress[]
+  operations             Operation[]
+  alerts                 Alert[]
+  reports                Report[]
+  shareholders           Shareholder[]
+  beneficialControllers  BeneficialController[]
+  uploadLinks            UploadLink[]
+  riskAssessments        ClientRiskAssessment[]
 
   @@index([organizationId])
   @@index([rfc])
@@ -261,6 +270,8 @@ model Client {
   @@index([economicActivityCode])
   @@index([kycStatus])
   @@index([screeningResult])
+  @@index([riskLevel])
+  @@index([nextRiskReview])
   @@map("clients")
 }
 
@@ -1550,4 +1561,147 @@ model ImportRowResult {
   @@index([status])
   @@index([rowNumber])
   @@map("import_row_results")
+}
+
+// ============================================================================
+// Risk-Based Approach Domain (Art. 18-VII through XI LFPIORPI Reform 2025)
+// ============================================================================
+
+// Reference catalog: geographic risk zones derived from ENR 2023
+model GeographicRiskZone {
+  id        String   @id
+  stateCode String   @map("state_code")
+  stateName String   @map("state_name")
+  riskLevel String   @map("risk_level")
+  riskScore Float    @map("risk_score")
+  factors   String?
+  source    String   @default("ENR_2023")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@unique([stateCode])
+  @@map("geographic_risk_zones")
+}
+
+// Reference catalog: activity risk profiles from ENR 2023 sectoral ratings
+model ActivityRiskProfile {
+  id              String   @id
+  activityKey     String   @unique @map("activity_key")
+  activityName    String   @map("activity_name")
+  riskLevel       String   @map("risk_level")
+  riskScore       Float    @map("risk_score")
+  liquidityFactor Float    @map("liquidity_factor")
+  anonymityFactor Float    @map("anonymity_factor")
+  valueTransfer   Float    @map("value_transfer_factor")
+  cashIntensity   Float    @map("cash_intensity_factor")
+  source          String   @default("ENR_2023")
+  updatedAt       DateTime @default(now()) @map("updated_at")
+
+  @@map("activity_risk_profiles")
+}
+
+// Reference catalog: jurisdiction risk list (GAFI/GAFILAT high-risk countries)
+model JurisdictionRisk {
+  id              String   @id
+  countryCode     String   @unique @map("country_code")
+  countryName     String   @map("country_name")
+  riskLevel       String   @map("risk_level")
+  riskScore       Float    @map("risk_score")
+  preferentialTax Boolean  @default(false) @map("preferential_tax")
+  gafiDeficient   Boolean  @default(false) @map("gafi_deficient")
+  highCorruption  Boolean  @default(false) @map("high_corruption")
+  source          String   @default("GAFI_2023")
+  updatedAt       DateTime @default(now()) @map("updated_at")
+
+  @@map("jurisdiction_risks")
+}
+
+// Organization Risk Assessment (Art. 18-VII -- entity side)
+model OrgRiskAssessment {
+  id                  String    @id
+  organizationId      String    @map("organization_id")
+  status              String    @map("status")
+  inherentRiskScore   Float?    @map("inherent_risk_score")
+  residualRiskScore   Float?    @map("residual_risk_score")
+  riskLevel           String?   @map("risk_level")
+  requiredAuditType   String?   @map("required_audit_type")
+  fpRiskLevel         String?   @map("fp_risk_level")
+  fpRiskJustification String?   @map("fp_risk_justification")
+  periodStartDate     DateTime  @map("period_start_date")
+  periodEndDate       DateTime  @map("period_end_date")
+  assessedBy          String    @map("assessed_by")
+  nextReviewDeadline  DateTime? @map("next_review_deadline")
+  version             Int       @default(1)
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @default(now()) @map("updated_at")
+
+  elements  OrgRiskElement[]
+  mitigants OrgMitigant[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("org_risk_assessments")
+}
+
+// Element-level breakdown (4 risk elements per ENR/GAFI)
+model OrgRiskElement {
+  id              String @id
+  assessmentId    String @map("assessment_id")
+  elementType     String @map("element_type")
+  weight          Float
+  riskScore       Float  @map("risk_score")
+  riskLevel       String @map("risk_level")
+  factorBreakdown String @map("factor_breakdown")
+  justification   String?
+
+  assessment OrgRiskAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@map("org_risk_elements")
+}
+
+// Mitigant tracking for organization EBR
+model OrgMitigant {
+  id                 String  @id
+  assessmentId       String  @map("assessment_id")
+  mitigantKey        String  @map("mitigant_key")
+  mitigantName       String  @map("mitigant_name")
+  exists             Boolean @default(true)
+  effectivenessScore Float   @map("effectiveness_score")
+  riskEffect         Float   @map("risk_effect")
+  justification      String?
+
+  assessment OrgRiskAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@map("org_mitigants")
+}
+
+// Client Risk Classification (Art. 18-VII -- client side, per RCG Art. 34)
+model ClientRiskAssessment {
+  id                String   @id
+  clientId          String   @map("client_id")
+  organizationId    String   @map("organization_id")
+  inherentRiskScore Float    @map("inherent_risk_score")
+  residualRiskScore Float    @map("residual_risk_score")
+  riskLevel         String   @map("risk_level")
+  dueDiligenceLevel String   @map("due_diligence_level")
+  clientFactors     String   @map("client_factors")
+  geographicFactors String   @map("geographic_factors")
+  activityFactors   String   @map("activity_factors")
+  transactionFactors String  @map("transaction_factors")
+  mitigantFactors   String   @map("mitigant_factors")
+  assessedAt        DateTime @map("assessed_at")
+  nextReviewAt      DateTime @map("next_review_at")
+  assessedBy        String   @map("assessed_by")
+  triggerReason     String?  @map("trigger_reason")
+  version           Int      @default(1)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @map("updated_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([organizationId])
+  @@index([riskLevel])
+  @@map("client_risk_assessments")
 }

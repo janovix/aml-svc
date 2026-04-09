@@ -306,6 +306,88 @@ export default {
 					console.error("[scheduled] Notice deadline check failed:", err),
 				),
 		);
+
+		// Risk review: enqueue reassessment for clients past their review date
+		ctx.waitUntil(
+			(async () => {
+				try {
+					const { getPrismaClient } = await import("./lib/prisma");
+					const { createRiskQueueService } = await import("./lib/risk-queue");
+					const { sendRiskNotification } = await import(
+						"./lib/risk-notifications"
+					);
+
+					const prisma = getPrismaClient(env.DB);
+					const riskQueue = createRiskQueueService(
+						env.RISK_ASSESSMENT_QUEUE as
+							| Queue<import("./lib/risk-queue").RiskJob>
+							| undefined,
+					);
+
+					if (!riskQueue.isAvailable()) return;
+
+					const now = new Date(event.scheduledTime);
+					const dueClients = await prisma.client.findMany({
+						where: {
+							nextRiskReview: { lte: now },
+							deletedAt: null,
+						},
+						select: { id: true, organizationId: true },
+					});
+
+					if (dueClients.length === 0) return;
+
+					const orgMap = new Map<string, string[]>();
+					for (const c of dueClients) {
+						const list = orgMap.get(c.organizationId) ?? [];
+						list.push(c.id);
+						orgMap.set(c.organizationId, list);
+					}
+
+					for (const [orgId, clientIds] of orgMap) {
+						for (const clientId of clientIds) {
+							await riskQueue.queueClientReassess(
+								orgId,
+								clientId,
+								"scheduled_review",
+							);
+						}
+						await sendRiskNotification(env, {
+							type: "aml.risk.review_due",
+							organizationId: orgId,
+							clientsDueCount: clientIds.length,
+						});
+					}
+
+					console.log(
+						`[scheduled] Risk review: ${dueClients.length} clients enqueued across ${orgMap.size} orgs`,
+					);
+				} catch (err) {
+					console.error("[scheduled] Risk review check failed:", err);
+				}
+			})(),
+		);
+	},
+
+	async queue(
+		batch: MessageBatch<import("./lib/risk-queue").RiskJob>,
+		env: Bindings,
+		_ctx: ExecutionContext,
+	): Promise<void> {
+		const { processRiskJob } = await import("./lib/risk-queue-processor");
+
+		for (const message of batch.messages) {
+			try {
+				await processRiskJob(env, message.body);
+				message.ack();
+			} catch (err) {
+				console.error(
+					`[risk-queue] Failed to process ${message.body.type}:`,
+					err,
+				);
+				message.retry();
+			}
+		}
 	},
 };
 
