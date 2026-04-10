@@ -107,6 +107,11 @@ export const openAPISpec = {
 			description:
 				"Token-based KYC self-service endpoints. Clients access via invite link to update personal info, documents, shareholders, beneficial controllers, and submit for review.",
 		},
+		{
+			name: "Risk",
+			description:
+				"Client and organization risk assessment (EBR), dashboards, authority reporting, and exports. Requires authentication and active organization.",
+		},
 	],
 	paths: {
 		"/healthz": {
@@ -1073,6 +1078,182 @@ export const openAPISpec = {
 				},
 			},
 		},
+		"/api/v1/operations/activities": {
+			get: {
+				tags: ["Operations"],
+				summary: "List vulnerable activities",
+				description:
+					"Returns all supported vulnerable activities with notice/identification thresholds and current UMA value.",
+				responses: {
+					"200": {
+						description: "Activities with thresholds",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										data: { type: "array", items: { type: "object" } },
+										currentUmaValue: { type: "number" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/operations/activities/{code}/fields": {
+			get: {
+				tags: ["Operations"],
+				summary: "Activity field metadata",
+				description:
+					"Field definitions for a vulnerable activity code (extension fields, CFDI mapping, importance).",
+				parameters: [
+					{
+						name: "code",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Activity code (e.g. VEH, INM)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Field metadata",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										activityCode: { type: "string" },
+										fields: { type: "array", items: { type: "object" } },
+										message: { type: "string" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/operations/thresholds": {
+			get: {
+				tags: ["Operations"],
+				summary: "UMA thresholds by activity",
+				description:
+					"Current UMA value and identification/notice thresholds for all activities.",
+				responses: {
+					"200": {
+						description: "Threshold map",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										currentUmaValue: { type: "number" },
+										thresholds: { type: "object", additionalProperties: true },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/operations/bulk-import": {
+			post: {
+				tags: ["Operations"],
+				summary: "Bulk import operations",
+				description:
+					"Import up to 100 operations per request with dataSource forced to IMPORT. Returns per-row results; HTTP 207 when partially successful.",
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: {
+								$ref: "#/components/schemas/BulkOperationImportRequest",
+							},
+						},
+					},
+				},
+				responses: {
+					"201": {
+						description: "All rows processed successfully",
+						content: {
+							"application/json": {
+								schema: {
+									$ref: "#/components/schemas/BulkOperationImportResponse",
+								},
+							},
+						},
+					},
+					"207": {
+						description: "Partial success",
+						content: {
+							"application/json": {
+								schema: {
+									$ref: "#/components/schemas/BulkOperationImportResponse",
+								},
+							},
+						},
+					},
+					"400": {
+						description: "Validation error or all rows failed",
+						content: {
+							"application/json": {
+								schema: {
+									$ref: "#/components/schemas/BulkOperationImportResponse",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/operations/client/{clientId}/accumulated": {
+			get: {
+				tags: ["Operations"],
+				summary: "Accumulated operation amount",
+				description:
+					"Aggregated amount for a client and activity in a date range (defaults to last 30 days).",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string", format: "uuid" },
+					},
+					{
+						name: "activityCode",
+						in: "query",
+						required: true,
+						schema: { type: "string" },
+						description: "Vulnerable activity code",
+					},
+					{
+						name: "startDate",
+						in: "query",
+						schema: { type: "string", format: "date" },
+					},
+					{
+						name: "endDate",
+						in: "query",
+						schema: { type: "string", format: "date" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Accumulated totals",
+						content: {
+							"application/json": {
+								schema: { type: "object", additionalProperties: true },
+							},
+						},
+					},
+					"400": { description: "Missing or invalid parameters" },
+				},
+			},
+		},
 		"/api/v1/operations/{id}": {
 			get: {
 				tags: ["Operations"],
@@ -1297,6 +1478,24 @@ export const openAPISpec = {
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/Error" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/invoices/stats": {
+			get: {
+				tags: ["Invoices"],
+				summary: "Invoice statistics",
+				description:
+					"Counts of total, ingreso (I), and egreso (E) invoices for the organization.",
+				responses: {
+					"200": {
+						description: "Invoice counts",
+						content: {
+							"application/json": {
+								schema: { $ref: "#/components/schemas/InvoiceStats" },
 							},
 						},
 					},
@@ -3808,6 +4007,11 @@ export const openAPISpec = {
 										enum: ["CLIENT", "OPERATION"],
 										description: "Type of entities in the file",
 									},
+									activityCode: {
+										type: "string",
+										description:
+											"Required when entityType is OPERATION — vulnerable activity code for column layout (e.g. VEH).",
+									},
 								},
 							},
 						},
@@ -3831,6 +4035,55 @@ export const openAPISpec = {
 					"400": {
 						description: "Invalid file type or missing required fields",
 					},
+				},
+			},
+		},
+		"/api/v1/imports/target-fields": {
+			get: {
+				tags: ["Imports"],
+				summary: "Target fields for column mapping",
+				description:
+					"Returns value/label/required metadata for mapping CSV columns. For OPERATION imports, pass activityCode.",
+				parameters: [
+					{
+						name: "entityType",
+						in: "query",
+						required: true,
+						schema: { type: "string", enum: ["CLIENT", "OPERATION"] },
+					},
+					{
+						name: "activityCode",
+						in: "query",
+						schema: { type: "string" },
+						description: "Required when entityType is OPERATION",
+					},
+				],
+				responses: {
+					"200": {
+						description: "Field descriptors",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									required: ["fields"],
+									properties: {
+										fields: {
+											type: "array",
+											items: {
+												type: "object",
+												properties: {
+													value: { type: "string" },
+													label: { type: "string" },
+													required: { type: "boolean" },
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					"400": { description: "Missing entityType or activityCode" },
 				},
 			},
 		},
@@ -3867,6 +4120,44 @@ export const openAPISpec = {
 					},
 					"400": {
 						description: "Invalid entity type",
+					},
+				},
+			},
+		},
+		"/api/v1/imports/templates/{entityType}/{activityCode}": {
+			get: {
+				tags: ["Imports"],
+				summary: "Download operation import template",
+				description:
+					"CSV template for OPERATION imports for a specific vulnerable activity code. Public; no authentication.",
+				security: [],
+				parameters: [
+					{
+						name: "entityType",
+						in: "path",
+						required: true,
+						schema: { type: "string", enum: ["operation", "OPERATION"] },
+						description: "Must be operation",
+					},
+					{
+						name: "activityCode",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+						description: "Activity code (e.g. VEH, INM)",
+					},
+				],
+				responses: {
+					"200": {
+						description: "CSV template file",
+						content: {
+							"text/csv": {
+								schema: { type: "string", format: "binary" },
+							},
+						},
+					},
+					"400": {
+						description: "Invalid entity type or unknown activity code",
 					},
 				},
 			},
@@ -3935,6 +4226,86 @@ export const openAPISpec = {
 					"404": {
 						description: "Import not found",
 					},
+				},
+			},
+		},
+		"/api/v1/imports/{id}/preview": {
+			get: {
+				tags: ["Imports"],
+				summary: "CSV preview for mapping",
+				description:
+					"Returns parsed headers and sample rows for a PENDING import (column mapping UI).",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Headers and sample rows",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									required: ["headers", "sampleRows"],
+									properties: {
+										headers: { type: "array", items: { type: "string" } },
+										sampleRows: {
+											type: "array",
+											items: { type: "array", items: { type: "string" } },
+										},
+									},
+								},
+							},
+						},
+					},
+					"400": { description: "Import not in PENDING status" },
+					"404": { description: "Import or file not found" },
+					"503": { description: "R2 not configured" },
+				},
+			},
+		},
+		"/api/v1/imports/{id}/start": {
+			post: {
+				tags: ["Imports"],
+				summary: "Start import processing",
+				description:
+					"Submit column mapping and enqueue processing. Requires IMPORT_PROCESSING_QUEUE.",
+				parameters: [
+					{
+						name: "id",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				requestBody: {
+					required: true,
+					content: {
+						"application/json": {
+							schema: { $ref: "#/components/schemas/ImportStartRequest" },
+						},
+					},
+				},
+				responses: {
+					"200": {
+						description: "Import started",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										success: { type: "boolean", example: true },
+										data: { $ref: "#/components/schemas/Import" },
+									},
+								},
+							},
+						},
+					},
+					"503": { description: "Import queue not configured" },
 				},
 			},
 		},
@@ -5632,6 +6003,282 @@ export const openAPISpec = {
 						content: {
 							"application/json": {
 								schema: { $ref: "#/components/schemas/OrganizationSettings" },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/risk/batch-assess": {
+			post: {
+				tags: ["Risk"],
+				summary: "Queue batch client risk assessment",
+				description:
+					"Enqueues reassessment for all clients in the organization. Returns 503 if the risk queue is not configured.",
+				responses: {
+					"202": {
+						description: "Batch queued",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										status: { type: "string", example: "queued" },
+										organizationId: { type: "string" },
+									},
+								},
+							},
+						},
+					},
+					"503": {
+						description: "Risk assessment queue not available",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: { error: { type: "string" } },
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/risk/dashboard": {
+			get: {
+				tags: ["Risk"],
+				summary: "Risk dashboard",
+				description:
+					"Client risk distribution, count of clients due for review, and active organization EBR summary.",
+				responses: {
+					"200": {
+						description: "Dashboard payload",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										clientRiskDistribution: { type: "object" },
+										clientsPendingReview: { type: "integer" },
+										orgAssessment: { type: "object", nullable: true },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/risk/org-assessment": {
+			get: {
+				tags: ["Risk"],
+				summary: "Latest organization risk assessment",
+				description: "Active org EBR with elements and mitigants.",
+				responses: {
+					"200": {
+						description: "Organization assessment",
+						content: {
+							"application/json": {
+								schema: { type: "object", additionalProperties: true },
+							},
+						},
+					},
+					"404": { description: "No org risk assessment found" },
+				},
+			},
+			post: {
+				tags: ["Risk"],
+				summary: "Queue organization EBR",
+				description: "Enqueue full organization risk assessment.",
+				responses: {
+					"202": {
+						description: "Queued",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										status: { type: "string", example: "queued" },
+										organizationId: { type: "string" },
+									},
+								},
+							},
+						},
+					},
+					"503": { description: "Risk queue not configured" },
+				},
+			},
+		},
+		"/api/v1/risk/org-assessment/history": {
+			get: {
+				tags: ["Risk"],
+				summary: "Organization assessment history",
+				responses: {
+					"200": {
+						description: "List of org assessments by version",
+						content: {
+							"application/json": {
+								schema: { type: "array", items: { type: "object" } },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/risk/org-assessment/evolution": {
+			get: {
+				tags: ["Risk"],
+				summary: "EBR evolution over versions",
+				description: "Per-version scores and element summaries.",
+				responses: {
+					"200": {
+						description: "Evolution timeline",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										organizationId: { type: "string" },
+										evolution: { type: "array", items: { type: "object" } },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/risk/authority-report": {
+			get: {
+				tags: ["Risk"],
+				summary: "Authority reporting snapshot",
+				description:
+					"GAFI-style aggregate: org assessment, distribution, and high-risk clients.",
+				responses: {
+					"200": {
+						description: "Report JSON",
+						content: {
+							"application/json": {
+								schema: { type: "object", additionalProperties: true },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/risk/export": {
+			get: {
+				tags: ["Risk"],
+				summary: "Export org and client assessments",
+				description:
+					"Full export of org and client risk assessments for the organization.",
+				responses: {
+					"200": {
+						description: "Export bundle",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										exportedAt: { type: "string", format: "date-time" },
+										organizationId: { type: "string" },
+										orgAssessments: {
+											type: "array",
+											items: { type: "object" },
+										},
+										clientAssessments: {
+											type: "array",
+											items: { type: "object" },
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/risk/{clientId}/assessment": {
+			get: {
+				tags: ["Risk"],
+				summary: "Latest client risk assessment",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Assessment with parsed factor objects",
+						content: {
+							"application/json": {
+								schema: { type: "object", additionalProperties: true },
+							},
+						},
+					},
+					"404": { description: "No risk assessment found" },
+				},
+			},
+			post: {
+				tags: ["Risk"],
+				summary: "Trigger client risk assessment",
+				description:
+					"Queues assessment when the risk queue is available; otherwise runs synchronously (e.g. local dev).",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"202": {
+						description: "Queued for assessment",
+						content: {
+							"application/json": {
+								schema: {
+									type: "object",
+									properties: {
+										status: { type: "string", example: "queued" },
+										clientId: { type: "string" },
+									},
+								},
+							},
+						},
+					},
+					"200": {
+						description: "Synchronous assessment result (queue unavailable)",
+						content: {
+							"application/json": {
+								schema: { type: "object", additionalProperties: true },
+							},
+						},
+					},
+				},
+			},
+		},
+		"/api/v1/risk/{clientId}/history": {
+			get: {
+				tags: ["Risk"],
+				summary: "Client assessment history",
+				parameters: [
+					{
+						name: "clientId",
+						in: "path",
+						required: true,
+						schema: { type: "string" },
+					},
+				],
+				responses: {
+					"200": {
+						description: "Historical assessments",
+						content: {
+							"application/json": {
+								schema: { type: "array", items: { type: "object" } },
 							},
 						},
 					},
@@ -8350,6 +8997,18 @@ export const openAPISpec = {
 					updatedAt: { type: "string", format: "date-time" },
 				},
 			},
+			ImportStartRequest: {
+				type: "object",
+				required: ["columnMapping"],
+				properties: {
+					columnMapping: {
+						type: "object",
+						additionalProperties: { type: "string", minLength: 1 },
+						description:
+							"Maps CSV header names to target field keys (non-empty strings).",
+					},
+				},
+			},
 			ImportWithRows: {
 				allOf: [
 					{ $ref: "#/components/schemas/Import" },
@@ -8609,6 +9268,74 @@ export const openAPISpec = {
 							limit: { type: "integer" },
 							total: { type: "integer" },
 							totalPages: { type: "integer" },
+						},
+					},
+				},
+			},
+			InvoiceStats: {
+				type: "object",
+				required: ["totalInvoices", "ingresoInvoices", "egresoInvoices"],
+				properties: {
+					totalInvoices: { type: "integer" },
+					ingresoInvoices: {
+						type: "integer",
+						description: "Voucher type I (ingreso)",
+					},
+					egresoInvoices: {
+						type: "integer",
+						description: "Voucher type E (egreso)",
+					},
+				},
+			},
+			BulkOperationImportRequest: {
+				type: "object",
+				required: ["operations"],
+				properties: {
+					operations: {
+						type: "array",
+						minItems: 1,
+						maxItems: 100,
+						items: {
+							type: "object",
+							description:
+								"Operation payload aligned with create operation; activity-specific extensions optional. dataSource is forced to IMPORT.",
+						},
+					},
+					stopOnError: {
+						type: "boolean",
+						default: false,
+						description: "Stop processing on first error",
+					},
+				},
+			},
+			BulkOperationImportResponse: {
+				type: "object",
+				properties: {
+					success: { type: "boolean" },
+					summary: {
+						type: "object",
+						properties: {
+							total: { type: "integer" },
+							processed: { type: "integer" },
+							success: { type: "integer" },
+							warnings: { type: "integer" },
+							errors: { type: "integer" },
+						},
+					},
+					results: {
+						type: "array",
+						items: {
+							type: "object",
+							properties: {
+								index: { type: "integer" },
+								status: {
+									type: "string",
+									enum: ["success", "warning", "error"],
+								},
+								operationId: { type: "string" },
+								warnings: { type: "array", items: { type: "string" } },
+								error: { type: "string" },
+							},
 						},
 					},
 				},
