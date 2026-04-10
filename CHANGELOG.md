@@ -1,3 +1,10 @@
+# [1.11.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.4...v1.11.0-rc.5) (2026-04-10)
+
+
+### Bug Fixes
+
+* **risk:** update organization risk assessment response to include null state and improve schema definition ([7966ab7](https://github.com/janovix/aml-svc/commit/7966ab77365d2d4e1b2c4e4f60193a62821019a7))
+
 # [1.11.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.3...v1.11.0-rc.4) (2026-04-10)
 
 
