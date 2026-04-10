@@ -1,3 +1,10 @@
+# [1.11.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.2...v1.11.0-rc.3) (2026-04-10)
+
+
+### Features
+
+* **alert-detection:** add KYC session expiration notifications and implement alert seeker system ([23ff8d9](https://github.com/janovix/aml-svc/commit/23ff8d920b1e6a4452e898a0bc667a3b9bd7de16))
+
 # [1.11.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.1...v1.11.0-rc.2) (2026-04-09)
 
 
