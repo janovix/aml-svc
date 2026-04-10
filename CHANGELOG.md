@@ -1,3 +1,10 @@
+# [1.11.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.3...v1.11.0-rc.4) (2026-04-10)
+
+
+### Features
+
+* **openapi:** add new operations endpoints for activities, thresholds, and imports ([619ec78](https://github.com/janovix/aml-svc/commit/619ec78a4a926bc7f1f21627a430902330e4bbae))
+
 # [1.11.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.2...v1.11.0-rc.3) (2026-04-10)
 
 
