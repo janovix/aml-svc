@@ -171,15 +171,18 @@ riskRouter.get("/org-assessment", async (c) => {
 	});
 
 	if (!assessment) {
-		return c.json({ error: "No org risk assessment found" }, 404);
+		// Empty state: no EBR run yet — use 200 so dashboards and proxies do not treat this as a route/client error.
+		return c.json({ assessment: null });
 	}
 
 	return c.json({
-		...assessment,
-		elements: assessment.elements.map((e) => ({
-			...e,
-			factorBreakdown: JSON.parse(e.factorBreakdown),
-		})),
+		assessment: {
+			...assessment,
+			elements: assessment.elements.map((e) => ({
+				...e,
+				factorBreakdown: JSON.parse(e.factorBreakdown),
+			})),
+		},
 	});
 });
 

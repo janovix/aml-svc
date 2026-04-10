@@ -6073,17 +6073,30 @@ export const openAPISpec = {
 			get: {
 				tags: ["Risk"],
 				summary: "Latest organization risk assessment",
-				description: "Active org EBR with elements and mitigants.",
+				description:
+					"Active org EBR with elements and mitigants. When none exists yet, returns 200 with assessment null (not 404).",
 				responses: {
 					"200": {
-						description: "Organization assessment",
+						description: "Wrapped assessment or null if no active EBR",
 						content: {
 							"application/json": {
-								schema: { type: "object", additionalProperties: true },
+								schema: {
+									type: "object",
+									required: ["assessment"],
+									properties: {
+										assessment: {
+											oneOf: [
+												{ type: "null" },
+												{ type: "object", additionalProperties: true },
+											],
+											description:
+												"Active org risk assessment, or null until the first EBR completes.",
+										},
+									},
+								},
 							},
 						},
 					},
-					"404": { description: "No org risk assessment found" },
 				},
 			},
 			post: {
