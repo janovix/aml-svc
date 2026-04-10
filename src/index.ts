@@ -307,6 +307,27 @@ export default {
 				),
 		);
 
+		// KYC session expiration: notify orgs about soon-to-expire sessions & bulk-expire stale ones
+		ctx.waitUntil(
+			(async () => {
+				const { processKycExpirationNotifications } = await import(
+					"./lib/kyc-expiration-notifications"
+				);
+				return processKycExpirationNotifications(
+					env,
+					new Date(event.scheduledTime),
+				);
+			})()
+				.then((r) =>
+					console.log(
+						`[scheduled] KYC expiry: ${r.notifiedCount} notified, ${r.expiredCount} expired`,
+					),
+				)
+				.catch((err) =>
+					console.error("[scheduled] KYC expiry check failed:", err),
+				),
+		);
+
 		// Risk review: enqueue reassessment for clients past their review date
 		ctx.waitUntil(
 			(async () => {
@@ -370,21 +391,42 @@ export default {
 	},
 
 	async queue(
-		batch: MessageBatch<import("./lib/risk-queue").RiskJob>,
+		batch: MessageBatch,
 		env: Bindings,
 		_ctx: ExecutionContext,
 	): Promise<void> {
+		const queueName = batch.queue;
+
+		if (queueName.startsWith("aml-alert-detection")) {
+			const { processAlertBatch } = await import("./domain/alert-detection");
+			return processAlertBatch(
+				batch as MessageBatch<import("./domain/alert-detection").AlertJob>,
+				env,
+			);
+		}
+
+		if (queueName.startsWith("aml-imports")) {
+			const { processImportBatch } = await import(
+				"./domain/import/queue-processor"
+			);
+			return processImportBatch(
+				batch as MessageBatch<import("./domain/import").ImportJob>,
+				env,
+			);
+		}
+
+		// Default: risk assessment queue
 		const { processRiskJob } = await import("./lib/risk-queue-processor");
 
 		for (const message of batch.messages) {
 			try {
-				await processRiskJob(env, message.body);
+				await processRiskJob(
+					env,
+					(message as Message<import("./lib/risk-queue").RiskJob>).body,
+				);
 				message.ack();
 			} catch (err) {
-				console.error(
-					`[risk-queue] Failed to process ${message.body.type}:`,
-					err,
-				);
+				console.error(`[risk-queue] Failed to process job:`, err);
 				message.retry();
 			}
 		}

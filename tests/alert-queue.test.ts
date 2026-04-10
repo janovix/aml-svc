@@ -29,7 +29,7 @@ describe("AlertQueueService", () => {
 
 	describe("queueClientCreated", () => {
 		it("should send a client.created job to the queue", async () => {
-			await service.queueClientCreated("client-123");
+			await service.queueClientCreated("client-123", "organization-123");
 
 			expect(mockQueue?.send).toHaveBeenCalledTimes(1);
 			const call = vi.mocked(mockQueue!.send).mock.calls[0][0];
@@ -42,7 +42,10 @@ describe("AlertQueueService", () => {
 		it("should not throw when queue is undefined", async () => {
 			const serviceWithoutQueue = new AlertQueueService(undefined);
 			await expect(
-				serviceWithoutQueue.queueClientCreated("client-123"),
+				serviceWithoutQueue.queueClientCreated(
+					"client-123",
+					"organization-123",
+				),
 			).resolves.not.toThrow();
 		});
 
@@ -53,14 +56,14 @@ describe("AlertQueueService", () => {
 			const serviceWithError = new AlertQueueService(errorQueue);
 
 			await expect(
-				serviceWithError.queueClientCreated("client-123"),
+				serviceWithError.queueClientCreated("client-123", "organization-123"),
 			).resolves.not.toThrow();
 		});
 	});
 
 	describe("queueClientUpdated", () => {
 		it("should send a client.updated job to the queue", async () => {
-			await service.queueClientUpdated("client-456");
+			await service.queueClientUpdated("client-456", "organization-456");
 
 			expect(mockQueue?.send).toHaveBeenCalledTimes(1);
 			const call = vi.mocked(mockQueue!.send).mock.calls[0][0];
@@ -73,14 +76,21 @@ describe("AlertQueueService", () => {
 		it("should not throw when queue is undefined", async () => {
 			const serviceWithoutQueue = new AlertQueueService(undefined);
 			await expect(
-				serviceWithoutQueue.queueClientUpdated("client-456"),
+				serviceWithoutQueue.queueClientUpdated(
+					"client-456",
+					"organization-456",
+				),
 			).resolves.not.toThrow();
 		});
 	});
 
 	describe("queueTransactionCreated", () => {
 		it("should send a transaction.created job to the queue", async () => {
-			await service.queueTransactionCreated("client-789", "transaction-123");
+			await service.queueTransactionCreated(
+				"client-789",
+				"transaction-123",
+				"organization-789",
+			);
 
 			expect(mockQueue?.send).toHaveBeenCalledTimes(1);
 			const call = vi.mocked(mockQueue!.send).mock.calls[0][0];
@@ -95,6 +105,7 @@ describe("AlertQueueService", () => {
 			await expect(
 				serviceWithoutQueue.queueTransactionCreated(
 					"client-789",
+					"organization-789",
 					"transaction-123",
 				),
 			).resolves.not.toThrow();

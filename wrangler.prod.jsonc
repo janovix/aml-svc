@@ -61,6 +61,18 @@
 				"queue": "aml-imports",
 			},
 		],
+		"consumers": [
+			{
+				"queue": "aml-alert-detection",
+				"max_batch_size": 10,
+				"max_batch_timeout": 30,
+			},
+			{
+				"queue": "aml-imports",
+				"max_batch_size": 5,
+				"max_batch_timeout": 60,
+			},
+		],
 	},
 	"r2_buckets": [
 		{

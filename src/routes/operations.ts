@@ -492,7 +492,11 @@ operationsRouter.post("/", async (c) => {
 
 	// Queue alert detection job for new operation
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
-	await alertQueue.queueOperationCreated(created.clientId, created.id);
+	await alertQueue.queueOperationCreated(
+		created.clientId,
+		created.id,
+		organizationId,
+	);
 
 	// Queue risk check for operation (may trigger client reassessment)
 	const riskQueue = createRiskQueueService(
@@ -709,7 +713,7 @@ operationsRouter.post("/bulk-import", async (c) => {
 
 			// Queue alert detection
 			await alertQueue
-				.queueOperationCreated(created.clientId, created.id)
+				.queueOperationCreated(created.clientId, created.id, organizationId)
 				.catch((err) =>
 					Sentry.captureException(err, {
 						tags: { context: "bulk-import-queue-alert-failed" },
@@ -925,7 +929,11 @@ operationsInternalRouter.post("/", async (c) => {
 
 		// Queue alert detection job for new operation
 		const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
-		await alertQueue.queueOperationCreated(created.clientId, created.id);
+		await alertQueue.queueOperationCreated(
+			created.clientId,
+			created.id,
+			organizationId,
+		);
 
 		return c.json(created, 201);
 	} catch (error) {

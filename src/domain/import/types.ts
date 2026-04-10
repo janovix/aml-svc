@@ -99,6 +99,61 @@ export interface ImportJob {
 }
 
 /**
+ * Parsed row data from CSV/Excel
+ */
+export interface ParsedRow {
+	rowNumber: number;
+	data: Record<string, string>;
+}
+
+/**
+ * Result of processing a single row
+ */
+export interface RowProcessingResult {
+	rowNumber: number;
+	status: ImportRowStatus;
+	entityId?: string;
+	message?: string;
+	errors?: string[];
+}
+
+/**
+ * Client data structure from CSV/Excel
+ */
+export interface ClientRowData {
+	person_type: string;
+	rfc: string;
+	first_name?: string;
+	last_name?: string;
+	second_last_name?: string;
+	birth_date?: string;
+	curp?: string;
+	business_name?: string;
+	incorporation_date?: string;
+	nationality?: string;
+	email: string;
+	phone: string;
+	country: string;
+	state_code: string;
+	city: string;
+	municipality: string;
+	neighborhood: string;
+	street: string;
+	external_number: string;
+	internal_number?: string;
+	postal_code: string;
+	reference?: string;
+	notes?: string;
+	country_code?: string;
+	economic_activity_code?: string;
+	gender?: string;
+	occupation?: string;
+	marital_status?: string;
+	source_of_funds?: string;
+	source_of_wealth?: string;
+}
+
+/**
  * SSE event types for real-time updates
  */
 export type ImportSSEEventType =

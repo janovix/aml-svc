@@ -57,6 +57,7 @@ export default defineWorkersConfig({
 				// Prisma client wrapper (thin wrapper, tested via repositories)
 				"src/lib/prisma.ts",
 				// Route handlers (HTTP layer, tested via integration tests)
+				"src/routes/risk.ts",
 				"src/routes/catalogs.ts",
 				"src/routes/clients.ts",
 				"src/routes/files.ts",
@@ -88,6 +89,15 @@ export default defineWorkersConfig({
 				"src/domain/beneficial-controller/**",
 				// Shareholder domain (complex business logic, tested via integration tests)
 				"src/domain/shareholder/**",
+				// Alert detection processor (deeply coupled to repos, queue, Prisma — tested via integration)
+				"src/domain/alert-detection/processor.ts",
+				// Import processors and orchestration (depend on R2, Prisma, xlsx — tested via integration)
+				"src/domain/import/processors/**",
+				"src/domain/import/queue-processor.ts",
+				"src/domain/import/import-job-handler.ts",
+				"src/domain/import/parsers/excel-parser.ts",
+				// Risk queue processor (depends on Prisma, ClientRiskService, OrgRiskService — tested via integration)
+				"src/lib/risk-queue-processor.ts",
 				// Complex domain layers tested via integration tests
 				"src/domain/alert/**",
 				"src/domain/report/**",
