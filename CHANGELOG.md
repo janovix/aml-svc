@@ -1,3 +1,10 @@
+# [1.11.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.5...v1.11.0-rc.6) (2026-04-11)
+
+
+### Features
+
+* **risk:** add risk methodology configuration and dynamic scoring capabilities ([5fc2ea8](https://github.com/janovix/aml-svc/commit/5fc2ea8ea2354ac5fc909d679efb14f60ac83293))
+
 # [1.11.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.4...v1.11.0-rc.5) (2026-04-10)
 
 
