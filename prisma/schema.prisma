@@ -1619,6 +1619,7 @@ model JurisdictionRisk {
 model OrgRiskAssessment {
   id                  String    @id
   organizationId      String    @map("organization_id")
+  methodologyId       String?   @map("methodology_id")
   status              String    @map("status")
   inherentRiskScore   Float?    @map("inherent_risk_score")
   residualRiskScore   Float?    @map("residual_risk_score")
@@ -1681,6 +1682,7 @@ model ClientRiskAssessment {
   id                String   @id
   clientId          String   @map("client_id")
   organizationId    String   @map("organization_id")
+  methodologyId     String?  @map("methodology_id")
   inherentRiskScore Float    @map("inherent_risk_score")
   residualRiskScore Float    @map("residual_risk_score")
   riskLevel         String   @map("risk_level")
@@ -1703,5 +1705,134 @@ model ClientRiskAssessment {
   @@index([clientId])
   @@index([organizationId])
   @@index([riskLevel])
+  @@index([methodologyId])
   @@map("client_risk_assessments")
+}
+
+// ============================================================================
+// Risk Methodology Configuration (Dynamic EBR -- FATF R.1 / Art. 18-VII)
+// ============================================================================
+
+model RiskMethodology {
+  id             String  @id
+  scope          String  @map("scope")
+  activityKey    String? @map("activity_key")
+  organizationId String? @map("organization_id")
+  name           String
+  description    String?
+  version        Int     @default(1)
+  status         String  @default("ACTIVE") @map("status")
+  scoringFormula String  @default("weighted_sum") @map("scoring_formula")
+  scaleMax       Float   @default(9.0) @map("scale_max")
+  createdBy      String  @map("created_by")
+  approvedBy     String? @map("approved_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @map("updated_at")
+
+  categories RiskCategory[]
+  thresholds RiskThreshold[]
+  mitigants  RiskMitigantDef[]
+  auditLogs  MethodologyAuditLog[]
+
+  @@unique([scope, activityKey, organizationId, status])
+  @@index([scope, status])
+  @@index([activityKey])
+  @@index([organizationId])
+  @@map("risk_methodologies")
+}
+
+model RiskCategory {
+  id            String @id
+  methodologyId String @map("methodology_id")
+  name          String
+  displayName   String @map("display_name")
+  weight        Float
+  displayOrder  Int    @map("display_order")
+
+  methodology RiskMethodology @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+  factors     RiskFactor[]
+
+  @@index([methodologyId])
+  @@map("risk_categories")
+}
+
+model RiskFactor {
+  id           String  @id
+  categoryId   String  @map("category_id")
+  name         String
+  displayName  String  @map("display_name")
+  weight       Float
+  factorType   String  @map("factor_type")
+  dataSource   String  @map("data_source")
+  displayOrder Int     @map("display_order")
+  description  String?
+
+  category  RiskCategory       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  scoreMaps RiskFactorScoreMap[]
+
+  @@index([categoryId])
+  @@map("risk_factors")
+}
+
+model RiskFactorScoreMap {
+  id             String  @id
+  factorId       String  @map("factor_id")
+  conditionType  String  @map("condition_type")
+  conditionValue String  @map("condition_value")
+  score          Float
+  label          String?
+  displayOrder   Int     @default(0) @map("display_order")
+
+  factor RiskFactor @relation(fields: [factorId], references: [id], onDelete: Cascade)
+
+  @@index([factorId])
+  @@map("risk_factor_score_maps")
+}
+
+model RiskThreshold {
+  id            String @id
+  methodologyId String @map("methodology_id")
+  riskLevel     String @map("risk_level")
+  minScore      Float  @map("min_score")
+  maxScore      Float  @map("max_score")
+  ddLevel       String @map("dd_level")
+  reviewMonths  Int    @map("review_months")
+  displayOrder  Int    @map("display_order")
+
+  methodology RiskMethodology @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+
+  @@index([methodologyId])
+  @@map("risk_thresholds")
+}
+
+model RiskMitigantDef {
+  id            String @id
+  methodologyId String @map("methodology_id")
+  mitigantKey   String @map("mitigant_key")
+  displayName   String @map("display_name")
+  maxEffect     Float  @map("max_effect")
+  weight        Float
+  dataSource    String @map("data_source")
+  displayOrder  Int    @map("display_order")
+
+  methodology RiskMethodology @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+
+  @@index([methodologyId])
+  @@map("risk_mitigant_defs")
+}
+
+model MethodologyAuditLog {
+  id            String   @id
+  methodologyId String   @map("methodology_id")
+  changeType    String   @map("change_type")
+  previousValue String?  @map("previous_value")
+  newValue      String?  @map("new_value")
+  changedBy     String   @map("changed_by")
+  justification String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  methodology RiskMethodology @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+
+  @@index([methodologyId])
+  @@map("methodology_audit_logs")
 }

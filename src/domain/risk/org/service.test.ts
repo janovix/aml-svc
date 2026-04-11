@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { OrgRiskService } from "./service";
 import { OrgRiskRepository } from "./repository";
+import { RiskMethodologyRepository } from "../methodology/repository";
 
 describe("OrgRiskService", () => {
 	beforeEach(() => {
@@ -50,6 +51,7 @@ describe("OrgRiskService", () => {
 			operationPayment: { findMany: vi.fn().mockResolvedValue([]) },
 			organizationSettings: {
 				findUnique: vi.fn().mockResolvedValue({ activityKey: "INM" }),
+				findFirst: vi.fn().mockResolvedValue({ activityKey: "INM" }),
 			},
 			activityRiskProfile: {
 				findUnique: vi.fn().mockResolvedValue({ riskScore: 4 }),
@@ -63,6 +65,49 @@ describe("OrgRiskService", () => {
 				previousLevel: "LOW",
 				previousAuditType: "INTERNAL",
 			} as never);
+
+		vi.spyOn(RiskMethodologyRepository.prototype, "resolve").mockResolvedValue({
+			id: "meth-1",
+			scope: "SYSTEM",
+			name: "Default",
+			version: 1,
+			status: "ACTIVE",
+			scoringFormula: "WEIGHTED_AVERAGE",
+			scaleMax: 9,
+			categories: [],
+			thresholds: [
+				{
+					riskLevel: "LOW",
+					minScore: 0,
+					maxScore: 3,
+					ddLevel: "SIMPLIFIED",
+					reviewMonths: 12,
+				},
+				{
+					riskLevel: "MEDIUM_LOW",
+					minScore: 3.01,
+					maxScore: 4.5,
+					ddLevel: "STANDARD",
+					reviewMonths: 9,
+				},
+				{
+					riskLevel: "MEDIUM_HIGH",
+					minScore: 4.51,
+					maxScore: 6,
+					ddLevel: "STANDARD",
+					reviewMonths: 6,
+				},
+				{
+					riskLevel: "HIGH",
+					minScore: 6.01,
+					maxScore: 9,
+					ddLevel: "ENHANCED",
+					reviewMonths: 3,
+				},
+			],
+			mitigants: [],
+			sourceScope: "SYSTEM",
+		} as never);
 
 		const service = new OrgRiskService(prisma);
 

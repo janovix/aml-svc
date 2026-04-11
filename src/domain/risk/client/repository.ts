@@ -31,6 +31,7 @@ export class ClientRiskRepository {
 				id: generateId("CLIENT_RISK_ASSESSMENT"),
 				clientId: result.clientId,
 				organizationId: result.organizationId,
+				methodologyId: result.methodologyId ?? null,
 				inherentRiskScore: result.inherentRiskScore,
 				residualRiskScore: result.residualRiskScore,
 				riskLevel: result.riskLevel,

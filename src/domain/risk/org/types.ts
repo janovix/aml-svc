@@ -20,6 +20,7 @@ export interface OrgMitigantEvaluation {
 
 export interface OrgAssessmentResult {
 	organizationId: string;
+	methodologyId?: string;
 	inherentRiskScore: number;
 	residualRiskScore: number;
 	riskLevel: RiskLevel;

@@ -7,6 +7,7 @@
 
 import { clampScore, riskLevelToAuditType, scoreToRiskLevel } from "../types";
 import type { RiskLevel } from "../types";
+import type { ResolvedMethodology } from "../methodology/types";
 import {
 	evaluateClientElement,
 	evaluateGeographyElement,
@@ -16,7 +17,10 @@ import {
 import { evaluateMitigants } from "./mitigant-tracker";
 import type { OrgAssessmentResult, OrgRiskInput } from "./types";
 
-export function calculateOrgRisk(input: OrgRiskInput): OrgAssessmentResult {
+export function calculateOrgRisk(
+	input: OrgRiskInput,
+	methodology?: ResolvedMethodology,
+): OrgAssessmentResult {
 	const elements = [
 		evaluateClientElement(input),
 		evaluateGeographyElement(input),
@@ -43,6 +47,7 @@ export function calculateOrgRisk(input: OrgRiskInput): OrgAssessmentResult {
 
 	return {
 		organizationId: input.organizationId,
+		methodologyId: methodology?.id,
 		inherentRiskScore,
 		residualRiskScore,
 		riskLevel,

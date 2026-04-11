@@ -62,6 +62,14 @@ const POPULATED_MODELS = new Set([
 	"AlertRule", // Populated via populate scripts (legal/system rules)
 	"AlertRuleConfig", // Populated via populate scripts (seeker configs)
 	"UmaValue", // Populated via populate scripts (UMA reference values)
+	// Risk Assessment Framework - populated via populate scripts, not seeded
+	"RiskMethodology", // Populated via populate scripts (risk assessment methodology configs)
+	"RiskCategory", // Populated via populate scripts (risk assessment categories)
+	"RiskFactor", // Populated via populate scripts (risk assessment factors)
+	"RiskFactorScoreMap", // Populated via populate scripts (risk factor score mappings)
+	"RiskThreshold", // Populated via populate scripts (risk level thresholds)
+	"RiskMitigantDef", // Populated via populate scripts (mitigant definitions)
+	"MethodologyAuditLog", // System-generated audit logs, not seeded
 ]);
 
 /**

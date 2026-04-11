@@ -3,12 +3,15 @@ import { calculateClientRisk } from "./engine";
 import type { RiskLookups } from "./engine";
 import { ClientRiskRepository } from "./repository";
 import type { ClientRiskInput, ClientRiskResult } from "./types";
+import { RiskMethodologyRepository } from "../methodology/repository";
 
 export class ClientRiskService {
 	private repository: ClientRiskRepository;
+	private methodologyRepo: RiskMethodologyRepository;
 
 	constructor(private readonly prisma: PrismaClient) {
 		this.repository = new ClientRiskRepository(prisma);
+		this.methodologyRepo = new RiskMethodologyRepository(prisma);
 	}
 
 	async assessClient(
@@ -17,10 +20,19 @@ export class ClientRiskService {
 		lookups: RiskLookups,
 		triggerReason: string,
 		assessedBy = "SYSTEM",
+		activityKey?: string,
 	): Promise<{ result: ClientRiskResult; previousLevel: string | null }> {
 		const input = await this.buildRiskInput(clientId, organizationId);
 
-		const result = calculateClientRisk(input, lookups);
+		// Resolve the effective methodology for this org+activity
+		const effectiveActivityKey =
+			activityKey ?? (await this.getOrgActivityKey(organizationId));
+		const methodology = await this.methodologyRepo.resolve(
+			organizationId,
+			effectiveActivityKey,
+		);
+
+		const result = calculateClientRisk(input, lookups, methodology);
 		const { previousLevel } = await this.repository.saveAssessment(
 			result,
 			assessedBy,
@@ -44,6 +56,14 @@ export class ClientRiskService {
 
 	async getRiskDistribution(organizationId: string) {
 		return this.repository.getRiskDistribution(organizationId);
+	}
+
+	private async getOrgActivityKey(organizationId: string): Promise<string> {
+		const settings = await this.prisma.organizationSettings.findFirst({
+			where: { organizationId },
+			select: { activityKey: true },
+		});
+		return settings?.activityKey ?? "DEFAULT";
 	}
 
 	private async buildRiskInput(

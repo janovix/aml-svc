@@ -75,6 +75,7 @@ export interface ElementScore {
 export interface ClientRiskResult {
 	clientId: string;
 	organizationId: string;
+	methodologyId?: string;
 	inherentRiskScore: number;
 	residualRiskScore: number;
 	riskLevel: RiskLevel;

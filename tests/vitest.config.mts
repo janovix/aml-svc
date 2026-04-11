@@ -113,6 +113,10 @@ export default defineWorkersConfig({
 				"src/domain/invoice/**",
 				// Operation domain (complex business logic, tested via integration tests)
 				"src/domain/operation/**",
+				// Risk methodology domain (complex business logic, tested via integration tests)
+				"src/domain/risk/methodology/**",
+				"src/domain/risk/client/service.ts",
+				"src/domain/risk/client/dynamic-scorer.ts",
 			],
 			thresholds: {
 				lines: 75,

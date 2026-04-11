@@ -46,6 +46,7 @@ export class OrgRiskRepository {
 			data: {
 				id: assessmentId,
 				organizationId: result.organizationId,
+				methodologyId: result.methodologyId ?? null,
 				status: "ACTIVE",
 				inherentRiskScore: result.inherentRiskScore,
 				residualRiskScore: result.residualRiskScore,

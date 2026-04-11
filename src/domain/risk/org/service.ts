@@ -1,13 +1,16 @@
 import type { PrismaClient } from "@prisma/client";
 import { calculateOrgRisk } from "./engine";
 import { OrgRiskRepository } from "./repository";
+import { RiskMethodologyRepository } from "../methodology/repository";
 import type { OrgAssessmentResult, OrgRiskInput } from "./types";
 
 export class OrgRiskService {
 	private repository: OrgRiskRepository;
+	private methodologyRepo: RiskMethodologyRepository;
 
 	constructor(private readonly prisma: PrismaClient) {
 		this.repository = new OrgRiskRepository(prisma);
+		this.methodologyRepo = new RiskMethodologyRepository(prisma);
 	}
 
 	async assessOrganization(
@@ -20,7 +23,18 @@ export class OrgRiskService {
 		previousAuditType: string | null;
 	}> {
 		const input = await this.buildOrgInput(organizationId);
-		const result = calculateOrgRisk(input);
+
+		const orgSettings = await this.prisma.organizationSettings.findFirst({
+			where: { organizationId },
+			select: { activityKey: true },
+		});
+		const activityKey = orgSettings?.activityKey ?? "DEFAULT";
+		const methodology = await this.methodologyRepo.resolve(
+			organizationId,
+			activityKey,
+		);
+
+		const result = calculateOrgRisk(input, methodology);
 
 		const periodEnd = new Date();
 		const periodStart = new Date(periodEnd);
