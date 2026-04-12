@@ -1,3 +1,10 @@
+# [1.11.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.6...v1.11.0-rc.7) (2026-04-12)
+
+
+### Features
+
+* **risk:** enhance risk assessment mapping and add new fields ([c6fe41d](https://github.com/janovix/aml-svc/commit/c6fe41d1beeed6de4e7f450086f9a21a8619edeb))
+
 # [1.11.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.5...v1.11.0-rc.6) (2026-04-11)
 
 
