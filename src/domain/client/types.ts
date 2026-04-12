@@ -62,6 +62,9 @@ export interface ClientEntity {
 	adverseMediaFlagged?: boolean;
 	screeningResult?: "pending" | "clear" | "flagged";
 	screenedAt?: string | null;
+	// Risk classification (Art. 18-VII LFPIORPI) — mirrored from latest assessment
+	riskLevel?: string | null;
+	lastRiskAssessment?: string | null;
 	// Resolved catalog names for *Code fields
 	resolvedNames?: Record<string, string> | null;
 	// Timestamps

@@ -7,6 +7,10 @@ import { getOrganizationId } from "../middleware/auth";
 import { getPrismaClient } from "../lib/prisma";
 import { createRiskQueueService, type RiskJob } from "../lib/risk-queue";
 import { ClientRiskService, loadRiskLookups } from "../domain/risk";
+import {
+	mapPrismaAssessmentToApi,
+	type ClientRiskAssessmentRow,
+} from "../domain/risk/client/map-assessment-api";
 import { RiskMethodologyRepository } from "../domain/risk/methodology/repository";
 
 export const riskRouter = new Hono<{
@@ -63,12 +67,7 @@ riskRouter.get("/:clientId/assessment", async (c) => {
 	}
 
 	return c.json({
-		...assessment,
-		clientFactors: JSON.parse(assessment.clientFactors),
-		geographicFactors: JSON.parse(assessment.geographicFactors),
-		activityFactors: JSON.parse(assessment.activityFactors),
-		transactionFactors: JSON.parse(assessment.transactionFactors),
-		mitigantFactors: JSON.parse(assessment.mitigantFactors),
+		assessment: mapPrismaAssessmentToApi(assessment as ClientRiskAssessmentRow),
 	});
 });
 
@@ -80,16 +79,11 @@ riskRouter.get("/:clientId/history", async (c) => {
 	const service = new ClientRiskService(prisma);
 	const history = await service.getAssessmentHistory(clientId, organizationId);
 
-	return c.json(
-		history.map((h) => ({
-			...h,
-			clientFactors: JSON.parse(h.clientFactors),
-			geographicFactors: JSON.parse(h.geographicFactors),
-			activityFactors: JSON.parse(h.activityFactors),
-			transactionFactors: JSON.parse(h.transactionFactors),
-			mitigantFactors: JSON.parse(h.mitigantFactors),
-		})),
-	);
+	return c.json({
+		assessments: (history as ClientRiskAssessmentRow[]).map(
+			mapPrismaAssessmentToApi,
+		),
+	});
 });
 
 // ---------- Batch Assessment ----------

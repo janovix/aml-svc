@@ -343,6 +343,13 @@ export function mapPrismaClient(
 		adverseMediaFlagged: Boolean(record.adverseMediaFlagged),
 		screeningResult: record.screeningResult ?? "pending",
 		screenedAt: mapDateTime(record.screenedAt),
+		riskLevel:
+			(record as typeof record & { riskLevel?: string | null }).riskLevel ??
+			null,
+		lastRiskAssessment: mapDateTime(
+			(record as typeof record & { lastRiskAssessment?: Date | null })
+				.lastRiskAssessment,
+		),
 		// Resolved catalog names
 		resolvedNames: record.resolvedNames
 			? safeJsonParse<Record<string, string>>(record.resolvedNames)
