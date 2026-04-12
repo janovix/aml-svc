@@ -1,3 +1,10 @@
+# [1.11.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.7...v1.11.0-rc.8) (2026-04-12)
+
+
+### Features
+
+* **import:** update column mapping logic to transition status to VALIDATING and set startedAt timestamp ([13b57b4](https://github.com/janovix/aml-svc/commit/13b57b408cddf061191f157f6e9daacfb83ccffe))
+
 # [1.11.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.6...v1.11.0-rc.7) (2026-04-12)
 
 
