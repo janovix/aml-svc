@@ -258,6 +258,8 @@ describe("ImportService", () => {
 				...mockImport,
 				columnMapping,
 				fileUrl: "https://example.com/test.csv",
+				status: "VALIDATING" as const,
+				startedAt: "2024-01-01T12:00:00.000Z",
 			};
 			vi.mocked(mockRepository.updateColumnMappingIfPending).mockResolvedValue(
 				updatedImport,

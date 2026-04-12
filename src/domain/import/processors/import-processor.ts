@@ -61,6 +61,24 @@ export class ImportProcessor {
 			`[ImportProcessor] Starting import ${importId} for ${entityType}`,
 		);
 
+		const existing = await this.importRepo.getById(organizationId, importId);
+		if (!existing) {
+			console.warn(
+				`[ImportProcessor] Skipping import ${importId}: record not found`,
+			);
+			return;
+		}
+		if (
+			existing.status === "COMPLETED" ||
+			existing.status === "FAILED" ||
+			existing.status === "PROCESSING"
+		) {
+			console.log(
+				`[ImportProcessor] Skipping import ${importId}: already ${existing.status}`,
+			);
+			return;
+		}
+
 		try {
 			await this.importRepo.updateStatus(importId, { status: "VALIDATING" });
 
