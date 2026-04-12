@@ -264,8 +264,9 @@ export class ImportRepository {
 	}
 
 	/**
-	 * Update column mapping only when import status is PENDING (atomic).
-	 * Returns the updated entity or null if no row matched (e.g. wrong status).
+	 * Update column mapping and move to VALIDATING only when status is PENDING (atomic).
+	 * Sets startedAt when the import is claimed for processing.
+	 * Returns the updated entity or null if no row matched (e.g. already started).
 	 */
 	async updateColumnMappingIfPending(
 		importId: string,
@@ -278,7 +279,11 @@ export class ImportRepository {
 				organizationId,
 				status: "PENDING",
 			},
-			data: { columnMapping: columnMapping as Prisma.InputJsonValue },
+			data: {
+				columnMapping: columnMapping as Prisma.InputJsonValue,
+				status: "VALIDATING",
+				startedAt: new Date(),
+			},
 		});
 		if (count === 0) return null;
 		const updated = await this.prisma.import.findUnique({

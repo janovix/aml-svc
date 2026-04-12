@@ -8,13 +8,15 @@ export type ReportPeriodType = "MONTHLY" | "QUARTERLY" | "ANNUAL" | "CUSTOM";
 
 // Report templates for common use cases
 export type ReportTemplate =
-	| "EXECUTIVE_SUMMARY" // High-level compliance overview
-	| "COMPLIANCE_STATUS" // Audit-ready compliance report
-	| "OPERATION_ANALYSIS" // Operation volume & patterns
-	| "CLIENT_RISK_PROFILE" // Deep-dive on specific client
-	| "ALERT_BREAKDOWN" // Alert management metrics
-	| "PERIOD_COMPARISON" // Trend analysis
-	| "CUSTOM"; // User-defined report
+	| "EXECUTIVE_SUMMARY"
+	| "COMPLIANCE_STATUS"
+	| "OPERATION_ANALYSIS"
+	| "CLIENT_RISK_PROFILE"
+	| "ALERT_BREAKDOWN"
+	| "PERIOD_COMPARISON"
+	| "MANUAL_POLITICAS_INTERNAS"
+	| "EBR_RESULTS"
+	| "CUSTOM";
 
 // Data sources that can be included
 export type ReportDataSource = "ALERTS" | "OPERATIONS" | "CLIENTS";

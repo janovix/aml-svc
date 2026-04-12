@@ -13,6 +13,7 @@ import {
 	organizationSettingsCreateSchema,
 	organizationSettingsUpdateSchema,
 } from "../domain/organization-settings";
+import { RiskMethodologyRepository } from "../domain/risk/methodology/repository";
 
 export const adminRouter = new Hono<{
 	Bindings: Bindings;
@@ -541,4 +542,152 @@ adminRouter.patch("/organization-settings/:orgId", async (c) => {
 		success: true,
 		data: { configured: true, settings },
 	});
+});
+
+// =============================================================================
+// Risk Methodology (Admin)
+// =============================================================================
+
+/**
+ * GET /api/v1/admin/risk-methodologies
+ * List all SYSTEM + ACTIVITY methodologies (excludes ORGANIZATION scope)
+ */
+adminRouter.get("/risk-methodologies", async (c) => {
+	const prisma = getPrismaClient(c.env.DB);
+	const repo = new RiskMethodologyRepository(prisma);
+
+	const scopeFilter = c.req.query("scope") as "SYSTEM" | "ACTIVITY" | undefined;
+	const methodologies = await repo.listAll(scopeFilter);
+
+	return c.json({
+		success: true,
+		data: methodologies,
+	});
+});
+
+/**
+ * GET /api/v1/admin/risk-methodologies/:id
+ * Get a single methodology with all relations
+ */
+adminRouter.get("/risk-methodologies/:id", async (c) => {
+	const prisma = getPrismaClient(c.env.DB);
+	const repo = new RiskMethodologyRepository(prisma);
+	const id = c.req.param("id");
+
+	const methodology = await repo.getById(id);
+	if (!methodology) {
+		return c.json({ success: false, error: "Not found" }, 404);
+	}
+
+	return c.json({ success: true, data: methodology });
+});
+
+/**
+ * POST /api/v1/admin/risk-methodologies
+ * Create an activity-default methodology
+ */
+adminRouter.post("/risk-methodologies", async (c) => {
+	const prisma = getPrismaClient(c.env.DB);
+	const repo = new RiskMethodologyRepository(prisma);
+
+	const body = await c.req.json();
+	const adminId = c.get("adminUser").id;
+
+	if (!body.activityKey && body.scope === "ACTIVITY") {
+		return c.json(
+			{ success: false, error: "activityKey is required for ACTIVITY scope" },
+			400,
+		);
+	}
+
+	const methodology = await repo.create({
+		scope: (body.scope as "SYSTEM" | "ACTIVITY") ?? "ACTIVITY",
+		activityKey: body.activityKey as string | undefined,
+		name: body.name as string,
+		description: body.description as string | undefined,
+		createdBy: adminId,
+		categories: body.categories ?? [],
+		thresholds: body.thresholds ?? [],
+		mitigants: body.mitigants ?? [],
+	});
+
+	return c.json({ success: true, data: methodology }, 201);
+});
+
+/**
+ * PUT /api/v1/admin/risk-methodologies/:id
+ * Update an existing methodology (archives old, creates new version)
+ */
+adminRouter.put("/risk-methodologies/:id", async (c) => {
+	const prisma = getPrismaClient(c.env.DB);
+	const repo = new RiskMethodologyRepository(prisma);
+	const id = c.req.param("id");
+	const body = await c.req.json();
+	const adminId = c.get("adminUser").id;
+
+	const existing = await repo.getById(id);
+	if (!existing) {
+		return c.json({ success: false, error: "Not found" }, 404);
+	}
+
+	// Archive current version
+	await repo.archive(id, adminId, body.justification ?? "Updated by admin");
+
+	// Retrieve the raw record to get scope/activity/org info
+	const rawMethodology = await prisma.riskMethodology.findUnique({
+		where: { id },
+	});
+
+	// Create new version
+	const methodology = await repo.create({
+		scope: (rawMethodology?.scope as "SYSTEM" | "ACTIVITY") ?? "ACTIVITY",
+		activityKey: rawMethodology?.activityKey ?? undefined,
+		organizationId: rawMethodology?.organizationId ?? undefined,
+		name: body.name ?? existing.name,
+		description: body.description,
+		createdBy: adminId,
+		categories: body.categories ?? existing.categories,
+		thresholds: body.thresholds ?? existing.thresholds,
+		mitigants: body.mitigants ?? existing.mitigants,
+	});
+
+	return c.json({ success: true, data: methodology });
+});
+
+/**
+ * DELETE /api/v1/admin/risk-methodologies/:id
+ * Archive a methodology (soft delete)
+ */
+adminRouter.delete("/risk-methodologies/:id", async (c) => {
+	const prisma = getPrismaClient(c.env.DB);
+	const repo = new RiskMethodologyRepository(prisma);
+	const id = c.req.param("id");
+	const adminId = c.get("adminUser").id;
+	const body = await c.req.json().catch(() => ({}));
+
+	const existing = await repo.getById(id);
+	if (!existing) {
+		return c.json({ success: false, error: "Not found" }, 404);
+	}
+
+	await repo.archive(
+		id,
+		adminId,
+		(body as Record<string, string>).justification,
+	);
+
+	return c.json({ success: true });
+});
+
+/**
+ * POST /api/v1/admin/risk-methodologies/seed
+ * Ensure the system default methodology exists
+ */
+adminRouter.post("/risk-methodologies/seed", async (c) => {
+	const prisma = getPrismaClient(c.env.DB);
+	const repo = new RiskMethodologyRepository(prisma);
+
+	const methodology = await repo.seedSystemDefault();
+
+	return c.json({ success: true, data: methodology });
 });

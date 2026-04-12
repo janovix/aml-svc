@@ -47,8 +47,8 @@ export default defineWorkersConfig({
 				"src/lib/sat-xml-generator.ts",
 				"src/lib/sat-xml-generator/**",
 				"src/lib/pdf-report-generator.ts",
+				// Large aggregation module; smoke-tested in report-aggregator.test.ts, full paths via integration
 				"src/lib/report-aggregator.ts",
-				"src/lib/route-helpers.ts",
 				// Service bindings and search clients (complex integration, tested via integration tests)
 				"src/lib/watchlist-search.ts",
 				"src/lib/kyc-email.ts",
@@ -57,6 +57,7 @@ export default defineWorkersConfig({
 				// Prisma client wrapper (thin wrapper, tested via repositories)
 				"src/lib/prisma.ts",
 				// Route handlers (HTTP layer, tested via integration tests)
+				"src/routes/risk.ts",
 				"src/routes/catalogs.ts",
 				"src/routes/clients.ts",
 				"src/routes/files.ts",
@@ -88,6 +89,15 @@ export default defineWorkersConfig({
 				"src/domain/beneficial-controller/**",
 				// Shareholder domain (complex business logic, tested via integration tests)
 				"src/domain/shareholder/**",
+				// Alert detection processor (deeply coupled to repos, queue, Prisma — tested via integration)
+				"src/domain/alert-detection/processor.ts",
+				// Import processors and orchestration (depend on R2, Prisma, xlsx — tested via integration)
+				"src/domain/import/processors/**",
+				"src/domain/import/queue-processor.ts",
+				"src/domain/import/import-job-handler.ts",
+				"src/domain/import/parsers/excel-parser.ts",
+				// Risk queue processor (depends on Prisma, ClientRiskService, OrgRiskService — tested via integration)
+				"src/lib/risk-queue-processor.ts",
 				// Complex domain layers tested via integration tests
 				"src/domain/alert/**",
 				"src/domain/report/**",
@@ -103,6 +113,10 @@ export default defineWorkersConfig({
 				"src/domain/invoice/**",
 				// Operation domain (complex business logic, tested via integration tests)
 				"src/domain/operation/**",
+				// Risk methodology domain (complex business logic, tested via integration tests)
+				"src/domain/risk/methodology/**",
+				"src/domain/risk/client/service.ts",
+				"src/domain/risk/client/dynamic-scorer.ts",
 			],
 			thresholds: {
 				lines: 75,

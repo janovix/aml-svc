@@ -1,9 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
 	calculateCalendarMonthPeriod,
 	calculateQuarterlyPeriod,
 	calculateAnnualPeriod,
 } from "./types";
+import { ReportService } from "./service";
+import type { ReportRepository } from "./repository";
+import type { ReportEntity } from "./types";
 
 describe("Report Period Calculations (Calendar-based)", () => {
 	describe("calculateCalendarMonthPeriod", () => {
@@ -149,5 +152,93 @@ describe("Report Period Calculations (Calendar-based)", () => {
 			expect(period.end.getUTCSeconds()).toBe(59);
 			expect(period.end.getUTCMilliseconds()).toBe(999);
 		});
+	});
+});
+
+describe("ReportService", () => {
+	let mockRepository: ReportRepository;
+	let service: ReportService;
+
+	const mockReport: ReportEntity = {
+		id: "rpt-1",
+		organizationId: "org-1",
+		name: "Test",
+		template: "EXECUTIVE_SUMMARY",
+		periodType: "MONTHLY",
+		periodStart: "2024-01-01T00:00:00.000Z",
+		periodEnd: "2024-01-31T23:59:59.999Z",
+		dataSources: ["ALERTS"],
+		filters: {},
+		charts: [],
+		includeSummaryCards: true,
+		includeDetailTables: true,
+		status: "DRAFT",
+		createdAt: "2024-01-01T00:00:00Z",
+		updatedAt: "2024-01-01T00:00:00Z",
+	};
+
+	beforeEach(() => {
+		mockRepository = {
+			list: vi.fn(),
+			get: vi.fn(),
+			getWithAlertSummary: vi.fn(),
+			countAlertsForPeriod: vi.fn(),
+			create: vi.fn(),
+			patch: vi.fn(),
+			delete: vi.fn(),
+			markAsGenerated: vi.fn(),
+		} as unknown as ReportRepository;
+
+		service = new ReportService(mockRepository);
+	});
+
+	it("list delegates to repository", async () => {
+		vi.mocked(mockRepository.list).mockResolvedValue({
+			data: [mockReport],
+			pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+		});
+
+		const filters = { page: 1, limit: 10 } as never;
+		const result = await service.list("org-1", filters);
+
+		expect(mockRepository.list).toHaveBeenCalledWith("org-1", filters);
+		expect(result.data).toEqual([mockReport]);
+	});
+
+	it("delete throws when report is not DRAFT", async () => {
+		vi.mocked(mockRepository.get).mockResolvedValue({
+			...mockReport,
+			status: "GENERATED",
+		} as ReportEntity);
+
+		await expect(service.delete("org-1", "rpt-1")).rejects.toThrow(
+			"CANNOT_DELETE_NON_DRAFT_REPORT",
+		);
+	});
+
+	it("delete delegates when status is DRAFT", async () => {
+		vi.mocked(mockRepository.get).mockResolvedValue(mockReport);
+		vi.mocked(mockRepository.delete).mockResolvedValue(undefined);
+
+		await service.delete("org-1", "rpt-1");
+
+		expect(mockRepository.delete).toHaveBeenCalledWith("org-1", "rpt-1");
+	});
+
+	it("getPeriodDates routes monthly quarterly annual", () => {
+		const m = service.getPeriodDates("MONTHLY", 2024, 3);
+		expect(m.start.getUTCMonth()).toBe(2);
+
+		const q = service.getPeriodDates("QUARTERLY", 2024, 2);
+		expect(q.start.getUTCMonth()).toBe(3);
+
+		const a = service.getPeriodDates("ANNUAL", 2024, 1);
+		expect(a.start.getUTCMonth()).toBe(0);
+	});
+
+	it("getTemplates returns non-empty template configs", () => {
+		const templates = service.getTemplates();
+		expect(Array.isArray(templates)).toBe(true);
+		expect(templates.length).toBeGreaterThan(0);
 	});
 });

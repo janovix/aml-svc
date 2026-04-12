@@ -15,6 +15,7 @@ export type AlertJobType =
 export interface AlertJob {
 	type: AlertJobType;
 	clientId: string;
+	organizationId: string;
 	transactionId?: string;
 	operationId?: string;
 	timestamp: string;
@@ -33,54 +34,56 @@ export class AlertQueueService {
 		return this.queue !== undefined;
 	}
 
-	/**
-	 * Queues a client.created job
-	 */
-	async queueClientCreated(clientId: string): Promise<void> {
+	async queueClientCreated(
+		clientId: string,
+		organizationId: string,
+	): Promise<void> {
 		await this.sendJob({
 			type: "client.created",
 			clientId,
+			organizationId,
 			timestamp: new Date().toISOString(),
 		});
 	}
 
-	/**
-	 * Queues a client.updated job
-	 */
-	async queueClientUpdated(clientId: string): Promise<void> {
+	async queueClientUpdated(
+		clientId: string,
+		organizationId: string,
+	): Promise<void> {
 		await this.sendJob({
 			type: "client.updated",
 			clientId,
+			organizationId,
 			timestamp: new Date().toISOString(),
 		});
 	}
 
 	/**
-	 * Queues a transaction.created job
 	 * @deprecated Use queueOperationCreated instead
 	 */
 	async queueTransactionCreated(
 		clientId: string,
 		transactionId: string,
+		organizationId: string,
 	): Promise<void> {
 		await this.sendJob({
 			type: "transaction.created",
 			clientId,
+			organizationId,
 			transactionId,
 			timestamp: new Date().toISOString(),
 		});
 	}
 
-	/**
-	 * Queues an operation.created job
-	 */
 	async queueOperationCreated(
 		clientId: string,
 		operationId: string,
+		organizationId: string,
 	): Promise<void> {
 		await this.sendJob({
 			type: "operation.created",
 			clientId,
+			organizationId,
 			operationId,
 			timestamp: new Date().toISOString(),
 		});

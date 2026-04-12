@@ -403,4 +403,60 @@ describe("NoticeService", () => {
 			}
 		});
 	});
+
+	describe("repository delegation", () => {
+		it("list delegates to repository", async () => {
+			vi.mocked(mockRepository.list).mockResolvedValue({
+				data: [mockNotice],
+				pagination: {
+					page: 1,
+					limit: 10,
+					total: 1,
+					totalPages: 1,
+				},
+				filterMeta: [],
+			});
+
+			const filters = { page: 1, limit: 10 } as never;
+			const result = await service.list("org_123", filters);
+
+			expect(mockRepository.list).toHaveBeenCalledWith("org_123", filters);
+			expect(result.data).toEqual([mockNotice]);
+		});
+
+		it("get delegates to repository", async () => {
+			vi.mocked(mockRepository.get).mockResolvedValue(mockNotice);
+
+			const result = await service.get("org_123", "NTC_123");
+
+			expect(mockRepository.get).toHaveBeenCalledWith("org_123", "NTC_123");
+			expect(result).toEqual(mockNotice);
+		});
+
+		it("preview aggregates stats and alert details", async () => {
+			vi.mocked(mockRepository.countAlertsForPeriod).mockResolvedValue({
+				total: 2,
+				bySeverity: { HIGH: 2 },
+				byStatus: { OPEN: 2 },
+			});
+			vi.mocked(mockRepository.getAlertsForPeriodDetailed).mockResolvedValue([
+				{
+					id: "a1",
+					severity: "HIGH",
+					status: "OPEN",
+					ruleName: "Rule",
+					clientName: "C",
+				},
+			] as never);
+
+			const result = await service.preview("org_123", {
+				year: 2024,
+				month: 6,
+			});
+
+			expect(result.total).toBe(2);
+			expect(result.alerts).toHaveLength(1);
+			expect(result.displayName).toContain("2024");
+		});
+	});
 });

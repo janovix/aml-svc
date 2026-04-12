@@ -306,6 +306,130 @@ export default {
 					console.error("[scheduled] Notice deadline check failed:", err),
 				),
 		);
+
+		// KYC session expiration: notify orgs about soon-to-expire sessions & bulk-expire stale ones
+		ctx.waitUntil(
+			(async () => {
+				const { processKycExpirationNotifications } = await import(
+					"./lib/kyc-expiration-notifications"
+				);
+				return processKycExpirationNotifications(
+					env,
+					new Date(event.scheduledTime),
+				);
+			})()
+				.then((r) =>
+					console.log(
+						`[scheduled] KYC expiry: ${r.notifiedCount} notified, ${r.expiredCount} expired`,
+					),
+				)
+				.catch((err) =>
+					console.error("[scheduled] KYC expiry check failed:", err),
+				),
+		);
+
+		// Risk review: enqueue reassessment for clients past their review date
+		ctx.waitUntil(
+			(async () => {
+				try {
+					const { getPrismaClient } = await import("./lib/prisma");
+					const { createRiskQueueService } = await import("./lib/risk-queue");
+					const { sendRiskNotification } = await import(
+						"./lib/risk-notifications"
+					);
+
+					const prisma = getPrismaClient(env.DB);
+					const riskQueue = createRiskQueueService(
+						env.RISK_ASSESSMENT_QUEUE as
+							| Queue<import("./lib/risk-queue").RiskJob>
+							| undefined,
+					);
+
+					if (!riskQueue.isAvailable()) return;
+
+					const now = new Date(event.scheduledTime);
+					const dueClients = await prisma.client.findMany({
+						where: {
+							nextRiskReview: { lte: now },
+							deletedAt: null,
+						},
+						select: { id: true, organizationId: true },
+					});
+
+					if (dueClients.length === 0) return;
+
+					const orgMap = new Map<string, string[]>();
+					for (const c of dueClients) {
+						const list = orgMap.get(c.organizationId) ?? [];
+						list.push(c.id);
+						orgMap.set(c.organizationId, list);
+					}
+
+					for (const [orgId, clientIds] of orgMap) {
+						for (const clientId of clientIds) {
+							await riskQueue.queueClientReassess(
+								orgId,
+								clientId,
+								"scheduled_review",
+							);
+						}
+						await sendRiskNotification(env, {
+							type: "aml.risk.review_due",
+							organizationId: orgId,
+							clientsDueCount: clientIds.length,
+						});
+					}
+
+					console.log(
+						`[scheduled] Risk review: ${dueClients.length} clients enqueued across ${orgMap.size} orgs`,
+					);
+				} catch (err) {
+					console.error("[scheduled] Risk review check failed:", err);
+				}
+			})(),
+		);
+	},
+
+	async queue(
+		batch: MessageBatch,
+		env: Bindings,
+		_ctx: ExecutionContext,
+	): Promise<void> {
+		const queueName = batch.queue;
+
+		if (queueName.startsWith("aml-alert-detection")) {
+			const { processAlertBatch } = await import("./domain/alert-detection");
+			return processAlertBatch(
+				batch as MessageBatch<import("./domain/alert-detection").AlertJob>,
+				env,
+			);
+		}
+
+		if (queueName.startsWith("aml-imports")) {
+			const { processImportBatch } = await import(
+				"./domain/import/queue-processor"
+			);
+			return processImportBatch(
+				batch as MessageBatch<import("./domain/import").ImportJob>,
+				env,
+			);
+		}
+
+		// Default: risk assessment queue
+		const { processRiskJob } = await import("./lib/risk-queue-processor");
+
+		for (const message of batch.messages) {
+			try {
+				await processRiskJob(
+					env,
+					(message as Message<import("./lib/risk-queue").RiskJob>).body,
+				);
+				message.ack();
+			} catch (err) {
+				console.error(`[risk-queue] Failed to process job:`, err);
+				message.retry();
+			}
+		}
 	},
 };
 

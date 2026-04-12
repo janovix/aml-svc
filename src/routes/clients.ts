@@ -25,6 +25,7 @@ import {
 	createUsageRightsClient,
 } from "../lib/usage-rights-client";
 import { createAlertQueueService } from "../lib/alert-queue";
+import { createRiskQueueService, type RiskJob } from "../lib/risk-queue";
 import { createWatchlistSearchService } from "../lib/watchlist-search";
 import { getPrismaClient } from "../lib/prisma";
 import {
@@ -373,7 +374,17 @@ clientsRouter.post("/", async (c) => {
 
 	// Queue alert detection job for new client
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
-	await alertQueue.queueClientCreated(created.id);
+	await alertQueue.queueClientCreated(created.id, organizationId);
+
+	// Queue initial risk assessment for new client
+	const riskQueue = createRiskQueueService(
+		c.env.RISK_ASSESSMENT_QUEUE as Queue<RiskJob> | undefined,
+	);
+	await riskQueue.queueClientAssess(
+		organizationId,
+		created.id,
+		"client_created",
+	);
 
 	// Trigger watchlist search (non-blocking)
 	const watchlistSearch = createWatchlistSearchService(c.env.WATCHLIST_SERVICE);
@@ -437,7 +448,7 @@ clientsRouter.put("/:id", async (c) => {
 
 	// Queue alert detection job for updated client
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
-	await alertQueue.queueClientUpdated(updated.id);
+	await alertQueue.queueClientUpdated(updated.id, organizationId);
 
 	// Trigger watchlist search (non-blocking)
 	const watchlistSearch = createWatchlistSearchService(c.env.WATCHLIST_SERVICE);
@@ -503,7 +514,7 @@ clientsRouter.patch("/:id", async (c) => {
 
 	// Queue alert detection job for updated client
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
-	await alertQueue.queueClientUpdated(updated.id);
+	await alertQueue.queueClientUpdated(updated.id, organizationId);
 
 	// Trigger watchlist search if screening-relevant fields changed
 	const screeningFieldsChanged =
@@ -840,7 +851,17 @@ clientsInternalRouter.post("/", async (c) => {
 
 		// Queue alert detection job for new client
 		const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
-		await alertQueue.queueClientCreated(created.id);
+		await alertQueue.queueClientCreated(created.id, organizationId);
+
+		// Queue initial risk assessment
+		const riskQueue = createRiskQueueService(
+			c.env.RISK_ASSESSMENT_QUEUE as Queue<RiskJob> | undefined,
+		);
+		await riskQueue.queueClientAssess(
+			organizationId,
+			created.id,
+			"client_created_import",
+		);
 
 		// Trigger watchlist screening (non-blocking) — CSV import: use csv_import + user who triggered import
 		const importUserId = c.req.header("X-User-Id") ?? "import-worker";

@@ -236,4 +236,81 @@ describe("AlertService", () => {
 			expect(result).toBeNull();
 		});
 	});
+
+	describe("list", () => {
+		it("delegates to repository", async () => {
+			vi.mocked(mockRepository.list).mockResolvedValue({
+				data: [mockAlert],
+				pagination: {
+					total: 1,
+					page: 1,
+					limit: 10,
+					totalPages: 1,
+				},
+			});
+
+			const filters = { page: 1, limit: 10 } as never;
+			const result = await service.list(organizationId, filters);
+
+			expect(mockRepository.list).toHaveBeenCalledWith(organizationId, filters);
+			expect(result.data).toEqual([mockAlert]);
+		});
+	});
+
+	describe("create", () => {
+		it("delegates to repository", async () => {
+			const input = { alertRuleId: "2501" } as never;
+			vi.mocked(mockRepository.create).mockResolvedValue(mockAlert);
+
+			const result = await service.create(input, organizationId);
+
+			expect(mockRepository.create).toHaveBeenCalledWith(input, organizationId);
+			expect(result).toEqual(mockAlert);
+		});
+	});
+
+	describe("update", () => {
+		it("delegates to repository", async () => {
+			const input = { status: "SUBMITTED" } as never;
+			vi.mocked(mockRepository.update).mockResolvedValue(mockAlert);
+
+			const result = await service.update(organizationId, "alert-123", input);
+
+			expect(mockRepository.update).toHaveBeenCalledWith(
+				organizationId,
+				"alert-123",
+				input,
+			);
+			expect(result).toEqual(mockAlert);
+		});
+	});
+
+	describe("patch", () => {
+		it("delegates to repository", async () => {
+			const input = { severity: "CRITICAL" } as never;
+			vi.mocked(mockRepository.patch).mockResolvedValue(mockAlert);
+
+			const result = await service.patch(organizationId, "alert-123", input);
+
+			expect(mockRepository.patch).toHaveBeenCalledWith(
+				organizationId,
+				"alert-123",
+				input,
+			);
+			expect(result).toEqual(mockAlert);
+		});
+	});
+
+	describe("delete", () => {
+		it("delegates to repository", async () => {
+			vi.mocked(mockRepository.delete).mockResolvedValue(undefined);
+
+			await service.delete(organizationId, "alert-123");
+
+			expect(mockRepository.delete).toHaveBeenCalledWith(
+				organizationId,
+				"alert-123",
+			);
+		});
+	});
 });

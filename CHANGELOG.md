@@ -1,9 +1,51 @@
-# [1.11.0](https://github.com/janovix/aml-svc/compare/v1.10.1...v1.11.0) (2026-04-08)
+# [1.11.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.7...v1.11.0-rc.8) (2026-04-12)
 
 
 ### Features
 
-* enhance usage rights and organization middleware ([08780dd](https://github.com/janovix/aml-svc/commit/08780ddb21cdf376e4dd0ab2353cf2f37046986e))
+* **import:** update column mapping logic to transition status to VALIDATING and set startedAt timestamp ([13b57b4](https://github.com/janovix/aml-svc/commit/13b57b408cddf061191f157f6e9daacfb83ccffe))
+
+# [1.11.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.6...v1.11.0-rc.7) (2026-04-12)
+
+
+### Features
+
+* **risk:** enhance risk assessment mapping and add new fields ([c6fe41d](https://github.com/janovix/aml-svc/commit/c6fe41d1beeed6de4e7f450086f9a21a8619edeb))
+
+# [1.11.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.5...v1.11.0-rc.6) (2026-04-11)
+
+
+### Features
+
+* **risk:** add risk methodology configuration and dynamic scoring capabilities ([5fc2ea8](https://github.com/janovix/aml-svc/commit/5fc2ea8ea2354ac5fc909d679efb14f60ac83293))
+
+# [1.11.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.4...v1.11.0-rc.5) (2026-04-10)
+
+
+### Bug Fixes
+
+* **risk:** update organization risk assessment response to include null state and improve schema definition ([7966ab7](https://github.com/janovix/aml-svc/commit/7966ab77365d2d4e1b2c4e4f60193a62821019a7))
+
+# [1.11.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.3...v1.11.0-rc.4) (2026-04-10)
+
+
+### Features
+
+* **openapi:** add new operations endpoints for activities, thresholds, and imports ([619ec78](https://github.com/janovix/aml-svc/commit/619ec78a4a926bc7f1f21627a430902330e4bbae))
+
+# [1.11.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.2...v1.11.0-rc.3) (2026-04-10)
+
+
+### Features
+
+* **alert-detection:** add KYC session expiration notifications and implement alert seeker system ([23ff8d9](https://github.com/janovix/aml-svc/commit/23ff8d920b1e6a4452e898a0bc667a3b9bd7de16))
+
+# [1.11.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.11.0-rc.1...v1.11.0-rc.2) (2026-04-09)
+
+
+### Features
+
+* **risk:** implement risk assessment features and reference data ([68c64df](https://github.com/janovix/aml-svc/commit/68c64df05a9ea77c465e50211b4d6d3a939c4b59))
 
 # [1.11.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.10.1...v1.11.0-rc.1) (2026-04-03)
 

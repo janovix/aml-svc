@@ -20,6 +20,7 @@ import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth";
 import { createAlertQueueService } from "../lib/alert-queue";
+import { createRiskQueueService, type RiskJob } from "../lib/risk-queue";
 import {
 	buildGateDenialBody,
 	createUsageRightsClient,
@@ -491,7 +492,22 @@ operationsRouter.post("/", async (c) => {
 
 	// Queue alert detection job for new operation
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
-	await alertQueue.queueOperationCreated(created.clientId, created.id);
+	await alertQueue.queueOperationCreated(
+		created.clientId,
+		created.id,
+		organizationId,
+	);
+
+	// Queue risk check for operation (may trigger client reassessment)
+	const riskQueue = createRiskQueueService(
+		c.env.RISK_ASSESSMENT_QUEUE as Queue<RiskJob> | undefined,
+	);
+	await riskQueue.queueOperationRiskCheck(
+		organizationId,
+		created.clientId,
+		created.id,
+		"operation_created",
+	);
 
 	// Threshold-crossing KYC trigger (non-blocking, Art. 17 LFPIORPI)
 	// If this operation pushes a client above the identification or notice threshold,
@@ -697,7 +713,7 @@ operationsRouter.post("/bulk-import", async (c) => {
 
 			// Queue alert detection
 			await alertQueue
-				.queueOperationCreated(created.clientId, created.id)
+				.queueOperationCreated(created.clientId, created.id, organizationId)
 				.catch((err) =>
 					Sentry.captureException(err, {
 						tags: { context: "bulk-import-queue-alert-failed" },
@@ -913,7 +929,11 @@ operationsInternalRouter.post("/", async (c) => {
 
 		// Queue alert detection job for new operation
 		const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
-		await alertQueue.queueOperationCreated(created.clientId, created.id);
+		await alertQueue.queueOperationCreated(
+			created.clientId,
+			created.id,
+			organizationId,
+		);
 
 		return c.json(created, 201);
 	} catch (error) {
