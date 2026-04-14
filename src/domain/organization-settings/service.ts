@@ -18,6 +18,7 @@ export class OrganizationSettingsService {
 			selfServiceMode?: string;
 			selfServiceExpiryHours?: number;
 			selfServiceRequiredSections?: string[] | null;
+			selfServiceSendEmail?: boolean;
 		},
 	): Promise<OrganizationSettingsEntity> {
 		return this.repository.upsert(organizationId, data);
@@ -31,6 +32,7 @@ export class OrganizationSettingsService {
 			selfServiceMode?: string;
 			selfServiceExpiryHours?: number;
 			selfServiceRequiredSections?: string[] | null;
+			selfServiceSendEmail?: boolean;
 		},
 	): Promise<OrganizationSettingsEntity> {
 		return this.repository.update(organizationId, data);

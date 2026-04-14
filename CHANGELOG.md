@@ -1,4 +1,34 @@
-# [1.12.0](https://github.com/janovix/aml-svc/compare/v1.11.0...v1.12.0) (2026-04-12)
+# [1.13.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.12.0...v1.13.0-rc.1) (2026-04-14)
+
+
+### Features
+
+* **catalog:** add backward compatibility for catalog item IDs in result mapping ([e98e1a8](https://github.com/janovix/aml-svc/commit/e98e1a89ac2e78fe4413aea01893d41c7181fd84))
+* **catalog:** add backward compatibility for catalog item IDs in result mapping ([fc497ce](https://github.com/janovix/aml-svc/commit/fc497cef10ab631b4a30b2a62281620c2c671131))
+* **catalog:** add backward compatibility for catalog item IDs in result mapping ([122f724](https://github.com/janovix/aml-svc/commit/122f7247539b8bd2aa19569cd4ae8770f64c9d90))
+
+# [1.12.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.12.0-rc.3...v1.12.0-rc.4) (2026-04-14)
+
+
+### Features
+
+* **catalog:** add backward compatibility for catalog item IDs in result mapping ([e98e1a8](https://github.com/janovix/aml-svc/commit/e98e1a89ac2e78fe4413aea01893d41c7181fd84))
+
+# [1.12.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.12.0-rc.2...v1.12.0-rc.3) (2026-04-14)
+
+
+### Features
+
+* **catalog:** add backward compatibility for catalog item IDs in result mapping ([fc497ce](https://github.com/janovix/aml-svc/commit/fc497cef10ab631b4a30b2a62281620c2c671131))
+
+# [1.12.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.12.0-rc.1...v1.12.0-rc.2) (2026-04-14)
+
+
+### Features
+
+* **catalog:** add backward compatibility for catalog item IDs in result mapping ([122f724](https://github.com/janovix/aml-svc/commit/122f7247539b8bd2aa19569cd4ae8770f64c9d90))
+
+# [1.12.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.11.0...v1.12.0-rc.1) (2026-04-12)
 
 
 ### Bug Fixes

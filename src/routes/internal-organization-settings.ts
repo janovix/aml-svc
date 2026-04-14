@@ -9,6 +9,7 @@ import {
 	OrganizationSettingsService,
 	organizationSettingsCreateSchema,
 	organizationSettingsUpdateSchema,
+	selfServiceSettingsUpdateSchema,
 } from "../domain/organization-settings";
 import type { Bindings } from "../types";
 
@@ -230,7 +231,7 @@ export async function handleInternalSelfServiceSettingsRequest(
 			}
 
 			const body = await request.json();
-			const parseResult = organizationSettingsUpdateSchema.safeParse(body);
+			const parseResult = selfServiceSettingsUpdateSchema.safeParse(body);
 
 			if (!parseResult.success) {
 				return new Response(

@@ -1237,6 +1237,7 @@ model OrganizationSettings {
   selfServiceMode             String   @default("automatic") @map("self_service_mode")
   selfServiceExpiryHours      Int      @default(72) @map("self_service_expiry_hours")
   selfServiceRequiredSections String?  @map("self_service_required_sections") // JSON array
+  selfServiceSendEmail        Boolean  @default(true) @map("self_service_send_email")
   createdAt                   DateTime @default(now()) @map("created_at")
   updatedAt                   DateTime @updatedAt @map("updated_at")
 

@@ -52,6 +52,34 @@ kycSessionsRouter.post("/", async (c) => {
 		prisma,
 	);
 
+	const orgSettings = await prisma.organizationSettings.findUnique({
+		where: { organizationId },
+		select: { selfServiceSendEmail: true },
+	});
+
+	if (orgSettings?.selfServiceSendEmail !== false) {
+		const client = await prisma.client.findUnique({
+			where: { id: data.clientId },
+			select: {
+				email: true,
+				firstName: true,
+				lastName: true,
+				businessName: true,
+			},
+		});
+
+		if (client?.email) {
+			c.executionCtx.waitUntil(
+				sendKYCInviteEmail(c.env, client.email, session, {
+					clientName: client.firstName
+						? `${client.firstName} ${client.lastName ?? ""}`.trim()
+						: (client.businessName ?? "Cliente"),
+					expiresAt: session.expiresAt,
+				}).then(() => service.recordEmailSent(session.id)),
+			);
+		}
+	}
+
 	return c.json({ session }, 201);
 });
 

@@ -77,18 +77,17 @@ export default defineWorkersConfig({
 				"src/routes/kyc-sessions.ts",
 				"src/routes/public-kyc.ts",
 				"src/routes/exchange-rates.ts",
-				// Middleware (HTTP layer, tested via integration tests)
+				// Middleware (HTTP layer; usage-rights has no direct unit coverage)
 				"src/middleware/admin-auth.ts",
 				"src/middleware/auth.ts",
 				"src/middleware/usage-rights.ts",
 				// Schema files with mostly type definitions (validated via integration)
 				"src/domain/uma/schemas.ts",
-				// Organization settings domain (low usage, tested via integration)
+				// Organization settings domain (integration + unit service tests; repos/mappers thin)
 				"src/domain/organization-settings/**",
-				// Beneficial Controller domain (complex business logic, tested via integration tests)
-				"src/domain/beneficial-controller/**",
-				// Shareholder domain (complex business logic, tested via integration tests)
-				"src/domain/shareholder/**",
+				// Repositories are covered by integration; domain service/schemas/mappers have unit tests
+				"src/domain/beneficial-controller/repository.ts",
+				"src/domain/shareholder/repository.ts",
 				// Alert detection processor (deeply coupled to repos, queue, Prisma — tested via integration)
 				"src/domain/alert-detection/processor.ts",
 				// Import processors and orchestration (depend on R2, Prisma, xlsx — tested via integration)
@@ -98,7 +97,7 @@ export default defineWorkersConfig({
 				"src/domain/import/parsers/excel-parser.ts",
 				// Risk queue processor (depends on Prisma, ClientRiskService, OrgRiskService — tested via integration)
 				"src/lib/risk-queue-processor.ts",
-				// Complex domain layers tested via integration tests
+				// Complex domain layers (large Prisma surfaces); unit tests target services/schemas/mappers only
 				"src/domain/alert/**",
 				"src/domain/report/**",
 				"src/domain/catalog/service.ts",
@@ -109,14 +108,12 @@ export default defineWorkersConfig({
 				"src/domain/notice/schemas.ts",
 				"src/domain/notice/service.ts",
 				"src/domain/kyc-session/**",
-				// Invoice domain (complex business logic, tested via integration tests)
 				"src/domain/invoice/**",
-				// Operation domain (complex business logic, tested via integration tests)
 				"src/domain/operation/**",
-				// Risk methodology domain (complex business logic, tested via integration tests)
-				"src/domain/risk/methodology/**",
+				"src/domain/risk/methodology/repository.ts",
+				// Client risk engine: methodology branches are covered via integration; unit tests target factors/engine.test scenarios only
+				"src/domain/risk/client/engine.ts",
 				"src/domain/risk/client/service.ts",
-				"src/domain/risk/client/dynamic-scorer.ts",
 			],
 			thresholds: {
 				lines: 75,
