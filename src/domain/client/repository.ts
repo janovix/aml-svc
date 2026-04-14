@@ -51,6 +51,8 @@ import { recalculateKycProgress } from "./kyc-progress";
 const CLIENT_CATALOG_FIELDS: CatalogFieldsConfig = {
 	stateCode: { catalog: "states", strategy: "BY_CODE" },
 	countryCode: { catalog: "countries", strategy: "BY_CODE" },
+	/** Address-level country (ISO code), same catalog as countryCode */
+	country: { catalog: "countries", strategy: "BY_CODE" },
 	economicActivityCode: {
 		catalog: "economic-activities",
 		strategy: "BY_CODE",

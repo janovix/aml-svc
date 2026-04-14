@@ -459,6 +459,10 @@ export class CatalogRepository {
 					resultMap.set(metadata.code, mapCatalogItemWithKey(item, catalogKey));
 				}
 			}
+			// Backward compatibility: values stored as catalog item IDs (not metadata.code)
+			if (uniqueCodes.includes(item.id) && !resultMap.has(item.id)) {
+				resultMap.set(item.id, mapCatalogItemWithKey(item, catalogKey));
+			}
 		}
 
 		return resultMap;
@@ -514,6 +518,10 @@ export class CatalogRepository {
 					const catalogKey = catalogIdToKey.get(item.catalogId) ?? "";
 					resultMap.set(metadata.code, mapCatalogItemWithKey(item, catalogKey));
 				}
+			}
+			if (uniqueCodes.includes(item.id) && !resultMap.has(item.id)) {
+				const catalogKey = catalogIdToKey.get(item.catalogId) ?? "";
+				resultMap.set(item.id, mapCatalogItemWithKey(item, catalogKey));
 			}
 		}
 
