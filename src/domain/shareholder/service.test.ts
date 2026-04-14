@@ -151,6 +151,142 @@ describe("ShareholderService", () => {
 		expect(out.ownershipPercentage).toBe(50);
 	});
 
+	it("update throws when shareholder not found", async () => {
+		vi.mocked(mockRepo.getById).mockResolvedValue(null);
+		await expect(
+			service.update(clientId, "SHR999999999", {
+				entityType: "PERSON",
+				firstName: "A",
+				lastName: "B",
+				ownershipPercentage: 10,
+			}),
+		).rejects.toThrow(/Shareholder not found/);
+	});
+
+	it("update validates depth when parent changes", async () => {
+		const existing = personEntity({ parentShareholderId: null });
+		vi.mocked(mockRepo.getById).mockResolvedValue(existing);
+		const level2 = personEntity({
+			id: "SHR333333333",
+			parentShareholderId: "SHR222222222",
+		});
+		vi.mocked(mockRepo.getByIdOnly).mockResolvedValue(level2);
+
+		await expect(
+			service.update(clientId, "SHR111111111", {
+				entityType: "PERSON",
+				parentShareholderId: "SHR333333333",
+				firstName: "A",
+				lastName: "B",
+				ownershipPercentage: 10,
+			}),
+		).rejects.toThrow(/depth/i);
+	});
+
+	it("update skips depth validation when parent clears to undefined", async () => {
+		const existing = personEntity({
+			parentShareholderId: "SHR222222222",
+		});
+		vi.mocked(mockRepo.getById).mockResolvedValue(existing);
+		vi.mocked(mockRepo.getSumOfOwnershipByParent).mockResolvedValue(0);
+		vi.mocked(mockRepo.update).mockResolvedValue(
+			personEntity({ parentShareholderId: null }),
+		);
+
+		const out = await service.update(clientId, "SHR111111111", {
+			entityType: "PERSON",
+			firstName: "A",
+			lastName: "B",
+			ownershipPercentage: 10,
+		});
+		expect(mockRepo.getByIdOnly).not.toHaveBeenCalled();
+		expect(out).toBeDefined();
+	});
+
+	it("patch throws when shareholder not found", async () => {
+		vi.mocked(mockRepo.getById).mockResolvedValue(null);
+		await expect(
+			service.patch(clientId, "SHR999999999", {
+				entityType: "PERSON",
+				firstName: "A",
+			}),
+		).rejects.toThrow(/Shareholder not found/);
+	});
+
+	it("patch validates depth when parent changes", async () => {
+		const existing = personEntity({ parentShareholderId: null });
+		vi.mocked(mockRepo.getById).mockResolvedValue(existing);
+		const companyP = companyParent();
+		vi.mocked(mockRepo.getByIdOnly).mockResolvedValue(companyP);
+		vi.mocked(mockRepo.getSumOfOwnershipByParent).mockResolvedValue(0);
+		vi.mocked(mockRepo.patch).mockResolvedValue(
+			personEntity({ parentShareholderId: "SHR222222222" }),
+		);
+
+		const out = await service.patch(clientId, "SHR111111111", {
+			entityType: "PERSON",
+			parentShareholderId: "SHR222222222",
+			ownershipPercentage: 10,
+		});
+		expect(mockRepo.getByIdOnly).toHaveBeenCalledWith("SHR222222222");
+		expect(out.parentShareholderId).toBe("SHR222222222");
+	});
+
+	it("patch uses existing ownership when not in input", async () => {
+		const existing = personEntity({ ownershipPercentage: 30 });
+		vi.mocked(mockRepo.getById).mockResolvedValue(existing);
+		vi.mocked(mockRepo.getSumOfOwnershipByParent).mockResolvedValue(30);
+		vi.mocked(mockRepo.patch).mockResolvedValue(
+			personEntity({ firstName: "New" }),
+		);
+
+		const out = await service.patch(clientId, "SHR111111111", {
+			entityType: "PERSON",
+			firstName: "New",
+		});
+		expect(out.firstName).toBe("New");
+	});
+
+	it("validateOwnershipCap skips subtraction when existing shareholder moves to different parent", async () => {
+		vi.mocked(mockRepo.getSumOfOwnershipByParent).mockResolvedValue(90);
+		vi.mocked(mockRepo.getById).mockResolvedValue(
+			personEntity({
+				id: "SHR666666666",
+				ownershipPercentage: 30,
+				parentShareholderId: "SHR_OTHER",
+			}),
+		);
+
+		await expect(
+			service.update(clientId, "SHR666666666", {
+				entityType: "PERSON",
+				parentShareholderId: null,
+				firstName: "A",
+				lastName: "B",
+				ownershipPercentage: 20,
+			}),
+		).rejects.toThrow(/exceed 100%/);
+	});
+
+	it("validateOwnershipCap handles null getById for excludeShareholderId", async () => {
+		vi.mocked(mockRepo.getSumOfOwnershipByParent).mockResolvedValue(50);
+		vi.mocked(mockRepo.getById).mockImplementation(async (_cid, sid) => {
+			if (sid === "SHR777777777") return personEntity({ id: "SHR777777777" });
+			return null;
+		});
+		vi.mocked(mockRepo.update).mockResolvedValue(
+			personEntity({ id: "SHR777777777", ownershipPercentage: 40 }),
+		);
+
+		const out = await service.update(clientId, "SHR777777777", {
+			entityType: "PERSON",
+			firstName: "A",
+			lastName: "B",
+			ownershipPercentage: 40,
+		});
+		expect(out.ownershipPercentage).toBe(40);
+	});
+
 	it("getShareholderDisplayName formats PERSON and COMPANY", () => {
 		expect(
 			service.getShareholderDisplayName(

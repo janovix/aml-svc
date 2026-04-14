@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
 	UsageRightsClient,
 	createUsageRightsClient,
+	buildGateDenialBody,
 	type GateResult,
 } from "./usage-rights-client";
 import type { Bindings } from "../types";
@@ -197,5 +198,77 @@ describe("UsageRightsClient", () => {
 
 			expect(created).toBeInstanceOf(UsageRightsClient);
 		});
+	});
+});
+
+describe("buildGateDenialBody", () => {
+	it("returns defaults when result has no optional fields", () => {
+		const body = buildGateDenialBody("clients", { allowed: false });
+		expect(body.code).toBe("USAGE_LIMIT_EXCEEDED");
+		expect(body.error).toBe("usage_limit_exceeded");
+		expect(body.upgradeRequired).toBe(true);
+		expect(body.metric).toBe("clients");
+		expect(body.remaining).toBe(0);
+		expect(body.message).toContain("clients");
+		expect(body.success).toBe(false);
+	});
+
+	it("uses provided code, error, metric, remaining, upgradeRequired", () => {
+		const body = buildGateDenialBody("reports", {
+			allowed: false,
+			code: "SPEND_LIMIT_EXCEEDED",
+			error: "spend_limit",
+			metric: "reports",
+			remaining: 5,
+			upgradeRequired: false,
+			used: 95,
+			limit: 100,
+			entitlementType: "stripe",
+		});
+		expect(body.code).toBe("SPEND_LIMIT_EXCEEDED");
+		expect(body.error).toBe("spend_limit");
+		expect(body.upgradeRequired).toBe(false);
+		expect(body.metric).toBe("reports");
+		expect(body.remaining).toBe(5);
+		expect(body.used).toBe(95);
+		expect(body.limit).toBe(100);
+		expect(body.entitlementType).toBe("stripe");
+	});
+
+	it("returns archived message when code is ORGANIZATION_ARCHIVED", () => {
+		const body = buildGateDenialBody("notices", {
+			allowed: false,
+			code: "ORGANIZATION_ARCHIVED",
+		});
+		expect(body.code).toBe("ORGANIZATION_ARCHIVED");
+		expect(body.upgradeRequired).toBe(false);
+		expect(body.message).toContain("archived");
+		expect(body.message).toContain("Restore");
+	});
+
+	it("returns upgrade message for non-archived denial", () => {
+		const body = buildGateDenialBody("watchlistQueries", {
+			allowed: false,
+		});
+		expect(body.message).toContain("watchlist queries");
+		expect(body.message).toContain("upgrade");
+	});
+
+	it("handles all known metric labels", () => {
+		const metrics = [
+			"reports",
+			"notices",
+			"alerts",
+			"operations",
+			"clients",
+			"users",
+			"watchlistQueries",
+			"organizations",
+		] as const;
+		for (const m of metrics) {
+			const body = buildGateDenialBody(m, { allowed: false });
+			expect(body.metric).toBe(m);
+			expect(typeof body.message).toBe("string");
+		}
 	});
 });

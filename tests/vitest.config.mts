@@ -118,8 +118,7 @@ export default defineWorkersConfig({
 			thresholds: {
 				lines: 75,
 				functions: 75,
-				// Seekers + service-binding keep global branches just under 75; lines/stmts remain strong
-				branches: 74,
+				branches: 75,
 				statements: 75,
 			},
 		},

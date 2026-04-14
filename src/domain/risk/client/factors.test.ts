@@ -120,6 +120,102 @@ describe("scoreClientElement", () => {
 		const mxResult = scoreClientElement(mxClient, mockJurisdictionLookup);
 		expect(irResult.score).toBeGreaterThan(mxResult.score);
 	});
+
+	it("falls back to default when countryCode is null", () => {
+		const result = scoreClientElement(
+			{ ...baseInput, countryCode: null as unknown as string },
+			mockJurisdictionLookup,
+		);
+		const nationalityFactor = result.factors.find(
+			(f) => f.name === "nationality_risk",
+		);
+		expect(nationalityFactor?.score).toBe(2.0);
+	});
+
+	it("scores UNSC-sanctioned clients", () => {
+		const result = scoreClientElement(
+			{ ...baseInput, unscSanctioned: true },
+			mockJurisdictionLookup,
+		);
+		const screeningFactor = result.factors.find(
+			(f) => f.name === "screening_result",
+		);
+		expect(screeningFactor?.score).toBe(9.0);
+	});
+
+	it("scores SAT 69-B listed clients", () => {
+		const result = scoreClientElement(
+			{ ...baseInput, sat69bListed: true },
+			mockJurisdictionLookup,
+		);
+		const screeningFactor = result.factors.find(
+			(f) => f.name === "screening_result",
+		);
+		expect(screeningFactor?.score).toBe(8.0);
+	});
+
+	it("scores adverse-media-flagged clients", () => {
+		const result = scoreClientElement(
+			{ ...baseInput, adverseMediaFlagged: true },
+			mockJurisdictionLookup,
+		);
+		const screeningFactor = result.factors.find(
+			(f) => f.name === "screening_result",
+		);
+		expect(screeningFactor?.score).toBe(6.0);
+	});
+
+	it("scores flagged screening result", () => {
+		const result = scoreClientElement(
+			{ ...baseInput, screeningResult: "flagged" },
+			mockJurisdictionLookup,
+		);
+		const screeningFactor = result.factors.find(
+			(f) => f.name === "screening_result",
+		);
+		expect(screeningFactor?.score).toBe(5.0);
+	});
+
+	it("gives higher age score for new clients (< 6 months)", () => {
+		const newClient = {
+			...baseInput,
+			createdAt: new Date().toISOString(),
+		};
+		const result = scoreClientElement(newClient, mockJurisdictionLookup);
+		const ageFactor = result.factors.find((f) => f.name === "client_age");
+		expect(ageFactor?.score).toBe(6.0);
+	});
+
+	it("gives medium age score for 6-12 month clients", () => {
+		const d = new Date();
+		d.setMonth(d.getMonth() - 9);
+		const result = scoreClientElement(
+			{ ...baseInput, createdAt: d.toISOString() },
+			mockJurisdictionLookup,
+		);
+		const ageFactor = result.factors.find((f) => f.name === "client_age");
+		expect(ageFactor?.score).toBe(4.0);
+	});
+
+	it("gives low age score for old clients (> 12 months)", () => {
+		const d = new Date();
+		d.setFullYear(d.getFullYear() - 2);
+		const result = scoreClientElement(
+			{ ...baseInput, createdAt: d.toISOString() },
+			mockJurisdictionLookup,
+		);
+		const ageFactor = result.factors.find((f) => f.name === "client_age");
+		expect(ageFactor?.score).toBe(1.0);
+	});
+
+	it("caps bc_complexity at 9", () => {
+		const result = scoreClientElement(
+			{ ...baseInput, bcCount: 10 },
+			mockJurisdictionLookup,
+		);
+		const bcFactor = result.factors.find((f) => f.name === "bc_complexity");
+		expect(bcFactor?.score).toBe(9);
+	});
 });
 
 // ─── Geographic Element ─────────────────────────────────────────────────────
@@ -174,6 +270,40 @@ describe("scoreGeographicElement", () => {
 			mockJurisdictionLookup,
 		);
 		expect(result.score).toBeGreaterThan(baseResult.score);
+	});
+
+	it("falls back to default when clientStateCode is null", () => {
+		const result = scoreGeographicElement(
+			{ ...baseInput, clientStateCode: null as unknown as string },
+			mockGeoLookup,
+			mockJurisdictionLookup,
+		);
+		const stateFactor = result.factors.find(
+			(f) => f.name === "domicile_state_risk",
+		);
+		expect(stateFactor?.score).toBe(3.0);
+	});
+
+	it("falls back to default when clientCountryCode is null", () => {
+		const result = scoreGeographicElement(
+			{ ...baseInput, clientCountryCode: null as unknown as string },
+			mockGeoLookup,
+			mockJurisdictionLookup,
+		);
+		const countryFactor = result.factors.find((f) => f.name === "country_risk");
+		expect(countryFactor?.score).toBe(2.0);
+	});
+
+	it("uses default for empty operationStateCodes", () => {
+		const result = scoreGeographicElement(
+			{ ...baseInput, operationStateCodes: [] },
+			mockGeoLookup,
+			mockJurisdictionLookup,
+		);
+		const opFactor = result.factors.find(
+			(f) => f.name === "operation_location_risk",
+		);
+		expect(opFactor?.score).toBe(3.0);
 	});
 });
 
@@ -274,6 +404,64 @@ describe("scoreTransactionElement", () => {
 		const result = scoreTransactionElement(empty);
 		expect(result.score).toBeGreaterThanOrEqual(0);
 	});
+
+	it("differentiates frequency tiers", () => {
+		const tier1 = scoreTransactionElement({
+			...baseInput,
+			avgFrequencyPerMonth: 7,
+		});
+		const tier2 = scoreTransactionElement({
+			...baseInput,
+			avgFrequencyPerMonth: 15,
+		});
+		const tier3 = scoreTransactionElement({
+			...baseInput,
+			avgFrequencyPerMonth: 25,
+		});
+
+		const getFreqScore = (r: ReturnType<typeof scoreTransactionElement>) =>
+			r.factors.find((f) => f.name === "operation_frequency")?.score ?? 0;
+
+		expect(getFreqScore(tier1)).toBe(3.0);
+		expect(getFreqScore(tier2)).toBe(5.0);
+		expect(getFreqScore(tier3)).toBe(7.0);
+	});
+
+	it("differentiates volume tiers", () => {
+		const low = scoreTransactionElement({
+			...baseInput,
+			totalAmountMxn: 50_000,
+		});
+		const med = scoreTransactionElement({
+			...baseInput,
+			totalAmountMxn: 500_000,
+		});
+		const high = scoreTransactionElement({
+			...baseInput,
+			totalAmountMxn: 5_000_000,
+		});
+		const vhigh = scoreTransactionElement({
+			...baseInput,
+			totalAmountMxn: 15_000_000,
+		});
+
+		const getVol = (r: ReturnType<typeof scoreTransactionElement>) =>
+			r.factors.find((f) => f.name === "volume")?.score ?? 0;
+
+		expect(getVol(low)).toBe(2.0);
+		expect(getVol(med)).toBe(4.0);
+		expect(getVol(high)).toBe(6.0);
+		expect(getVol(vhigh)).toBe(8.0);
+	});
+
+	it("scores third-party operations", () => {
+		const result = scoreTransactionElement({
+			...baseInput,
+			thirdPartyCount: 5,
+		});
+		const tpFactor = result.factors.find((f) => f.name === "third_party_ratio");
+		expect(tpFactor?.score).toBeGreaterThan(0);
+	});
 });
 
 // ─── Mitigants ──────────────────────────────────────────────────────────────
@@ -316,5 +504,31 @@ describe("scoreMitigants", () => {
 		const shortResult = scoreMitigants(short);
 		const longResult = scoreMitigants(long);
 		expect(longResult.effect).toBeGreaterThan(shortResult.effect);
+	});
+
+	it("gives medium relationship effect for 12-24 months", () => {
+		const result = scoreMitigants({
+			kycComplete: true,
+			documentsVerified: true,
+			relationshipMonths: 18,
+			regulatedCounterparty: false,
+		});
+		const relFactor = result.factors.find(
+			(f) => f.name === "relationship_length",
+		);
+		expect(relFactor?.score).toBe(0.3);
+	});
+
+	it("gives zero relationship effect for < 12 months", () => {
+		const result = scoreMitigants({
+			kycComplete: true,
+			documentsVerified: true,
+			relationshipMonths: 6,
+			regulatedCounterparty: false,
+		});
+		const relFactor = result.factors.find(
+			(f) => f.name === "relationship_length",
+		);
+		expect(relFactor?.score).toBe(0);
 	});
 });
