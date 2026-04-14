@@ -60,6 +60,22 @@ const CLIENT_CATALOG_FIELDS: CatalogFieldsConfig = {
 	nationality: { catalog: "countries", strategy: "BY_CODE" },
 };
 
+/**
+ * País/Nacionalidad (código) uses `countryCode`; the countries catalog also backs
+ * `nationality`. If the client only sends nationality (e.g. wizard default MX),
+ * copy it to `countryCode` for persona física, moral, and fideicomiso alike.
+ */
+function withCountryCodeSyncedFromNationalityWhenMissing<
+	T extends { nationality?: unknown; countryCode?: unknown },
+>(input: T): T {
+	const nationality = String(input.nationality ?? "").trim();
+	const countryCode = String(input.countryCode ?? "").trim();
+	if (nationality && !countryCode) {
+		return { ...input, countryCode: nationality };
+	}
+	return input;
+}
+
 export class ClientRepository {
 	private catalogResolver: CatalogNameResolver;
 
@@ -192,13 +208,14 @@ export class ClientRepository {
 		organizationId: string,
 		input: ClientCreateInput,
 	): Promise<ClientEntity> {
-		const prismaData = mapCreateInputToPrisma(input);
+		const normalized = withCountryCodeSyncedFromNationalityWhenMissing(input);
+		const prismaData = mapCreateInputToPrisma(normalized);
 		const { completenessStatus, missingFields } =
-			this.detectCompleteness(input);
+			this.detectCompleteness(normalized);
 
 		// Resolve catalog names for *Code fields
 		const resolvedNames = await this.catalogResolver.resolveNames(
-			input,
+			normalized as Record<string, unknown>,
 			CLIENT_CATALOG_FIELDS,
 		);
 
@@ -229,13 +246,14 @@ export class ClientRepository {
 	): Promise<ClientEntity> {
 		await this.ensureExists(organizationId, id);
 
-		const prismaData = mapUpdateInputToPrisma(input);
+		const normalized = withCountryCodeSyncedFromNationalityWhenMissing(input);
+		const prismaData = mapUpdateInputToPrisma(normalized);
 		const { completenessStatus, missingFields } =
-			this.detectCompleteness(input);
+			this.detectCompleteness(normalized);
 
 		// Resolve catalog names for *Code fields
 		const resolvedNames = await this.catalogResolver.resolveNames(
-			input,
+			normalized as Record<string, unknown>,
 			CLIENT_CATALOG_FIELDS,
 		);
 
@@ -273,7 +291,10 @@ export class ClientRepository {
 			where: { id, deletedAt: null },
 		});
 		if (current) {
-			const merged = { ...current, ...input };
+			const merged = withCountryCodeSyncedFromNationalityWhenMissing({
+				...current,
+				...input,
+			});
 			const { completenessStatus, missingFields } =
 				this.detectCompleteness(merged);
 			(payload as Record<string, unknown>).completenessStatus =
@@ -281,9 +302,19 @@ export class ClientRepository {
 			(payload as Record<string, unknown>).missingFields =
 				missingFields.length > 0 ? JSON.stringify(missingFields) : null;
 
+			// Persist inferred countryCode when patch did not explicitly set it
+			const inputRecord = input as Record<string, unknown>;
+			if (
+				!("countryCode" in inputRecord) &&
+				typeof merged.countryCode === "string" &&
+				merged.countryCode !== (current.countryCode ?? "")
+			) {
+				(payload as Record<string, unknown>).countryCode = merged.countryCode;
+			}
+
 			// Resolve catalog names for *Code fields
 			const resolvedNames = await this.catalogResolver.resolveNames(
-				merged,
+				merged as Record<string, unknown>,
 				CLIENT_CATALOG_FIELDS,
 			);
 			(payload as Record<string, unknown>).resolvedNames =
