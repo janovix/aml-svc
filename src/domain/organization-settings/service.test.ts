@@ -14,6 +14,7 @@ describe("OrganizationSettingsService", () => {
 		activityKey: "VEH",
 		selfServiceMode: "disabled",
 		selfServiceExpiryHours: 72,
+		selfServiceSendEmail: true,
 		selfServiceRequiredSections: null,
 		createdAt: "2024-01-01T00:00:00.000Z",
 		updatedAt: "2024-01-01T00:00:00.000Z",

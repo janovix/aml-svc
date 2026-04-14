@@ -9,6 +9,8 @@ export interface OrganizationSettingsEntity {
 	selfServiceMode: SelfServiceMode;
 	selfServiceExpiryHours: number;
 	selfServiceRequiredSections: string[] | null; // JSON array of section keys
+	/** When true, aml-svc sends KYC invite email on manual session creation (default). */
+	selfServiceSendEmail: boolean;
 	createdAt: string;
 	updatedAt: string;
 }

@@ -29,6 +29,7 @@ export class OrganizationSettingsRepository {
 			selfServiceMode?: string;
 			selfServiceExpiryHours?: number;
 			selfServiceRequiredSections?: string[] | null;
+			selfServiceSendEmail?: boolean;
 		},
 	): Promise<OrganizationSettingsEntity> {
 		const prisma = await this.prisma.organizationSettings.create({
@@ -39,6 +40,7 @@ export class OrganizationSettingsRepository {
 				activityKey: data.activityKey,
 				selfServiceMode: data.selfServiceMode ?? "automatic",
 				selfServiceExpiryHours: data.selfServiceExpiryHours ?? 72,
+				selfServiceSendEmail: data.selfServiceSendEmail ?? true,
 				selfServiceRequiredSections:
 					data.selfServiceRequiredSections != null
 						? JSON.stringify(data.selfServiceRequiredSections)
@@ -57,6 +59,7 @@ export class OrganizationSettingsRepository {
 			selfServiceMode?: string;
 			selfServiceExpiryHours?: number;
 			selfServiceRequiredSections?: string[] | null;
+			selfServiceSendEmail?: boolean;
 		},
 	): Promise<OrganizationSettingsEntity> {
 		const prisma = await this.prisma.organizationSettings.update({
@@ -73,6 +76,9 @@ export class OrganizationSettingsRepository {
 				}),
 				...(data.selfServiceExpiryHours !== undefined && {
 					selfServiceExpiryHours: data.selfServiceExpiryHours,
+				}),
+				...(data.selfServiceSendEmail !== undefined && {
+					selfServiceSendEmail: data.selfServiceSendEmail,
 				}),
 				...(data.selfServiceRequiredSections !== undefined && {
 					selfServiceRequiredSections:
@@ -94,6 +100,7 @@ export class OrganizationSettingsRepository {
 			selfServiceMode?: string;
 			selfServiceExpiryHours?: number;
 			selfServiceRequiredSections?: string[] | null;
+			selfServiceSendEmail?: boolean;
 		},
 	): Promise<OrganizationSettingsEntity> {
 		const prisma = await this.prisma.organizationSettings.upsert({
@@ -105,6 +112,7 @@ export class OrganizationSettingsRepository {
 				activityKey: data.activityKey,
 				selfServiceMode: data.selfServiceMode ?? "automatic",
 				selfServiceExpiryHours: data.selfServiceExpiryHours ?? 72,
+				selfServiceSendEmail: data.selfServiceSendEmail ?? true,
 				selfServiceRequiredSections:
 					data.selfServiceRequiredSections != null
 						? JSON.stringify(data.selfServiceRequiredSections)
@@ -118,6 +126,9 @@ export class OrganizationSettingsRepository {
 				}),
 				...(data.selfServiceExpiryHours !== undefined && {
 					selfServiceExpiryHours: data.selfServiceExpiryHours,
+				}),
+				...(data.selfServiceSendEmail !== undefined && {
+					selfServiceSendEmail: data.selfServiceSendEmail,
 				}),
 				...(data.selfServiceRequiredSections !== undefined && {
 					selfServiceRequiredSections:

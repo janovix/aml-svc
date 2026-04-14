@@ -70,6 +70,7 @@ organizationSettingsRouter.put("/", async (c) => {
 		selfServiceMode: data.selfServiceMode,
 		selfServiceExpiryHours: data.selfServiceExpiryHours,
 		selfServiceRequiredSections: data.selfServiceRequiredSections,
+		selfServiceSendEmail: data.selfServiceSendEmail,
 	});
 
 	return c.json({ configured: true, settings }, 200);
@@ -103,6 +104,7 @@ organizationSettingsRouter.patch("/", async (c) => {
 		selfServiceMode: data.selfServiceMode,
 		selfServiceExpiryHours: data.selfServiceExpiryHours,
 		selfServiceRequiredSections: data.selfServiceRequiredSections,
+		selfServiceSendEmail: data.selfServiceSendEmail,
 	});
 
 	return c.json({ configured: true, settings });
@@ -134,6 +136,7 @@ organizationSettingsRouter.patch("/self-service", async (c) => {
 		selfServiceMode: data.selfServiceMode,
 		selfServiceExpiryHours: data.selfServiceExpiryHours,
 		selfServiceRequiredSections: data.selfServiceRequiredSections,
+		selfServiceSendEmail: data.selfServiceSendEmail,
 	});
 
 	return c.json({ configured: true, settings });

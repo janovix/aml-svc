@@ -25,6 +25,7 @@ export const organizationSettingsCreateSchema = z.object({
 	selfServiceMode: selfServiceModeSchema.optional(),
 	selfServiceExpiryHours: z.number().int().min(1).max(720).optional(),
 	selfServiceRequiredSections: z.array(z.string()).nullable().optional(),
+	selfServiceSendEmail: z.boolean().optional(),
 });
 
 export const organizationSettingsUpdateSchema =
@@ -34,6 +35,7 @@ export const selfServiceSettingsUpdateSchema = z.object({
 	selfServiceMode: selfServiceModeSchema.optional(),
 	selfServiceExpiryHours: z.number().int().min(1).max(720).optional(),
 	selfServiceRequiredSections: z.array(z.string()).nullable().optional(),
+	selfServiceSendEmail: z.boolean().optional(),
 });
 
 export type OrganizationSettingsCreateInput = z.infer<
