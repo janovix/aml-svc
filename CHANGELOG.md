@@ -1,3 +1,11 @@
+# [1.14.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.13.0...v1.14.0-rc.1) (2026-04-16)
+
+
+### Features
+
+* **alert:** add environment column for data isolation in org-scoped tables and update related queries ([d3f5fbd](https://github.com/janovix/aml-svc/commit/d3f5fbddf012653c348d6ee22663e8e2ae02ca7e))
+* **cors:** allow X-Environment header in CORS preflight response ([92be467](https://github.com/janovix/aml-svc/commit/92be467f7214d9088c7c6514ab227566e1943717))
+
 # [1.13.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.13.0-rc.2...v1.13.0-rc.3) (2026-04-16)
 
 
