@@ -13,9 +13,10 @@ import {
 import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
-import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import { type AuthVariables, getTenantContext } from "../middleware/auth";
 import { z } from "zod";
 import { parseQueryParams } from "../lib/query-params";
+import { productionTenant } from "../lib/tenant-context";
 
 export const invoicesRouter = new Hono<{
 	Bindings: Bindings;
@@ -67,7 +68,7 @@ function handleServiceError(error: unknown): never {
  * List all invoices with optional filters
  */
 invoicesRouter.get("/", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const url = new URL(c.req.url);
 	const queryObject = parseQueryParams(url.searchParams, [
 		"voucherTypeCode",
@@ -76,9 +77,7 @@ invoicesRouter.get("/", async (c) => {
 	const filters = parseWithZod(InvoiceFilterSchema, queryObject);
 
 	const service = getService(c);
-	const result = await service
-		.list(organizationId, filters)
-		.catch(handleServiceError);
+	const result = await service.list(tenant, filters).catch(handleServiceError);
 
 	return c.json(result);
 });
@@ -89,11 +88,9 @@ invoicesRouter.get("/", async (c) => {
  * IMPORTANT: must be defined before /:id to avoid "stats" being matched as an id.
  */
 invoicesRouter.get("/stats", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const service = getService(c);
-	const stats = await service
-		.getStats(organizationId)
-		.catch(handleServiceError);
+	const stats = await service.getStats(tenant).catch(handleServiceError);
 	return c.json(stats);
 });
 
@@ -102,12 +99,12 @@ invoicesRouter.get("/stats", async (c) => {
  * Get a single invoice by ID
  */
 invoicesRouter.get("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const params = parseWithZod(InvoiceIdParamSchema, c.req.param());
 
 	const service = getService(c);
 	const record = await service
-		.getById(organizationId, params.id)
+		.getById(tenant, params.id)
 		.catch(handleServiceError);
 
 	return c.json(record);
@@ -118,7 +115,7 @@ invoicesRouter.get("/:id", async (c) => {
  * Get a single invoice by CFDI UUID
  */
 invoicesRouter.get("/uuid/:uuid", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const uuid = c.req.param("uuid");
 
 	if (!uuid || !/^[0-9a-f-]{36}$/i.test(uuid)) {
@@ -127,7 +124,7 @@ invoicesRouter.get("/uuid/:uuid", async (c) => {
 
 	const service = getService(c);
 	const record = await service
-		.getByUuid(organizationId, uuid)
+		.getByUuid(tenant, uuid)
 		.catch(handleServiceError);
 
 	return c.json(record);
@@ -138,13 +135,13 @@ invoicesRouter.get("/uuid/:uuid", async (c) => {
  * Create a new invoice manually
  */
 invoicesRouter.post("/", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const body = await c.req.json();
 	const payload = parseWithZod(InvoiceCreateSchema, body);
 
 	const service = getService(c);
 	const created = await service
-		.create(organizationId, payload)
+		.create(tenant, payload)
 		.catch(handleServiceError);
 
 	return c.json(created, 201);
@@ -156,13 +153,13 @@ invoicesRouter.post("/", async (c) => {
  * Returns PLD hints for activity detection
  */
 invoicesRouter.post("/parse-xml", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const body = await c.req.json();
 	const payload = parseWithZod(InvoiceParseXmlSchema, body);
 
 	const service = getService(c);
 	const result = await service
-		.parseAndCreate(organizationId, payload)
+		.parseAndCreate(tenant, payload)
 		.catch(handleServiceError);
 
 	return c.json(result, 201);
@@ -173,14 +170,14 @@ invoicesRouter.post("/parse-xml", async (c) => {
  * Update invoice notes
  */
 invoicesRouter.put("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const params = parseWithZod(InvoiceIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(InvoiceUpdateSchema, body);
 
 	const service = getService(c);
 	const updated = await service
-		.updateNotes(organizationId, params.id, payload.notes ?? null)
+		.updateNotes(tenant, params.id, payload.notes ?? null)
 		.catch(handleServiceError);
 
 	return c.json(updated);
@@ -191,11 +188,11 @@ invoicesRouter.put("/:id", async (c) => {
  * Soft delete an invoice
  */
 invoicesRouter.delete("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const params = parseWithZod(InvoiceIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	await service.delete(organizationId, params.id).catch(handleServiceError);
+	await service.delete(tenant, params.id).catch(handleServiceError);
 
 	return c.body(null, 204);
 });
@@ -231,7 +228,10 @@ invoicesInternalRouter.post("/parse-xml", async (c) => {
 		const payload = parseWithZod(InvoiceParseXmlSchema, body);
 
 		const service = getInternalService(c);
-		const result = await service.parseAndCreate(organizationId, payload);
+		const result = await service.parseAndCreate(
+			productionTenant(organizationId),
+			payload,
+		);
 
 		return c.json(result, 201);
 	} catch (error) {

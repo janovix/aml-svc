@@ -87,7 +87,7 @@ export function corsMiddleware(): MiddlewareHandler {
 				// Check if origin matches any pattern
 				return isOriginAllowed(origin, trustedPatterns) ? origin : null;
 			},
-			allowHeaders: ["Content-Type", "Authorization"],
+			allowHeaders: ["Content-Type", "Authorization", "X-Environment"],
 			allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
 			exposeHeaders: ["Content-Length", "X-Request-Id"],
 			maxAge: 600,

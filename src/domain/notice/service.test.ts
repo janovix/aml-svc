@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { calculateNoticePeriod, getNoticeSubmissionDeadline } from "./types";
+import { productionTenant } from "../../lib/tenant-context";
 import { NoticeService } from "./service";
 import type { NoticeRepository } from "./repository";
 import type { NoticeEntity } from "./types";
@@ -168,6 +169,7 @@ describe("Notice Period Calculations (SAT 17-17 Cycle)", () => {
 describe("NoticeService", () => {
 	let service: NoticeService;
 	let mockRepository: NoticeRepository;
+	const orgTenant = productionTenant("org_123");
 
 	const mockNotice: NoticeEntity = {
 		id: "NTC_123",
@@ -233,13 +235,13 @@ describe("NoticeService", () => {
 
 			const result = await service.create(
 				{ name: "Aviso Enero 2024", year: 2024, month: 1 },
-				"org_123",
+				orgTenant,
 				"user_123",
 			);
 
 			expect(result.recordCount).toBe(5);
 			expect(mockRepository.hasPendingNoticeForPeriod).toHaveBeenCalledWith(
-				"org_123",
+				orgTenant,
 				"202401",
 			);
 		});
@@ -254,7 +256,7 @@ describe("NoticeService", () => {
 
 			const result = await service.create(
 				{ name: "Aviso Enero 2024 #2", year: 2024, month: 1 },
-				"org_123",
+				orgTenant,
 			);
 
 			expect(result.id).toBe("NTC_123");
@@ -269,7 +271,7 @@ describe("NoticeService", () => {
 			await expect(
 				service.create(
 					{ name: "Aviso Enero 2024", year: 2024, month: 1 },
-					"org_123",
+					orgTenant,
 				),
 			).rejects.toThrow("NOTICE_ALREADY_EXISTS_FOR_PERIOD");
 
@@ -284,7 +286,7 @@ describe("NoticeService", () => {
 			await expect(
 				service.create(
 					{ name: "Aviso Enero 2024", year: 2024, month: 1 },
-					"org_123",
+					orgTenant,
 				),
 			).rejects.toThrow("NOTICE_ALREADY_EXISTS_FOR_PERIOD");
 		});
@@ -318,7 +320,7 @@ describe("NoticeService", () => {
 					noticeCount: 0,
 				});
 
-			const months = await service.getAvailableMonths("org_123");
+			const months = await service.getAvailableMonths(orgTenant);
 
 			expect(months).toHaveLength(12);
 
@@ -351,7 +353,7 @@ describe("NoticeService", () => {
 				noticeCount: 0,
 			});
 
-			const months = await service.getAvailableMonths("org_123");
+			const months = await service.getAvailableMonths(orgTenant);
 
 			// Should include next month (February 2026) when we're past day 16
 			expect(months).toHaveLength(13);
@@ -375,7 +377,7 @@ describe("NoticeService", () => {
 				noticeCount: 0,
 			});
 
-			const months = await service.getAvailableMonths("org_123");
+			const months = await service.getAvailableMonths(orgTenant);
 
 			// Should NOT include next month when we're on or before day 16
 			expect(months).toHaveLength(12);
@@ -394,7 +396,7 @@ describe("NoticeService", () => {
 				noticeCount: 2,
 			});
 
-			const months = await service.getAvailableMonths("org_123");
+			const months = await service.getAvailableMonths(orgTenant);
 
 			// All months should have hasNotice = false (allowing new notice creation)
 			for (const month of months) {
@@ -418,18 +420,18 @@ describe("NoticeService", () => {
 			});
 
 			const filters = { page: 1, limit: 10 } as never;
-			const result = await service.list("org_123", filters);
+			const result = await service.list(orgTenant, filters);
 
-			expect(mockRepository.list).toHaveBeenCalledWith("org_123", filters);
+			expect(mockRepository.list).toHaveBeenCalledWith(orgTenant, filters);
 			expect(result.data).toEqual([mockNotice]);
 		});
 
 		it("get delegates to repository", async () => {
 			vi.mocked(mockRepository.get).mockResolvedValue(mockNotice);
 
-			const result = await service.get("org_123", "NTC_123");
+			const result = await service.get(orgTenant, "NTC_123");
 
-			expect(mockRepository.get).toHaveBeenCalledWith("org_123", "NTC_123");
+			expect(mockRepository.get).toHaveBeenCalledWith(orgTenant, "NTC_123");
 			expect(result).toEqual(mockNotice);
 		});
 
@@ -449,7 +451,7 @@ describe("NoticeService", () => {
 				},
 			] as never);
 
-			const result = await service.preview("org_123", {
+			const result = await service.preview(orgTenant, {
 				year: 2024,
 				month: 6,
 			});

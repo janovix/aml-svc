@@ -9,6 +9,7 @@ import type {
 	OperationCreateInput,
 	OperationUpdateInput,
 } from "./schemas";
+import type { TenantContext } from "../../lib/tenant-context";
 import { mapOperationToEntity } from "./mappers";
 import {
 	buildEnumFilterMeta,
@@ -125,12 +126,14 @@ export class OperationRepository {
 	}
 
 	async existsByImportHash(
-		organizationId: string,
+		tenant: TenantContext,
 		importHash: string,
 	): Promise<boolean> {
+		const { organizationId, environment } = tenant;
 		const count = await this.prisma.operation.count({
 			where: {
 				organizationId,
+				environment,
 				importHash,
 				deletedAt: null,
 			},
@@ -139,10 +142,11 @@ export class OperationRepository {
 	}
 
 	async create(
-		organizationId: string,
+		tenant: TenantContext,
 		input: OperationCreateInput,
 		umaInfo?: { umaValue: number; umaDailyValue: number },
 	): Promise<OperationEntity> {
+		const { organizationId, environment } = tenant;
 		const operationId = crypto.randomUUID();
 
 		// Calculate amount in MXN if foreign currency
@@ -170,6 +174,7 @@ export class OperationRepository {
 			data: {
 				id: operationId,
 				organizationId,
+				environment,
 				clientId: input.clientId,
 				invoiceId: input.invoiceId,
 				activityCode: input.activityCode,
@@ -623,13 +628,15 @@ export class OperationRepository {
 	}
 
 	async findById(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 	): Promise<OperationEntity | null> {
+		const { organizationId, environment } = tenant;
 		const operation = await this.prisma.operation.findFirst({
 			where: {
 				id,
 				organizationId,
+				environment,
 				deletedAt: null,
 			},
 			include: operationInclude,
@@ -641,12 +648,14 @@ export class OperationRepository {
 	}
 
 	async list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: OperationFilters,
 	): Promise<ListResultWithMeta<OperationEntity>> {
+		const { organizationId, environment } = tenant;
 		// Base conditions (always applied, not affected by active filters)
 		const baseWhere: Prisma.OperationWhereInput = {
 			organizationId,
+			environment,
 			deletedAt: null,
 		};
 
@@ -834,13 +843,14 @@ export class OperationRepository {
 	}
 
 	async update(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: OperationUpdateInput,
 		umaInfo?: { umaValue: number; umaDailyValue: number },
 	): Promise<OperationEntity | null> {
+		const { organizationId, environment } = tenant;
 		const existing = await this.prisma.operation.findFirst({
-			where: { id, organizationId, deletedAt: null },
+			where: { id, organizationId, environment, deletedAt: null },
 		});
 
 		if (!existing) {
@@ -913,7 +923,7 @@ export class OperationRepository {
 
 		await this.prisma.$transaction(queries);
 
-		return this.findById(organizationId, id);
+		return this.findById(tenant, id);
 	}
 
 	/**
@@ -1231,9 +1241,10 @@ export class OperationRepository {
 		return null;
 	}
 
-	async softDelete(organizationId: string, id: string): Promise<boolean> {
+	async softDelete(tenant: TenantContext, id: string): Promise<boolean> {
+		const { organizationId, environment } = tenant;
 		const existing = await this.prisma.operation.findFirst({
-			where: { id, organizationId, deletedAt: null },
+			where: { id, organizationId, environment, deletedAt: null },
 		});
 
 		if (!existing) {
@@ -1249,12 +1260,14 @@ export class OperationRepository {
 	}
 
 	async findByClientId(
-		organizationId: string,
+		tenant: TenantContext,
 		clientId: string,
 		options?: { activityCode?: ActivityCode; startDate?: Date; endDate?: Date },
 	): Promise<OperationEntity[]> {
+		const { organizationId, environment } = tenant;
 		const where: Prisma.OperationWhereInput = {
 			organizationId,
+			environment,
 			clientId,
 			deletedAt: null,
 		};
@@ -1282,27 +1295,29 @@ export class OperationRepository {
 		return operations.map((op) => mapOperationToEntity(op));
 	}
 
-	async getStats(organizationId: string): Promise<{
+	async getStats(tenant: TenantContext): Promise<{
 		totalOperations: number;
 		operationsToday: number;
 		totalAmountMxn: string;
 	}> {
+		const { organizationId, environment } = tenant;
 		const todayStart = new Date();
 		todayStart.setHours(0, 0, 0, 0);
 
 		const [totalOperations, operationsToday, aggregate] = await Promise.all([
 			this.prisma.operation.count({
-				where: { organizationId, deletedAt: null },
+				where: { organizationId, environment, deletedAt: null },
 			}),
 			this.prisma.operation.count({
 				where: {
 					organizationId,
+					environment,
 					deletedAt: null,
 					operationDate: { gte: todayStart },
 				},
 			}),
 			this.prisma.operation.aggregate({
-				where: { organizationId, deletedAt: null },
+				where: { organizationId, environment, deletedAt: null },
 				_sum: { amountMxn: true },
 			}),
 		]);

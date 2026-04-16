@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { NoticeRepository } from "./repository";
+import { productionTenant } from "../../lib/tenant-context";
 import type {
 	PrismaClient,
 	Notice,
@@ -48,9 +49,12 @@ function createMockPrisma(): PrismaClient {
 	} as unknown as PrismaClient;
 }
 
+const noticeTenant = productionTenant("org_123");
+
 const mockNotice: Notice = {
 	id: "NTC_123",
 	organizationId: "org_123",
+	environment: "production",
 	name: "Aviso SAT Enero 2024",
 	activityCode: "VEH",
 	status: "DRAFT" as PrismaNoticeStatus,
@@ -116,14 +120,20 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findMany).mockResolvedValue([mockNotice]);
 			vi.mocked(prisma.notice.count).mockResolvedValue(1);
 
-			const result = await repository.list("org_123", { page: 1, limit: 10 });
+			const result = await repository.list(noticeTenant, {
+				page: 1,
+				limit: 10,
+			});
 
 			expect(result.data).toHaveLength(1);
 			expect(result.pagination.total).toBe(1);
 			expect(result.pagination.page).toBe(1);
 			expect(prisma.notice.findMany).toHaveBeenCalledWith(
 				expect.objectContaining({
-					where: { organizationId: "org_123" },
+					where: {
+						organizationId: "org_123",
+						environment: "production",
+					},
 					skip: 0,
 					take: 10,
 				}),
@@ -134,7 +144,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findMany).mockResolvedValue([]);
 			vi.mocked(prisma.notice.count).mockResolvedValue(0);
 
-			await repository.list("org_123", {
+			await repository.list(noticeTenant, {
 				page: 1,
 				limit: 10,
 				status: ["DRAFT"],
@@ -142,7 +152,11 @@ describe("NoticeRepository", () => {
 
 			expect(prisma.notice.findMany).toHaveBeenCalledWith(
 				expect.objectContaining({
-					where: { organizationId: "org_123", status: { in: ["DRAFT"] } },
+					where: {
+						organizationId: "org_123",
+						environment: "production",
+						status: { in: ["DRAFT"] },
+					},
 				}),
 			);
 		});
@@ -151,7 +165,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findMany).mockResolvedValue([]);
 			vi.mocked(prisma.notice.count).mockResolvedValue(0);
 
-			await repository.list("org_123", {
+			await repository.list(noticeTenant, {
 				page: 1,
 				limit: 10,
 				periodStart: "2024-01-01",
@@ -161,6 +175,7 @@ describe("NoticeRepository", () => {
 				expect.objectContaining({
 					where: {
 						organizationId: "org_123",
+						environment: "production",
 						periodStart: { gte: new Date("2024-01-01") },
 					},
 				}),
@@ -171,7 +186,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findMany).mockResolvedValue([]);
 			vi.mocked(prisma.notice.count).mockResolvedValue(0);
 
-			await repository.list("org_123", {
+			await repository.list(noticeTenant, {
 				page: 1,
 				limit: 10,
 				periodEnd: "2024-01-31",
@@ -181,6 +196,7 @@ describe("NoticeRepository", () => {
 				expect.objectContaining({
 					where: {
 						organizationId: "org_123",
+						environment: "production",
 						periodEnd: { lte: new Date("2024-01-31") },
 					},
 				}),
@@ -191,12 +207,13 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findMany).mockResolvedValue([]);
 			vi.mocked(prisma.notice.count).mockResolvedValue(0);
 
-			await repository.list("org_123", { page: 1, limit: 10, year: 2024 });
+			await repository.list(noticeTenant, { page: 1, limit: 10, year: 2024 });
 
 			expect(prisma.notice.findMany).toHaveBeenCalledWith(
 				expect.objectContaining({
 					where: {
 						organizationId: "org_123",
+						environment: "production",
 						reportedMonth: { startsWith: "2024" },
 					},
 				}),
@@ -207,7 +224,10 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findMany).mockResolvedValue([]);
 			vi.mocked(prisma.notice.count).mockResolvedValue(50);
 
-			const result = await repository.list("org_123", { page: 3, limit: 10 });
+			const result = await repository.list(noticeTenant, {
+				page: 3,
+				limit: 10,
+			});
 
 			expect(prisma.notice.findMany).toHaveBeenCalledWith(
 				expect.objectContaining({
@@ -223,19 +243,23 @@ describe("NoticeRepository", () => {
 		it("returns notice by ID", async () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockNotice);
 
-			const result = await repository.get("org_123", "NTC_123");
+			const result = await repository.get(noticeTenant, "NTC_123");
 
 			expect(result.id).toBe("NTC_123");
 			expect(result.name).toBe("Aviso SAT Enero 2024");
 			expect(prisma.notice.findFirst).toHaveBeenCalledWith({
-				where: { id: "NTC_123", organizationId: "org_123" },
+				where: {
+					id: "NTC_123",
+					organizationId: "org_123",
+					environment: "production",
+				},
 			});
 		});
 
 		it("throws error if notice not found", async () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(null);
 
-			await expect(repository.get("org_123", "NTC_999")).rejects.toThrow(
+			await expect(repository.get(noticeTenant, "NTC_999")).rejects.toThrow(
 				"NOTICE_NOT_FOUND",
 			);
 		});
@@ -260,7 +284,10 @@ describe("NoticeRepository", () => {
 				} as AlertWithRule,
 			]);
 
-			const result = await repository.getWithAlertSummary("org_123", "NTC_123");
+			const result = await repository.getWithAlertSummary(
+				noticeTenant,
+				"NTC_123",
+			);
 
 			expect(result.id).toBe("NTC_123");
 			expect(result.alertSummary.total).toBe(2);
@@ -279,7 +306,7 @@ describe("NoticeRepository", () => {
 					year: 2024,
 					month: 1,
 				},
-				"org_123",
+				noticeTenant,
 				"user_123",
 			);
 
@@ -297,7 +324,7 @@ describe("NoticeRepository", () => {
 				name: "Updated Name",
 			});
 
-			const result = await repository.patch("org_123", "NTC_123", {
+			const result = await repository.patch(noticeTenant, "NTC_123", {
 				name: "Updated Name",
 			});
 
@@ -313,7 +340,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(null);
 
 			await expect(
-				repository.patch("org_123", "NTC_999", { name: "Test" }),
+				repository.patch(noticeTenant, "NTC_999", { name: "Test" }),
 			).rejects.toThrow("NOTICE_NOT_FOUND");
 		});
 	});
@@ -324,7 +351,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 0 });
 			vi.mocked(prisma.notice.delete).mockResolvedValue(mockNotice);
 
-			await repository.delete("org_123", "NTC_123");
+			await repository.delete(noticeTenant, "NTC_123");
 
 			expect(prisma.notice.delete).toHaveBeenCalledWith({
 				where: { id: "NTC_123" },
@@ -336,7 +363,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 0 });
 			vi.mocked(prisma.notice.delete).mockResolvedValue(mockGeneratedNotice);
 
-			await repository.delete("org_123", "NTC_456");
+			await repository.delete(noticeTenant, "NTC_456");
 
 			expect(prisma.notice.delete).toHaveBeenCalledWith({
 				where: { id: "NTC_456" },
@@ -346,7 +373,7 @@ describe("NoticeRepository", () => {
 		it("throws error when deleting a submitted notice", async () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockSubmittedNotice);
 
-			await expect(repository.delete("org_123", "NTC_789")).rejects.toThrow(
+			await expect(repository.delete(noticeTenant, "NTC_789")).rejects.toThrow(
 				"CANNOT_DELETE_NON_DRAFT_NOTICE",
 			);
 		});
@@ -354,7 +381,7 @@ describe("NoticeRepository", () => {
 		it("throws error if notice not found", async () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(null);
 
-			await expect(repository.delete("org_123", "NTC_999")).rejects.toThrow(
+			await expect(repository.delete(noticeTenant, "NTC_999")).rejects.toThrow(
 				"NOTICE_NOT_FOUND",
 			);
 		});
@@ -369,7 +396,7 @@ describe("NoticeRepository", () => {
 			] as unknown as Alert[]);
 
 			const result = await repository.countAlertsForPeriod(
-				"org_123",
+				noticeTenant,
 				new Date("2023-12-17"),
 				new Date("2024-01-16"),
 			);
@@ -383,6 +410,7 @@ describe("NoticeRepository", () => {
 				expect.objectContaining({
 					where: expect.objectContaining({
 						organizationId: "org_123",
+						environment: "production",
 						noticeId: null,
 					}),
 				}),
@@ -393,7 +421,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.alert.findMany).mockResolvedValue([]);
 
 			const result = await repository.countAlertsForPeriod(
-				"org_123",
+				noticeTenant,
 				new Date("2023-12-17"),
 				new Date("2024-01-16"),
 			);
@@ -413,7 +441,7 @@ describe("NoticeRepository", () => {
 			});
 
 			const result = await repository.assignAlertsToNotice(
-				"org_123",
+				noticeTenant,
 				"NTC_123",
 				new Date("2023-12-17"),
 				new Date("2024-01-16"),
@@ -442,11 +470,18 @@ describe("NoticeRepository", () => {
 				alerts as unknown as Alert[],
 			);
 
-			const result = await repository.getAlertsForNotice("org_123", "NTC_123");
+			const result = await repository.getAlertsForNotice(
+				noticeTenant,
+				"NTC_123",
+			);
 
 			expect(result).toHaveLength(2);
 			expect(prisma.alert.findMany).toHaveBeenCalledWith({
-				where: { noticeId: "NTC_123", organizationId: "org_123" },
+				where: {
+					noticeId: "NTC_123",
+					organizationId: "org_123",
+					environment: "production",
+				},
 				include: { alertRule: true, client: true },
 				orderBy: { createdAt: "asc" },
 			});
@@ -498,7 +533,7 @@ describe("NoticeRepository", () => {
 			);
 
 			const result = await repository.getAlertsWithOperationsForNotice(
-				"org_123",
+				noticeTenant,
 				"NTC_123",
 			);
 
@@ -512,7 +547,11 @@ describe("NoticeRepository", () => {
 
 			// Alerts fetched without includes (batch approach)
 			expect(prisma.alert.findMany).toHaveBeenCalledWith({
-				where: { noticeId: "NTC_123", organizationId: "org_123" },
+				where: {
+					noticeId: "NTC_123",
+					organizationId: "org_123",
+					environment: "production",
+				},
 				orderBy: { createdAt: "asc" },
 			});
 
@@ -544,7 +583,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.alertRule.findMany).mockResolvedValue([]);
 
 			const result = await repository.getAlertsWithOperationsForNotice(
-				"org_123",
+				noticeTenant,
 				"NTC_123",
 			);
 
@@ -560,7 +599,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.alert.findMany).mockResolvedValue([]);
 
 			const result = await repository.getAlertsWithOperationsForNotice(
-				"org_123",
+				noticeTenant,
 				"NTC_123",
 			);
 
@@ -578,7 +617,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.update).mockResolvedValue(mockGeneratedNotice);
 			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 5 });
 
-			const result = await repository.markAsGenerated("org_123", "NTC_123", {
+			const result = await repository.markAsGenerated(noticeTenant, "NTC_123", {
 				xmlFileUrl: "https://storage.example.com/notices/ntc_123.xml",
 				fileSize: 12345,
 			});
@@ -599,7 +638,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(null);
 
 			await expect(
-				repository.markAsGenerated("org_123", "NTC_999", {}),
+				repository.markAsGenerated(noticeTenant, "NTC_999", {}),
 			).rejects.toThrow("NOTICE_NOT_FOUND");
 		});
 	});
@@ -611,7 +650,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 5 });
 
 			const result = await repository.markAsSubmitted(
-				"org_123",
+				noticeTenant,
 				"NTC_456",
 				"DOC_submit_123",
 			);
@@ -630,7 +669,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockNotice);
 
 			await expect(
-				repository.markAsSubmitted("org_123", "NTC_123", "DOC_123"),
+				repository.markAsSubmitted(noticeTenant, "NTC_123", "DOC_123"),
 			).rejects.toThrow("NOTICE_MUST_BE_GENERATED_BEFORE_SUBMISSION");
 		});
 
@@ -638,7 +677,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(null);
 
 			await expect(
-				repository.markAsSubmitted("org_123", "NTC_999", "DOC_123"),
+				repository.markAsSubmitted(noticeTenant, "NTC_999", "DOC_123"),
 			).rejects.toThrow("NOTICE_NOT_FOUND");
 		});
 	});
@@ -652,7 +691,7 @@ describe("NoticeRepository", () => {
 			});
 
 			const result = await repository.markAsAcknowledged(
-				"org_123",
+				noticeTenant,
 				"NTC_789",
 				"DOC_ack_456",
 			);
@@ -671,7 +710,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockGeneratedNotice);
 
 			await expect(
-				repository.markAsAcknowledged("org_123", "NTC_456", "DOC_123"),
+				repository.markAsAcknowledged(noticeTenant, "NTC_456", "DOC_123"),
 			).rejects.toThrow("NOTICE_MUST_BE_SUBMITTED_BEFORE_ACKNOWLEDGMENT");
 		});
 
@@ -679,7 +718,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(null);
 
 			await expect(
-				repository.markAsAcknowledged("org_123", "NTC_999", "DOC_123"),
+				repository.markAsAcknowledged(noticeTenant, "NTC_999", "DOC_123"),
 			).rejects.toThrow("NOTICE_NOT_FOUND");
 		});
 	});
@@ -689,7 +728,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.count).mockResolvedValue(1);
 
 			const result = await repository.hasPendingNoticeForPeriod(
-				"org_123",
+				noticeTenant,
 				"202401",
 			);
 
@@ -697,6 +736,7 @@ describe("NoticeRepository", () => {
 			expect(prisma.notice.count).toHaveBeenCalledWith({
 				where: {
 					organizationId: "org_123",
+					environment: "production",
 					reportedMonth: "202401",
 					status: { in: ["DRAFT", "GENERATED"] },
 				},
@@ -707,7 +747,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.count).mockResolvedValue(1);
 
 			const result = await repository.hasPendingNoticeForPeriod(
-				"org_123",
+				noticeTenant,
 				"202401",
 			);
 
@@ -718,7 +758,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.count).mockResolvedValue(0);
 
 			const result = await repository.hasPendingNoticeForPeriod(
-				"org_123",
+				noticeTenant,
 				"202401",
 			);
 
@@ -731,7 +771,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findMany).mockResolvedValue([]);
 
 			const result = await repository.getNoticeStatsForPeriod(
-				"org_123",
+				noticeTenant,
 				"202401",
 			);
 
@@ -748,7 +788,7 @@ describe("NoticeRepository", () => {
 			] as Notice[]);
 
 			const result = await repository.getNoticeStatsForPeriod(
-				"org_123",
+				noticeTenant,
 				"202401",
 			);
 
@@ -765,7 +805,7 @@ describe("NoticeRepository", () => {
 			] as Notice[]);
 
 			const result = await repository.getNoticeStatsForPeriod(
-				"org_123",
+				noticeTenant,
 				"202401",
 			);
 
@@ -782,7 +822,7 @@ describe("NoticeRepository", () => {
 			] as Notice[]);
 
 			const result = await repository.getNoticeStatsForPeriod(
-				"org_123",
+				noticeTenant,
 				"202401",
 			);
 
@@ -799,7 +839,7 @@ describe("NoticeRepository", () => {
 			] as Notice[]);
 
 			const result = await repository.getNoticeStatsForPeriod(
-				"org_123",
+				noticeTenant,
 				"202401",
 			);
 
@@ -817,7 +857,7 @@ describe("NoticeRepository", () => {
 			] as Notice[]);
 
 			const result = await repository.getNoticeStatsForPeriod(
-				"org_123",
+				noticeTenant,
 				"202401",
 			);
 
@@ -835,7 +875,7 @@ describe("NoticeRepository", () => {
 			] as Notice[]);
 
 			const result = await repository.getNoticeStatsForPeriod(
-				"org_123",
+				noticeTenant,
 				"202401",
 			);
 
@@ -854,7 +894,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.update).mockResolvedValue(mockNotice);
 
 			const result = await repository.addAlertsToNotice(
-				"org_123",
+				noticeTenant,
 				"NTC_123",
 				["ALT_1", "ALT_2", "ALT_3"],
 				"user_123",
@@ -873,9 +913,11 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.findFirst).mockResolvedValue(mockNotice);
 			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 0 });
 
-			const result = await repository.addAlertsToNotice("org_123", "NTC_123", [
-				"ALT_already_assigned",
-			]);
+			const result = await repository.addAlertsToNotice(
+				noticeTenant,
+				"NTC_123",
+				["ALT_already_assigned"],
+			);
 
 			expect(result).toBe(0);
 			expect(prisma.notice.update).not.toHaveBeenCalled();
@@ -888,7 +930,7 @@ describe("NoticeRepository", () => {
 			});
 
 			await expect(
-				repository.addAlertsToNotice("org_123", "NTC_123", ["ALT_1"]),
+				repository.addAlertsToNotice(noticeTenant, "NTC_123", ["ALT_1"]),
 			).rejects.toThrow("NOTICE_MUST_BE_DRAFT_TO_MODIFY_ALERTS");
 		});
 	});
@@ -900,7 +942,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.update).mockResolvedValue(mockNotice);
 
 			const result = await repository.removeAlertsFromNotice(
-				"org_123",
+				noticeTenant,
 				"NTC_123",
 				["ALT_1", "ALT_2"],
 				"user_123",
@@ -920,7 +962,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.alert.updateMany).mockResolvedValue({ count: 0 });
 
 			const result = await repository.removeAlertsFromNotice(
-				"org_123",
+				noticeTenant,
 				"NTC_123",
 				["ALT_not_found"],
 			);
@@ -936,7 +978,7 @@ describe("NoticeRepository", () => {
 			});
 
 			await expect(
-				repository.removeAlertsFromNotice("org_123", "NTC_123", ["ALT_1"]),
+				repository.removeAlertsFromNotice(noticeTenant, "NTC_123", ["ALT_1"]),
 			).rejects.toThrow("NOTICE_MUST_BE_DRAFT_TO_MODIFY_ALERTS");
 		});
 	});
@@ -976,7 +1018,7 @@ describe("NoticeRepository", () => {
 			] as unknown as Alert[]);
 
 			const result = await repository.getAlertsForPeriodDetailed(
-				"org_123",
+				noticeTenant,
 				new Date("2024-01-01"),
 				new Date("2024-01-31"),
 			);
@@ -999,7 +1041,7 @@ describe("NoticeRepository", () => {
 			] as unknown as Alert[]);
 
 			const result = await repository.getAlertsForPeriodDetailed(
-				"org_123",
+				noticeTenant,
 				new Date("2024-01-01"),
 				new Date("2024-01-31"),
 			);
@@ -1022,7 +1064,7 @@ describe("NoticeRepository", () => {
 			] as unknown as Alert[]);
 
 			const result = await repository.getAlertsForPeriodDetailed(
-				"org_123",
+				noticeTenant,
 				new Date("2024-01-01"),
 				new Date("2024-01-31"),
 			);
@@ -1045,7 +1087,7 @@ describe("NoticeRepository", () => {
 			] as unknown as Alert[]);
 
 			const result = await repository.getAlertsForPeriodDetailed(
-				"org_123",
+				noticeTenant,
 				new Date("2024-01-01"),
 				new Date("2024-01-31"),
 			);
@@ -1068,7 +1110,7 @@ describe("NoticeRepository", () => {
 			] as unknown as Alert[]);
 
 			const result = await repository.getAlertsForPeriodDetailed(
-				"org_123",
+				noticeTenant,
 				new Date("2024-01-01"),
 				new Date("2024-01-31"),
 			);
@@ -1083,7 +1125,7 @@ describe("NoticeRepository", () => {
 			vi.mocked(prisma.notice.update).mockResolvedValue(mockNotice);
 
 			const result = await repository.assignSpecificAlertsToNotice(
-				"org_123",
+				noticeTenant,
 				"NTC_123",
 				["ALT_1", "ALT_2", "ALT_3", "ALT_4", "ALT_5"],
 			);
@@ -1124,12 +1166,19 @@ describe("NoticeRepository", () => {
 					: Awaited<ReturnType<typeof prisma.noticeEvent.findMany>>,
 			);
 
-			const result = await repository.getEventsForNotice("org_123", "NTC_123");
+			const result = await repository.getEventsForNotice(
+				noticeTenant,
+				"NTC_123",
+			);
 
 			expect(result).toHaveLength(1);
 			expect(result[0].noticeId).toBe("NTC_123");
 			expect(prisma.noticeEvent.findMany).toHaveBeenCalledWith({
-				where: { noticeId: "NTC_123", organizationId: "org_123" },
+				where: {
+					noticeId: "NTC_123",
+					organizationId: "org_123",
+					environment: "production",
+				},
 				orderBy: { createdAt: "asc" },
 			});
 		});
@@ -1137,7 +1186,10 @@ describe("NoticeRepository", () => {
 		it("returns empty array when no events exist", async () => {
 			vi.mocked(prisma.noticeEvent.findMany).mockResolvedValue([]);
 
-			const result = await repository.getEventsForNotice("org_123", "NTC_999");
+			const result = await repository.getEventsForNotice(
+				noticeTenant,
+				"NTC_999",
+			);
 
 			expect(result).toEqual([]);
 		});

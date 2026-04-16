@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
+import type { TenantContext } from "../../lib/tenant-context";
 import {
 	mapAlertCreateInputToPrisma,
 	mapAlertPatchInputToPrisma,
@@ -273,9 +274,10 @@ export class AlertRepository {
 	constructor(private readonly prisma: PrismaClient) {}
 
 	async list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: AlertFilters,
 	): Promise<ListResult<AlertEntity>> {
+		const { organizationId, environment } = tenant;
 		const {
 			page,
 			limit,
@@ -291,6 +293,7 @@ export class AlertRepository {
 
 		const where: Prisma.AlertWhereInput = {
 			organizationId,
+			environment,
 		};
 
 		if (alertRuleId) {
@@ -327,7 +330,7 @@ export class AlertRepository {
 
 		// Update overdue status for alerts that have passed their deadline
 		// This ensures we always have current overdue status
-		await this.updateOverdueStatus(organizationId);
+		await this.updateOverdueStatus(tenant);
 
 		const [total, records] = await Promise.all([
 			this.prisma.alert.count({ where }),
@@ -368,11 +371,13 @@ export class AlertRepository {
 	 * Update overdue status for alerts that have passed their submission deadline
 	 * This should be called periodically or before listing alerts
 	 */
-	private async updateOverdueStatus(organizationId: string): Promise<void> {
+	private async updateOverdueStatus(tenant: TenantContext): Promise<void> {
+		const { organizationId, environment } = tenant;
 		const now = new Date();
 		await this.prisma.alert.updateMany({
 			where: {
 				organizationId,
+				environment,
 				submissionDeadline: { lte: now },
 				status: { notIn: ["SUBMITTED", "CANCELLED", "OVERDUE"] },
 				isOverdue: false,
@@ -385,11 +390,12 @@ export class AlertRepository {
 	}
 
 	async getById(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 	): Promise<AlertEntity | null> {
+		const { organizationId, environment } = tenant;
 		const record = await this.prisma.alert.findFirst({
-			where: { id, organizationId },
+			where: { id, organizationId, environment },
 			include: {
 				alertRule: true,
 			},
@@ -403,8 +409,9 @@ export class AlertRepository {
 
 	async create(
 		input: AlertCreateInput,
-		organizationId: string,
+		tenant: TenantContext,
 	): Promise<AlertEntity> {
+		const { organizationId, environment } = tenant;
 		// Check if alert with same idempotency key already exists
 		const existing = await this.prisma.alert.findUnique({
 			where: { idempotencyKey: input.idempotencyKey },
@@ -445,7 +452,7 @@ export class AlertRepository {
 		}
 
 		const created = await this.prisma.alert.create({
-			data: prismaData,
+			data: { ...prismaData, environment },
 			include: {
 				alertRule: true,
 			},
@@ -458,11 +465,11 @@ export class AlertRepository {
 	}
 
 	async update(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: AlertUpdateInput,
 	): Promise<AlertEntity> {
-		await this.ensureExists(organizationId, id);
+		await this.ensureExists(tenant, id);
 
 		// Get current alert to check submissionDeadline
 		const current = await this.prisma.alert.findUnique({
@@ -510,11 +517,11 @@ export class AlertRepository {
 	}
 
 	async patch(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: AlertPatchInput,
 	): Promise<AlertEntity> {
-		await this.ensureExists(organizationId, id);
+		await this.ensureExists(tenant, id);
 
 		// Get current alert to check submissionDeadline
 		const current = await this.prisma.alert.findUnique({
@@ -565,17 +572,19 @@ export class AlertRepository {
 		};
 	}
 
-	async delete(organizationId: string, id: string): Promise<void> {
-		await this.ensureExists(organizationId, id);
+	async delete(tenant: TenantContext, id: string): Promise<void> {
+		await this.ensureExists(tenant, id);
+
 		await this.prisma.alert.delete({ where: { id } });
 	}
 
 	async findByIdempotencyKey(
-		organizationId: string,
+		tenant: TenantContext,
 		idempotencyKey: string,
 	): Promise<AlertEntity | null> {
+		const { organizationId, environment } = tenant;
 		const record = await this.prisma.alert.findFirst({
-			where: { idempotencyKey, organizationId },
+			where: { idempotencyKey, organizationId, environment },
 			include: {
 				alertRule: true,
 			},
@@ -587,12 +596,10 @@ export class AlertRepository {
 		};
 	}
 
-	private async ensureExists(
-		organizationId: string,
-		id: string,
-	): Promise<void> {
+	private async ensureExists(tenant: TenantContext, id: string): Promise<void> {
+		const { organizationId, environment } = tenant;
 		const exists = await this.prisma.alert.findFirst({
-			where: { id, organizationId },
+			where: { id, organizationId, environment },
 			select: { id: true },
 		});
 

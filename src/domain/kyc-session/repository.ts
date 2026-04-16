@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { generateId } from "../../lib/id-generator";
+import type { TenantContext } from "../../lib/tenant-context";
 import type {
 	KycSessionEntity,
 	KycSessionEventEntity,
@@ -12,7 +13,6 @@ import type {
 import { mapPrismaKycSession, mapPrismaKycSessionEvent } from "./mappers";
 
 export interface KycSessionCreateData {
-	organizationId: string;
 	clientId: string;
 	token: string;
 	createdBy: string;
@@ -35,11 +35,16 @@ export interface KycSessionEventCreateData {
 export class KycSessionRepository {
 	constructor(private readonly prisma: PrismaClient) {}
 
-	async create(data: KycSessionCreateData): Promise<KycSessionEntity> {
+	async create(
+		tenant: TenantContext,
+		data: KycSessionCreateData,
+	): Promise<KycSessionEntity> {
+		const { organizationId, environment } = tenant;
 		const record = await this.prisma.kycSession.create({
 			data: {
 				id: generateId("KYC_SESSION"),
-				organizationId: data.organizationId,
+				organizationId,
+				environment,
 				clientId: data.clientId,
 				token: data.token,
 				createdBy: data.createdBy,
@@ -67,17 +72,21 @@ export class KycSessionRepository {
 		return record ? mapPrismaKycSession(record) : null;
 	}
 
-	async list(filters: {
-		organizationId: string;
-		clientId?: string;
-		status?: KycSessionStatus;
-		page?: number;
-		limit?: number;
-	}): Promise<{ data: KycSessionEntity[]; total: number }> {
-		const { organizationId, clientId, status, page = 1, limit = 20 } = filters;
+	async list(
+		tenant: TenantContext,
+		filters: {
+			clientId?: string;
+			status?: KycSessionStatus;
+			page?: number;
+			limit?: number;
+		},
+	): Promise<{ data: KycSessionEntity[]; total: number }> {
+		const { organizationId, environment } = tenant;
+		const { clientId, status, page = 1, limit = 20 } = filters;
 
 		const where = {
 			organizationId,
+			environment,
 			...(clientId && { clientId }),
 			...(status && { status }),
 		};

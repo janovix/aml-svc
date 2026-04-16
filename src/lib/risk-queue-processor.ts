@@ -14,6 +14,7 @@ import {
 	loadRiskLookups,
 } from "../domain/risk";
 import { sendRiskNotification } from "./risk-notifications";
+import { productionTenant } from "./tenant-context";
 
 export async function processRiskJob(
 	env: Bindings,
@@ -36,7 +37,7 @@ export async function processRiskJob(
 
 			const { result, previousLevel } = await service.assessClient(
 				job.clientId,
-				job.organizationId,
+				productionTenant(job.organizationId),
 				lookups,
 				job.triggerReason,
 			);
@@ -69,7 +70,7 @@ export async function processRiskJob(
 				try {
 					const { result } = await service.assessClient(
 						client.id,
-						job.organizationId,
+						productionTenant(job.organizationId),
 						lookups,
 						job.triggerReason,
 					);
@@ -111,7 +112,7 @@ export async function processRiskJob(
 				previousLevel: prevOrgLevel,
 				previousAuditType,
 			} = await orgService.assessOrganization(
-				job.organizationId,
+				productionTenant(job.organizationId),
 				job.triggerReason,
 			);
 

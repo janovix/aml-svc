@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { env } from "cloudflare:test";
 
 import { ImportRepository } from "./repository";
+import { productionTenant } from "../../lib/tenant-context";
 import type {
 	ImportCreateInput,
 	ImportFilters,
@@ -17,6 +18,9 @@ describe("ImportRepository", () => {
 	let repository: ImportRepository;
 	const organizationId = "org_test123";
 	const createdBy = "user_test123";
+	const tenant = productionTenant(organizationId);
+	const otherTenant = productionTenant("other_org");
+	const emptyTenant = productionTenant("empty_org");
 
 	beforeEach(async () => {
 		const adapter = new PrismaD1(env.DB);
@@ -37,7 +41,7 @@ describe("ImportRepository", () => {
 			};
 
 			const result = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				input,
 				"https://example.com/file.csv",
@@ -63,7 +67,7 @@ describe("ImportRepository", () => {
 			};
 
 			const result = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				input,
 				"https://example.com/operations.xlsx",
@@ -77,7 +81,7 @@ describe("ImportRepository", () => {
 		beforeEach(async () => {
 			// Create test data
 			await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -87,7 +91,7 @@ describe("ImportRepository", () => {
 				"https://example.com/file1.csv",
 			);
 			await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "OPERATION",
@@ -97,7 +101,7 @@ describe("ImportRepository", () => {
 				"https://example.com/file2.csv",
 			);
 			await repository.create(
-				"other_org",
+				otherTenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -114,7 +118,7 @@ describe("ImportRepository", () => {
 				limit: 10,
 			};
 
-			const result = await repository.list(organizationId, filters);
+			const result = await repository.list(tenant, filters);
 
 			expect(result.data).toHaveLength(2);
 			expect(result.pagination).toEqual({
@@ -132,14 +136,14 @@ describe("ImportRepository", () => {
 				entityType: ["CLIENT"],
 			};
 
-			const result = await repository.list(organizationId, filters);
+			const result = await repository.list(tenant, filters);
 
 			expect(result.data).toHaveLength(1);
 			expect(result.data[0].entityType).toBe("CLIENT");
 		});
 
 		it("should filter by status", async () => {
-			const imports = await repository.list(organizationId, {
+			const imports = await repository.list(tenant, {
 				page: 1,
 				limit: 10,
 			});
@@ -153,7 +157,7 @@ describe("ImportRepository", () => {
 				status: ["COMPLETED"],
 			};
 
-			const result = await repository.list(organizationId, filters);
+			const result = await repository.list(tenant, filters);
 
 			expect(result.data).toHaveLength(1);
 			expect(result.data[0].status).toBe("COMPLETED");
@@ -165,7 +169,7 @@ describe("ImportRepository", () => {
 				limit: 1,
 			};
 
-			const result = await repository.list(organizationId, filters);
+			const result = await repository.list(tenant, filters);
 
 			expect(result.data).toHaveLength(1);
 			expect(result.pagination.totalPages).toBe(2);
@@ -177,7 +181,7 @@ describe("ImportRepository", () => {
 				limit: 10,
 			};
 
-			const result = await repository.list("empty_org", filters);
+			const result = await repository.list(emptyTenant, filters);
 
 			expect(result.data).toHaveLength(0);
 			expect(result.pagination.total).toBe(0);
@@ -187,7 +191,7 @@ describe("ImportRepository", () => {
 	describe("getById", () => {
 		it("should get import by ID", async () => {
 			const created = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -197,7 +201,7 @@ describe("ImportRepository", () => {
 				"https://example.com/test.csv",
 			);
 
-			const result = await repository.getById(organizationId, created.id);
+			const result = await repository.getById(tenant, created.id);
 
 			expect(result).toMatchObject({
 				id: created.id,
@@ -206,14 +210,14 @@ describe("ImportRepository", () => {
 		});
 
 		it("should return null for non-existent import", async () => {
-			const result = await repository.getById(organizationId, "non_existent");
+			const result = await repository.getById(tenant, "non_existent");
 
 			expect(result).toBeNull();
 		});
 
 		it("should return null for import from different organization", async () => {
 			const created = await repository.create(
-				"other_org",
+				otherTenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -223,7 +227,7 @@ describe("ImportRepository", () => {
 				"https://example.com/test.csv",
 			);
 
-			const result = await repository.getById(organizationId, created.id);
+			const result = await repository.getById(tenant, created.id);
 
 			expect(result).toBeNull();
 		});
@@ -232,7 +236,7 @@ describe("ImportRepository", () => {
 	describe("updateStatus", () => {
 		it("should update import status", async () => {
 			const created = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -254,7 +258,7 @@ describe("ImportRepository", () => {
 
 		it("should update counts", async () => {
 			const created = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -286,7 +290,7 @@ describe("ImportRepository", () => {
 
 		it("should set startedAt when status changes to VALIDATING", async () => {
 			const created = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -305,7 +309,7 @@ describe("ImportRepository", () => {
 
 		it("should set startedAt when status changes to PROCESSING", async () => {
 			const created = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -324,7 +328,7 @@ describe("ImportRepository", () => {
 
 		it("should set completedAt when status changes to COMPLETED", async () => {
 			const created = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -343,7 +347,7 @@ describe("ImportRepository", () => {
 
 		it("should set completedAt when status changes to FAILED", async () => {
 			const created = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -366,7 +370,7 @@ describe("ImportRepository", () => {
 	describe("incrementCounts", () => {
 		it("should increment counts atomically", async () => {
 			const created = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -386,7 +390,7 @@ describe("ImportRepository", () => {
 				warningCount: 1,
 			});
 
-			const result = await repository.getById(organizationId, created.id);
+			const result = await repository.getById(tenant, created.id);
 
 			expect(result).toMatchObject({
 				processedRows: 2,
@@ -400,7 +404,7 @@ describe("ImportRepository", () => {
 	describe("createRowResults", () => {
 		it("should create multiple row results in bulk", async () => {
 			const importRecord = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -434,7 +438,7 @@ describe("ImportRepository", () => {
 	describe("updateRowResult", () => {
 		it("should update a row result", async () => {
 			const importRecord = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -464,7 +468,7 @@ describe("ImportRepository", () => {
 
 		it("should handle errors array", async () => {
 			const importRecord = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -491,7 +495,7 @@ describe("ImportRepository", () => {
 
 		it("should return null for non-existent row", async () => {
 			const importRecord = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -512,7 +516,7 @@ describe("ImportRepository", () => {
 	describe("listRowResults", () => {
 		it("should list row results with pagination", async () => {
 			const importRecord = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -548,7 +552,7 @@ describe("ImportRepository", () => {
 
 		it("should filter by status", async () => {
 			const importRecord = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -585,7 +589,7 @@ describe("ImportRepository", () => {
 	describe("getWithResults", () => {
 		it("should get import with row results", async () => {
 			const importRecord = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -602,10 +606,7 @@ describe("ImportRepository", () => {
 				],
 			});
 
-			const result = await repository.getWithResults(
-				organizationId,
-				importRecord.id,
-			);
+			const result = await repository.getWithResults(tenant, importRecord.id);
 
 			expect(result).toBeTruthy();
 			expect(result?.id).toBe(importRecord.id);
@@ -613,17 +614,14 @@ describe("ImportRepository", () => {
 		});
 
 		it("should return null for non-existent import", async () => {
-			const result = await repository.getWithResults(
-				organizationId,
-				"non_existent",
-			);
+			const result = await repository.getWithResults(tenant, "non_existent");
 
 			expect(result).toBeNull();
 		});
 
 		it("should filter row results by status", async () => {
 			const importRecord = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -644,11 +642,11 @@ describe("ImportRepository", () => {
 				status: "SUCCESS",
 			});
 
-			const result = await repository.getWithResults(
-				organizationId,
-				importRecord.id,
-				{ page: 1, limit: 10, status: "SUCCESS" },
-			);
+			const result = await repository.getWithResults(tenant, importRecord.id, {
+				page: 1,
+				limit: 10,
+				status: "SUCCESS",
+			});
 
 			expect(result?.rowResults).toHaveLength(1);
 			expect(result?.rowResults[0].status).toBe("SUCCESS");
@@ -658,7 +656,7 @@ describe("ImportRepository", () => {
 	describe("getRecentRowUpdates", () => {
 		it("should get row updates since a specific time", async () => {
 			const importRecord = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -693,7 +691,7 @@ describe("ImportRepository", () => {
 	describe("delete", () => {
 		it("should delete an import", async () => {
 			const created = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -703,15 +701,15 @@ describe("ImportRepository", () => {
 				"https://example.com/test.csv",
 			);
 
-			await repository.delete(organizationId, created.id);
+			await repository.delete(tenant, created.id);
 
-			const result = await repository.getById(organizationId, created.id);
+			const result = await repository.getById(tenant, created.id);
 			expect(result).toBeNull();
 		});
 
 		it("should delete import with row results (cascade)", async () => {
 			const importRecord = await repository.create(
-				organizationId,
+				tenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -725,9 +723,9 @@ describe("ImportRepository", () => {
 				rows: [{ rowNumber: 1, rawData: JSON.stringify({}) }],
 			});
 
-			await repository.delete(organizationId, importRecord.id);
+			await repository.delete(tenant, importRecord.id);
 
-			const result = await repository.getById(organizationId, importRecord.id);
+			const result = await repository.getById(tenant, importRecord.id);
 			expect(result).toBeNull();
 
 			const rows = await repository.listRowResults(importRecord.id, {
@@ -738,14 +736,14 @@ describe("ImportRepository", () => {
 		});
 
 		it("should throw error when deleting non-existent import", async () => {
-			await expect(
-				repository.delete(organizationId, "non_existent"),
-			).rejects.toThrow("IMPORT_NOT_FOUND");
+			await expect(repository.delete(tenant, "non_existent")).rejects.toThrow(
+				"IMPORT_NOT_FOUND",
+			);
 		});
 
 		it("should throw error when deleting import from different organization", async () => {
 			const created = await repository.create(
-				"other_org",
+				otherTenant,
 				createdBy,
 				{
 					entityType: "CLIENT",
@@ -755,9 +753,9 @@ describe("ImportRepository", () => {
 				"https://example.com/test.csv",
 			);
 
-			await expect(
-				repository.delete(organizationId, created.id),
-			).rejects.toThrow("IMPORT_NOT_FOUND");
+			await expect(repository.delete(tenant, created.id)).rejects.toThrow(
+				"IMPORT_NOT_FOUND",
+			);
 		});
 	});
 });

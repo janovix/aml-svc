@@ -10,6 +10,7 @@ import type {
 	OperationCreateInput,
 	OperationUpdateInput,
 } from "./schemas";
+import type { TenantContext } from "../../lib/tenant-context";
 
 export class DuplicateOperationError extends Error {
 	constructor(importHash: string) {
@@ -33,30 +34,29 @@ const UMA_THRESHOLDS: Record<
 	ActivityCode,
 	{ identification: number | "ALWAYS"; notice: number | "ALWAYS" }
 > = {
-	JYS: { identification: 325, notice: 645 }, // Fracción I - Gambling
-	TSC: { identification: 805, notice: 1285 }, // Fracción II-a - Cards
-	TPP: { identification: 645, notice: 645 }, // Fracción II-b,c - Prepaid
-	TDR: { identification: 645, notice: 645 }, // Fracción II-c - Rewards
-	CHV: { identification: "ALWAYS", notice: 645 }, // Fracción III - Traveler checks
-	MPC: { identification: "ALWAYS", notice: 1605 }, // Fracción IV - Loans
-	INM: { identification: "ALWAYS", notice: 8025 }, // Fracción V - Real estate
-	DIN: { identification: "ALWAYS", notice: 8025 }, // Fracción V Bis - Development
-	MJR: { identification: 805, notice: 1605 }, // Fracción VI - Jewelry
-	OBA: { identification: 2410, notice: 4815 }, // Fracción VII - Art
-	VEH: { identification: 3210, notice: 6420 }, // Fracción VIII - Vehicles
-	BLI: { identification: 2410, notice: 4815 }, // Fracción IX - Armoring
-	TCV: { identification: "ALWAYS", notice: 3210 }, // Fracción X - Custody
-	SPR: { identification: "ALWAYS", notice: "ALWAYS" }, // Fracción XI - Professional
-	FEP: { identification: "ALWAYS", notice: 8000 }, // Fracción XII-A - Notaries
-	FES: { identification: "ALWAYS", notice: "ALWAYS" }, // Fracción XII-B - Brokers
-	DON: { identification: 1605, notice: 3210 }, // Fracción XIII - Donations
-	ARI: { identification: 1605, notice: 3210 }, // Fracción XV - Rental
-	AVI: { identification: "ALWAYS", notice: 210 }, // Fracción XVI - Virtual assets
+	JYS: { identification: 325, notice: 645 },
+	TSC: { identification: 805, notice: 1285 },
+	TPP: { identification: 645, notice: 645 },
+	TDR: { identification: 645, notice: 645 },
+	CHV: { identification: "ALWAYS", notice: 645 },
+	MPC: { identification: "ALWAYS", notice: 1605 },
+	INM: { identification: "ALWAYS", notice: 8025 },
+	DIN: { identification: "ALWAYS", notice: 8025 },
+	MJR: { identification: 805, notice: 1605 },
+	OBA: { identification: 2410, notice: 4815 },
+	VEH: { identification: 3210, notice: 6420 },
+	BLI: { identification: 2410, notice: 4815 },
+	TCV: { identification: "ALWAYS", notice: 3210 },
+	SPR: { identification: "ALWAYS", notice: "ALWAYS" },
+	FEP: { identification: "ALWAYS", notice: 8000 },
+	FES: { identification: "ALWAYS", notice: "ALWAYS" },
+	DON: { identification: 1605, notice: 3210 },
+	ARI: { identification: 1605, notice: 3210 },
+	AVI: { identification: "ALWAYS", notice: 210 },
 };
 
-// Current UMA value (updated Feb 1, 2026)
 const CURRENT_UMA = 117.31;
-const CURRENT_UMA_DAILY = CURRENT_UMA; // Same for daily value
+const CURRENT_UMA_DAILY = CURRENT_UMA;
 
 export class OperationService {
 	private repository: OperationRepository;
@@ -66,12 +66,12 @@ export class OperationService {
 	}
 
 	async create(
-		organizationId: string,
+		tenant: TenantContext,
 		input: OperationCreateInput,
 	): Promise<OperationEntity> {
 		if (input.importHash) {
 			const exists = await this.repository.existsByImportHash(
-				organizationId,
+				tenant,
 				input.importHash,
 			);
 			if (exists) {
@@ -84,31 +84,27 @@ export class OperationService {
 			umaDailyValue: CURRENT_UMA_DAILY,
 		};
 
-		const operation = await this.repository.create(
-			organizationId,
-			input,
-			umaInfo,
-		);
+		const operation = await this.repository.create(tenant, input, umaInfo);
 
 		return operation;
 	}
 
 	async getById(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 	): Promise<OperationEntity | null> {
-		return this.repository.findById(organizationId, id);
+		return this.repository.findById(tenant, id);
 	}
 
 	async list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: OperationFilters,
 	): Promise<ListResultWithMeta<OperationEntity>> {
-		return this.repository.list(organizationId, filters);
+		return this.repository.list(tenant, filters);
 	}
 
 	async update(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: OperationUpdateInput,
 	): Promise<OperationEntity | null> {
@@ -117,64 +113,47 @@ export class OperationService {
 			umaDailyValue: CURRENT_UMA_DAILY,
 		};
 
-		return this.repository.update(organizationId, id, input, umaInfo);
+		return this.repository.update(tenant, id, input, umaInfo);
 	}
 
-	async delete(organizationId: string, id: string): Promise<boolean> {
-		return this.repository.softDelete(organizationId, id);
+	async delete(tenant: TenantContext, id: string): Promise<boolean> {
+		return this.repository.softDelete(tenant, id);
 	}
 
-	async getStats(organizationId: string): Promise<{
+	async getStats(tenant: TenantContext): Promise<{
 		totalOperations: number;
 		operationsToday: number;
 		totalAmountMxn: string;
 	}> {
-		return this.repository.getStats(organizationId);
+		return this.repository.getStats(tenant);
 	}
 
 	async getByClientId(
-		organizationId: string,
+		tenant: TenantContext,
 		clientId: string,
 		options?: { activityCode?: ActivityCode; startDate?: Date; endDate?: Date },
 	): Promise<OperationEntity[]> {
-		return this.repository.findByClientId(organizationId, clientId, options);
+		return this.repository.findByClientId(tenant, clientId, options);
 	}
 
-	/**
-	 * Gets the notice UMA threshold for a specific activity.
-	 * Returns 0 for "ALWAYS" activities.
-	 */
 	getNoticeThresholdUma(activityCode: ActivityCode): number {
 		const t = UMA_THRESHOLDS[activityCode].notice;
 		return t === "ALWAYS" ? 0 : t;
 	}
 
-	/**
-	 * Gets the identification UMA threshold for a specific activity.
-	 * Returns 0 for "ALWAYS" activities.
-	 */
 	getIdentificationThresholdUma(activityCode: ActivityCode): number {
 		const t = UMA_THRESHOLDS[activityCode].identification;
 		return t === "ALWAYS" ? 0 : t;
 	}
 
-	/**
-	 * Gets the notice monetary threshold in MXN for a specific activity
-	 */
 	getNoticeThresholdMxn(activityCode: ActivityCode): number {
 		return this.getNoticeThresholdUma(activityCode) * CURRENT_UMA;
 	}
 
-	/**
-	 * Gets the identification monetary threshold in MXN for a specific activity
-	 */
 	getIdentificationThresholdMxn(activityCode: ActivityCode): number {
 		return this.getIdentificationThresholdUma(activityCode) * CURRENT_UMA;
 	}
 
-	/**
-	 * Checks if an amount exceeds the notice threshold for a given activity
-	 */
 	exceedsNoticeThreshold(
 		activityCode: ActivityCode,
 		amountMxn: number,
@@ -183,9 +162,6 @@ export class OperationService {
 		return amountMxn >= threshold;
 	}
 
-	/**
-	 * Checks if an amount exceeds the identification threshold for a given activity
-	 */
 	exceedsIdentificationThreshold(
 		activityCode: ActivityCode,
 		amountMxn: number,
@@ -194,33 +170,23 @@ export class OperationService {
 		return amountMxn >= threshold;
 	}
 
-	/**
-	 * @deprecated Use getNoticeThresholdUma() instead
-	 */
+	/** @deprecated Use getNoticeThresholdUma() instead */
 	getUmaThreshold(activityCode: ActivityCode): number {
 		return this.getNoticeThresholdUma(activityCode);
 	}
 
-	/**
-	 * @deprecated Use getNoticeThresholdMxn() instead
-	 */
+	/** @deprecated Use getNoticeThresholdMxn() instead */
 	getThresholdMxn(activityCode: ActivityCode): number {
 		return this.getNoticeThresholdMxn(activityCode);
 	}
 
-	/**
-	 * @deprecated Use exceedsNoticeThreshold() instead
-	 */
+	/** @deprecated Use exceedsNoticeThreshold() instead */
 	exceedsThreshold(activityCode: ActivityCode, amountMxn: number): boolean {
 		return this.exceedsNoticeThreshold(activityCode, amountMxn);
 	}
 
-	/**
-	 * Calculates accumulated amount for a client within a period
-	 * Used for detecting threshold breaches over accumulated operations
-	 */
 	async calculateAccumulatedAmount(
-		organizationId: string,
+		tenant: TenantContext,
 		clientId: string,
 		activityCode: ActivityCode,
 		startDate: Date,
@@ -230,15 +196,11 @@ export class OperationService {
 		operationCount: number;
 		exceedsThreshold: boolean;
 	}> {
-		const operations = await this.repository.findByClientId(
-			organizationId,
-			clientId,
-			{
-				activityCode,
-				startDate,
-				endDate,
-			},
-		);
+		const operations = await this.repository.findByClientId(tenant, clientId, {
+			activityCode,
+			startDate,
+			endDate,
+		});
 
 		let totalMxn = 0;
 		for (const op of operations) {
@@ -255,16 +217,10 @@ export class OperationService {
 		};
 	}
 
-	/**
-	 * Gets the current UMA value
-	 */
 	getCurrentUmaValue(): number {
 		return CURRENT_UMA;
 	}
 
-	/**
-	 * Gets all UMA thresholds (both identification and notice)
-	 */
 	getAllThresholds(): Record<
 		ActivityCode,
 		{

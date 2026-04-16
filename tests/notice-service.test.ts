@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { productionTenant } from "../src/lib/tenant-context";
 import { NoticeService } from "../src/domain/notice/service";
 import { calculateNoticePeriod } from "../src/domain/notice/types";
 import { NoticeRepository } from "../src/domain/notice/repository";
@@ -39,6 +40,7 @@ describe("NoticeService", () => {
 	} as unknown as NoticeRepository;
 
 	const organizationId = "org-123";
+	const orgTenant = productionTenant(organizationId);
 	const userId = "user-456";
 
 	beforeEach(() => {
@@ -131,11 +133,11 @@ describe("NoticeService", () => {
 			vi.mocked(mockRepository.assignAlertsToNotice).mockResolvedValue(5);
 
 			const service = new NoticeService(mockRepository);
-			const result = await service.create(createInput, organizationId, userId);
+			const result = await service.create(createInput, orgTenant, userId);
 
 			expect(result).toEqual({ ...mockNotice, recordCount: 5 });
 			expect(mockRepository.hasPendingNoticeForPeriod).toHaveBeenCalledWith(
-				organizationId,
+				orgTenant,
 				"202401", // calculated from year/month
 			);
 			expect(mockRepository.create).toHaveBeenCalled();
@@ -150,7 +152,7 @@ describe("NoticeService", () => {
 			const service = new NoticeService(mockRepository);
 
 			await expect(
-				service.create(createInput, organizationId, userId),
+				service.create(createInput, orgTenant, userId),
 			).rejects.toThrow("NOTICE_ALREADY_EXISTS_FOR_PERIOD");
 		});
 
@@ -163,7 +165,7 @@ describe("NoticeService", () => {
 			vi.mocked(mockRepository.assignAlertsToNotice).mockResolvedValue(3);
 
 			const service = new NoticeService(mockRepository);
-			const result = await service.create(createInput, organizationId, userId);
+			const result = await service.create(createInput, orgTenant, userId);
 
 			expect(result.recordCount).toBe(3);
 			expect(mockRepository.hasPendingNoticeForPeriod).toHaveBeenCalled();
@@ -201,14 +203,14 @@ describe("NoticeService", () => {
 			});
 
 			const service = new NoticeService(mockRepository);
-			const result = await service.markAsGenerated(organizationId, noticeId, {
+			const result = await service.markAsGenerated(orgTenant, noticeId, {
 				xmlFileUrl: "https://example.com/file.xml",
 				fileSize: 1024,
 			});
 
 			expect(result.status).toBe("GENERATED");
 			expect(mockRepository.markAsGenerated).toHaveBeenCalledWith(
-				organizationId,
+				orgTenant,
 				noticeId,
 				{
 					xmlFileUrl: "https://example.com/file.xml",
@@ -251,14 +253,14 @@ describe("NoticeService", () => {
 
 			const service = new NoticeService(mockRepository);
 			const result = await service.markAsSubmitted(
-				organizationId,
+				orgTenant,
 				noticeId,
 				"DOC_submit_123",
 			);
 
 			expect(result.status).toBe("SUBMITTED");
 			expect(mockRepository.markAsSubmitted).toHaveBeenCalledWith(
-				organizationId,
+				orgTenant,
 				noticeId,
 				"DOC_submit_123",
 				undefined,
@@ -274,13 +276,10 @@ describe("NoticeService", () => {
 
 			const service = new NoticeService(mockRepository);
 			await expect(
-				service.delete(organizationId, noticeId),
+				service.delete(orgTenant, noticeId),
 			).resolves.toBeUndefined();
 
-			expect(mockRepository.delete).toHaveBeenCalledWith(
-				organizationId,
-				noticeId,
-			);
+			expect(mockRepository.delete).toHaveBeenCalledWith(orgTenant, noticeId);
 		});
 	});
 
@@ -321,11 +320,11 @@ describe("NoticeService", () => {
 			);
 
 			const service = new NoticeService(mockRepository);
-			const result = await service.getWithSummary(organizationId, noticeId);
+			const result = await service.getWithSummary(orgTenant, noticeId);
 
 			expect(result.alertSummary.total).toBe(5);
 			expect(mockRepository.getWithAlertSummary).toHaveBeenCalledWith(
-				organizationId,
+				orgTenant,
 				noticeId,
 			);
 		});

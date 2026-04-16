@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { productionTenant } from "../../lib/tenant-context";
 import { InvoiceService } from "./service";
 import { InvoiceRepository } from "./repository";
 
@@ -13,6 +14,7 @@ describe("InvoiceService", () => {
 	});
 
 	it("create delegates to repository", async () => {
+		const tenant = productionTenant("org-1");
 		const entity = { id: "inv-1" };
 		vi.spyOn(InvoiceRepository.prototype, "create").mockResolvedValue(
 			entity as never,
@@ -24,22 +26,23 @@ describe("InvoiceService", () => {
 			totalAmount: "100",
 		};
 
-		const result = await service.create("org-1", input as never);
+		const result = await service.create(tenant, input as never);
 
 		expect(result).toEqual(entity);
 		expect(InvoiceRepository.prototype.create).toHaveBeenCalledWith(
-			"org-1",
+			tenant,
 			input,
 		);
 	});
 
 	it("getById delegates to findById", async () => {
+		const tenant = productionTenant("org-1");
 		vi.spyOn(InvoiceRepository.prototype, "findById").mockResolvedValue(null);
 
-		await service.getById("org-1", "inv-1");
+		await service.getById(tenant, "inv-1");
 
 		expect(InvoiceRepository.prototype.findById).toHaveBeenCalledWith(
-			"org-1",
+			tenant,
 			"inv-1",
 		);
 	});

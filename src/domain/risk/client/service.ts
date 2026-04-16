@@ -4,6 +4,7 @@ import type { RiskLookups } from "./engine";
 import { ClientRiskRepository } from "./repository";
 import type { ClientRiskInput, ClientRiskResult } from "./types";
 import { RiskMethodologyRepository } from "../methodology/repository";
+import type { TenantContext } from "../../../lib/tenant-context";
 
 export class ClientRiskService {
 	private repository: ClientRiskRepository;
@@ -16,19 +17,19 @@ export class ClientRiskService {
 
 	async assessClient(
 		clientId: string,
-		organizationId: string,
+		tenant: TenantContext,
 		lookups: RiskLookups,
 		triggerReason: string,
 		assessedBy = "SYSTEM",
 		activityKey?: string,
 	): Promise<{ result: ClientRiskResult; previousLevel: string | null }> {
+		const { organizationId } = tenant;
 		const input = await this.buildRiskInput(clientId, organizationId);
 
-		// Resolve the effective methodology for this org+activity
 		const effectiveActivityKey =
 			activityKey ?? (await this.getOrgActivityKey(organizationId));
 		const methodology = await this.methodologyRepo.resolve(
-			organizationId,
+			tenant,
 			effectiveActivityKey,
 		);
 
@@ -42,20 +43,20 @@ export class ClientRiskService {
 		return { result, previousLevel };
 	}
 
-	async getLatestAssessment(clientId: string, organizationId: string) {
-		return this.repository.getLatest(clientId, organizationId);
+	async getLatestAssessment(clientId: string, tenant: TenantContext) {
+		return this.repository.getLatest(clientId, tenant);
 	}
 
-	async getAssessmentHistory(clientId: string, organizationId: string) {
-		return this.repository.getHistory(clientId, organizationId);
+	async getAssessmentHistory(clientId: string, tenant: TenantContext) {
+		return this.repository.getHistory(clientId, tenant);
 	}
 
-	async getClientsDueForReview(organizationId: string) {
-		return this.repository.getClientsDueForReview(organizationId, new Date());
+	async getClientsDueForReview(tenant: TenantContext) {
+		return this.repository.getClientsDueForReview(tenant, new Date());
 	}
 
-	async getRiskDistribution(organizationId: string) {
-		return this.repository.getRiskDistribution(organizationId);
+	async getRiskDistribution(tenant: TenantContext) {
+		return this.repository.getRiskDistribution(tenant);
 	}
 
 	private async getOrgActivityKey(organizationId: string): Promise<string> {

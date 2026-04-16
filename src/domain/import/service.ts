@@ -21,6 +21,7 @@ import type {
 	ImportJob,
 } from "./types";
 import type { ImportStartInput } from "./schemas";
+import type { TenantContext } from "../../lib/tenant-context";
 
 export class ImportService {
 	constructor(private readonly repository: ImportRepository) {}
@@ -29,17 +30,17 @@ export class ImportService {
 	 * List imports for an organization
 	 */
 	list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: ImportFilters,
 	): Promise<ListResultWithMeta<ImportEntity>> {
-		return this.repository.list(organizationId, filters);
+		return this.repository.list(tenant, filters);
 	}
 
 	/**
 	 * Get a single import by ID
 	 */
-	async get(organizationId: string, id: string): Promise<ImportEntity> {
-		const importRecord = await this.repository.getById(organizationId, id);
+	async get(tenant: TenantContext, id: string): Promise<ImportEntity> {
+		const importRecord = await this.repository.getById(tenant, id);
 		if (!importRecord) {
 			throw new Error("IMPORT_NOT_FOUND");
 		}
@@ -50,15 +51,11 @@ export class ImportService {
 	 * Get import with row results
 	 */
 	async getWithResults(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		rowFilters?: ImportRowFilters,
 	): Promise<ImportWithResults> {
-		const result = await this.repository.getWithResults(
-			organizationId,
-			id,
-			rowFilters,
-		);
+		const result = await this.repository.getWithResults(tenant, id, rowFilters);
 		if (!result) {
 			throw new Error("IMPORT_NOT_FOUND");
 		}
@@ -69,13 +66,14 @@ export class ImportService {
 	 * Create a new import and prepare job for queue
 	 */
 	async create(
-		organizationId: string,
+		tenant: TenantContext,
 		createdBy: string,
 		input: ImportCreateInput,
 		fileUrl: string,
 	): Promise<{ import: ImportEntity; job: ImportJob }> {
+		const { organizationId } = tenant;
 		const importRecord = await this.repository.create(
-			organizationId,
+			tenant,
 			createdBy,
 			input,
 			fileUrl,
@@ -98,13 +96,14 @@ export class ImportService {
 	 * Caller (route) must send the job to IMPORT_PROCESSING_QUEUE.
 	 */
 	async startImport(
-		organizationId: string,
+		tenant: TenantContext,
 		importId: string,
 		input: ImportStartInput,
 	): Promise<{ import: ImportEntity; job: ImportJob }> {
+		const { organizationId } = tenant;
 		const updated = await this.repository.updateColumnMappingIfPending(
 			importId,
-			organizationId,
+			tenant,
 			input.columnMapping,
 		);
 		if (!updated) {
@@ -201,7 +200,6 @@ export class ImportService {
 			errors?: string[];
 		},
 	): Promise<ImportRowResultEntity | null> {
-		// Update the row
 		const result = await this.repository.updateRowResult(
 			importId,
 			rowNumber,
@@ -209,7 +207,6 @@ export class ImportService {
 		);
 
 		if (result) {
-			// Increment the appropriate count
 			const counts: {
 				processedRows: number;
 				successCount?: number;
@@ -262,7 +259,7 @@ export class ImportService {
 	/**
 	 * Delete an import
 	 */
-	delete(organizationId: string, id: string): Promise<void> {
-		return this.repository.delete(organizationId, id);
+	delete(tenant: TenantContext, id: string): Promise<void> {
+		return this.repository.delete(tenant, id);
 	}
 }

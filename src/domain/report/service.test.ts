@@ -4,6 +4,7 @@ import {
 	calculateQuarterlyPeriod,
 	calculateAnnualPeriod,
 } from "./types";
+import { productionTenant } from "../../lib/tenant-context";
 import { ReportService } from "./service";
 import type { ReportRepository } from "./repository";
 import type { ReportEntity } from "./types";
@@ -158,6 +159,7 @@ describe("Report Period Calculations (Calendar-based)", () => {
 describe("ReportService", () => {
 	let mockRepository: ReportRepository;
 	let service: ReportService;
+	const tenant = productionTenant("org-1");
 
 	const mockReport: ReportEntity = {
 		id: "rpt-1",
@@ -199,30 +201,32 @@ describe("ReportService", () => {
 		});
 
 		const filters = { page: 1, limit: 10 } as never;
-		const result = await service.list("org-1", filters);
+		const result = await service.list(tenant, filters);
 
-		expect(mockRepository.list).toHaveBeenCalledWith("org-1", filters);
+		expect(mockRepository.list).toHaveBeenCalledWith(tenant, filters);
 		expect(result.data).toEqual([mockReport]);
 	});
 
 	it("delete throws when report is not DRAFT", async () => {
+		const tenant = productionTenant("org-1");
 		vi.mocked(mockRepository.get).mockResolvedValue({
 			...mockReport,
 			status: "GENERATED",
 		} as ReportEntity);
 
-		await expect(service.delete("org-1", "rpt-1")).rejects.toThrow(
+		await expect(service.delete(tenant, "rpt-1")).rejects.toThrow(
 			"CANNOT_DELETE_NON_DRAFT_REPORT",
 		);
 	});
 
 	it("delete delegates when status is DRAFT", async () => {
+		const tenant = productionTenant("org-1");
 		vi.mocked(mockRepository.get).mockResolvedValue(mockReport);
 		vi.mocked(mockRepository.delete).mockResolvedValue(undefined);
 
-		await service.delete("org-1", "rpt-1");
+		await service.delete(tenant, "rpt-1");
 
-		expect(mockRepository.delete).toHaveBeenCalledWith("org-1", "rpt-1");
+		expect(mockRepository.delete).toHaveBeenCalledWith(tenant, "rpt-1");
 	});
 
 	it("getPeriodDates routes monthly quarterly annual", () => {

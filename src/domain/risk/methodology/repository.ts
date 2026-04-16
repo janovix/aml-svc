@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { generateId } from "../../../lib/id-generator";
+import type { TenantContext } from "../../../lib/tenant-context";
 import type {
 	MethodologyCreateInput,
 	MethodologyScope,
@@ -29,12 +30,18 @@ export class RiskMethodologyRepository {
 	 * Returns the effective methodology plus which scope it came from.
 	 */
 	async resolve(
-		organizationId: string,
+		tenant: TenantContext,
 		activityKey: string,
 	): Promise<MethodologyWithSource> {
+		const { organizationId, environment } = tenant;
 		// 1. Check org-level override
 		const orgMethodology = await this.prisma.riskMethodology.findFirst({
-			where: { scope: "ORGANIZATION", organizationId, status: "ACTIVE" },
+			where: {
+				scope: "ORGANIZATION",
+				organizationId,
+				environment,
+				status: "ACTIVE",
+			},
 			include: INCLUDE_ALL_RELATIONS,
 		});
 		if (orgMethodology) {
@@ -188,11 +195,17 @@ export class RiskMethodologyRepository {
 	}
 
 	async resetOrgToDefault(
-		organizationId: string,
+		tenant: TenantContext,
 		changedBy: string,
 	): Promise<void> {
+		const { organizationId, environment } = tenant;
 		const existing = await this.prisma.riskMethodology.findFirst({
-			where: { scope: "ORGANIZATION", organizationId, status: "ACTIVE" },
+			where: {
+				scope: "ORGANIZATION",
+				organizationId,
+				environment,
+				status: "ACTIVE",
+			},
 		});
 		if (existing) {
 			await this.archive(

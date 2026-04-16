@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { productionTenant } from "../../../lib/tenant-context";
 import { OrgRiskService } from "./service";
 import { OrgRiskRepository } from "./repository";
 import { RiskMethodologyRepository } from "../methodology/repository";
@@ -11,16 +12,17 @@ describe("OrgRiskService", () => {
 	it("getActiveAssessment and getAssessmentHistory delegate to repository", async () => {
 		const prisma = {} as never;
 		const service = new OrgRiskService(prisma);
+		const tenant = productionTenant("org-1");
 
 		vi.spyOn(OrgRiskRepository.prototype, "getActive").mockResolvedValue({
 			id: "a1",
 		} as never);
 		vi.spyOn(OrgRiskRepository.prototype, "getHistory").mockResolvedValue([]);
 
-		await expect(service.getActiveAssessment("org-1")).resolves.toEqual({
+		await expect(service.getActiveAssessment(tenant)).resolves.toEqual({
 			id: "a1",
 		});
-		await expect(service.getAssessmentHistory("org-1")).resolves.toEqual([]);
+		await expect(service.getAssessmentHistory(tenant)).resolves.toEqual([]);
 	});
 
 	it("assessOrganization computes risk and saves assessment", async () => {
@@ -110,8 +112,9 @@ describe("OrgRiskService", () => {
 		} as never);
 
 		const service = new OrgRiskService(prisma);
+		const tenant = productionTenant("org-svc");
 
-		const out = await service.assessOrganization("org-svc", "scheduled");
+		const out = await service.assessOrganization(tenant, "scheduled");
 
 		expect(out.result.organizationId).toBe("org-svc");
 		expect(out.previousLevel).toBe("LOW");

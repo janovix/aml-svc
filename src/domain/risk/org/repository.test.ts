@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { productionTenant } from "../../../lib/tenant-context";
 import { calculateOrgRisk } from "./engine";
 import { OrgRiskRepository } from "./repository";
 import type { OrgRiskInput } from "./types";
@@ -121,10 +122,14 @@ describe("OrgRiskRepository", () => {
 		const prisma = { orgRiskAssessment: { findFirst } };
 		const repo = new OrgRiskRepository(prisma as never);
 
-		await repo.getActive("org-x");
+		await repo.getActive(productionTenant("org-x"));
 
 		expect(findFirst).toHaveBeenCalledWith({
-			where: { organizationId: "org-x", status: "ACTIVE" },
+			where: {
+				organizationId: "org-x",
+				environment: "production",
+				status: "ACTIVE",
+			},
 			orderBy: { version: "desc" },
 			include: { elements: true, mitigants: true },
 		});

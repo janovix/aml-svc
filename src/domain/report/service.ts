@@ -17,6 +17,7 @@ import {
 	calculateQuarterlyPeriod,
 	calculateAnnualPeriod,
 } from "./types";
+import type { TenantContext } from "../../lib/tenant-context";
 
 export class ReportService {
 	constructor(private readonly repository: ReportRepository) {}
@@ -25,34 +26,34 @@ export class ReportService {
 	 * List reports with filters
 	 */
 	async list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: ReportFilterInput,
 	): Promise<ListResult<ReportEntity>> {
-		return this.repository.list(organizationId, filters);
+		return this.repository.list(tenant, filters);
 	}
 
 	/**
 	 * Get a single report
 	 */
-	async get(organizationId: string, id: string): Promise<ReportEntity> {
-		return this.repository.get(organizationId, id);
+	async get(tenant: TenantContext, id: string): Promise<ReportEntity> {
+		return this.repository.get(tenant, id);
 	}
 
 	/**
 	 * Get a report with alert summary
 	 */
 	async getWithSummary(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 	): Promise<ReportWithAlertSummary> {
-		return this.repository.getWithAlertSummary(organizationId, id);
+		return this.repository.getWithAlertSummary(tenant, id);
 	}
 
 	/**
 	 * Preview data that would be included in a report
 	 */
 	async preview(
-		organizationId: string,
+		tenant: TenantContext,
 		input: ReportPreviewInput,
 	): Promise<{
 		total: number;
@@ -65,7 +66,7 @@ export class ReportService {
 		const periodEnd = new Date(input.periodEnd);
 
 		const stats = await this.repository.countAlertsForPeriod(
-			organizationId,
+			tenant,
 			periodStart,
 			periodEnd,
 			{
@@ -87,48 +88,48 @@ export class ReportService {
 	 */
 	async create(
 		input: ReportCreateInput,
-		organizationId: string,
+		tenant: TenantContext,
 		createdBy?: string,
 	): Promise<ReportEntity> {
-		return this.repository.create(input, organizationId, createdBy);
+		return this.repository.create(input, tenant, createdBy);
 	}
 
 	/**
 	 * Update a report
 	 */
 	async patch(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: ReportPatchInput,
 	): Promise<ReportEntity> {
-		return this.repository.patch(organizationId, id, input);
+		return this.repository.patch(tenant, id, input);
 	}
 
 	/**
 	 * Delete a report (only if DRAFT status)
 	 */
-	async delete(organizationId: string, id: string): Promise<void> {
-		const report = await this.repository.get(organizationId, id);
+	async delete(tenant: TenantContext, id: string): Promise<void> {
+		const report = await this.repository.get(tenant, id);
 
 		if (report.status !== "DRAFT") {
 			throw new Error("CANNOT_DELETE_NON_DRAFT_REPORT");
 		}
 
-		return this.repository.delete(organizationId, id);
+		return this.repository.delete(tenant, id);
 	}
 
 	/**
 	 * Mark a report as generated with PDF file URL
 	 */
 	async markAsGenerated(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		options: {
 			pdfFileUrl?: string | null;
 			fileSize?: number | null;
 		},
 	): Promise<ReportEntity> {
-		return this.repository.markAsGenerated(organizationId, id, options);
+		return this.repository.markAsGenerated(tenant, id, options);
 	}
 
 	/**
@@ -144,7 +145,7 @@ export class ReportService {
 	getPeriodDates(
 		periodType: "MONTHLY" | "QUARTERLY" | "ANNUAL",
 		year: number,
-		period: number, // month (1-12) for MONTHLY, quarter (1-4) for QUARTERLY, ignored for ANNUAL
+		period: number,
 	): { start: Date; end: Date } {
 		switch (periodType) {
 			case "MONTHLY":

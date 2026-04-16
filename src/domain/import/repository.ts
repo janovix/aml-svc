@@ -27,6 +27,7 @@ import type {
 	ImportRowStatus,
 	ColumnMapping,
 } from "./types";
+import type { TenantContext } from "../../lib/tenant-context";
 import type { ListResult } from "../../lib/list-result";
 import {
 	buildEnumFilterMeta,
@@ -40,12 +41,13 @@ export class ImportRepository {
 	 * List imports for an organization with pagination and filters
 	 */
 	async list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: ImportFilters,
 	): Promise<ListResultWithMeta<ImportEntity>> {
+		const { organizationId, environment } = tenant;
 		const { page, limit, status, entityType } = filters;
 
-		const baseWhere: Prisma.ImportWhereInput = { organizationId };
+		const baseWhere: Prisma.ImportWhereInput = { organizationId, environment };
 
 		const where: Prisma.ImportWhereInput = { ...baseWhere };
 		if (status?.length) where.status = { in: status.map(toPrismaImportStatus) };
@@ -117,11 +119,12 @@ export class ImportRepository {
 	 * Get a single import by ID
 	 */
 	async getById(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 	): Promise<ImportEntity | null> {
+		const { organizationId, environment } = tenant;
 		const record = await this.prisma.import.findFirst({
-			where: { organizationId, id },
+			where: { organizationId, environment, id },
 		});
 		return record ? mapPrismaImport(record) : null;
 	}
@@ -130,12 +133,13 @@ export class ImportRepository {
 	 * Get import with all row results
 	 */
 	async getWithResults(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		rowFilters?: ImportRowFilters,
 	): Promise<ImportWithResults | null> {
+		const { organizationId, environment } = tenant;
 		const importRecord = await this.prisma.import.findFirst({
-			where: { organizationId, id },
+			where: { organizationId, environment, id },
 		});
 
 		if (!importRecord) {
@@ -167,17 +171,19 @@ export class ImportRepository {
 	 * Create a new import record
 	 */
 	async create(
-		organizationId: string,
+		tenant: TenantContext,
 		createdBy: string,
 		input: ImportCreateInput,
 		fileUrl: string,
 	): Promise<ImportEntity> {
+		const { organizationId, environment } = tenant;
 		const id = generateId("IMPORT");
 
 		const created = await this.prisma.import.create({
 			data: {
 				id,
 				organizationId,
+				environment,
 				entityType: toPrismaEntityType(input.entityType),
 				activityCode: input.activityCode ?? null,
 				fileName: input.fileName,
@@ -247,11 +253,12 @@ export class ImportRepository {
 	 */
 	async updateColumnMapping(
 		importId: string,
-		organizationId: string,
+		tenant: TenantContext,
 		columnMapping: ColumnMapping,
 	): Promise<ImportEntity> {
+		const { organizationId, environment } = tenant;
 		const existing = await this.prisma.import.findFirst({
-			where: { id: importId, organizationId },
+			where: { id: importId, organizationId, environment },
 		});
 		if (!existing) {
 			throw new Error("IMPORT_NOT_FOUND");
@@ -270,13 +277,15 @@ export class ImportRepository {
 	 */
 	async updateColumnMappingIfPending(
 		importId: string,
-		organizationId: string,
+		tenant: TenantContext,
 		columnMapping: ColumnMapping,
 	): Promise<ImportEntity | null> {
+		const { organizationId, environment } = tenant;
 		const { count } = await this.prisma.import.updateMany({
 			where: {
 				id: importId,
 				organizationId,
+				environment,
 				status: "PENDING",
 			},
 			data: {
@@ -446,20 +455,18 @@ export class ImportRepository {
 	/**
 	 * Delete an import and all its row results (cascade)
 	 */
-	async delete(organizationId: string, id: string): Promise<void> {
-		await this.ensureExists(organizationId, id);
+	async delete(tenant: TenantContext, id: string): Promise<void> {
+		await this.ensureExists(tenant, id);
 		await this.prisma.import.delete({ where: { id } });
 	}
 
 	/**
 	 * Ensure import exists and belongs to organization
 	 */
-	private async ensureExists(
-		organizationId: string,
-		id: string,
-	): Promise<void> {
+	private async ensureExists(tenant: TenantContext, id: string): Promise<void> {
+		const { organizationId, environment } = tenant;
 		const exists = await this.prisma.import.findFirst({
-			where: { organizationId, id },
+			where: { organizationId, environment, id },
 			select: { id: true },
 		});
 

@@ -31,10 +31,13 @@ import {
 	selfServiceAddressSchema,
 } from "../domain/kyc-session/self-service-schemas";
 import { ClientRepository } from "../domain/client";
+import { productionTenant } from "../lib/tenant-context";
 import { ShareholderService } from "../domain/shareholder/index.js";
 import { BeneficialControllerService } from "../domain/beneficial-controller/index.js";
 import { CatalogRepository, CatalogQueryService } from "../domain/catalog";
 import { sendKYCSubmissionNotification } from "../lib/kyc-email";
+import { emitWebhookEvent, WEBHOOK_EVENT_TYPES } from "../lib/webhook-events";
+
 export const publicKycRouter = new Hono<{ Bindings: Bindings }>();
 
 // ============================================================================
@@ -295,7 +298,11 @@ publicKycRouter.patch("/:token/personal-info", async (c) => {
 		},
 	});
 
-	await clientRepo.patch(session.organizationId, session.clientId, updateData);
+	await clientRepo.patch(
+		productionTenant(session.organizationId),
+		session.clientId,
+		updateData,
+	);
 
 	await kycService.logEvent(session.id, "personal_info_updated", {
 		actorIp: ip,
@@ -631,6 +638,15 @@ publicKycRouter.post("/:token/submit", async (c) => {
 	}
 
 	const submitted = await kycService.markSubmitted(token, ip);
+
+	c.executionCtx.waitUntil(
+		emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+			organizationId: submitted.organizationId,
+			environment: "production",
+			eventType: WEBHOOK_EVENT_TYPES.KYC_SESSION_SUBMITTED,
+			data: { id: submitted.id, clientId: submitted.clientId },
+		}),
+	);
 
 	// Fetch client for notification
 	const client = await prisma.client.findUnique({

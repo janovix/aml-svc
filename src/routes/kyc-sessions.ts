@@ -7,6 +7,7 @@ import {
 	type AuthVariables,
 	getOrganizationId,
 	getAuthUser,
+	getTenantContext,
 } from "../middleware/auth";
 import { APIError } from "../middleware/error";
 import {
@@ -16,6 +17,7 @@ import {
 	kycSessionListFiltersSchema,
 } from "../domain/kyc-session";
 import { sendKYCInviteEmail } from "../lib/kyc-email";
+import { emitWebhookEvent, WEBHOOK_EVENT_TYPES } from "../lib/webhook-events";
 
 export const kycSessionsRouter = new Hono<{
 	Bindings: Bindings;
@@ -38,7 +40,7 @@ function parseWithZod<T>(
 
 // POST /api/v1/kyc-sessions - Create a KYC session for a client
 kycSessionsRouter.post("/", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const user = getAuthUser(c);
 	const prisma = getPrismaClient(c.env.DB);
 	const service = new KycSessionService(prisma);
@@ -47,13 +49,13 @@ kycSessionsRouter.post("/", async (c) => {
 	const data = parseWithZod(kycSessionCreateSchema, body);
 
 	const session = await service.create(
-		organizationId,
+		tenant,
 		{ ...data, createdBy: user.id },
 		prisma,
 	);
 
 	const orgSettings = await prisma.organizationSettings.findUnique({
-		where: { organizationId },
+		where: { organizationId: tenant.organizationId },
 		select: { selfServiceSendEmail: true },
 	});
 
@@ -85,14 +87,14 @@ kycSessionsRouter.post("/", async (c) => {
 
 // GET /api/v1/kyc-sessions - List sessions for the org
 kycSessionsRouter.get("/", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const prisma = getPrismaClient(c.env.DB);
 	const service = new KycSessionService(prisma);
 
 	const query = c.req.query();
 	const filters = parseWithZod(kycSessionListFiltersSchema, query);
 
-	const result = await service.list(organizationId, {
+	const result = await service.list(tenant, {
 		clientId: filters.clientId,
 		status: filters.status,
 		page: filters.page,
@@ -184,15 +186,24 @@ kycSessionsRouter.post("/:id/resend-email", async (c) => {
 
 // POST /api/v1/kyc-sessions/:id/approve - Compliance officer approves the session
 kycSessionsRouter.post("/:id/approve", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const user = getAuthUser(c);
 	const prisma = getPrismaClient(c.env.DB);
 	const service = new KycSessionService(prisma);
 
 	const session = await service.approve(
 		c.req.param("id"),
-		organizationId,
+		tenant.organizationId,
 		user.id,
+	);
+
+	c.executionCtx.waitUntil(
+		emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+			organizationId: tenant.organizationId,
+			environment: tenant.environment,
+			eventType: WEBHOOK_EVENT_TYPES.KYC_SESSION_STATUS_CHANGED,
+			data: { id: session.id, clientId: session.clientId, status: "APPROVED" },
+		}),
 	);
 
 	return c.json({ session });
@@ -200,7 +211,7 @@ kycSessionsRouter.post("/:id/approve", async (c) => {
 
 // POST /api/v1/kyc-sessions/:id/reject - Compliance officer rejects the session
 kycSessionsRouter.post("/:id/reject", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const user = getAuthUser(c);
 	const prisma = getPrismaClient(c.env.DB);
 	const service = new KycSessionService(prisma);
@@ -210,9 +221,22 @@ kycSessionsRouter.post("/:id/reject", async (c) => {
 
 	const session = await service.reject(
 		c.req.param("id"),
-		organizationId,
+		tenant.organizationId,
 		user.id,
 		data,
+	);
+
+	c.executionCtx.waitUntil(
+		emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+			organizationId: tenant.organizationId,
+			environment: tenant.environment,
+			eventType: WEBHOOK_EVENT_TYPES.KYC_SESSION_STATUS_CHANGED,
+			data: {
+				id: session.id,
+				clientId: session.clientId,
+				status: session.status,
+			},
+		}),
 	);
 
 	return c.json({ session });
@@ -220,15 +244,24 @@ kycSessionsRouter.post("/:id/reject", async (c) => {
 
 // POST /api/v1/kyc-sessions/:id/revoke - Revoke a session
 kycSessionsRouter.post("/:id/revoke", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const user = getAuthUser(c);
 	const prisma = getPrismaClient(c.env.DB);
 	const service = new KycSessionService(prisma);
 
 	const session = await service.revoke(
 		c.req.param("id"),
-		organizationId,
+		tenant.organizationId,
 		user.id,
+	);
+
+	c.executionCtx.waitUntil(
+		emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+			organizationId: tenant.organizationId,
+			environment: tenant.environment,
+			eventType: WEBHOOK_EVENT_TYPES.KYC_SESSION_STATUS_CHANGED,
+			data: { id: session.id, clientId: session.clientId, status: "REVOKED" },
+		}),
 	);
 
 	return c.json({ session });

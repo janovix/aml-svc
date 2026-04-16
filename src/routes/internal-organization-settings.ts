@@ -12,6 +12,7 @@ import {
 	selfServiceSettingsUpdateSchema,
 } from "../domain/organization-settings";
 import type { Bindings } from "../types";
+import { productionTenant } from "../lib/tenant-context";
 
 /**
  * Handle internal organization settings requests from service bindings
@@ -29,11 +30,12 @@ export async function handleInternalOrganizationSettingsRequest(
 	const prisma = getPrismaClient(env.DB);
 	const repository = new OrganizationSettingsRepository(prisma);
 	const service = new OrganizationSettingsService(repository);
+	const tenant = productionTenant(organizationId);
 
 	try {
 		// GET - Fetch organization settings
 		if (request.method === "GET") {
-			const settings = await service.getByOrganizationId(organizationId);
+			const settings = await service.getByOrganizationId(tenant);
 
 			if (!settings) {
 				return new Response(
@@ -83,10 +85,7 @@ export async function handleInternalOrganizationSettingsRequest(
 				);
 			}
 
-			const settings = await service.createOrUpdate(
-				organizationId,
-				parseResult.data,
-			);
+			const settings = await service.createOrUpdate(tenant, parseResult.data);
 
 			return new Response(
 				JSON.stringify({
@@ -102,7 +101,7 @@ export async function handleInternalOrganizationSettingsRequest(
 		// PATCH - Partial update organization settings
 		if (request.method === "PATCH") {
 			// Check if settings exist first
-			const existing = await service.getByOrganizationId(organizationId);
+			const existing = await service.getByOrganizationId(tenant);
 			if (!existing) {
 				return new Response(
 					JSON.stringify({
@@ -151,7 +150,7 @@ export async function handleInternalOrganizationSettingsRequest(
 				);
 			}
 
-			const settings = await service.update(organizationId, parseResult.data);
+			const settings = await service.update(tenant, parseResult.data);
 
 			return new Response(
 				JSON.stringify({
@@ -208,12 +207,13 @@ export async function handleInternalSelfServiceSettingsRequest(
 	const prisma = getPrismaClient(env.DB);
 	const repository = new OrganizationSettingsRepository(prisma);
 	const service = new OrganizationSettingsService(repository);
+	const tenant = productionTenant(organizationId);
 
 	try {
 		// PATCH - Partial update self-service settings only
 		if (request.method === "PATCH") {
 			// Check if settings exist first
-			const existing = await service.getByOrganizationId(organizationId);
+			const existing = await service.getByOrganizationId(tenant);
 			if (!existing) {
 				return new Response(
 					JSON.stringify({
@@ -262,7 +262,7 @@ export async function handleInternalSelfServiceSettingsRequest(
 				);
 			}
 
-			const settings = await service.update(organizationId, parseResult.data);
+			const settings = await service.update(tenant, parseResult.data);
 
 			return new Response(
 				JSON.stringify({

@@ -26,6 +26,9 @@ import {
 	getOperationRequiredHeaders,
 } from "./operation-processor";
 import { getPrismaClient } from "../../../lib/prisma";
+import { t, type LanguageCode } from "../../../lib/i18n";
+import { getOrganizationLanguageForTenant } from "../../../lib/org-language";
+import { productionTenant } from "../../../lib/tenant-context";
 
 const BATCH_SIZE = 100;
 
@@ -61,7 +64,10 @@ export class ImportProcessor {
 			`[ImportProcessor] Starting import ${importId} for ${entityType}`,
 		);
 
-		const existing = await this.importRepo.getById(organizationId, importId);
+		const existing = await this.importRepo.getById(
+			productionTenant(organizationId),
+			importId,
+		);
 		if (!existing) {
 			console.warn(
 				`[ImportProcessor] Skipping import ${importId}: record not found`,
@@ -296,25 +302,43 @@ export class ImportProcessor {
 		if (!this.notifService) return;
 
 		try {
-			const entityLabel = entityType === "CLIENT" ? "clients" : "operations";
+			const lang: LanguageCode = await getOrganizationLanguageForTenant(
+				this.env,
+				organizationId,
+			);
+			const titleKey =
+				entityType === "CLIENT"
+					? ("import.completed.clients.title" as const)
+					: ("import.completed.operations.title" as const);
+			const title = t(lang, titleKey);
+			const warningPart =
+				counts.warnings > 0
+					? t(lang, "import.warnings", { n: counts.warnings })
+					: "";
+			const errorPart =
+				counts.errors > 0 ? t(lang, "import.errors", { n: counts.errors }) : "";
+			const skippedPart =
+				counts.skipped > 0
+					? t(lang, "import.skipped", { n: counts.skipped })
+					: "";
+			const body = t(lang, "import.completed.body", {
+				totalRows: counts.total,
+				successCount: counts.success,
+				warningPart,
+				errorPart,
+				skippedPart,
+			});
+
 			const amlFrontendUrl = getAmlFrontendUrl(this.env);
 			const callbackUrl = `${amlFrontendUrl.replace(/\/$/, "")}/imports/${importId}`;
-
-			const bodyParts = [
-				`${counts.total} row${counts.total !== 1 ? "s" : ""} processed:`,
-				`${counts.success} succeeded`,
-			];
-			if (counts.warnings > 0) bodyParts.push(`${counts.warnings} warnings`);
-			if (counts.errors > 0) bodyParts.push(`${counts.errors} errors`);
-			if (counts.skipped > 0) bodyParts.push(`${counts.skipped} skipped`);
 
 			await this.notifService.notify({
 				tenantId: organizationId,
 				target: { kind: "org" },
 				channelSlug: "system",
 				type: "aml.import.completed",
-				title: `Import Completed: ${entityLabel}`,
-				body: bodyParts.join(", ") + ".",
+				title,
+				body,
 				payload: {
 					importId,
 					entityType,
@@ -326,6 +350,18 @@ export class ImportProcessor {
 				severity: counts.errors > 0 ? "warn" : "info",
 				callbackUrl,
 				sendEmail: false,
+				emailI18n: {
+					titleKey,
+					bodyKey: "import.completed.body",
+					titleParams: {},
+					bodyParams: {
+						totalRows: counts.total,
+						successCount: counts.success,
+						warningPart,
+						errorPart,
+						skippedPart,
+					},
+				},
 				sourceService: "aml-svc",
 				sourceEvent: "import.completed",
 			});
@@ -346,7 +382,17 @@ export class ImportProcessor {
 		if (!this.notifService) return;
 
 		try {
-			const entityLabel = entityType === "CLIENT" ? "clients" : "operations";
+			const lang: LanguageCode = await getOrganizationLanguageForTenant(
+				this.env,
+				organizationId,
+			);
+			const titleKey =
+				entityType === "CLIENT"
+					? ("import.failed.clients.title" as const)
+					: ("import.failed.operations.title" as const);
+			const title = t(lang, titleKey);
+			const body = t(lang, "import.failed.body", { errorMessage });
+
 			const amlFrontendUrl = getAmlFrontendUrl(this.env);
 			const callbackUrl = `${amlFrontendUrl.replace(/\/$/, "")}/imports/${importId}`;
 
@@ -355,12 +401,17 @@ export class ImportProcessor {
 				target: { kind: "org" },
 				channelSlug: "system",
 				type: "aml.import.failed",
-				title: `Import Failed: ${entityLabel}`,
-				body: `The import could not be completed. Reason: ${errorMessage}`,
+				title,
+				body,
 				payload: { importId, entityType, errorMessage },
 				severity: "error",
 				callbackUrl,
 				sendEmail: false,
+				emailI18n: {
+					titleKey,
+					bodyKey: "import.failed.body",
+					bodyParams: { errorMessage },
+				},
 				sourceService: "aml-svc",
 				sourceEvent: "import.failed",
 			});

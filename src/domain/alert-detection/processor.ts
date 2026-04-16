@@ -26,8 +26,48 @@ import { generateContextHash } from "../../lib/hash";
 import { retry } from "../../lib/retry";
 import { AlertRepository, AlertRuleRepository } from "../alert/repository";
 import type { Bindings } from "../../types";
+import { t, type LanguageCode, type MessageKey } from "../../lib/i18n";
+import { getOrganizationLanguageForTenant } from "../../lib/org-language";
+import type {
+	ApiKeyEnvironment,
+	TenantContext,
+} from "../../lib/tenant-context";
 
 const LOG_TAG = "[alert-detection]";
+
+function tenantFromClientAndJob(
+	client: Record<string, unknown>,
+	job: AlertJob,
+): TenantContext {
+	const organizationId = String(client.organizationId ?? job.organizationId);
+	const raw = String(client.environment ?? "production");
+	const environment: ApiKeyEnvironment =
+		raw === "staging" || raw === "development" ? raw : "production";
+	return { organizationId, environment };
+}
+
+function alertSeverityKeys(severity: string): {
+	title: MessageKey;
+	adj: MessageKey;
+} {
+	const u = severity.toUpperCase();
+	if (u === "CRITICAL")
+		return {
+			title: "alert.severity.title.CRITICAL",
+			adj: "alert.severity.adj.CRITICAL",
+		};
+	if (u === "HIGH")
+		return {
+			title: "alert.severity.title.HIGH",
+			adj: "alert.severity.adj.HIGH",
+		};
+	if (u === "MEDIUM")
+		return {
+			title: "alert.severity.title.MEDIUM",
+			adj: "alert.severity.adj.MEDIUM",
+		};
+	return { title: "alert.severity.title.LOW", adj: "alert.severity.adj.LOW" };
+}
 
 interface AlertProcessorConfig {
 	useSeekers: boolean;
@@ -246,6 +286,11 @@ export class AlertDetectionProcessor {
 			return null;
 		}
 
+		const alertTenant = tenantFromClientAndJob(
+			context.client as Record<string, unknown>,
+			job,
+		);
+
 		try {
 			const alert = await retry(
 				() =>
@@ -265,7 +310,7 @@ export class AlertDetectionProcessor {
 							operationId: job.operationId,
 							isManual: false,
 						},
-						job.organizationId,
+						alertTenant,
 					),
 				{ maxRetries: 2 },
 			);
@@ -278,9 +323,20 @@ export class AlertDetectionProcessor {
 				try {
 					const clientName = (context.client as Record<string, unknown>)
 						.name as string | undefined;
-					const severityLabel =
-						alert.severity.charAt(0).toUpperCase() +
-						alert.severity.slice(1).toLowerCase();
+					const lang: LanguageCode = await getOrganizationLanguageForTenant(
+						this.env,
+						job.organizationId,
+					);
+					const sevKeys = alertSeverityKeys(alert.severity);
+					const severityLabel = t(lang, sevKeys.title);
+					const severityLower = t(lang, sevKeys.adj);
+					const clientDisplay = clientName || alert.clientId;
+					const title = t(lang, "alert.new.title", { severityLabel });
+					const body = t(lang, "alert.new.body", {
+						severityLower,
+						clientDisplay,
+						seekerName: seeker.name,
+					});
 					const amlFrontendUrl =
 						this.env.TRUSTED_ORIGINS?.split(",")[0] ??
 						"https://aml.janovix.workers.dev";
@@ -291,8 +347,8 @@ export class AlertDetectionProcessor {
 						target: { kind: "org" },
 						channelSlug: "system",
 						type: "aml.alert.detected",
-						title: `New AML Alert: ${severityLabel} Severity`,
-						body: `A ${severityLabel.toLowerCase()} alert was detected for client ${clientName || alert.clientId}: ${seeker.name}.`,
+						title,
+						body,
 						payload: {
 							alertId: alert.id,
 							clientId: alert.clientId,
@@ -308,6 +364,16 @@ export class AlertDetectionProcessor {
 									: "info",
 						callbackUrl,
 						sendEmail: true,
+						emailI18n: {
+							titleKey: "alert.new.title",
+							bodyKey: "alert.new.body",
+							titleParams: { severityLabel },
+							bodyParams: {
+								severityLower,
+								clientDisplay,
+								seekerName: seeker.name,
+							},
+						},
 						sourceService: "aml-svc",
 						sourceEvent: "seeker.alert.detected",
 					});

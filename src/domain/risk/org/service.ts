@@ -3,6 +3,7 @@ import { calculateOrgRisk } from "./engine";
 import { OrgRiskRepository } from "./repository";
 import { RiskMethodologyRepository } from "../methodology/repository";
 import type { OrgAssessmentResult, OrgRiskInput } from "./types";
+import type { TenantContext } from "../../../lib/tenant-context";
 
 export class OrgRiskService {
 	private repository: OrgRiskRepository;
@@ -14,7 +15,7 @@ export class OrgRiskService {
 	}
 
 	async assessOrganization(
-		organizationId: string,
+		tenant: TenantContext,
 		triggerReason: string,
 		assessedBy = "SYSTEM",
 	): Promise<{
@@ -22,6 +23,7 @@ export class OrgRiskService {
 		previousLevel: string | null;
 		previousAuditType: string | null;
 	}> {
+		const { organizationId } = tenant;
 		const input = await this.buildOrgInput(organizationId);
 
 		const orgSettings = await this.prisma.organizationSettings.findFirst({
@@ -29,10 +31,7 @@ export class OrgRiskService {
 			select: { activityKey: true },
 		});
 		const activityKey = orgSettings?.activityKey ?? "DEFAULT";
-		const methodology = await this.methodologyRepo.resolve(
-			organizationId,
-			activityKey,
-		);
+		const methodology = await this.methodologyRepo.resolve(tenant, activityKey);
 
 		const result = calculateOrgRisk(input, methodology);
 
@@ -51,12 +50,12 @@ export class OrgRiskService {
 		return { result, previousLevel, previousAuditType };
 	}
 
-	async getActiveAssessment(organizationId: string) {
-		return this.repository.getActive(organizationId);
+	async getActiveAssessment(tenant: TenantContext) {
+		return this.repository.getActive(tenant);
 	}
 
-	async getAssessmentHistory(organizationId: string) {
-		return this.repository.getHistory(organizationId);
+	async getAssessmentHistory(tenant: TenantContext) {
+		return this.repository.getHistory(tenant);
 	}
 
 	private async buildOrgInput(organizationId: string): Promise<OrgRiskInput> {

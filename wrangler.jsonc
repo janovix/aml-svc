@@ -67,6 +67,10 @@
 				"binding": "RISK_ASSESSMENT_QUEUE",
 				"queue": "aml-risk-assessment-dev",
 			},
+			{
+				"binding": "WEBHOOK_QUEUE",
+				"queue": "webhook-events-dev",
+			},
 		],
 		"consumers": [
 			{
@@ -93,5 +97,6 @@
 		"ENVIRONMENT": "dev",
 		"AUTH_JWKS_CACHE_TTL": "3600",
 		"TRUSTED_ORIGINS": "*.janovix.workers.dev,http://localhost:*",
+		"KYC_SELF_SERVICE_URL": "https://kyc.janovix.workers.dev",
 	},
 }

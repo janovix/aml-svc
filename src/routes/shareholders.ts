@@ -17,6 +17,7 @@ import type { Bindings } from "../types.js";
 import { getPrismaClient } from "../lib/prisma.js";
 import { type AuthVariables, getOrganizationId } from "../middleware/auth.js";
 import { APIError } from "../middleware/error.js";
+import { productionTenant } from "../lib/tenant-context.js";
 
 export const shareholdersRouter = new Hono<{
 	Bindings: Bindings;
@@ -75,7 +76,10 @@ async function verifyClientOwnership(
 ): Promise<void> {
 	const organizationId = getOrganizationId(c);
 	const clientRepo = getClientRepository(c);
-	const client = await clientRepo.getById(organizationId, clientId);
+	const client = await clientRepo.getById(
+		productionTenant(organizationId),
+		clientId,
+	);
 	if (!client) {
 		throw new APIError(404, "Client not found");
 	}

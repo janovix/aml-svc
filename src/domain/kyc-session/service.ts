@@ -11,6 +11,7 @@ import {
 import type { ActivityCode } from "../operation/types";
 import type { KycSessionCreateInput, KycSessionRejectInput } from "./schemas";
 import { APIError } from "../../middleware/error";
+import type { TenantContext } from "../../lib/tenant-context";
 
 /**
  * Generates a cryptographically secure random token for KYC session URLs.
@@ -78,12 +79,11 @@ export class KycSessionService {
 	}
 
 	async create(
-		organizationId: string,
+		tenant: TenantContext,
 		input: KycSessionCreateInput,
 		prisma: PrismaClient,
 	): Promise<KycSessionEntity> {
-		const settings =
-			await this.orgSettingsRepo.findByOrganizationId(organizationId);
+		const settings = await this.orgSettingsRepo.findByOrganizationId(tenant);
 
 		if (!settings) {
 			throw new APIError(
@@ -157,8 +157,7 @@ export class KycSessionService {
 
 		const token = generateSessionToken();
 
-		const session = await this.sessionRepo.create({
-			organizationId,
+		const session = await this.sessionRepo.create(tenant, {
 			clientId: input.clientId,
 			token,
 			createdBy: input.createdBy ?? "system",
@@ -216,7 +215,7 @@ export class KycSessionService {
 	}
 
 	async list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: {
 			clientId?: string;
 			status?: string;
@@ -231,8 +230,7 @@ export class KycSessionService {
 	}> {
 		const page = filters.page ?? 1;
 		const limit = filters.limit ?? 20;
-		const { data, total } = await this.sessionRepo.list({
-			organizationId,
+		const { data, total } = await this.sessionRepo.list(tenant, {
 			clientId: filters.clientId,
 			status: filters.status as KycSessionEntity["status"] | undefined,
 			page,

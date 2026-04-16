@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { productionTenant } from "../../../lib/tenant-context";
 import { ClientRiskRepository } from "./repository";
 import type { ClientRiskResult } from "./types";
 
@@ -93,10 +94,14 @@ describe("ClientRiskRepository", () => {
 		const prisma = { clientRiskAssessment: { findFirst } };
 		const repo = new ClientRiskRepository(prisma as never);
 
-		await repo.getLatest("cli-1", "org-1");
+		await repo.getLatest("cli-1", productionTenant("org-1"));
 
 		expect(findFirst).toHaveBeenCalledWith({
-			where: { clientId: "cli-1", organizationId: "org-1" },
+			where: {
+				clientId: "cli-1",
+				organizationId: "org-1",
+				environment: "production",
+			},
 			orderBy: { version: "desc" },
 		});
 	});
@@ -115,7 +120,7 @@ describe("ClientRiskRepository", () => {
 		};
 		const repo = new ClientRiskRepository(prisma as never);
 
-		const dist = await repo.getRiskDistribution("org-1");
+		const dist = await repo.getRiskDistribution(productionTenant("org-1"));
 
 		expect(dist.total).toBe(3);
 		expect(dist.distribution.LOW).toBe(1);

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { PrismaClient } from "@prisma/client";
+import { productionTenant } from "../../lib/tenant-context";
 import { OperationService, DuplicateOperationError } from "./service";
 import { OperationRepository } from "./repository";
 import type { ActivityCode } from "./types";
@@ -76,13 +77,14 @@ describe("OperationService CRUD and stats", () => {
 	});
 
 	it("create throws DuplicateOperationError when import hash exists", async () => {
+		const tenant = productionTenant("org-1");
 		vi.spyOn(
 			OperationRepository.prototype,
 			"existsByImportHash",
 		).mockResolvedValue(true);
 
 		await expect(
-			service.create("org-1", {
+			service.create(tenant, {
 				clientId: "c1",
 				activityCode: "VEH",
 				operationDate: "2024-06-01",
@@ -105,6 +107,7 @@ describe("OperationService CRUD and stats", () => {
 	});
 
 	it("create delegates to repository when hash is unique", async () => {
+		const tenant = productionTenant("org-1");
 		const entity = { id: "op-1" };
 		vi.spyOn(
 			OperationRepository.prototype,
@@ -132,7 +135,7 @@ describe("OperationService CRUD and stats", () => {
 			importHash: "new-hash",
 		} as Parameters<OperationService["create"]>[1];
 
-		const result = await service.create("org-1", input);
+		const result = await service.create(tenant, input);
 		expect(result).toEqual(entity);
 
 		vi.spyOn(OperationRepository.prototype, "existsByImportHash").mockRestore();
@@ -140,12 +143,13 @@ describe("OperationService CRUD and stats", () => {
 	});
 
 	it("calculateAccumulatedAmount sums operations and compares to notice threshold", async () => {
+		const tenant = productionTenant("org-1");
 		vi.spyOn(OperationRepository.prototype, "findByClientId").mockResolvedValue(
 			[{ amountMxn: "50.5" }, { amountMxn: "49.5" }] as never,
 		);
 
 		const out = await service.calculateAccumulatedAmount(
-			"org-1",
+			tenant,
 			"client-1",
 			"JYS" as ActivityCode,
 			new Date("2024-01-01"),

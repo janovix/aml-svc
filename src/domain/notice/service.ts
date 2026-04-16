@@ -13,6 +13,7 @@ import type {
 	NoticePeriod,
 } from "./types";
 import { calculateNoticePeriod, getNoticeSubmissionDeadline } from "./types";
+import type { TenantContext } from "../../lib/tenant-context";
 
 /**
  * Month names in Spanish for notice naming
@@ -39,27 +40,27 @@ export class NoticeService {
 	 * List notices with filters
 	 */
 	async list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: NoticeFilterInput,
 	): Promise<ListResultWithMeta<NoticeEntity>> {
-		return this.repository.list(organizationId, filters);
+		return this.repository.list(tenant, filters);
 	}
 
 	/**
 	 * Get a single notice
 	 */
-	async get(organizationId: string, id: string): Promise<NoticeEntity> {
-		return this.repository.get(organizationId, id);
+	async get(tenant: TenantContext, id: string): Promise<NoticeEntity> {
+		return this.repository.get(tenant, id);
 	}
 
 	/**
 	 * Get a notice with alert summary
 	 */
 	async getWithSummary(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 	): Promise<NoticeWithAlertSummary> {
-		return this.repository.getWithAlertSummary(organizationId, id);
+		return this.repository.getWithAlertSummary(tenant, id);
 	}
 
 	/**
@@ -67,7 +68,7 @@ export class NoticeService {
 	 * Returns both aggregate stats and individual alert details for selection.
 	 */
 	async preview(
-		organizationId: string,
+		tenant: TenantContext,
 		input: NoticePreviewInput,
 	): Promise<{
 		total: number;
@@ -84,13 +85,9 @@ export class NoticeService {
 		const deadline = getNoticeSubmissionDeadline(input.year, input.month);
 
 		const [stats, alerts] = await Promise.all([
-			this.repository.countAlertsForPeriod(
-				organizationId,
-				period.start,
-				period.end,
-			),
+			this.repository.countAlertsForPeriod(tenant, period.start, period.end),
 			this.repository.getAlertsForPeriodDetailed(
-				organizationId,
+				tenant,
 				period.start,
 				period.end,
 			),
@@ -117,13 +114,14 @@ export class NoticeService {
 	 */
 	async create(
 		input: NoticeCreateInput,
-		organizationId: string,
+		tenant: TenantContext,
 		createdBy?: string,
 	): Promise<NoticeEntity> {
 		const period = calculateNoticePeriod(input.year, input.month);
+		const { organizationId, environment } = tenant;
 
 		const hasPending = await this.repository.hasPendingNoticeForPeriod(
-			organizationId,
+			tenant,
 			period.reportedMonth,
 		);
 
@@ -131,23 +129,19 @@ export class NoticeService {
 			throw new Error("NOTICE_ALREADY_EXISTS_FOR_PERIOD");
 		}
 
-		const notice = await this.repository.create(
-			input,
-			organizationId,
-			createdBy,
-		);
+		const notice = await this.repository.create(input, tenant, createdBy);
 
 		let alertCount: number;
 		if (input.alertIds === undefined) {
 			alertCount = await this.repository.assignAlertsToNotice(
-				organizationId,
+				tenant,
 				notice.id,
 				period.start,
 				period.end,
 			);
 		} else if (input.alertIds.length > 0) {
 			alertCount = await this.repository.assignSpecificAlertsToNotice(
-				organizationId,
+				tenant,
 				notice.id,
 				input.alertIds,
 			);
@@ -158,6 +152,7 @@ export class NoticeService {
 		await this.repository.createEvent({
 			noticeId: notice.id,
 			organizationId,
+			environment,
 			eventType: "CREATED",
 			toStatus: "DRAFT",
 			createdBy,
@@ -173,25 +168,25 @@ export class NoticeService {
 	 * Update a notice
 	 */
 	async patch(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: NoticePatchInput,
 	): Promise<NoticeEntity> {
-		return this.repository.patch(organizationId, id, input);
+		return this.repository.patch(tenant, id, input);
 	}
 
 	/**
 	 * Delete a notice (only if DRAFT status)
 	 */
-	async delete(organizationId: string, id: string): Promise<void> {
-		return this.repository.delete(organizationId, id);
+	async delete(tenant: TenantContext, id: string): Promise<void> {
+		return this.repository.delete(tenant, id);
 	}
 
 	/**
 	 * Get alerts for a notice (for XML generation)
 	 */
-	async getAlertsForNotice(organizationId: string, noticeId: string) {
-		return this.repository.getAlertsForNotice(organizationId, noticeId);
+	async getAlertsForNotice(tenant: TenantContext, noticeId: string) {
+		return this.repository.getAlertsForNotice(tenant, noticeId);
 	}
 
 	/**
@@ -200,17 +195,14 @@ export class NoticeService {
 	 * needed for SAT XML generation using the new multi-activity system
 	 */
 	async getAlertsWithOperationsForNotice(
-		organizationId: string,
+		tenant: TenantContext,
 		noticeId: string,
 	) {
-		return this.repository.getAlertsWithOperationsForNotice(
-			organizationId,
-			noticeId,
-		);
+		return this.repository.getAlertsWithOperationsForNotice(tenant, noticeId);
 	}
 
 	async markAsGenerated(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		options: {
 			xmlFileUrl?: string | null;
@@ -218,22 +210,17 @@ export class NoticeService {
 		},
 		createdBy?: string,
 	): Promise<NoticeEntity> {
-		return this.repository.markAsGenerated(
-			organizationId,
-			id,
-			options,
-			createdBy,
-		);
+		return this.repository.markAsGenerated(tenant, id, options, createdBy);
 	}
 
 	async markAsSubmitted(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		docSvcDocumentId: string,
 		createdBy?: string,
 	): Promise<NoticeEntity> {
 		return this.repository.markAsSubmitted(
-			organizationId,
+			tenant,
 			id,
 			docSvcDocumentId,
 			createdBy,
@@ -241,13 +228,13 @@ export class NoticeService {
 	}
 
 	async markAsAcknowledged(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		docSvcDocumentId: string,
 		createdBy?: string,
 	): Promise<NoticeEntity> {
 		return this.repository.markAsAcknowledged(
-			organizationId,
+			tenant,
 			id,
 			docSvcDocumentId,
 			createdBy,
@@ -255,14 +242,14 @@ export class NoticeService {
 	}
 
 	async markAsRebuked(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		docSvcDocumentId: string,
 		notes?: string | null,
 		createdBy?: string,
 	): Promise<NoticeEntity> {
 		return this.repository.markAsRebuked(
-			organizationId,
+			tenant,
 			id,
 			docSvcDocumentId,
 			notes,
@@ -271,21 +258,21 @@ export class NoticeService {
 	}
 
 	async revertToDraft(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		createdBy?: string,
 	): Promise<NoticeEntity> {
-		return this.repository.revertToDraft(organizationId, id, createdBy);
+		return this.repository.revertToDraft(tenant, id, createdBy);
 	}
 
 	async addAlerts(
-		organizationId: string,
+		tenant: TenantContext,
 		noticeId: string,
 		alertIds: string[],
 		createdBy?: string,
 	): Promise<number> {
 		return this.repository.addAlertsToNotice(
-			organizationId,
+			tenant,
 			noticeId,
 			alertIds,
 			createdBy,
@@ -293,13 +280,13 @@ export class NoticeService {
 	}
 
 	async removeAlerts(
-		organizationId: string,
+		tenant: TenantContext,
 		noticeId: string,
 		alertIds: string[],
 		createdBy?: string,
 	): Promise<number> {
 		return this.repository.removeAlertsFromNotice(
-			organizationId,
+			tenant,
 			noticeId,
 			alertIds,
 			createdBy,
@@ -334,7 +321,7 @@ export class NoticeService {
 	 * If we're past day 16 of the current month, alerts created now belong to the next
 	 * month's period, so we include the next month in the available options.
 	 */
-	async getAvailableMonths(organizationId: string): Promise<
+	async getAvailableMonths(tenant: TenantContext): Promise<
 		Array<{
 			year: number;
 			month: number;
@@ -359,9 +346,6 @@ export class NoticeService {
 			availableAlertCount: number;
 		}> = [];
 
-		// Determine starting offset: if we're past day 16, include next month (i = -1)
-		// This accounts for the SAT 17-17 period cycle where alerts created after
-		// day 16 belong to the next month's reporting period
 		const startOffset = currentDay > 16 ? -1 : 0;
 
 		for (let i = startOffset; i < 12; i++) {
@@ -374,17 +358,10 @@ export class NoticeService {
 			const period = calculateNoticePeriod(year, month);
 
 			const [stats, alertStats] = await Promise.all([
-				this.repository.getNoticeStatsForPeriod(organizationId, reportedMonth),
-				this.repository.countAlertsForPeriod(
-					organizationId,
-					period.start,
-					period.end,
-				),
+				this.repository.getNoticeStatsForPeriod(tenant, reportedMonth),
+				this.repository.countAlertsForPeriod(tenant, period.start, period.end),
 			]);
 
-			// A month blocks creation only when there's already a pending notice
-			// AND no unassigned alerts remain. If alerts are still available,
-			// the user can create an additional notice for the same period.
 			const blockCreation = stats.hasPendingNotice && alertStats.total === 0;
 
 			months.push({

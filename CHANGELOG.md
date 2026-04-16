@@ -1,11 +1,24 @@
-# [1.13.0](https://github.com/janovix/aml-svc/compare/v1.12.0...v1.13.0) (2026-04-14)
+# [1.14.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.13.0...v1.14.0-rc.1) (2026-04-16)
 
 
 ### Features
 
-* **catalog:** add backward compatibility for catalog item IDs in result mapping ([e98e1a8](https://github.com/janovix/aml-svc/commit/e98e1a89ac2e78fe4413aea01893d41c7181fd84))
-* **catalog:** add backward compatibility for catalog item IDs in result mapping ([fc497ce](https://github.com/janovix/aml-svc/commit/fc497cef10ab631b4a30b2a62281620c2c671131))
-* **catalog:** add backward compatibility for catalog item IDs in result mapping ([122f724](https://github.com/janovix/aml-svc/commit/122f7247539b8bd2aa19569cd4ae8770f64c9d90))
+* **alert:** add environment column for data isolation in org-scoped tables and update related queries ([d3f5fbd](https://github.com/janovix/aml-svc/commit/d3f5fbddf012653c348d6ee22663e8e2ae02ca7e))
+* **cors:** allow X-Environment header in CORS preflight response ([92be467](https://github.com/janovix/aml-svc/commit/92be467f7214d9088c7c6514ab227566e1943717))
+
+# [1.13.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.13.0-rc.2...v1.13.0-rc.3) (2026-04-16)
+
+
+### Features
+
+* **cors:** allow X-Environment header in CORS preflight response ([92be467](https://github.com/janovix/aml-svc/commit/92be467f7214d9088c7c6514ab227566e1943717))
+
+# [1.13.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.13.0-rc.1...v1.13.0-rc.2) (2026-04-16)
+
+
+### Features
+
+* **alert:** add environment column for data isolation in org-scoped tables and update related queries ([d3f5fbd](https://github.com/janovix/aml-svc/commit/d3f5fbddf012653c348d6ee22663e8e2ae02ca7e))
 
 # [1.13.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.12.0...v1.13.0-rc.1) (2026-04-14)
 

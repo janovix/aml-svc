@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { generateId } from "../../../lib/id-generator";
+import type { TenantContext } from "../../../lib/tenant-context";
 import type { OrgAssessmentResult } from "./types";
 
 export class OrgRiskRepository {
@@ -97,17 +98,19 @@ export class OrgRiskRepository {
 		return { assessment, previousLevel, previousAuditType };
 	}
 
-	async getActive(organizationId: string) {
+	async getActive(tenant: TenantContext) {
+		const { organizationId, environment } = tenant;
 		return this.prisma.orgRiskAssessment.findFirst({
-			where: { organizationId, status: "ACTIVE" },
+			where: { organizationId, environment, status: "ACTIVE" },
 			orderBy: { version: "desc" },
 			include: { elements: true, mitigants: true },
 		});
 	}
 
-	async getHistory(organizationId: string) {
+	async getHistory(tenant: TenantContext) {
+		const { organizationId, environment } = tenant;
 		return this.prisma.orgRiskAssessment.findMany({
-			where: { organizationId },
+			where: { organizationId, environment },
 			orderBy: { version: "desc" },
 		});
 	}

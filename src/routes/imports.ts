@@ -29,8 +29,10 @@ import {
 	type AuthVariables,
 	type AuthTokenPayload,
 	getOrganizationId,
+	getTenantContext,
 	verifyToken,
 } from "../middleware/auth";
+import { productionTenant } from "../lib/tenant-context";
 import { generateImportFileKey } from "../lib/r2-upload";
 import { APIError } from "../middleware/error";
 import {
@@ -201,7 +203,10 @@ importEventsRouter.get("/:id/events", async (c) => {
 
 	let importRecord: ImportEntity;
 	try {
-		importRecord = await service.get(organizationId, importId);
+		importRecord = await service.get(
+			productionTenant(organizationId),
+			importId,
+		);
 	} catch (error) {
 		if (error instanceof Error && error.message === "IMPORT_NOT_FOUND") {
 			return c.json(
@@ -270,7 +275,10 @@ importEventsRouter.get("/:id/events", async (c) => {
 			// status_change is emitted whenever the status OR processedRows changes
 			// so the frontend progress ring updates continuously during processing
 			// (not only on status transitions).
-			const currentImport = await service.get(organizationId, importId);
+			const currentImport = await service.get(
+				productionTenant(organizationId),
+				importId,
+			);
 			if (
 				currentImport.status !== currentStatus ||
 				currentImport.processedRows !== lastProcessedRows
@@ -369,7 +377,6 @@ function handleServiceError(error: unknown): never {
  * List imports for the organization
  */
 importsRouter.get("/", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = parseQueryParams(url.searchParams, [
 		"status",
@@ -379,7 +386,7 @@ importsRouter.get("/", async (c) => {
 
 	const service = getService(c);
 	const result = await service
-		.list(organizationId, filters)
+		.list(getTenantContext(c), filters)
 		.catch(handleServiceError);
 
 	return c.json(result);
@@ -471,11 +478,10 @@ importsRouter.get("/target-fields", async (c) => {
  * CSV headers + sample rows for column mapping (PENDING imports only)
  */
 importsRouter.get("/:id/preview", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ImportIdParamSchema, c.req.param());
 	const service = getService(c);
 	const importRecord = await service
-		.get(organizationId, params.id)
+		.get(getTenantContext(c), params.id)
 		.catch(handleServiceError);
 	if (importRecord.status !== "PENDING") {
 		throw new APIError(
@@ -504,13 +510,12 @@ importsRouter.post("/:id/start", async (c) => {
 	if (!c.env.IMPORT_PROCESSING_QUEUE) {
 		throw new APIError(503, "Import processing queue not configured");
 	}
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ImportIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const input = parseWithZod(ImportStartSchema, body);
 	const service = getService(c);
 	const { import: importRecord, job } = await service
-		.startImport(organizationId, params.id, input)
+		.startImport(getTenantContext(c), params.id, input)
 		.catch(handleServiceError);
 	await c.env.IMPORT_PROCESSING_QUEUE.send(job);
 	return c.json({ success: true, data: importRecord });
@@ -521,7 +526,6 @@ importsRouter.post("/:id/start", async (c) => {
  * Get import details with row results
  */
 importsRouter.get("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ImportIdParamSchema, c.req.param());
 	const url = new URL(c.req.url);
 	const queryObject = Object.fromEntries(url.searchParams.entries());
@@ -529,7 +533,7 @@ importsRouter.get("/:id", async (c) => {
 
 	const service = getService(c);
 	const result = await service
-		.getWithResults(organizationId, params.id, rowFilters)
+		.getWithResults(getTenantContext(c), params.id, rowFilters)
 		.catch(handleServiceError);
 
 	return c.json(result);
@@ -540,7 +544,6 @@ importsRouter.get("/:id", async (c) => {
  * Get paginated row results for an import
  */
 importsRouter.get("/:id/rows", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ImportIdParamSchema, c.req.param());
 	const url = new URL(c.req.url);
 	const queryObject = Object.fromEntries(url.searchParams.entries());
@@ -548,7 +551,7 @@ importsRouter.get("/:id/rows", async (c) => {
 
 	// First verify the import exists and belongs to org
 	const service = getService(c);
-	await service.get(organizationId, params.id).catch(handleServiceError);
+	await service.get(getTenantContext(c), params.id).catch(handleServiceError);
 
 	const result = await service.listRowResults(params.id, filters);
 
@@ -639,7 +642,7 @@ importsRouter.post("/", async (c) => {
 	// Create import record (do not send job yet; user will map columns then start)
 	const service = getService(c);
 	const { import: importRecord } = await service.create(
-		organizationId,
+		getTenantContext(c),
 		user.id,
 		input,
 		fileKey,
@@ -659,11 +662,12 @@ importsRouter.post("/", async (c) => {
  * Delete an import and its row results
  */
 importsRouter.delete("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ImportIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	await service.delete(organizationId, params.id).catch(handleServiceError);
+	await service
+		.delete(getTenantContext(c), params.id)
+		.catch(handleServiceError);
 
 	return c.body(null, 204);
 });

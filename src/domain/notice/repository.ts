@@ -23,6 +23,7 @@ import {
 	fromPrismaGroupBy,
 } from "../../lib/filter-metadata";
 import { generateId } from "../../lib/id-generator";
+import type { TenantContext } from "../../lib/tenant-context";
 
 export class NoticeRepository {
 	constructor(private readonly prisma: PrismaClient) {}
@@ -31,13 +32,14 @@ export class NoticeRepository {
 	 * List notices with pagination and filters
 	 */
 	async list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: NoticeFilterInput,
 	): Promise<ListResultWithMeta<NoticeEntity>> {
+		const { organizationId, environment } = tenant;
 		const { page, limit, status, periodStart, periodEnd, year } = filters;
 		const skip = (page - 1) * limit;
 
-		const baseWhere: Prisma.NoticeWhereInput = { organizationId };
+		const baseWhere: Prisma.NoticeWhereInput = { organizationId, environment };
 
 		if (periodStart) baseWhere.periodStart = { gte: new Date(periodStart) };
 		if (periodEnd) baseWhere.periodEnd = { lte: new Date(periodEnd) };
@@ -50,7 +52,10 @@ export class NoticeRepository {
 		const statusCountWhere: Prisma.NoticeWhereInput = { ...baseWhere };
 
 		// year counts: apply status but not year
-		const yearCountWhere: Prisma.NoticeWhereInput = { organizationId };
+		const yearCountWhere: Prisma.NoticeWhereInput = {
+			organizationId,
+			environment,
+		};
 		if (status?.length) yearCountWhere.status = { in: status };
 		if (periodStart)
 			yearCountWhere.periodStart = { gte: new Date(periodStart) };
@@ -117,9 +122,10 @@ export class NoticeRepository {
 	/**
 	 * Get a single notice by ID
 	 */
-	async get(organizationId: string, id: string): Promise<NoticeEntity> {
+	async get(tenant: TenantContext, id: string): Promise<NoticeEntity> {
+		const { organizationId, environment } = tenant;
 		const notice = await this.prisma.notice.findFirst({
-			where: { id, organizationId },
+			where: { id, organizationId, environment },
 		});
 
 		if (!notice) {
@@ -133,19 +139,20 @@ export class NoticeRepository {
 	 * Get a notice with alert summary, events, and individual alert details
 	 */
 	async getWithAlertSummary(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 	): Promise<NoticeWithAlertSummary> {
-		const notice = await this.get(organizationId, id);
+		const { organizationId, environment } = tenant;
+		const notice = await this.get(tenant, id);
 
 		const [alertRows, eventRows] = await Promise.all([
 			this.prisma.alert.findMany({
-				where: { noticeId: id, organizationId },
+				where: { noticeId: id, organizationId, environment },
 				include: { alertRule: true, client: true },
 				orderBy: { createdAt: "asc" },
 			}),
 			this.prisma.noticeEvent.findMany({
-				where: { noticeId: id, organizationId },
+				where: { noticeId: id, organizationId, environment },
 				orderBy: { createdAt: "asc" },
 			}),
 		]);
@@ -217,13 +224,14 @@ export class NoticeRepository {
 	 */
 	async create(
 		input: NoticeCreateInput,
-		organizationId: string,
+		tenant: TenantContext,
 		createdBy?: string,
 	): Promise<NoticeEntity> {
+		const { organizationId, environment } = tenant;
 		const data = mapNoticeCreateInputToPrisma(input, organizationId, createdBy);
 
 		const notice = await this.prisma.notice.create({
-			data,
+			data: { ...data, environment },
 		});
 
 		return mapPrismaNotice(notice);
@@ -233,11 +241,11 @@ export class NoticeRepository {
 	 * Update a notice (partial)
 	 */
 	async patch(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: NoticePatchInput,
 	): Promise<NoticeEntity> {
-		await this.ensureExists(organizationId, id);
+		await this.ensureExists(tenant, id);
 
 		const data = mapNoticePatchInputToPrisma(input);
 
@@ -252,8 +260,9 @@ export class NoticeRepository {
 	/**
 	 * Delete a notice (only DRAFT or GENERATED status)
 	 */
-	async delete(organizationId: string, id: string): Promise<void> {
-		const notice = await this.get(organizationId, id);
+	async delete(tenant: TenantContext, id: string): Promise<void> {
+		const { organizationId, environment } = tenant;
+		const notice = await this.get(tenant, id);
 
 		if (notice.status !== "DRAFT" && notice.status !== "GENERATED") {
 			throw new Error("CANNOT_DELETE_NON_DRAFT_NOTICE");
@@ -261,7 +270,7 @@ export class NoticeRepository {
 
 		// First, remove the noticeId from all alerts linked to this notice
 		await this.prisma.alert.updateMany({
-			where: { noticeId: id, organizationId },
+			where: { noticeId: id, organizationId, environment },
 			data: { noticeId: null },
 		});
 
@@ -275,7 +284,7 @@ export class NoticeRepository {
 	 * Uses the SAT 17-17 period cycle
 	 */
 	async countAlertsForPeriod(
-		organizationId: string,
+		tenant: TenantContext,
 		periodStart: Date,
 		periodEnd: Date,
 	): Promise<{
@@ -283,9 +292,11 @@ export class NoticeRepository {
 		bySeverity: Record<string, number>;
 		byStatus: Record<string, number>;
 	}> {
+		const { organizationId, environment } = tenant;
 		const alerts = await this.prisma.alert.findMany({
 			where: {
 				organizationId,
+				environment,
 				createdAt: {
 					gte: periodStart,
 					lte: periodEnd,
@@ -320,14 +331,16 @@ export class NoticeRepository {
 	 * Assign alerts to a notice
 	 */
 	async assignAlertsToNotice(
-		organizationId: string,
+		tenant: TenantContext,
 		noticeId: string,
 		periodStart: Date,
 		periodEnd: Date,
 	): Promise<number> {
+		const { organizationId, environment } = tenant;
 		const result = await this.prisma.alert.updateMany({
 			where: {
 				organizationId,
+				environment,
 				createdAt: {
 					gte: periodStart,
 					lte: periodEnd,
@@ -353,9 +366,10 @@ export class NoticeRepository {
 	 * Get all alerts for a notice (for XML generation)
 	 * Returns alerts with their associated client and alertRule
 	 */
-	async getAlertsForNotice(organizationId: string, noticeId: string) {
+	async getAlertsForNotice(tenant: TenantContext, noticeId: string) {
+		const { organizationId, environment } = tenant;
 		return this.prisma.alert.findMany({
-			where: { noticeId, organizationId },
+			where: { noticeId, organizationId, environment },
 			include: {
 				alertRule: true,
 				client: true,
@@ -375,15 +389,16 @@ export class NoticeRepository {
 	 * 3. Manually join the data
 	 */
 	async getAlertsWithOperationsForNotice(
-		organizationId: string,
+		tenant: TenantContext,
 		noticeId: string,
 	) {
+		const { organizationId, environment } = tenant;
 		// D1/SQLite limit is ~999 variables, use a safe batch size
 		const BATCH_SIZE = 500;
 
 		// Get alerts without includes to avoid Prisma generating large IN queries
 		const alerts = await this.prisma.alert.findMany({
-			where: { noticeId, organizationId },
+			where: { noticeId, organizationId, environment },
 			orderBy: { createdAt: "asc" },
 		});
 
@@ -409,7 +424,7 @@ export class NoticeRepository {
 		for (let i = 0; i < clientIds.length; i += BATCH_SIZE) {
 			const batchIds = clientIds.slice(i, i + BATCH_SIZE);
 			const batchClients = await this.prisma.client.findMany({
-				where: { id: { in: batchIds }, organizationId },
+				where: { id: { in: batchIds }, organizationId, environment },
 			});
 			clients.push(...batchClients);
 		}
@@ -438,6 +453,7 @@ export class NoticeRepository {
 				where: {
 					id: { in: batchIds },
 					organizationId,
+					environment,
 				},
 				include: {
 					payments: true,
@@ -484,7 +500,7 @@ export class NoticeRepository {
 	 * Also updates all alerts in the notice to FILE_GENERATED status
 	 */
 	async markAsGenerated(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		options: {
 			xmlFileUrl?: string | null;
@@ -492,7 +508,8 @@ export class NoticeRepository {
 		},
 		createdBy?: string,
 	): Promise<NoticeEntity> {
-		const existing = await this.get(organizationId, id);
+		const { organizationId, environment } = tenant;
+		const existing = await this.get(tenant, id);
 
 		const now = new Date();
 
@@ -512,6 +529,7 @@ export class NoticeRepository {
 			where: {
 				noticeId: id,
 				organizationId,
+				environment,
 				status: { notIn: ["CANCELLED", "SUBMITTED"] },
 			},
 			data: {
@@ -523,6 +541,7 @@ export class NoticeRepository {
 		await this.createEvent({
 			noticeId: id,
 			organizationId,
+			environment,
 			eventType: "GENERATED",
 			fromStatus: existing.status,
 			toStatus: "GENERATED",
@@ -539,12 +558,13 @@ export class NoticeRepository {
 	 * Mark a notice as submitted to SAT
 	 */
 	async markAsSubmitted(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		docSvcDocumentId: string,
 		createdBy?: string,
 	): Promise<NoticeEntity> {
-		const notice = await this.get(organizationId, id);
+		const { organizationId, environment } = tenant;
+		const notice = await this.get(tenant, id);
 
 		if (notice.status === "DRAFT") {
 			throw new Error("NOTICE_MUST_BE_GENERATED_BEFORE_SUBMISSION");
@@ -564,6 +584,7 @@ export class NoticeRepository {
 			where: {
 				noticeId: id,
 				organizationId,
+				environment,
 				status: { notIn: ["CANCELLED"] },
 			},
 			data: {
@@ -575,6 +596,7 @@ export class NoticeRepository {
 		await this.createEvent({
 			noticeId: id,
 			organizationId,
+			environment,
 			eventType: "SUBMITTED",
 			fromStatus: notice.status,
 			toStatus: "SUBMITTED",
@@ -590,12 +612,13 @@ export class NoticeRepository {
 	 * Mark a notice as acknowledged by SAT
 	 */
 	async markAsAcknowledged(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		docSvcDocumentId: string,
 		createdBy?: string,
 	): Promise<NoticeEntity> {
-		const notice = await this.get(organizationId, id);
+		const { organizationId, environment } = tenant;
+		const notice = await this.get(tenant, id);
 
 		if (notice.status !== "SUBMITTED") {
 			throw new Error("NOTICE_MUST_BE_SUBMITTED_BEFORE_ACKNOWLEDGMENT");
@@ -611,6 +634,7 @@ export class NoticeRepository {
 		await this.createEvent({
 			noticeId: id,
 			organizationId,
+			environment,
 			eventType: "ACKNOWLEDGED",
 			fromStatus: "SUBMITTED",
 			toStatus: "ACKNOWLEDGED",
@@ -627,13 +651,14 @@ export class NoticeRepository {
 	 * Does NOT change alert statuses -- alerts remain SUBMITTED.
 	 */
 	async markAsRebuked(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		docSvcDocumentId: string,
 		notes?: string | null,
 		createdBy?: string,
 	): Promise<NoticeEntity> {
-		const notice = await this.get(organizationId, id);
+		const { organizationId, environment } = tenant;
+		const notice = await this.get(tenant, id);
 
 		if (notice.status !== "SUBMITTED") {
 			throw new Error("NOTICE_MUST_BE_SUBMITTED_BEFORE_REBUKE");
@@ -647,6 +672,7 @@ export class NoticeRepository {
 		await this.createEvent({
 			noticeId: id,
 			organizationId,
+			environment,
 			eventType: "REBUKED",
 			fromStatus: "SUBMITTED",
 			toStatus: "REBUKED",
@@ -665,11 +691,12 @@ export class NoticeRepository {
 	 * Keeps noticeId set on alerts so they remain assigned.
 	 */
 	async revertToDraft(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		createdBy?: string,
 	): Promise<NoticeEntity> {
-		const notice = await this.get(organizationId, id);
+		const { organizationId, environment } = tenant;
+		const notice = await this.get(tenant, id);
 
 		if (notice.status !== "REBUKED") {
 			throw new Error("NOTICE_MUST_BE_REBUKED_BEFORE_REVERT");
@@ -679,6 +706,7 @@ export class NoticeRepository {
 			where: {
 				noticeId: id,
 				organizationId,
+				environment,
 				status: { notIn: ["CANCELLED"] },
 			},
 			data: {
@@ -703,6 +731,7 @@ export class NoticeRepository {
 		await this.createEvent({
 			noticeId: id,
 			organizationId,
+			environment,
 			eventType: "REVERTED",
 			fromStatus: "REBUKED",
 			toStatus: "DRAFT",
@@ -717,12 +746,13 @@ export class NoticeRepository {
 	 * Add specific alerts to a DRAFT notice.
 	 */
 	async addAlertsToNotice(
-		organizationId: string,
+		tenant: TenantContext,
 		noticeId: string,
 		alertIds: string[],
 		createdBy?: string,
 	): Promise<number> {
-		const notice = await this.get(organizationId, noticeId);
+		const { organizationId, environment } = tenant;
+		const notice = await this.get(tenant, noticeId);
 		if (notice.status !== "DRAFT") {
 			throw new Error("NOTICE_MUST_BE_DRAFT_TO_MODIFY_ALERTS");
 		}
@@ -731,6 +761,7 @@ export class NoticeRepository {
 			where: {
 				id: { in: alertIds },
 				organizationId,
+				environment,
 				noticeId: null,
 				status: { notIn: ["CANCELLED", "SUBMITTED"] },
 			},
@@ -746,6 +777,7 @@ export class NoticeRepository {
 			await this.createEvent({
 				noticeId,
 				organizationId,
+				environment,
 				eventType: "ALERTS_MODIFIED",
 				fromStatus: "DRAFT",
 				toStatus: "DRAFT",
@@ -763,12 +795,13 @@ export class NoticeRepository {
 	 * Reverts alert status to DETECTED and clears noticeId.
 	 */
 	async removeAlertsFromNotice(
-		organizationId: string,
+		tenant: TenantContext,
 		noticeId: string,
 		alertIds: string[],
 		createdBy?: string,
 	): Promise<number> {
-		const notice = await this.get(organizationId, noticeId);
+		const { organizationId, environment } = tenant;
+		const notice = await this.get(tenant, noticeId);
 		if (notice.status !== "DRAFT") {
 			throw new Error("NOTICE_MUST_BE_DRAFT_TO_MODIFY_ALERTS");
 		}
@@ -777,6 +810,7 @@ export class NoticeRepository {
 			where: {
 				id: { in: alertIds },
 				organizationId,
+				environment,
 				noticeId,
 			},
 			data: {
@@ -795,6 +829,7 @@ export class NoticeRepository {
 			await this.createEvent({
 				noticeId,
 				organizationId,
+				environment,
 				eventType: "ALERTS_MODIFIED",
 				fromStatus: "DRAFT",
 				toStatus: "DRAFT",
@@ -811,13 +846,15 @@ export class NoticeRepository {
 	 * Get detailed alert info for a period (for notice preview with selection).
 	 */
 	async getAlertsForPeriodDetailed(
-		organizationId: string,
+		tenant: TenantContext,
 		periodStart: Date,
 		periodEnd: Date,
 	): Promise<NoticeAlertDetail[]> {
+		const { organizationId, environment } = tenant;
 		const alerts = await this.prisma.alert.findMany({
 			where: {
 				organizationId,
+				environment,
 				createdAt: { gte: periodStart, lte: periodEnd },
 				status: { notIn: ["CANCELLED", "SUBMITTED"] },
 				noticeId: null,
@@ -853,14 +890,16 @@ export class NoticeRepository {
 	 * Assign only specific alerts (by ID) to a notice.
 	 */
 	async assignSpecificAlertsToNotice(
-		organizationId: string,
+		tenant: TenantContext,
 		noticeId: string,
 		alertIds: string[],
 	): Promise<number> {
+		const { organizationId, environment } = tenant;
 		const result = await this.prisma.alert.updateMany({
 			where: {
 				id: { in: alertIds },
 				organizationId,
+				environment,
 				status: { notIn: ["CANCELLED", "SUBMITTED"] },
 				noticeId: null,
 			},
@@ -880,12 +919,14 @@ export class NoticeRepository {
 	 * Only pending notices block creation of new notices for the same period
 	 */
 	async hasPendingNoticeForPeriod(
-		organizationId: string,
+		tenant: TenantContext,
 		reportedMonth: string,
 	): Promise<boolean> {
+		const { organizationId, environment } = tenant;
 		const count = await this.prisma.notice.count({
 			where: {
 				organizationId,
+				environment,
 				reportedMonth,
 				status: { in: ["DRAFT", "GENERATED"] },
 			},
@@ -898,16 +939,18 @@ export class NoticeRepository {
 	 * Returns counts of notices by status for UI display
 	 */
 	async getNoticeStatsForPeriod(
-		organizationId: string,
+		tenant: TenantContext,
 		reportedMonth: string,
 	): Promise<{
 		hasPendingNotice: boolean;
 		hasSubmittedNotice: boolean;
 		noticeCount: number;
 	}> {
+		const { organizationId, environment } = tenant;
 		const notices = await this.prisma.notice.findMany({
 			where: {
 				organizationId,
+				environment,
 				reportedMonth,
 			},
 			select: {
@@ -934,6 +977,7 @@ export class NoticeRepository {
 	async createEvent(input: {
 		noticeId: string;
 		organizationId: string;
+		environment: string;
 		eventType: NoticeEventType;
 		fromStatus?: string;
 		toStatus: string;
@@ -949,6 +993,7 @@ export class NoticeRepository {
 				id: generateId("NOTICE_EVENT"),
 				noticeId: input.noticeId,
 				organizationId: input.organizationId,
+				environment: input.environment,
 				eventType: input.eventType,
 				fromStatus: input.fromStatus ?? null,
 				toStatus: input.toStatus,
@@ -964,22 +1009,21 @@ export class NoticeRepository {
 	}
 
 	async getEventsForNotice(
-		organizationId: string,
+		tenant: TenantContext,
 		noticeId: string,
 	): Promise<NoticeEventEntity[]> {
+		const { organizationId, environment } = tenant;
 		const events = await this.prisma.noticeEvent.findMany({
-			where: { noticeId, organizationId },
+			where: { noticeId, organizationId, environment },
 			orderBy: { createdAt: "asc" },
 		});
 		return events.map(mapPrismaNoticeEvent);
 	}
 
-	private async ensureExists(
-		organizationId: string,
-		id: string,
-	): Promise<void> {
+	private async ensureExists(tenant: TenantContext, id: string): Promise<void> {
+		const { organizationId, environment } = tenant;
 		const notice = await this.prisma.notice.findFirst({
-			where: { id, organizationId },
+			where: { id, organizationId, environment },
 		});
 		if (!notice) {
 			throw new Error("NOTICE_NOT_FOUND");
