@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { ImportService } from "./service";
+import type { TenantContext } from "../../lib/tenant-context";
 import type { ImportRepository } from "./repository";
 import type {
 	ImportCreateInput,
@@ -22,6 +23,7 @@ describe("ImportService", () => {
 	let mockRepository: ImportRepository;
 
 	const organizationId = "org_test123";
+	const tenant: TenantContext = { organizationId, environment: "production" };
 	const createdBy = "user_test123";
 
 	const mockImport: ImportEntity = {
@@ -88,10 +90,10 @@ describe("ImportService", () => {
 
 			vi.mocked(mockRepository.list).mockResolvedValue(expected);
 
-			const result = await service.list(organizationId, filters);
+			const result = await service.list(tenant, filters);
 
 			expect(result).toEqual(expected);
-			expect(mockRepository.list).toHaveBeenCalledWith(organizationId, filters);
+			expect(mockRepository.list).toHaveBeenCalledWith(tenant, filters);
 		});
 	});
 
@@ -99,11 +101,11 @@ describe("ImportService", () => {
 		it("should get import by ID", async () => {
 			vi.mocked(mockRepository.getById).mockResolvedValue(mockImport);
 
-			const result = await service.get(organizationId, mockImport.id);
+			const result = await service.get(tenant, mockImport.id);
 
 			expect(result).toEqual(mockImport);
 			expect(mockRepository.getById).toHaveBeenCalledWith(
-				organizationId,
+				tenant,
 				mockImport.id,
 			);
 		});
@@ -111,7 +113,7 @@ describe("ImportService", () => {
 		it("should throw error when import not found", async () => {
 			vi.mocked(mockRepository.getById).mockResolvedValue(null);
 
-			await expect(service.get(organizationId, "non_existent")).rejects.toThrow(
+			await expect(service.get(tenant, "non_existent")).rejects.toThrow(
 				"IMPORT_NOT_FOUND",
 			);
 		});
@@ -128,14 +130,11 @@ describe("ImportService", () => {
 				mockWithResults,
 			);
 
-			const result = await service.getWithResults(
-				organizationId,
-				mockImport.id,
-			);
+			const result = await service.getWithResults(tenant, mockImport.id);
 
 			expect(result).toEqual(mockWithResults);
 			expect(mockRepository.getWithResults).toHaveBeenCalledWith(
-				organizationId,
+				tenant,
 				mockImport.id,
 				undefined,
 			);
@@ -158,14 +157,14 @@ describe("ImportService", () => {
 			);
 
 			const result = await service.getWithResults(
-				organizationId,
+				tenant,
 				mockImport.id,
 				rowFilters,
 			);
 
 			expect(result).toEqual(mockWithResults);
 			expect(mockRepository.getWithResults).toHaveBeenCalledWith(
-				organizationId,
+				tenant,
 				mockImport.id,
 				rowFilters,
 			);
@@ -175,7 +174,7 @@ describe("ImportService", () => {
 			vi.mocked(mockRepository.getWithResults).mockResolvedValue(null);
 
 			await expect(
-				service.getWithResults(organizationId, "non_existent"),
+				service.getWithResults(tenant, "non_existent"),
 			).rejects.toThrow("IMPORT_NOT_FOUND");
 		});
 	});
@@ -192,12 +191,7 @@ describe("ImportService", () => {
 
 			vi.mocked(mockRepository.create).mockResolvedValue(mockImport);
 
-			const result = await service.create(
-				organizationId,
-				createdBy,
-				input,
-				fileUrl,
-			);
+			const result = await service.create(tenant, createdBy, input, fileUrl);
 
 			expect(result.import).toEqual(mockImport);
 			expect(result.job).toEqual({
@@ -208,7 +202,7 @@ describe("ImportService", () => {
 				createdBy,
 			});
 			expect(mockRepository.create).toHaveBeenCalledWith(
-				organizationId,
+				tenant,
 				createdBy,
 				input,
 				fileUrl,
@@ -241,13 +235,13 @@ describe("ImportService", () => {
 			);
 
 			await expect(
-				service.startImport(organizationId, mockImport.id, {
+				service.startImport(tenant, mockImport.id, {
 					columnMapping: { "Col A": "name" },
 				}),
 			).rejects.toThrow("IMPORT_NOT_PENDING");
 			expect(mockRepository.updateColumnMappingIfPending).toHaveBeenCalledWith(
 				mockImport.id,
-				organizationId,
+				tenant,
 				{ "Col A": "name" },
 			);
 		});
@@ -265,7 +259,7 @@ describe("ImportService", () => {
 				updatedImport,
 			);
 
-			const result = await service.startImport(organizationId, mockImport.id, {
+			const result = await service.startImport(tenant, mockImport.id, {
 				columnMapping,
 			});
 
@@ -281,7 +275,7 @@ describe("ImportService", () => {
 			});
 			expect(mockRepository.updateColumnMappingIfPending).toHaveBeenCalledWith(
 				mockImport.id,
-				organizationId,
+				tenant,
 				columnMapping,
 			);
 		});
@@ -589,12 +583,9 @@ describe("ImportService", () => {
 		it("should delete import", async () => {
 			vi.mocked(mockRepository.delete).mockResolvedValue(undefined);
 
-			await service.delete(organizationId, mockImport.id);
+			await service.delete(tenant, mockImport.id);
 
-			expect(mockRepository.delete).toHaveBeenCalledWith(
-				organizationId,
-				mockImport.id,
-			);
+			expect(mockRepository.delete).toHaveBeenCalledWith(tenant, mockImport.id);
 		});
 	});
 });

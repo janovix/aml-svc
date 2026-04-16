@@ -3,8 +3,10 @@ import { sendRiskNotification } from "./risk-notifications";
 import type { Bindings } from "../types";
 
 const mockNotify = vi.fn().mockResolvedValue(undefined);
+const mockGetOrgLanguage = vi.fn().mockResolvedValue("es");
 const mockEnv = {
 	NOTIFICATIONS_SERVICE: { notify: mockNotify },
+	AUTH_SERVICE: { getOrganizationLanguage: mockGetOrgLanguage },
 } as unknown as Bindings;
 
 describe("sendRiskNotification", () => {
@@ -61,6 +63,32 @@ describe("sendRiskNotification", () => {
 				},
 				sourceService: "aml-svc",
 				sourceEvent: "risk.client_high",
+				emailI18n: expect.objectContaining({
+					titleKey: "risk.client_high.title",
+					bodyKey: "risk.client_high.body",
+				}),
+			}),
+		);
+	});
+
+	it("uses English copy when org language is en", async () => {
+		mockGetOrgLanguage.mockResolvedValueOnce("en");
+		await sendRiskNotification(mockEnv, {
+			type: "aml.risk.client_high",
+			organizationId: "org-en",
+			clientId: "c1",
+			clientName: "Acme",
+			riskLevel: "high",
+			factors: {},
+		});
+
+		expect(mockNotify).toHaveBeenCalledWith(
+			expect.objectContaining({
+				title: "Client classified as High Risk",
+				body: expect.stringContaining("Acme"),
+				emailI18n: expect.objectContaining({
+					titleKey: "risk.client_high.title",
+				}),
 			}),
 		);
 	});

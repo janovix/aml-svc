@@ -1,17 +1,12 @@
 /**
  * Notice Deadline Notifications
- *
- * Checks for organizations with pending (unsubmitted) alerts whose
- * SAT submission deadline is approaching and sends email + in-app
- * notifications at 3 days, 2 days, and 1 day before the deadline.
- *
- * Designed to run as a daily cron job (once per day, e.g. 14:00 UTC).
- * Uses KV for deduplication so the same reminder is never sent twice.
  */
 
+import { t, type EmailI18nPayload, type LanguageCode } from "./i18n";
 import type { Bindings } from "../types";
 import { getPrismaClient } from "./prisma";
 import { getNoticeSubmissionDeadline } from "../domain/notice/types";
+import { getOrganizationLanguageForTenant } from "./org-language";
 
 const LOG_TAG = "[notice-deadline]";
 
@@ -29,14 +24,11 @@ interface PendingOrgInfo {
 function getReportableMonth(now: Date): { year: number; month: number } {
 	const day = now.getUTCDate();
 
-	// Deadline is the 17th of the reported month.
-	// Before/on the 17th → current month is the reportable period.
-	// After the 17th → next month's period is open (deadline is next month's 17th).
 	if (day <= 17) {
 		return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
 	}
 
-	let m = now.getUTCMonth() + 2; // next month (1-indexed)
+	let m = now.getUTCMonth() + 2;
 	let y = now.getUTCFullYear();
 	if (m > 12) {
 		m = 1;
@@ -65,9 +57,6 @@ function severityForDays(daysLeft: number): Severity {
 	return "info";
 }
 
-/**
- * Main entry point — called by the scheduled handler.
- */
 export async function processNoticeDeadlineNotifications(
 	env: Bindings,
 	now = new Date(),
@@ -149,23 +138,56 @@ export async function processNoticeDeadlineNotifications(
 }
 
 async function sendDeadlineNotification(
-	_env: Bindings,
+	env: Bindings,
 	notifService: import("../types").NotificationsRpc,
 	info: PendingOrgInfo,
 ): Promise<void> {
 	const severity = severityForDays(info.daysUntilDeadline);
 	const deadlineStr = info.deadline.toISOString().slice(0, 10);
+	const period = `${info.year}-${String(info.month).padStart(2, "0")}`;
+
+	const lang: LanguageCode = await getOrganizationLanguageForTenant(
+		env,
+		info.organizationId,
+	);
 
 	const title =
 		info.daysUntilDeadline <= 1
-			? `Vencimiento mañana: ${info.pendingAlertCount} alertas sin reportar`
-			: `${info.daysUntilDeadline} días para el vencimiento: ${info.pendingAlertCount} alertas pendientes`;
+			? t(lang, "notice.deadline.title_tomorrow", {
+					pendingAlertCount: info.pendingAlertCount,
+				})
+			: t(lang, "notice.deadline.title_days", {
+					daysUntilDeadline: info.daysUntilDeadline,
+					pendingAlertCount: info.pendingAlertCount,
+				});
 
-	const body =
-		`Tiene ${info.pendingAlertCount} alerta(s) pendiente(s) de incluir en un aviso SAT ` +
-		`para el periodo ${info.year}-${String(info.month).padStart(2, "0")}. ` +
-		`La fecha límite de presentación es el ${deadlineStr}. ` +
-		`Ingrese a la plataforma para generar y enviar su aviso antes del vencimiento.`;
+	const body = t(lang, "notice.deadline.body", {
+		pendingAlertCount: info.pendingAlertCount,
+		period,
+		deadlineStr,
+	});
+
+	const titleKey: EmailI18nPayload["titleKey"] =
+		info.daysUntilDeadline <= 1
+			? "notice.deadline.title_tomorrow"
+			: "notice.deadline.title_days";
+
+	const emailI18n: EmailI18nPayload = {
+		titleKey,
+		bodyKey: "notice.deadline.body",
+		titleParams:
+			info.daysUntilDeadline <= 1
+				? { pendingAlertCount: info.pendingAlertCount }
+				: {
+						daysUntilDeadline: info.daysUntilDeadline,
+						pendingAlertCount: info.pendingAlertCount,
+					},
+		bodyParams: {
+			pendingAlertCount: info.pendingAlertCount,
+			period,
+			deadlineStr,
+		},
+	};
 
 	await notifService.notify({
 		tenantId: info.organizationId,
@@ -185,5 +207,6 @@ async function sendDeadlineNotification(
 		sendEmail: true,
 		sourceService: "aml-svc",
 		sourceEvent: "notice.deadline_reminder",
+		emailI18n,
 	});
 }

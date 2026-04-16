@@ -11,6 +11,7 @@ import type {
 } from "./schemas";
 import { InvoiceRepository } from "./repository";
 import { CfdiV4Parser, cfdiToInvoiceData } from "./parser/cfdi-v4";
+import type { TenantContext } from "../../lib/tenant-context";
 
 export interface InvoiceParseResult {
 	invoice: InvoiceEntity;
@@ -30,10 +31,10 @@ export class InvoiceService {
 	 * Create invoice from manual input (no XML)
 	 */
 	async create(
-		organizationId: string,
+		tenant: TenantContext,
 		input: InvoiceCreateInput,
 	): Promise<InvoiceEntity> {
-		return this.repository.create(organizationId, input);
+		return this.repository.create(tenant, input);
 	}
 
 	/**
@@ -41,7 +42,7 @@ export class InvoiceService {
 	 * Returns the invoice along with PLD hints for operation suggestion
 	 */
 	async parseAndCreate(
-		organizationId: string,
+		tenant: TenantContext,
 		input: InvoiceParseXmlInput,
 	): Promise<InvoiceParseResult> {
 		// Parse the XML
@@ -50,7 +51,7 @@ export class InvoiceService {
 		// Check if invoice with same UUID already exists
 		if (comprobante.TimbreFiscalDigital?.UUID) {
 			const existing = await this.repository.findByUuid(
-				organizationId,
+				tenant,
 				comprobante.TimbreFiscalDigital.UUID,
 			);
 			if (existing) {
@@ -68,10 +69,7 @@ export class InvoiceService {
 		);
 
 		// Create the invoice
-		const invoice = await this.repository.createFromXml(
-			organizationId,
-			invoiceData,
-		);
+		const invoice = await this.repository.createFromXml(tenant, invoiceData);
 
 		// Extract PLD hints
 		const pldHints = this.parser.extractPldHints(comprobante);
@@ -83,58 +81,58 @@ export class InvoiceService {
 	 * Get invoice by ID
 	 */
 	async getById(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 	): Promise<InvoiceEntity | null> {
-		return this.repository.findById(organizationId, id);
+		return this.repository.findById(tenant, id);
 	}
 
 	/**
 	 * Get invoice by CFDI UUID
 	 */
 	async getByUuid(
-		organizationId: string,
+		tenant: TenantContext,
 		uuid: string,
 	): Promise<InvoiceEntity | null> {
-		return this.repository.findByUuid(organizationId, uuid);
+		return this.repository.findByUuid(tenant, uuid);
 	}
 
 	/**
 	 * List invoices with filters
 	 */
 	async list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: InvoiceFilters,
 	): Promise<ListResultWithMeta<InvoiceEntity>> {
-		return this.repository.list(organizationId, filters);
+		return this.repository.list(tenant, filters);
 	}
 
 	/**
 	 * Update invoice notes
 	 */
 	async updateNotes(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		notes: string | null,
 	): Promise<InvoiceEntity | null> {
-		return this.repository.update(organizationId, id, notes);
+		return this.repository.update(tenant, id, notes);
 	}
 
 	/**
 	 * Get invoice statistics for the organization
 	 */
-	async getStats(organizationId: string): Promise<{
+	async getStats(tenant: TenantContext): Promise<{
 		totalInvoices: number;
 		ingresoInvoices: number;
 		egresoInvoices: number;
 	}> {
-		return this.repository.getStats(organizationId);
+		return this.repository.getStats(tenant);
 	}
 
 	/**
 	 * Soft delete invoice
 	 */
-	async delete(organizationId: string, id: string): Promise<boolean> {
-		return this.repository.softDelete(organizationId, id);
+	async delete(tenant: TenantContext, id: string): Promise<boolean> {
+		return this.repository.softDelete(tenant, id);
 	}
 }

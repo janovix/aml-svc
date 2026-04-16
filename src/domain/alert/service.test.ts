@@ -14,6 +14,7 @@ import type {
 	AlertRuleEntity,
 	AlertRuleConfigEntity,
 } from "./types";
+import { productionTenant } from "../../lib/tenant-context";
 
 describe("AlertRuleService", () => {
 	let service: AlertRuleService;
@@ -152,6 +153,7 @@ describe("AlertService", () => {
 	let service: AlertService;
 	let mockRepository: AlertRepository;
 	const organizationId = "org-123";
+	const tenant = productionTenant(organizationId);
 
 	const mockAlert: AlertEntity = {
 		id: "alert-123",
@@ -189,19 +191,16 @@ describe("AlertService", () => {
 		it("should return alert when found", async () => {
 			vi.mocked(mockRepository.getById).mockResolvedValue(mockAlert);
 
-			const result = await service.get(organizationId, "alert-123");
+			const result = await service.get(tenant, "alert-123");
 
-			expect(mockRepository.getById).toHaveBeenCalledWith(
-				organizationId,
-				"alert-123",
-			);
+			expect(mockRepository.getById).toHaveBeenCalledWith(tenant, "alert-123");
 			expect(result).toEqual(mockAlert);
 		});
 
 		it("should throw error when alert not found", async () => {
 			vi.mocked(mockRepository.getById).mockResolvedValue(null);
 
-			await expect(service.get(organizationId, "non-existent")).rejects.toThrow(
+			await expect(service.get(tenant, "non-existent")).rejects.toThrow(
 				"ALERT_NOT_FOUND",
 			);
 		});
@@ -213,13 +212,10 @@ describe("AlertService", () => {
 				mockAlert,
 			);
 
-			const result = await service.findByIdempotencyKey(
-				organizationId,
-				"key-123",
-			);
+			const result = await service.findByIdempotencyKey(tenant, "key-123");
 
 			expect(mockRepository.findByIdempotencyKey).toHaveBeenCalledWith(
-				organizationId,
+				tenant,
 				"key-123",
 			);
 			expect(result).toEqual(mockAlert);
@@ -228,10 +224,7 @@ describe("AlertService", () => {
 		it("should return null when not found", async () => {
 			vi.mocked(mockRepository.findByIdempotencyKey).mockResolvedValue(null);
 
-			const result = await service.findByIdempotencyKey(
-				organizationId,
-				"non-existent",
-			);
+			const result = await service.findByIdempotencyKey(tenant, "non-existent");
 
 			expect(result).toBeNull();
 		});
@@ -250,9 +243,9 @@ describe("AlertService", () => {
 			});
 
 			const filters = { page: 1, limit: 10 } as never;
-			const result = await service.list(organizationId, filters);
+			const result = await service.list(tenant, filters);
 
-			expect(mockRepository.list).toHaveBeenCalledWith(organizationId, filters);
+			expect(mockRepository.list).toHaveBeenCalledWith(tenant, filters);
 			expect(result.data).toEqual([mockAlert]);
 		});
 	});
@@ -262,9 +255,9 @@ describe("AlertService", () => {
 			const input = { alertRuleId: "2501" } as never;
 			vi.mocked(mockRepository.create).mockResolvedValue(mockAlert);
 
-			const result = await service.create(input, organizationId);
+			const result = await service.create(input, tenant);
 
-			expect(mockRepository.create).toHaveBeenCalledWith(input, organizationId);
+			expect(mockRepository.create).toHaveBeenCalledWith(input, tenant);
 			expect(result).toEqual(mockAlert);
 		});
 	});
@@ -274,10 +267,10 @@ describe("AlertService", () => {
 			const input = { status: "SUBMITTED" } as never;
 			vi.mocked(mockRepository.update).mockResolvedValue(mockAlert);
 
-			const result = await service.update(organizationId, "alert-123", input);
+			const result = await service.update(tenant, "alert-123", input);
 
 			expect(mockRepository.update).toHaveBeenCalledWith(
-				organizationId,
+				tenant,
 				"alert-123",
 				input,
 			);
@@ -290,10 +283,10 @@ describe("AlertService", () => {
 			const input = { severity: "CRITICAL" } as never;
 			vi.mocked(mockRepository.patch).mockResolvedValue(mockAlert);
 
-			const result = await service.patch(organizationId, "alert-123", input);
+			const result = await service.patch(tenant, "alert-123", input);
 
 			expect(mockRepository.patch).toHaveBeenCalledWith(
-				organizationId,
+				tenant,
 				"alert-123",
 				input,
 			);
@@ -305,12 +298,9 @@ describe("AlertService", () => {
 		it("delegates to repository", async () => {
 			vi.mocked(mockRepository.delete).mockResolvedValue(undefined);
 
-			await service.delete(organizationId, "alert-123");
+			await service.delete(tenant, "alert-123");
 
-			expect(mockRepository.delete).toHaveBeenCalledWith(
-				organizationId,
-				"alert-123",
-			);
+			expect(mockRepository.delete).toHaveBeenCalledWith(tenant, "alert-123");
 		});
 	});
 });

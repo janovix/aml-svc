@@ -19,6 +19,7 @@ import type {
 	ClientAddressPatchInput,
 } from "./schemas";
 import type { CatalogNameResolver } from "../catalog/name-resolver";
+import { productionTenant } from "../../lib/tenant-context";
 
 describe("ClientRepository", () => {
 	let repository: ClientRepository;
@@ -28,6 +29,7 @@ describe("ClientRepository", () => {
 	const mockClient: Client = {
 		id: "CLT123456789",
 		organizationId: "org-123",
+		environment: "production",
 		rfc: "ABCD123456EF7",
 		personType: "PHYSICAL",
 		firstName: "Juan",
@@ -169,7 +171,10 @@ describe("ClientRepository", () => {
 			vi.mocked(mockPrisma.client.count).mockResolvedValue(1);
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([mockClient]);
 
-			const result = await repository.list("org-123", filters);
+			const result = await repository.list(
+				productionTenant("org-123"),
+				filters,
+			);
 
 			expect(result.data).toHaveLength(1);
 			expect(result.pagination).toEqual({
@@ -190,7 +195,7 @@ describe("ClientRepository", () => {
 			vi.mocked(mockPrisma.client.count).mockResolvedValue(1);
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([mockClient]);
 
-			await repository.list("org-123", filters);
+			await repository.list(productionTenant("org-123"), filters);
 
 			expect(mockPrisma.client.findMany).toHaveBeenCalledWith(
 				expect.objectContaining({
@@ -207,7 +212,7 @@ describe("ClientRepository", () => {
 			vi.mocked(mockPrisma.client.count).mockResolvedValue(1);
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([mockClient]);
 
-			await repository.list("org-123", filters);
+			await repository.list(productionTenant("org-123"), filters);
 
 			expect(mockPrisma.client.findMany).toHaveBeenCalledWith(
 				expect.objectContaining({
@@ -224,7 +229,7 @@ describe("ClientRepository", () => {
 			vi.mocked(mockPrisma.client.count).mockResolvedValue(1);
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([mockClient]);
 
-			await repository.list("org-123", filters);
+			await repository.list(productionTenant("org-123"), filters);
 
 			expect(mockPrisma.client.findMany).toHaveBeenCalledWith(
 				expect.objectContaining({
@@ -246,7 +251,10 @@ describe("ClientRepository", () => {
 			vi.mocked(mockPrisma.client.count).mockResolvedValue(25);
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([mockClient]);
 
-			const result = await repository.list("org-123", filters);
+			const result = await repository.list(
+				productionTenant("org-123"),
+				filters,
+			);
 
 			expect(result.pagination.totalPages).toBe(3);
 		});
@@ -257,7 +265,10 @@ describe("ClientRepository", () => {
 			vi.mocked(mockPrisma.client.count).mockResolvedValue(0);
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([]);
 
-			const result = await repository.list("org-123", filters);
+			const result = await repository.list(
+				productionTenant("org-123"),
+				filters,
+			);
 
 			expect(result.pagination.totalPages).toBe(0);
 		});
@@ -267,7 +278,10 @@ describe("ClientRepository", () => {
 		it("should return client when found", async () => {
 			vi.mocked(mockPrisma.client.findFirst).mockResolvedValue(mockClient);
 
-			const result = await repository.getById("org-123", "CLT123456789");
+			const result = await repository.getById(
+				productionTenant("org-123"),
+				"CLT123456789",
+			);
 
 			expect(result).not.toBeNull();
 			expect(result?.id).toBe("CLT123456789");
@@ -276,7 +290,10 @@ describe("ClientRepository", () => {
 		it("should return null when client not found", async () => {
 			vi.mocked(mockPrisma.client.findFirst).mockResolvedValue(null);
 
-			const result = await repository.getById("org-123", "CLT999999999");
+			const result = await repository.getById(
+				productionTenant("org-123"),
+				"CLT999999999",
+			);
 
 			expect(result).toBeNull();
 		});
@@ -314,7 +331,10 @@ describe("ClientRepository", () => {
 			} as any);
 			vi.mocked(mockPrisma.client.update).mockResolvedValue(mockClient);
 
-			const result = await repository.create("org-123", input);
+			const result = await repository.create(
+				productionTenant("org-123"),
+				input,
+			);
 
 			expect(result.id).toBe("CLT123456789");
 			expect(mockPrisma.client.create).toHaveBeenCalled();
@@ -358,7 +378,10 @@ describe("ClientRepository", () => {
 			} as any);
 			vi.mocked(mockPrisma.client.update).mockResolvedValue(moralClient);
 
-			const result = await repository.create("org-123", input);
+			const result = await repository.create(
+				productionTenant("org-123"),
+				input,
+			);
 
 			expect(result.personType).toBe("moral");
 			expect(mockPrisma.client.create).toHaveBeenCalledWith(
@@ -413,7 +436,7 @@ describe("ClientRepository", () => {
 			} as any);
 			vi.mocked(mockPrisma.client.update).mockResolvedValue(completeClient);
 
-			await repository.create("org-123", input);
+			await repository.create(productionTenant("org-123"), input);
 
 			expect(mockPrisma.client.create).toHaveBeenCalledWith(
 				expect.objectContaining({
@@ -458,7 +481,11 @@ describe("ClientRepository", () => {
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			} as any);
 
-			const result = await repository.update("org-123", "CLT123456789", input);
+			const result = await repository.update(
+				productionTenant("org-123"),
+				"CLT123456789",
+				input,
+			);
 
 			expect(result.firstName).toBe("Jane");
 		});
@@ -486,7 +513,7 @@ describe("ClientRepository", () => {
 			vi.mocked(mockPrisma.client.findFirst).mockResolvedValue(null);
 
 			await expect(
-				repository.update("org-123", "CLT999999999", input),
+				repository.update(productionTenant("org-123"), "CLT999999999", input),
 			).rejects.toThrow("CLIENT_NOT_FOUND");
 		});
 	});
@@ -509,7 +536,11 @@ describe("ClientRepository", () => {
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			} as any);
 
-			const result = await repository.patch("org-123", "CLT123456789", input);
+			const result = await repository.patch(
+				productionTenant("org-123"),
+				"CLT123456789",
+				input,
+			);
 
 			expect(result.email).toBe("newemail@example.com");
 		});
@@ -522,7 +553,7 @@ describe("ClientRepository", () => {
 			vi.mocked(mockPrisma.client.findFirst).mockResolvedValue(null);
 
 			await expect(
-				repository.patch("org-123", "CLT999999999", input),
+				repository.patch(productionTenant("org-123"), "CLT999999999", input),
 			).rejects.toThrow("CLIENT_NOT_FOUND");
 		});
 	});
@@ -535,7 +566,7 @@ describe("ClientRepository", () => {
 				deletedAt: new Date(),
 			});
 
-			await repository.delete("org-123", "CLT123456789");
+			await repository.delete(productionTenant("org-123"), "CLT123456789");
 
 			expect(mockPrisma.client.update).toHaveBeenCalledWith({
 				where: { id: "CLT123456789" },
@@ -547,7 +578,7 @@ describe("ClientRepository", () => {
 			vi.mocked(mockPrisma.client.findFirst).mockResolvedValue(null);
 
 			await expect(
-				repository.delete("org-123", "CLT999999999"),
+				repository.delete(productionTenant("org-123"), "CLT999999999"),
 			).rejects.toThrow("CLIENT_NOT_FOUND");
 		});
 	});
@@ -873,7 +904,7 @@ describe("ClientRepository", () => {
 				.mockResolvedValueOnce(30)
 				.mockResolvedValueOnce(10);
 
-			const result = await repository.getStats("org-123");
+			const result = await repository.getStats(productionTenant("org-123"));
 
 			expect(result).toEqual({
 				totalClients: 100,

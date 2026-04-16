@@ -29,7 +29,11 @@ import {
 	buildGateDenialBody,
 	createUsageRightsClient,
 } from "../lib/usage-rights-client";
-import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import {
+	type AuthVariables,
+	getOrganizationId,
+	getTenantContext,
+} from "../middleware/auth";
 import {
 	generateSatMonthlyReportXml,
 	type SatXmlConfig,
@@ -39,6 +43,7 @@ import type { OperationEntity, ActivityCode } from "../domain/operation/types";
 import type { ClientEntity } from "../domain/client/types";
 import { generateNoticeFileKey } from "../lib/r2-upload";
 import { parseQueryParams } from "../lib/query-params";
+import { emitWebhookEvent, WEBHOOK_EVENT_TYPES } from "../lib/webhook-events";
 
 export const noticesRouter = new Hono<{
 	Bindings: Bindings;
@@ -108,14 +113,13 @@ function handleServiceError(error: unknown): never {
 
 // GET /notices - List notices
 noticesRouter.get("/", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = parseQueryParams(url.searchParams, ["status"]);
 	const filters = parseWithZod(NoticeFilterSchema, queryObject);
 
 	const service = getService(c);
 	const result = await service
-		.list(organizationId, filters)
+		.list(getTenantContext(c), filters)
 		.catch(handleServiceError);
 
 	return c.json(result);
@@ -123,14 +127,13 @@ noticesRouter.get("/", async (c) => {
 
 // GET /notices/preview - Preview alerts for a potential notice
 noticesRouter.get("/preview", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = Object.fromEntries(url.searchParams.entries());
 	const input = parseWithZod(NoticePreviewSchema, queryObject);
 
 	const service = getService(c);
 	const result = await service
-		.preview(organizationId, input)
+		.preview(getTenantContext(c), input)
 		.catch(handleServiceError);
 
 	return c.json(result);
@@ -138,11 +141,9 @@ noticesRouter.get("/preview", async (c) => {
 
 // GET /notices/available-months - Get available months for creating notices
 noticesRouter.get("/available-months", async (c) => {
-	const organizationId = getOrganizationId(c);
-
 	const service = getService(c);
 	const months = await service
-		.getAvailableMonths(organizationId)
+		.getAvailableMonths(getTenantContext(c))
 		.catch(handleServiceError);
 
 	return c.json({ months });
@@ -150,12 +151,11 @@ noticesRouter.get("/available-months", async (c) => {
 
 // GET /notices/:id - Get a single notice
 noticesRouter.get("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
 
 	const service = getService(c);
 	const notice = await service
-		.getWithSummary(organizationId, params.id)
+		.getWithSummary(getTenantContext(c), params.id)
 		.catch(handleServiceError);
 
 	return c.json(notice);
@@ -179,7 +179,7 @@ noticesRouter.post("/", async (c) => {
 
 	const service = getService(c);
 	const created = await service
-		.create(payload, organizationId, userId)
+		.create(payload, getTenantContext(c), userId)
 		.catch(handleServiceError);
 
 	return c.json(created, 201);
@@ -187,7 +187,6 @@ noticesRouter.post("/", async (c) => {
 
 // PATCH /notices/:id - Update a notice
 noticesRouter.patch("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(NoticePatchSchema, body);
@@ -198,7 +197,7 @@ noticesRouter.patch("/:id", async (c) => {
 
 	const service = getService(c);
 	const updated = await service
-		.patch(organizationId, params.id, payload)
+		.patch(getTenantContext(c), params.id, payload)
 		.catch(handleServiceError);
 
 	return c.json(updated);
@@ -206,11 +205,12 @@ noticesRouter.patch("/:id", async (c) => {
 
 // DELETE /notices/:id - Delete a draft notice
 noticesRouter.delete("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	await service.delete(organizationId, params.id).catch(handleServiceError);
+	await service
+		.delete(getTenantContext(c), params.id)
+		.catch(handleServiceError);
 
 	return c.body(null, 204);
 });
@@ -220,10 +220,9 @@ noticesRouter.post("/:id/generate", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
 
+	const tenant = getTenantContext(c);
 	const service = getService(c);
-	const notice = await service
-		.get(organizationId, params.id)
-		.catch(handleServiceError);
+	const notice = await service.get(tenant, params.id).catch(handleServiceError);
 
 	if (notice.status !== "DRAFT") {
 		throw new APIError(400, "Notice has already been generated");
@@ -236,8 +235,7 @@ noticesRouter.post("/:id/generate", async (c) => {
 	const prisma = getPrismaClient(c.env.DB);
 	const orgSettingsRepo = new OrganizationSettingsRepository(prisma);
 	const orgSettingsService = new OrganizationSettingsService(orgSettingsRepo);
-	const orgSettings =
-		await orgSettingsService.getByOrganizationId(organizationId);
+	const orgSettings = await orgSettingsService.getByOrganizationId(tenant);
 
 	if (!orgSettings) {
 		throw new APIError(
@@ -250,7 +248,7 @@ noticesRouter.post("/:id/generate", async (c) => {
 
 	// Get alerts with transactions/operations for XML generation
 	const alertsData = await service.getAlertsWithOperationsForNotice(
-		organizationId,
+		tenant,
 		params.id,
 	);
 
@@ -362,10 +360,19 @@ noticesRouter.post("/:id/generate", async (c) => {
 	}
 
 	await service.markAsGenerated(
-		organizationId,
+		tenant,
 		params.id,
 		{ xmlFileUrl, fileSize },
 		userId,
+	);
+
+	c.executionCtx.waitUntil(
+		emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+			organizationId,
+			environment: tenant.environment,
+			eventType: WEBHOOK_EVENT_TYPES.NOTICE_GENERATED,
+			data: { id: notice.id, reportedMonth: notice.reportedMonth, alertCount },
+		}),
 	);
 
 	return c.json({
@@ -379,12 +386,11 @@ noticesRouter.post("/:id/generate", async (c) => {
 
 // GET /notices/:id/download - Download the generated XML file
 noticesRouter.get("/:id/download", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
 
 	const service = getService(c);
 	const notice = await service
-		.get(organizationId, params.id)
+		.get(getTenantContext(c), params.id)
 		.catch(handleServiceError);
 
 	if (notice.status === "DRAFT") {
@@ -424,28 +430,31 @@ noticesRouter.get("/:id/download", async (c) => {
 
 // POST /notices/:id/submit - Mark notice as submitted to SAT
 noticesRouter.post("/:id/submit", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
 	const body = await c.req.json().catch(() => ({}));
 	const input = parseWithZod(NoticeSubmitSchema, body);
 	const user = c.get("user");
 
+	const tenant = getTenantContext(c);
 	const service = getService(c);
 	const updated = await service
-		.markAsSubmitted(
-			organizationId,
-			params.id,
-			input.docSvcDocumentId,
-			user?.id,
-		)
+		.markAsSubmitted(tenant, params.id, input.docSvcDocumentId, user?.id)
 		.catch(handleServiceError);
+
+	c.executionCtx.waitUntil(
+		emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+			organizationId: tenant.organizationId,
+			environment: tenant.environment,
+			eventType: WEBHOOK_EVENT_TYPES.NOTICE_SUBMITTED,
+			data: { id: updated.id, reportedMonth: updated.reportedMonth },
+		}),
+	);
 
 	return c.json(updated);
 });
 
 // POST /notices/:id/acknowledge - Mark notice as acknowledged by SAT
 noticesRouter.post("/:id/acknowledge", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const input = parseWithZod(NoticeAcknowledgeSchema, body);
@@ -454,7 +463,7 @@ noticesRouter.post("/:id/acknowledge", async (c) => {
 	const service = getService(c);
 	const updated = await service
 		.markAsAcknowledged(
-			organizationId,
+			getTenantContext(c),
 			params.id,
 			input.docSvcDocumentId,
 			user?.id,
@@ -466,7 +475,6 @@ noticesRouter.post("/:id/acknowledge", async (c) => {
 
 // POST /notices/:id/rebuke - Mark notice as rebuked (rejected) by SAT
 noticesRouter.post("/:id/rebuke", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const input = parseWithZod(NoticeRebukeSchema, body);
@@ -475,7 +483,7 @@ noticesRouter.post("/:id/rebuke", async (c) => {
 	const service = getService(c);
 	const updated = await service
 		.markAsRebuked(
-			organizationId,
+			getTenantContext(c),
 			params.id,
 			input.docSvcDocumentId,
 			input.notes,
@@ -488,13 +496,12 @@ noticesRouter.post("/:id/rebuke", async (c) => {
 
 // POST /notices/:id/revert - Revert a rebuked notice back to draft
 noticesRouter.post("/:id/revert", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
 	const user = c.get("user");
 
 	const service = getService(c);
 	const updated = await service
-		.revertToDraft(organizationId, params.id, user?.id)
+		.revertToDraft(getTenantContext(c), params.id, user?.id)
 		.catch(handleServiceError);
 
 	return c.json(updated);
@@ -502,7 +509,6 @@ noticesRouter.post("/:id/revert", async (c) => {
 
 // POST /notices/:id/alerts/add - Add alerts to a draft notice
 noticesRouter.post("/:id/alerts/add", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const input = parseWithZod(NoticeAddAlertsSchema, body);
@@ -510,7 +516,7 @@ noticesRouter.post("/:id/alerts/add", async (c) => {
 
 	const service = getService(c);
 	const count = await service
-		.addAlerts(organizationId, params.id, input.alertIds, user?.id)
+		.addAlerts(getTenantContext(c), params.id, input.alertIds, user?.id)
 		.catch(handleServiceError);
 
 	return c.json({ added: count });
@@ -518,7 +524,6 @@ noticesRouter.post("/:id/alerts/add", async (c) => {
 
 // POST /notices/:id/alerts/remove - Remove alerts from a draft notice
 noticesRouter.post("/:id/alerts/remove", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(NoticeIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const input = parseWithZod(NoticeRemoveAlertsSchema, body);
@@ -526,7 +531,7 @@ noticesRouter.post("/:id/alerts/remove", async (c) => {
 
 	const service = getService(c);
 	const count = await service
-		.removeAlerts(organizationId, params.id, input.alertIds, user?.id)
+		.removeAlerts(getTenantContext(c), params.id, input.alertIds, user?.id)
 		.catch(handleServiceError);
 
 	return c.json({ removed: count });

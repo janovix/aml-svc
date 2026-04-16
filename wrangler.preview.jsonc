@@ -47,6 +47,10 @@
 				"binding": "IMPORT_PROCESSING_QUEUE",
 				"queue": "aml-imports-preview",
 			},
+			{
+				"binding": "WEBHOOK_QUEUE",
+				"queue": "webhook-events-preview",
+			},
 		],
 		"consumers": [
 			{
@@ -71,5 +75,6 @@
 		"ENVIRONMENT": "preview",
 		"AUTH_JWKS_CACHE_TTL": "3600",
 		"TRUSTED_ORIGINS": "*.janovix.workers.dev,http://localhost:*",
+		"KYC_SELF_SERVICE_URL": "https://kyc.janovix.workers.dev",
 	},
 }

@@ -1,6 +1,7 @@
 import type { PrismaClient, Prisma } from "@prisma/client";
 import type { InvoiceEntity, ListResultWithMeta } from "./types";
 import type { InvoiceFilters, InvoiceCreateInput } from "./schemas";
+import type { TenantContext } from "../../lib/tenant-context";
 import { mapInvoiceToEntity } from "./mappers";
 import {
 	buildEnumFilterMeta,
@@ -12,13 +13,15 @@ export class InvoiceRepository {
 	constructor(private prisma: PrismaClient) {}
 
 	async create(
-		organizationId: string,
+		tenant: TenantContext,
 		input: InvoiceCreateInput,
 	): Promise<InvoiceEntity> {
+		const { organizationId, environment } = tenant;
 		const invoice = await this.prisma.invoice.create({
 			data: {
 				id: crypto.randomUUID(),
 				organizationId,
+				environment,
 				uuid: input.uuid,
 				version: input.version,
 				series: input.series,
@@ -71,7 +74,7 @@ export class InvoiceRepository {
 	}
 
 	async createFromXml(
-		organizationId: string,
+		tenant: TenantContext,
 		data: {
 			uuid: string | null;
 			version: string;
@@ -119,10 +122,12 @@ export class InvoiceRepository {
 			}>;
 		},
 	): Promise<InvoiceEntity> {
+		const { organizationId, environment } = tenant;
 		const invoice = await this.prisma.invoice.create({
 			data: {
 				id: crypto.randomUUID(),
 				organizationId,
+				environment,
 				uuid: data.uuid,
 				version: data.version,
 				series: data.series,
@@ -166,13 +171,15 @@ export class InvoiceRepository {
 	}
 
 	async findById(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 	): Promise<InvoiceEntity | null> {
+		const { organizationId, environment } = tenant;
 		const invoice = await this.prisma.invoice.findFirst({
 			where: {
 				id,
 				organizationId,
+				environment,
 				deletedAt: null,
 			},
 			include: { items: true },
@@ -182,13 +189,15 @@ export class InvoiceRepository {
 	}
 
 	async findByUuid(
-		organizationId: string,
+		tenant: TenantContext,
 		uuid: string,
 	): Promise<InvoiceEntity | null> {
+		const { organizationId, environment } = tenant;
 		const invoice = await this.prisma.invoice.findFirst({
 			where: {
 				uuid,
 				organizationId,
+				environment,
 				deletedAt: null,
 			},
 			include: { items: true },
@@ -198,12 +207,14 @@ export class InvoiceRepository {
 	}
 
 	async list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: InvoiceFilters,
 	): Promise<ListResultWithMeta<InvoiceEntity>> {
+		const { organizationId, environment } = tenant;
 		// Base conditions (not modified by enum filters)
 		const baseWhere: Prisma.InvoiceWhereInput = {
 			organizationId,
+			environment,
 			deletedAt: null,
 		};
 
@@ -330,13 +341,14 @@ export class InvoiceRepository {
 	}
 
 	async update(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		notes: string | null,
 	): Promise<InvoiceEntity | null> {
+		const { organizationId, environment } = tenant;
 		// Use updateMany to atomically update only if conditions match
 		const result = await this.prisma.invoice.updateMany({
-			where: { id, organizationId, deletedAt: null },
+			where: { id, organizationId, environment, deletedAt: null },
 			data: { notes },
 		});
 
@@ -352,29 +364,41 @@ export class InvoiceRepository {
 		return invoice ? mapInvoiceToEntity(invoice) : null;
 	}
 
-	async getStats(organizationId: string): Promise<{
+	async getStats(tenant: TenantContext): Promise<{
 		totalInvoices: number;
 		ingresoInvoices: number;
 		egresoInvoices: number;
 	}> {
+		const { organizationId, environment } = tenant;
 		const [totalInvoices, ingresoInvoices, egresoInvoices] = await Promise.all([
 			this.prisma.invoice.count({
-				where: { organizationId, deletedAt: null },
+				where: { organizationId, environment, deletedAt: null },
 			}),
 			this.prisma.invoice.count({
-				where: { organizationId, deletedAt: null, voucherTypeCode: "I" },
+				where: {
+					organizationId,
+					environment,
+					deletedAt: null,
+					voucherTypeCode: "I",
+				},
 			}),
 			this.prisma.invoice.count({
-				where: { organizationId, deletedAt: null, voucherTypeCode: "E" },
+				where: {
+					organizationId,
+					environment,
+					deletedAt: null,
+					voucherTypeCode: "E",
+				},
 			}),
 		]);
 
 		return { totalInvoices, ingresoInvoices, egresoInvoices };
 	}
 
-	async softDelete(organizationId: string, id: string): Promise<boolean> {
+	async softDelete(tenant: TenantContext, id: string): Promise<boolean> {
+		const { organizationId, environment } = tenant;
 		const existing = await this.prisma.invoice.findFirst({
-			where: { id, organizationId, deletedAt: null },
+			where: { id, organizationId, environment, deletedAt: null },
 		});
 
 		if (!existing) {

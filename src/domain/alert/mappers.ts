@@ -253,7 +253,7 @@ export function mapAlertRuleConfigUpdateInputToPrisma(
 export function mapAlertCreateInputToPrisma(
 	input: AlertCreateInput,
 	organizationId: string,
-): Omit<PrismaAlertModel, "createdAt" | "updatedAt"> {
+): Omit<PrismaAlertModel, "createdAt" | "updatedAt" | "environment"> {
 	return {
 		id: generateId("ALERT"),
 		organizationId,

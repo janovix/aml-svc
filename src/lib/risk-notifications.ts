@@ -5,17 +5,9 @@
  * Non-blocking: all errors are caught and logged — callers use ctx.waitUntil().
  */
 
+import { t, type EmailI18nPayload, type LanguageCode } from "./i18n";
 import type { Bindings } from "../types";
-
-type _RiskNotificationType =
-	| "aml.risk.client_high"
-	| "aml.risk.client_changed"
-	| "aml.risk.client_critical"
-	| "aml.risk.review_due"
-	| "aml.risk.org_changed"
-	| "aml.risk.audit_escalated"
-	| "aml.risk.batch_complete"
-	| "aml.risk.simplified_dd";
+import { getOrganizationLanguageForTenant } from "./org-language";
 
 interface RiskNotificationBase {
 	organizationId: string;
@@ -90,19 +82,25 @@ type RiskNotificationInput =
 	| BatchCompleteInput
 	| SimplifiedDDInput;
 
-function buildContent(input: RiskNotificationInput): {
+function buildContent(
+	lang: LanguageCode,
+	input: RiskNotificationInput,
+): {
 	title: string;
 	body: string;
 	severity: string;
 	sendEmail: boolean;
 	callbackPath?: string;
 	payload: Record<string, unknown>;
+	emailI18n: EmailI18nPayload;
 } {
 	switch (input.type) {
 		case "aml.risk.client_high":
 			return {
-				title: "Cliente clasificado como Alto Riesgo",
-				body: `El cliente ${input.clientName} ha sido clasificado como Alto Riesgo. Se requiere debida diligencia reforzada y monitoreo intensificado (Art. 18-X LFPIORPI).`,
+				title: t(lang, "risk.client_high.title"),
+				body: t(lang, "risk.client_high.body", {
+					clientName: input.clientName,
+				}),
 				severity: "warn",
 				sendEmail: false,
 				callbackPath: `/clients/${input.clientId}`,
@@ -112,11 +110,20 @@ function buildContent(input: RiskNotificationInput): {
 					previousLevel: input.previousLevel,
 					factors: input.factors,
 				},
+				emailI18n: {
+					titleKey: "risk.client_high.title",
+					bodyKey: "risk.client_high.body",
+					bodyParams: { clientName: input.clientName },
+				},
 			};
 		case "aml.risk.client_changed":
 			return {
-				title: "Cambio en nivel de riesgo de cliente",
-				body: `El cliente ${input.clientName} cambió de ${input.previousLevel} a ${input.newLevel}.`,
+				title: t(lang, "risk.client_changed.title"),
+				body: t(lang, "risk.client_changed.body", {
+					clientName: input.clientName,
+					previousLevel: input.previousLevel,
+					newLevel: input.newLevel,
+				}),
 				severity: "info",
 				sendEmail: false,
 				callbackPath: `/clients/${input.clientId}`,
@@ -125,11 +132,22 @@ function buildContent(input: RiskNotificationInput): {
 					previousLevel: input.previousLevel,
 					newLevel: input.newLevel,
 				},
+				emailI18n: {
+					titleKey: "risk.client_changed.title",
+					bodyKey: "risk.client_changed.body",
+					bodyParams: {
+						clientName: input.clientName,
+						previousLevel: input.previousLevel,
+						newLevel: input.newLevel,
+					},
+				},
 			};
 		case "aml.risk.client_critical":
 			return {
-				title: "Cliente en riesgo CRITICO",
-				body: `El cliente ${input.clientName} combina PEP + coincidencia en listas + Alto Riesgo. Requiere revisión inmediata.`,
+				title: t(lang, "risk.client_critical.title"),
+				body: t(lang, "risk.client_critical.body", {
+					clientName: input.clientName,
+				}),
 				severity: "critical",
 				sendEmail: true,
 				callbackPath: `/clients/${input.clientId}`,
@@ -139,31 +157,58 @@ function buildContent(input: RiskNotificationInput): {
 					isPep: input.isPep,
 					hasWatchlistHit: input.hasWatchlistHit,
 				},
+				emailI18n: {
+					titleKey: "risk.client_critical.title",
+					bodyKey: "risk.client_critical.body",
+					bodyParams: { clientName: input.clientName },
+				},
 			};
 		case "aml.risk.review_due":
 			return {
-				title: "Clientes pendientes de revisión de riesgo",
-				body: `Hay ${input.clientsDueCount} cliente(s) con revisión de riesgo vencida.`,
+				title: t(lang, "risk.review_due.title"),
+				body: t(lang, "risk.review_due.body", {
+					clientsDueCount: input.clientsDueCount,
+				}),
 				severity: "info",
 				sendEmail: true,
 				callbackPath: "/risk",
 				payload: { clientsDueCount: input.clientsDueCount },
+				emailI18n: {
+					titleKey: "risk.review_due.title",
+					bodyKey: "risk.review_due.body",
+					bodyParams: { clientsDueCount: input.clientsDueCount },
+				},
 			};
 		case "aml.risk.org_changed":
 			return {
-				title: "Cambio en nivel de riesgo organizacional",
-				body: `El nivel de riesgo de la entidad cambió de ${input.previousLevel} a ${input.newLevel}. Revise las implicaciones en tipo de auditoría (Art. 18-XI).`,
+				title: t(lang, "risk.org_changed.title"),
+				body: t(lang, "risk.org_changed.body", {
+					previousLevel: input.previousLevel,
+					newLevel: input.newLevel,
+				}),
 				severity: "warn",
 				sendEmail: true,
 				payload: {
 					previousLevel: input.previousLevel,
 					newLevel: input.newLevel,
 				},
+				emailI18n: {
+					titleKey: "risk.org_changed.title",
+					bodyKey: "risk.org_changed.body",
+					bodyParams: {
+						previousLevel: input.previousLevel,
+						newLevel: input.newLevel,
+					},
+				},
 			};
 		case "aml.risk.audit_escalated":
 			return {
-				title: "Escalamiento de tipo de auditoría requerida",
-				body: `El tipo de auditoría requerida cambió de ${input.previousAuditType} a ${input.newAuditType} debido a riesgo ${input.riskLevel} (Art. 18-XI LFPIORPI).`,
+				title: t(lang, "risk.audit_escalated.title"),
+				body: t(lang, "risk.audit_escalated.body", {
+					previousAuditType: input.previousAuditType,
+					newAuditType: input.newAuditType,
+					riskLevel: input.riskLevel,
+				}),
 				severity: "critical",
 				sendEmail: true,
 				callbackPath: "/risk/org-assessment",
@@ -172,11 +217,25 @@ function buildContent(input: RiskNotificationInput): {
 					newAuditType: input.newAuditType,
 					riskLevel: input.riskLevel,
 				},
+				emailI18n: {
+					titleKey: "risk.audit_escalated.title",
+					bodyKey: "risk.audit_escalated.body",
+					bodyParams: {
+						previousAuditType: input.previousAuditType,
+						newAuditType: input.newAuditType,
+						riskLevel: input.riskLevel,
+					},
+				},
 			};
 		case "aml.risk.batch_complete":
 			return {
-				title: "Evaluación masiva de riesgo completada",
-				body: `Se evaluaron ${input.totalAssessed} clientes: ${input.highRiskCount} alto, ${input.mediumRiskCount} medio, ${input.lowRiskCount} bajo.`,
+				title: t(lang, "risk.batch_complete.title"),
+				body: t(lang, "risk.batch_complete.body", {
+					totalAssessed: input.totalAssessed,
+					highRiskCount: input.highRiskCount,
+					mediumRiskCount: input.mediumRiskCount,
+					lowRiskCount: input.lowRiskCount,
+				}),
 				severity: "info",
 				sendEmail: false,
 				callbackPath: "/risk",
@@ -186,15 +245,32 @@ function buildContent(input: RiskNotificationInput): {
 					mediumRiskCount: input.mediumRiskCount,
 					lowRiskCount: input.lowRiskCount,
 				},
+				emailI18n: {
+					titleKey: "risk.batch_complete.title",
+					bodyKey: "risk.batch_complete.body",
+					bodyParams: {
+						totalAssessed: input.totalAssessed,
+						highRiskCount: input.highRiskCount,
+						mediumRiskCount: input.mediumRiskCount,
+						lowRiskCount: input.lowRiskCount,
+					},
+				},
 			};
 		case "aml.risk.simplified_dd":
 			return {
-				title: "Cliente elegible para debida diligencia simplificada",
-				body: `El cliente ${input.clientName} fue clasificado como Bajo Riesgo y es elegible para DD simplificada (Art. 19 LFPIORPI).`,
+				title: t(lang, "risk.simplified_dd.title"),
+				body: t(lang, "risk.simplified_dd.body", {
+					clientName: input.clientName,
+				}),
 				severity: "info",
 				sendEmail: false,
 				callbackPath: `/clients/${input.clientId}`,
 				payload: { clientId: input.clientId },
+				emailI18n: {
+					titleKey: "risk.simplified_dd.title",
+					bodyKey: "risk.simplified_dd.body",
+					bodyParams: { clientName: input.clientName },
+				},
 			};
 	}
 }
@@ -215,7 +291,11 @@ export async function sendRiskNotification(
 		input.amlFrontendUrl?.replace(/\/$/, "") ??
 		"https://aml.janovix.workers.dev";
 
-	const content = buildContent(input);
+	const lang = await getOrganizationLanguageForTenant(
+		env,
+		input.organizationId,
+	);
+	const content = buildContent(lang, input);
 	const callbackUrl = content.callbackPath
 		? `${amlFrontendUrl}${content.callbackPath}`
 		: undefined;
@@ -236,6 +316,7 @@ export async function sendRiskNotification(
 			severity: content.severity,
 			callbackUrl,
 			sendEmail: content.sendEmail,
+			emailI18n: content.emailI18n,
 			sourceService: "aml-svc",
 			sourceEvent: input.type.replace("aml.", ""),
 		});

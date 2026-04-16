@@ -8,24 +8,17 @@ import type { Bindings } from "../types";
  * JWT payload structure from Better Auth
  */
 export interface AuthTokenPayload {
-	/** Subject - User ID */
 	sub: string;
-	/** Issuer - Auth service URL */
 	iss?: string;
-	/** Audience */
 	aud?: string | string[];
-	/** Expiration time (Unix timestamp) */
 	exp?: number;
-	/** Issued at (Unix timestamp) */
 	iat?: number;
-	/** JWT ID */
 	jti?: string;
-	/** User email (if included in token) */
 	email?: string;
-	/** User name (if included in token) */
 	name?: string;
-	/** Active organization ID (from better-auth organization plugin) */
 	organizationId?: string | null;
+	/** Environment scope from API key (absent for session-based auth → defaults to production) */
+	environment?: string;
 }
 
 /**
@@ -61,6 +54,8 @@ export interface AuthVariables {
 	organization: AuthOrganization | null;
 	token: string;
 	tokenPayload: AuthTokenPayload;
+	/** Environment scope: 'production' | 'staging' | 'development' */
+	environment: string;
 }
 
 const DEFAULT_JWKS_CACHE_TTL = 3600; // 1 hour in seconds
@@ -190,7 +185,6 @@ export function authMiddleware(options?: {
 
 		// Skip JWT verification in test environment but still require token
 		if (c.env.ENVIRONMENT === "test" && token) {
-			// Set a mock user for tests
 			c.set("user", {
 				id: "test-user-id",
 				email: "test@example.com",
@@ -201,9 +195,11 @@ export function authMiddleware(options?: {
 				email: "test@example.com",
 				name: "Test User",
 				organizationId: "test-org-id",
+				environment: "production",
 			});
 			c.set("organization", { id: "test-org-id" });
 			c.set("token", token);
+			c.set("environment", "production");
 			return next();
 		}
 
@@ -260,10 +256,14 @@ export function authMiddleware(options?: {
 				? { id: payload.organizationId }
 				: null;
 
+			const environment =
+				payload.environment ?? c.req.header("X-Environment") ?? "production";
+
 			c.set("user", user);
 			c.set("organization", organization);
 			c.set("token", token);
 			c.set("tokenPayload", payload);
+			c.set("environment", environment);
 
 			// Check if organization is required but not present
 			// Return 409 Conflict to distinguish from 403 Forbidden (access denied)
@@ -425,6 +425,22 @@ export function getOrganizationId(c: Context): string {
  */
 export function getOrganizationIdOrNull(c: Context): string | null {
 	return getAuthOrganizationOrNull(c)?.id ?? null;
+}
+
+/**
+ * Helper to get a TenantContext (organizationId + environment) from request context.
+ * Throws if organization is not set.
+ */
+export function getTenantContext(
+	c: Context,
+): import("../lib/tenant-context").TenantContext {
+	const orgId = getOrganizationId(c);
+	const environment = (c.get("environment") as string) ?? "production";
+	return {
+		organizationId: orgId,
+		environment:
+			environment as import("../lib/tenant-context").ApiKeyEnvironment,
+	};
 }
 
 /**

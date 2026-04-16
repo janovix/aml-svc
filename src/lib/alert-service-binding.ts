@@ -32,6 +32,7 @@ import { UmaValueService } from "../domain/uma";
 import { ClientRepository } from "../domain/client";
 import { ClientService } from "../domain/client";
 import { OperationService } from "../domain/operation";
+import { productionTenant } from "./tenant-context";
 import {
 	handleInternalOrganizationSettingsRequest,
 	handleInternalSelfServiceSettingsRequest,
@@ -113,7 +114,7 @@ export class AlertServiceBinding {
 		// Now use ClientService to get the full client entity
 		const repository = new ClientRepository(prisma);
 		const service = new ClientService(repository);
-		return service.get(clientRecord.organizationId, clientId);
+		return service.get(productionTenant(clientRecord.organizationId), clientId);
 	}
 
 	/**
@@ -136,11 +137,14 @@ export class AlertServiceBinding {
 		// Now use OperationService to list operations for this client
 		const service = new OperationService(prisma);
 
-		const result = await service.list(clientRecord.organizationId, {
-			clientId,
-			page: 1,
-			limit: 1000, // Get all operations for the client
-		});
+		const result = await service.list(
+			productionTenant(clientRecord.organizationId),
+			{
+				clientId,
+				page: 1,
+				limit: 1000, // Get all operations for the client
+			},
+		);
 
 		return result.data;
 	}
@@ -175,7 +179,7 @@ export class AlertServiceBinding {
 			throw new Error(`Client not found: ${alertData.clientId}`);
 		}
 
-		return service.create(alertData, client.organizationId);
+		return service.create(alertData, productionTenant(client.organizationId));
 	}
 }
 

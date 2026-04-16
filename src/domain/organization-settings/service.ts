@@ -1,17 +1,18 @@
 import type { OrganizationSettingsEntity } from "./types";
 import { OrganizationSettingsRepository } from "./repository";
+import type { TenantContext } from "../../lib/tenant-context";
 
 export class OrganizationSettingsService {
 	constructor(private readonly repository: OrganizationSettingsRepository) {}
 
 	async getByOrganizationId(
-		organizationId: string,
+		tenant: TenantContext,
 	): Promise<OrganizationSettingsEntity | null> {
-		return this.repository.findByOrganizationId(organizationId);
+		return this.repository.findByOrganizationId(tenant);
 	}
 
 	async createOrUpdate(
-		organizationId: string,
+		tenant: TenantContext,
 		data: {
 			obligatedSubjectKey: string;
 			activityKey: string;
@@ -21,11 +22,11 @@ export class OrganizationSettingsService {
 			selfServiceSendEmail?: boolean;
 		},
 	): Promise<OrganizationSettingsEntity> {
-		return this.repository.upsert(organizationId, data);
+		return this.repository.upsert(tenant, data);
 	}
 
 	async update(
-		organizationId: string,
+		tenant: TenantContext,
 		data: {
 			obligatedSubjectKey?: string;
 			activityKey?: string;
@@ -35,6 +36,6 @@ export class OrganizationSettingsService {
 			selfServiceSendEmail?: boolean;
 		},
 	): Promise<OrganizationSettingsEntity> {
-		return this.repository.update(organizationId, data);
+		return this.repository.update(tenant, data);
 	}
 }

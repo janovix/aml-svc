@@ -5,6 +5,7 @@ import {
 	AlertRepository,
 } from "./repository";
 import type { PrismaClient } from "@prisma/client";
+import { productionTenant } from "../../lib/tenant-context";
 
 // Mock Prisma client
 function createMockPrisma(): PrismaClient {
@@ -442,11 +443,17 @@ describe("AlertRepository", () => {
 				{ ...mockAlert, alertRule: mockAlertRule },
 			] as never);
 
-			await repository.list("org_123", { page: 1, limit: 10 });
+			await repository.list(productionTenant("org_123"), {
+				page: 1,
+				limit: 10,
+			});
 
 			expect(mockPrisma.alert.findMany).toHaveBeenCalledWith(
 				expect.objectContaining({
-					where: { organizationId: "org_123" },
+					where: expect.objectContaining({
+						organizationId: "org_123",
+						environment: "production",
+					}),
 				}),
 			);
 		});
@@ -458,12 +465,17 @@ describe("AlertRepository", () => {
 				{ ...mockAlert, alertRule: mockAlertRule, isManual: true },
 			] as never);
 
-			await repository.list("org_123", { page: 1, limit: 10, isManual: true });
+			await repository.list(productionTenant("org_123"), {
+				page: 1,
+				limit: 10,
+				isManual: true,
+			});
 
 			expect(mockPrisma.alert.findMany).toHaveBeenCalledWith(
 				expect.objectContaining({
 					where: expect.objectContaining({
 						organizationId: "org_123",
+						environment: "production",
 						isManual: true,
 					}),
 				}),
@@ -488,7 +500,7 @@ describe("AlertRepository", () => {
 					metadata: { operationIds: [] },
 					isManual: false,
 				},
-				"org_123",
+				productionTenant("org_123"),
 			);
 
 			expect(result.id).toBe("alt_123");
@@ -510,7 +522,7 @@ describe("AlertRepository", () => {
 						metadata: {},
 						isManual: false,
 					},
-					"org_123",
+					productionTenant("org_123"),
 				),
 			).rejects.toThrow("ALERT_RULE_NOT_FOUND");
 		});
@@ -532,7 +544,7 @@ describe("AlertRepository", () => {
 						metadata: {},
 						isManual: false, // Automatic creation
 					},
-					"org_123",
+					productionTenant("org_123"),
 				),
 			).rejects.toThrow("ALERT_RULE_IS_MANUAL_ONLY");
 		});
@@ -558,7 +570,7 @@ describe("AlertRepository", () => {
 					metadata: {},
 					isManual: true, // Manual creation
 				},
-				"org_123",
+				productionTenant("org_123"),
 			);
 
 			expect(result.isManual).toBe(true);
@@ -587,7 +599,7 @@ describe("AlertRepository", () => {
 					activityCode: "VEH",
 					isManual: false,
 				},
-				"org_123",
+				productionTenant("org_123"),
 			);
 
 			expect(result).toBeDefined();
@@ -602,11 +614,15 @@ describe("AlertRepository", () => {
 				alertRule: mockAlertRule,
 			} as never);
 
-			await repository.getById("org_123", "alt_123");
+			await repository.getById(productionTenant("org_123"), "alt_123");
 
 			expect(mockPrisma.alert.findFirst).toHaveBeenCalledWith(
 				expect.objectContaining({
-					where: { id: "alt_123", organizationId: "org_123" },
+					where: {
+						id: "alt_123",
+						organizationId: "org_123",
+						environment: "production",
+					},
 				}),
 			);
 		});
@@ -614,7 +630,10 @@ describe("AlertRepository", () => {
 		it("returns null for alert in different organization", async () => {
 			vi.mocked(mockPrisma.alert.findFirst).mockResolvedValue(null);
 
-			const result = await repository.getById("other_org", "alt_123");
+			const result = await repository.getById(
+				productionTenant("other_org"),
+				"alt_123",
+			);
 
 			expect(result).toBeNull();
 		});
@@ -628,7 +647,7 @@ describe("AlertRepository", () => {
 			} as never);
 
 			const result = await repository.findByIdempotencyKey(
-				"org_123",
+				productionTenant("org_123"),
 				"idem_key_123",
 			);
 
@@ -636,7 +655,11 @@ describe("AlertRepository", () => {
 			expect(result?.idempotencyKey).toBe("idem_key_123");
 			expect(mockPrisma.alert.findFirst).toHaveBeenCalledWith(
 				expect.objectContaining({
-					where: { idempotencyKey: "idem_key_123", organizationId: "org_123" },
+					where: {
+						idempotencyKey: "idem_key_123",
+						organizationId: "org_123",
+						environment: "production",
+					},
 				}),
 			);
 		});

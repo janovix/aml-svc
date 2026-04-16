@@ -3,12 +3,16 @@
  *
  * Sends org-wide notifications when a client or beneficial controller
  * has negative watchlist screening results (sanctions, PEP, or adverse media).
- *
- * Non-blocking: all errors are caught and logged — callers must never await
- * these in a way that would block the main screening update.
  */
 
+import {
+	t,
+	type EmailI18nPayload,
+	type LanguageCode,
+	type MessageKey,
+} from "./i18n";
 import type { Bindings } from "../types";
+import { getOrganizationLanguageForTenant } from "./org-language";
 
 type ScreeningHitType = "sanctions" | "pep" | "adverse_media";
 
@@ -22,39 +26,53 @@ interface ScreeningNotificationInput {
 	amlFrontendUrl?: string;
 }
 
-function buildNotificationContent(
-	entityName: string,
-	entityKind: "client" | "beneficial_controller",
-	hitType: ScreeningHitType,
-): { title: string; body: string } {
-	const label =
-		entityKind === "beneficial_controller" ? "Beneficial controller" : "Client";
-
+function hitKeys(hitType: ScreeningHitType): {
+	titleKey: MessageKey;
+	bodyKey: MessageKey;
+} {
 	switch (hitType) {
 		case "sanctions":
 			return {
-				title: "Watchlist Match: Sanctions",
-				body: `${label} ${entityName} matched on a sanctions list (OFAC, UNSC, or SAT 69-B).`,
+				titleKey: "screening.sanctions.title",
+				bodyKey: "screening.sanctions.body",
 			};
 		case "pep":
-			return {
-				title: "Watchlist Match: PEP",
-				body: `${label} ${entityName} has been identified as a Politically Exposed Person (PEP).`,
-			};
+			return { titleKey: "screening.pep.title", bodyKey: "screening.pep.body" };
 		case "adverse_media":
 			return {
-				title: "Watchlist Match: Adverse Media",
-				body: `${label} ${entityName} has been flagged for adverse media findings.`,
+				titleKey: "screening.adverse_media.title",
+				bodyKey: "screening.adverse_media.body",
 			};
 	}
 }
 
+function buildContent(
+	lang: LanguageCode,
+	entityName: string,
+	entityKind: "client" | "beneficial_controller",
+	hitType: ScreeningHitType,
+): { title: string; body: string; emailI18n: EmailI18nPayload } {
+	const labelKey =
+		entityKind === "beneficial_controller"
+			? "screening.label.beneficial_controller"
+			: "screening.label.client";
+	const entityLabel = t(lang, labelKey);
+	const { titleKey, bodyKey } = hitKeys(hitType);
+	const title = t(lang, titleKey);
+	const body = t(lang, bodyKey, { entityLabel, entityName });
+	return {
+		title,
+		body,
+		emailI18n: {
+			titleKey,
+			bodyKey,
+			bodyParams: { entityLabel, entityName },
+		},
+	};
+}
+
 /**
  * Sends an org-wide notification when a client or BC has a negative watchlist result.
- *
- * Designed to be called inside a fire-and-forget pattern:
- *   ctx.waitUntil(sendScreeningFlaggedNotification(...))
- * or directly with a try/catch that swallows errors.
  */
 export async function sendScreeningFlaggedNotification(
 	env: Bindings,
@@ -77,7 +95,12 @@ export async function sendScreeningFlaggedNotification(
 			? `${amlFrontendUrl}/clients/${input.entityId}`
 			: `${amlFrontendUrl}/clients?bc=${input.entityId}`;
 
-	const { title, body } = buildNotificationContent(
+	const lang = await getOrganizationLanguageForTenant(
+		env,
+		input.organizationId,
+	);
+	const { title, body, emailI18n } = buildContent(
+		lang,
 		input.entityName,
 		input.entityKind,
 		input.hitType,
@@ -104,6 +127,7 @@ export async function sendScreeningFlaggedNotification(
 			severity: "warn",
 			callbackUrl,
 			sendEmail: false,
+			emailI18n,
 			sourceService: "aml-svc",
 			sourceEvent: "screening.flagged",
 		});

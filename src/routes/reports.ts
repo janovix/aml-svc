@@ -20,7 +20,11 @@ import {
 import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
-import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import {
+	type AuthVariables,
+	getOrganizationId,
+	getTenantContext,
+} from "../middleware/auth";
 import { ReportAggregator } from "../lib/report-aggregator";
 import {
 	generatePdfReportHtml,
@@ -95,7 +99,6 @@ reportsRouter.get("/templates", async (c) => {
 
 // GET /reports - List reports
 reportsRouter.get("/", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = parseQueryParams(url.searchParams, [
 		"template",
@@ -106,7 +109,7 @@ reportsRouter.get("/", async (c) => {
 
 	const service = getService(c);
 	const result = await service
-		.list(organizationId, filters)
+		.list(getTenantContext(c), filters)
 		.catch(handleServiceError);
 
 	return c.json(result);
@@ -114,14 +117,13 @@ reportsRouter.get("/", async (c) => {
 
 // GET /reports/preview - Preview data for a potential report
 reportsRouter.get("/preview", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = Object.fromEntries(url.searchParams.entries());
 	const input = parseWithZod(ReportPreviewSchema, queryObject);
 
 	const service = getService(c);
 	const result = await service
-		.preview(organizationId, input)
+		.preview(getTenantContext(c), input)
 		.catch(handleServiceError);
 
 	return c.json(result);
@@ -210,12 +212,11 @@ reportsRouter.get("/aggregate/clients", async (c) => {
 
 // GET /reports/:id - Get a single report
 reportsRouter.get("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ReportIdParamSchema, c.req.param());
 
 	const service = getService(c);
 	const report = await service
-		.getWithSummary(organizationId, params.id)
+		.getWithSummary(getTenantContext(c), params.id)
 		.catch(handleServiceError);
 
 	return c.json(report);
@@ -239,7 +240,7 @@ reportsRouter.post("/", async (c) => {
 
 	const service = getService(c);
 	const created = await service
-		.create(payload, organizationId, userId)
+		.create(payload, getTenantContext(c), userId)
 		.catch(handleServiceError);
 
 	return c.json(created, 201);
@@ -247,7 +248,6 @@ reportsRouter.post("/", async (c) => {
 
 // PATCH /reports/:id - Update a report
 reportsRouter.patch("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ReportIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ReportPatchSchema, body);
@@ -258,7 +258,7 @@ reportsRouter.patch("/:id", async (c) => {
 
 	const service = getService(c);
 	const updated = await service
-		.patch(organizationId, params.id, payload)
+		.patch(getTenantContext(c), params.id, payload)
 		.catch(handleServiceError);
 
 	return c.json(updated);
@@ -266,11 +266,12 @@ reportsRouter.patch("/:id", async (c) => {
 
 // DELETE /reports/:id - Delete a draft report
 reportsRouter.delete("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ReportIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	await service.delete(organizationId, params.id).catch(handleServiceError);
+	await service
+		.delete(getTenantContext(c), params.id)
+		.catch(handleServiceError);
 
 	return c.body(null, 204);
 });
@@ -281,8 +282,9 @@ reportsRouter.post("/:id/generate", async (c) => {
 	const params = parseWithZod(ReportIdParamSchema, c.req.param());
 
 	const service = getService(c);
+	const tenant = getTenantContext(c);
 	const report = await service
-		.getWithSummary(organizationId, params.id)
+		.getWithSummary(tenant, params.id)
 		.catch(handleServiceError);
 
 	if (report.status !== "DRAFT") {
@@ -294,8 +296,7 @@ reportsRouter.post("/:id/generate", async (c) => {
 
 	// Get organization settings for the organization name and RFC
 	const orgSettingsService = getOrganizationSettingsService(c);
-	const orgSettings =
-		await orgSettingsService.getByOrganizationId(organizationId);
+	const orgSettings = await orgSettingsService.getByOrganizationId(tenant);
 
 	// Get the aggregation data for the report
 	const aggregator = getAggregator(c);
@@ -381,7 +382,7 @@ reportsRouter.post("/:id/generate", async (c) => {
 	}
 
 	// Mark the report as generated with the file URL
-	await service.markAsGenerated(organizationId, params.id, {
+	await service.markAsGenerated(tenant, params.id, {
 		pdfFileUrl,
 		fileSize,
 	});
@@ -397,12 +398,11 @@ reportsRouter.post("/:id/generate", async (c) => {
 
 // GET /reports/:id/download - Download the generated report file
 reportsRouter.get("/:id/download", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ReportIdParamSchema, c.req.param());
 
 	const service = getService(c);
 	const report = await service
-		.get(organizationId, params.id)
+		.get(getTenantContext(c), params.id)
 		.catch(handleServiceError);
 
 	if (report.status === "DRAFT") {
@@ -451,7 +451,7 @@ reportsRouter.get("/:id/aggregation", async (c) => {
 
 	const service = getService(c);
 	const report = await service
-		.get(organizationId, params.id)
+		.get(getTenantContext(c), params.id)
 		.catch(handleServiceError);
 
 	const aggregator = getAggregator(c);

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ClientService } from "./service";
 import type { ClientRepository } from "./repository";
+import type { TenantContext } from "../../lib/tenant-context";
 import type {
 	ClientEntity,
 	ClientDocumentEntity,
@@ -11,6 +12,7 @@ describe("ClientService", () => {
 	let service: ClientService;
 	let mockRepository: ClientRepository;
 	const organizationId = "org-123";
+	const tenant: TenantContext = { organizationId, environment: "production" };
 
 	const mockClient: ClientEntity = {
 		id: "client-123",
@@ -90,9 +92,9 @@ describe("ClientService", () => {
 				filterMeta: [],
 			});
 
-			const result = await service.list(organizationId, filters);
+			const result = await service.list(tenant, filters);
 
-			expect(mockRepository.list).toHaveBeenCalledWith(organizationId, filters);
+			expect(mockRepository.list).toHaveBeenCalledWith(tenant, filters);
 			expect(result.data).toHaveLength(1);
 		});
 	});
@@ -101,19 +103,16 @@ describe("ClientService", () => {
 		it("should return client when found", async () => {
 			vi.mocked(mockRepository.getById).mockResolvedValue(mockClient);
 
-			const result = await service.get(organizationId, "client-123");
+			const result = await service.get(tenant, "client-123");
 
-			expect(mockRepository.getById).toHaveBeenCalledWith(
-				organizationId,
-				"client-123",
-			);
+			expect(mockRepository.getById).toHaveBeenCalledWith(tenant, "client-123");
 			expect(result).toEqual(mockClient);
 		});
 
 		it("should throw error when client not found", async () => {
 			vi.mocked(mockRepository.getById).mockResolvedValue(null);
 
-			await expect(service.get(organizationId, "non-existent")).rejects.toThrow(
+			await expect(service.get(tenant, "non-existent")).rejects.toThrow(
 				"CLIENT_NOT_FOUND",
 			);
 		});
@@ -143,9 +142,9 @@ describe("ClientService", () => {
 
 			vi.mocked(mockRepository.create).mockResolvedValue(mockClient);
 
-			const result = await service.create(organizationId, input);
+			const result = await service.create(tenant, input);
 
-			expect(mockRepository.create).toHaveBeenCalledWith(organizationId, input);
+			expect(mockRepository.create).toHaveBeenCalledWith(tenant, input);
 			expect(result).toEqual(mockClient);
 		});
 	});
@@ -175,10 +174,10 @@ describe("ClientService", () => {
 				firstName: "Juan Carlos",
 			});
 
-			const result = await service.update(organizationId, "client-123", input);
+			const result = await service.update(tenant, "client-123", input);
 
 			expect(mockRepository.update).toHaveBeenCalledWith(
-				organizationId,
+				tenant,
 				"client-123",
 				input,
 			);
@@ -194,10 +193,10 @@ describe("ClientService", () => {
 				firstName: "Juan Carlos",
 			});
 
-			const result = await service.patch(organizationId, "client-123", input);
+			const result = await service.patch(tenant, "client-123", input);
 
 			expect(mockRepository.patch).toHaveBeenCalledWith(
-				organizationId,
+				tenant,
 				"client-123",
 				input,
 			);
@@ -209,12 +208,9 @@ describe("ClientService", () => {
 		it("should delete client", async () => {
 			vi.mocked(mockRepository.delete).mockResolvedValue(undefined);
 
-			await service.delete(organizationId, "client-123");
+			await service.delete(tenant, "client-123");
 
-			expect(mockRepository.delete).toHaveBeenCalledWith(
-				organizationId,
-				"client-123",
-			);
+			expect(mockRepository.delete).toHaveBeenCalledWith(tenant, "client-123");
 		});
 	});
 
@@ -234,7 +230,7 @@ describe("ClientService", () => {
 
 			vi.mocked(mockRepository.listDocuments).mockResolvedValue(mockDocuments);
 
-			const result = await service.listDocuments(organizationId, "client-123");
+			const result = await service.listDocuments(tenant, "client-123");
 
 			expect(mockRepository.listDocuments).toHaveBeenCalledWith(
 				organizationId,
@@ -262,7 +258,7 @@ describe("ClientService", () => {
 
 			vi.mocked(mockRepository.createDocument).mockResolvedValue(mockDocument);
 
-			const result = await service.createDocument(organizationId, input);
+			const result = await service.createDocument(tenant, input);
 
 			expect(mockRepository.createDocument).toHaveBeenCalledWith(
 				organizationId,
@@ -292,7 +288,7 @@ describe("ClientService", () => {
 			vi.mocked(mockRepository.updateDocument).mockResolvedValue(mockDocument);
 
 			const result = await service.updateDocument(
-				organizationId,
+				tenant,
 				"client-123",
 				"doc-1",
 				input,
@@ -324,7 +320,7 @@ describe("ClientService", () => {
 			vi.mocked(mockRepository.patchDocument).mockResolvedValue(mockDocument);
 
 			const result = await service.patchDocument(
-				organizationId,
+				tenant,
 				"client-123",
 				"doc-1",
 				input,
@@ -344,7 +340,7 @@ describe("ClientService", () => {
 		it("should delete document", async () => {
 			vi.mocked(mockRepository.deleteDocument).mockResolvedValue(undefined);
 
-			await service.deleteDocument(organizationId, "client-123", "doc-1");
+			await service.deleteDocument(tenant, "client-123", "doc-1");
 
 			expect(mockRepository.deleteDocument).toHaveBeenCalledWith(
 				organizationId,
@@ -374,7 +370,7 @@ describe("ClientService", () => {
 
 			vi.mocked(mockRepository.listAddresses).mockResolvedValue(mockAddresses);
 
-			const result = await service.listAddresses(organizationId, "client-123");
+			const result = await service.listAddresses(tenant, "client-123");
 
 			expect(mockRepository.listAddresses).toHaveBeenCalledWith(
 				organizationId,
@@ -406,7 +402,7 @@ describe("ClientService", () => {
 
 			vi.mocked(mockRepository.createAddress).mockResolvedValue(mockAddress);
 
-			const result = await service.createAddress(organizationId, input);
+			const result = await service.createAddress(tenant, input);
 
 			expect(mockRepository.createAddress).toHaveBeenCalledWith(
 				organizationId,
@@ -442,7 +438,7 @@ describe("ClientService", () => {
 			vi.mocked(mockRepository.updateAddress).mockResolvedValue(mockAddress);
 
 			const result = await service.updateAddress(
-				organizationId,
+				tenant,
 				"client-123",
 				"addr-1",
 				input,
@@ -478,7 +474,7 @@ describe("ClientService", () => {
 			vi.mocked(mockRepository.patchAddress).mockResolvedValue(mockAddress);
 
 			const result = await service.patchAddress(
-				organizationId,
+				tenant,
 				"client-123",
 				"addr-1",
 				input,
@@ -498,7 +494,7 @@ describe("ClientService", () => {
 		it("should delete address", async () => {
 			vi.mocked(mockRepository.deleteAddress).mockResolvedValue(undefined);
 
-			await service.deleteAddress(organizationId, "client-123", "addr-1");
+			await service.deleteAddress(tenant, "client-123", "addr-1");
 
 			expect(mockRepository.deleteAddress).toHaveBeenCalledWith(
 				organizationId,
@@ -519,9 +515,9 @@ describe("ClientService", () => {
 
 			vi.mocked(mockRepository.getStats).mockResolvedValue(stats);
 
-			const result = await service.getStats(organizationId);
+			const result = await service.getStats(tenant);
 
-			expect(mockRepository.getStats).toHaveBeenCalledWith(organizationId);
+			expect(mockRepository.getStats).toHaveBeenCalledWith(tenant);
 			expect(result).toEqual(stats);
 		});
 	});

@@ -19,8 +19,13 @@ import {
 	createUsageRightsClient,
 } from "../lib/usage-rights-client";
 import { APIError } from "../middleware/error";
-import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import {
+	type AuthVariables,
+	getOrganizationId,
+	getTenantContext,
+} from "../middleware/auth";
 import { parseQueryParams } from "../lib/query-params";
+import { emitWebhookEvent, WEBHOOK_EVENT_TYPES } from "../lib/webhook-events";
 
 export const alertsRouter = new Hono<{
 	Bindings: Bindings;
@@ -68,7 +73,6 @@ function handleServiceError(error: unknown): never {
 }
 
 alertsRouter.get("/", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = parseQueryParams(url.searchParams, [
 		"status",
@@ -78,38 +82,46 @@ alertsRouter.get("/", async (c) => {
 
 	const service = getService(c);
 	const result = await service
-		.list(organizationId, filters)
+		.list(getTenantContext(c), filters)
 		.catch(handleServiceError);
 
 	return c.json(result);
 });
 
 alertsRouter.post("/:id/cancel", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const user = c.get("user");
 	const params = parseWithZod(AlertIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const { reason } = parseWithZod(AlertCancelSchema, body);
 
+	const tenantCtx = getTenantContext(c);
 	const service = getService(c);
 	const updated = await service
-		.patch(organizationId, params.id, {
+		.patch(tenantCtx, params.id, {
 			status: "CANCELLED",
 			cancelledBy: user.id,
 			cancellationReason: reason,
 		})
 		.catch(handleServiceError);
 
+	c.executionCtx.waitUntil(
+		emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+			organizationId: tenantCtx.organizationId,
+			environment: tenantCtx.environment,
+			eventType: WEBHOOK_EVENT_TYPES.ALERT_STATUS_CHANGED,
+			data: { id: updated.id, status: "CANCELLED" },
+		}),
+	);
+
 	return c.json(updated);
 });
 
 alertsRouter.get("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AlertIdParamSchema, c.req.param());
 
 	const service = getService(c);
 	const alert = await service
-		.get(organizationId, params.id)
+		.get(getTenantContext(c), params.id)
 		.catch(handleServiceError);
 
 	return c.json(alert);
@@ -127,31 +139,42 @@ alertsRouter.post("/", async (c) => {
 	const body = await c.req.json();
 	const payload = parseWithZod(AlertCreateSchema, body);
 
+	const tenantCtx = getTenantContext(c);
 	const service = getService(c);
-	// The service handles idempotency via idempotencyKey
 	const created = await service
-		.create(payload, organizationId)
+		.create(payload, tenantCtx)
 		.catch(handleServiceError);
+
+	c.executionCtx.waitUntil(
+		emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+			organizationId,
+			environment: tenantCtx.environment,
+			eventType: WEBHOOK_EVENT_TYPES.ALERT_CREATED,
+			data: {
+				id: created.id,
+				severity: created.severity,
+				status: created.status,
+			},
+		}),
+	);
 
 	return c.json(created, 201);
 });
 
 alertsRouter.put("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AlertIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(AlertUpdateSchema, body);
 
 	const service = getService(c);
 	const updated = await service
-		.update(organizationId, params.id, payload)
+		.update(getTenantContext(c), params.id, payload)
 		.catch(handleServiceError);
 
 	return c.json(updated);
 });
 
 alertsRouter.patch("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AlertIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(AlertPatchSchema, body);
@@ -160,20 +183,33 @@ alertsRouter.patch("/:id", async (c) => {
 		throw new APIError(400, "Payload is empty");
 	}
 
+	const tenantCtx = getTenantContext(c);
 	const service = getService(c);
 	const updated = await service
-		.patch(organizationId, params.id, payload)
+		.patch(tenantCtx, params.id, payload)
 		.catch(handleServiceError);
+
+	if (payload.status) {
+		c.executionCtx.waitUntil(
+			emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+				organizationId: tenantCtx.organizationId,
+				environment: tenantCtx.environment,
+				eventType: WEBHOOK_EVENT_TYPES.ALERT_STATUS_CHANGED,
+				data: { id: updated.id, status: payload.status },
+			}),
+		);
+	}
 
 	return c.json(updated);
 });
 
 alertsRouter.delete("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AlertIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	await service.delete(organizationId, params.id).catch(handleServiceError);
+	await service
+		.delete(getTenantContext(c), params.id)
+		.catch(handleServiceError);
 
 	return c.body(null, 204);
 });

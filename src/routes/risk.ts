@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 
 import type { Bindings } from "../types";
 import type { AuthVariables } from "../middleware/auth";
-import { getOrganizationId } from "../middleware/auth";
+import { getOrganizationId, getTenantContext } from "../middleware/auth";
 import { getPrismaClient } from "../lib/prisma";
 import { createRiskQueueService, type RiskJob } from "../lib/risk-queue";
 import { ClientRiskService, loadRiskLookups } from "../domain/risk";
@@ -43,7 +43,7 @@ riskRouter.post("/:clientId/assessment", async (c) => {
 	const service = new ClientRiskService(prisma);
 	const { result } = await service.assessClient(
 		clientId,
-		organizationId,
+		getTenantContext(c),
 		lookups,
 		"manual_trigger",
 	);
@@ -52,14 +52,13 @@ riskRouter.post("/:clientId/assessment", async (c) => {
 });
 
 riskRouter.get("/:clientId/assessment", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const clientId = c.req.param("clientId");
 
 	const prisma = getPrismaClient(c.env.DB);
 	const service = new ClientRiskService(prisma);
 	const assessment = await service.getLatestAssessment(
 		clientId,
-		organizationId,
+		getTenantContext(c),
 	);
 
 	if (!assessment) {
@@ -72,12 +71,14 @@ riskRouter.get("/:clientId/assessment", async (c) => {
 });
 
 riskRouter.get("/:clientId/history", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const clientId = c.req.param("clientId");
 
 	const prisma = getPrismaClient(c.env.DB);
 	const service = new ClientRiskService(prisma);
-	const history = await service.getAssessmentHistory(clientId, organizationId);
+	const history = await service.getAssessmentHistory(
+		clientId,
+		getTenantContext(c),
+	);
 
 	return c.json({
 		assessments: (history as ClientRiskAssessmentRow[]).map(
@@ -115,8 +116,9 @@ riskRouter.get("/dashboard", async (c) => {
 	const prisma = getPrismaClient(c.env.DB);
 	const service = new ClientRiskService(prisma);
 
-	const distribution = await service.getRiskDistribution(organizationId);
-	const dueForReview = await service.getClientsDueForReview(organizationId);
+	const tenant = getTenantContext(c);
+	const distribution = await service.getRiskDistribution(tenant);
+	const dueForReview = await service.getClientsDueForReview(tenant);
 
 	const orgAssessment = await prisma.orgRiskAssessment.findFirst({
 		where: { organizationId, status: "ACTIVE" },
@@ -229,12 +231,13 @@ riskRouter.get("/authority-report", async (c) => {
 	const organizationId = getOrganizationId(c);
 	const prisma = getPrismaClient(c.env.DB);
 
+	const tenant = getTenantContext(c);
 	const [orgAssessment, distribution, highRiskClients] = await Promise.all([
 		prisma.orgRiskAssessment.findFirst({
 			where: { organizationId, status: "ACTIVE" },
 			include: { elements: true, mitigants: true },
 		}),
-		new ClientRiskService(prisma).getRiskDistribution(organizationId),
+		new ClientRiskService(prisma).getRiskDistribution(tenant),
 		prisma.client.findMany({
 			where: {
 				organizationId,
@@ -305,7 +308,7 @@ riskRouter.get("/methodology", async (c) => {
 	});
 	const activityKey = orgSettings?.activityKey ?? "DEFAULT";
 
-	const methodology = await repo.resolve(organizationId, activityKey);
+	const methodology = await repo.resolve(getTenantContext(c), activityKey);
 
 	return c.json({ success: true, data: methodology });
 });
@@ -322,7 +325,7 @@ riskRouter.put("/methodology", async (c) => {
 	const userId = c.get("user").id;
 
 	// Archive any existing org override
-	await repo.resetOrgToDefault(organizationId, userId);
+	await repo.resetOrgToDefault(getTenantContext(c), userId);
 
 	const methodology = await repo.create({
 		scope: "ORGANIZATION",
@@ -348,7 +351,7 @@ riskRouter.post("/methodology/reset", async (c) => {
 	const repo = new RiskMethodologyRepository(prisma);
 	const userId = c.get("user").id;
 
-	await repo.resetOrgToDefault(organizationId, userId);
+	await repo.resetOrgToDefault(getTenantContext(c), userId);
 
 	// Return the new effective methodology after reset
 	const orgSettings = await prisma.organizationSettings.findFirst({
@@ -356,7 +359,7 @@ riskRouter.post("/methodology/reset", async (c) => {
 		select: { activityKey: true },
 	});
 	const activityKey = orgSettings?.activityKey ?? "DEFAULT";
-	const methodology = await repo.resolve(organizationId, activityKey);
+	const methodology = await repo.resolve(getTenantContext(c), activityKey);
 
 	return c.json({ success: true, data: methodology });
 });

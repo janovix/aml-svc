@@ -13,6 +13,7 @@ describe("Import Mappers", () => {
 			const prismaImport = {
 				id: "IMP123456789",
 				organizationId: "org-123",
+				environment: "production",
 				entityType: "CLIENT" as const,
 				activityCode: null,
 				fileName: "clients.csv",
@@ -51,6 +52,7 @@ describe("Import Mappers", () => {
 			const prismaImport = {
 				id: "IMP123",
 				organizationId: "org-1",
+				environment: "production",
 				entityType: "CLIENT" as const,
 				activityCode: null,
 				fileName: "f.csv",
@@ -80,6 +82,7 @@ describe("Import Mappers", () => {
 			const prismaImport = {
 				id: "IMP123",
 				organizationId: "org-1",
+				environment: "production",
 				entityType: "CLIENT" as const,
 				activityCode: null,
 				fileName: "f.csv",
@@ -109,6 +112,7 @@ describe("Import Mappers", () => {
 			const prismaImport = {
 				id: "IMP123",
 				organizationId: "org-1",
+				environment: "production",
 				entityType: "CLIENT" as const,
 				activityCode: null,
 				fileName: "f.csv",

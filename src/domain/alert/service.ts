@@ -21,6 +21,7 @@ import type {
 	AlertRuleConfigEntity,
 	ListResult,
 } from "./types";
+import type { TenantContext } from "../../lib/tenant-context";
 
 /**
  * AlertRuleService - Global alert rules (no organizationId)
@@ -121,52 +122,48 @@ export class AlertService {
 	constructor(private readonly repository: AlertRepository) {}
 
 	list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: AlertFilters,
 	): Promise<ListResult<AlertEntity>> {
-		return this.repository.list(organizationId, filters);
+		return this.repository.list(tenant, filters);
 	}
 
-	async get(organizationId: string, id: string): Promise<AlertEntity> {
-		const alert = await this.repository.getById(organizationId, id);
+	async get(tenant: TenantContext, id: string): Promise<AlertEntity> {
+		const alert = await this.repository.getById(tenant, id);
 		if (!alert) {
 			throw new Error("ALERT_NOT_FOUND");
 		}
 		return alert;
 	}
 
-	create(
-		input: AlertCreateInput,
-		organizationId: string,
-	): Promise<AlertEntity> {
-		// The repository handles idempotency via idempotencyKey
-		return this.repository.create(input, organizationId);
+	create(input: AlertCreateInput, tenant: TenantContext): Promise<AlertEntity> {
+		return this.repository.create(input, tenant);
 	}
 
 	update(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: AlertUpdateInput,
 	): Promise<AlertEntity> {
-		return this.repository.update(organizationId, id, input);
+		return this.repository.update(tenant, id, input);
 	}
 
 	patch(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: AlertPatchInput,
 	): Promise<AlertEntity> {
-		return this.repository.patch(organizationId, id, input);
+		return this.repository.patch(tenant, id, input);
 	}
 
-	delete(organizationId: string, id: string): Promise<void> {
-		return this.repository.delete(organizationId, id);
+	delete(tenant: TenantContext, id: string): Promise<void> {
+		return this.repository.delete(tenant, id);
 	}
 
 	findByIdempotencyKey(
-		organizationId: string,
+		tenant: TenantContext,
 		idempotencyKey: string,
 	): Promise<AlertEntity | null> {
-		return this.repository.findByIdempotencyKey(organizationId, idempotencyKey);
+		return this.repository.findByIdempotencyKey(tenant, idempotencyKey);
 	}
 }

@@ -3,7 +3,7 @@ import { ZodError } from "zod";
 
 import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
-import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import { type AuthVariables, getTenantContext } from "../middleware/auth";
 import { APIError } from "../middleware/error";
 import {
 	OrganizationSettingsRepository,
@@ -34,12 +34,12 @@ function parseWithZod<T>(
 
 // GET /api/v1/organization-settings - Get current organization's settings
 organizationSettingsRouter.get("/", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const prisma = getPrismaClient(c.env.DB);
 	const repository = new OrganizationSettingsRepository(prisma);
 	const service = new OrganizationSettingsService(repository);
 
-	const settings = await service.getByOrganizationId(organizationId);
+	const settings = await service.getByOrganizationId(tenant);
 
 	if (!settings) {
 		return c.json({
@@ -56,7 +56,7 @@ organizationSettingsRouter.get("/", async (c) => {
 
 // PUT /api/v1/organization-settings - Create or update organization settings
 organizationSettingsRouter.put("/", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const prisma = getPrismaClient(c.env.DB);
 	const repository = new OrganizationSettingsRepository(prisma);
 	const service = new OrganizationSettingsService(repository);
@@ -64,7 +64,7 @@ organizationSettingsRouter.put("/", async (c) => {
 	const body = await c.req.json();
 	const data = parseWithZod(organizationSettingsCreateSchema, body);
 
-	const settings = await service.createOrUpdate(organizationId, {
+	const settings = await service.createOrUpdate(tenant, {
 		obligatedSubjectKey: data.obligatedSubjectKey,
 		activityKey: data.activityKey,
 		selfServiceMode: data.selfServiceMode,
@@ -78,12 +78,12 @@ organizationSettingsRouter.put("/", async (c) => {
 
 // PATCH /api/v1/organization-settings - Partial update
 organizationSettingsRouter.patch("/", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const prisma = getPrismaClient(c.env.DB);
 	const repository = new OrganizationSettingsRepository(prisma);
 	const service = new OrganizationSettingsService(repository);
 
-	const existing = await service.getByOrganizationId(organizationId);
+	const existing = await service.getByOrganizationId(tenant);
 	if (!existing) {
 		return c.json(
 			{
@@ -98,7 +98,7 @@ organizationSettingsRouter.patch("/", async (c) => {
 
 	const body = await c.req.json();
 	const data = parseWithZod(organizationSettingsUpdateSchema, body);
-	const settings = await service.update(organizationId, {
+	const settings = await service.update(tenant, {
 		obligatedSubjectKey: data.obligatedSubjectKey,
 		activityKey: data.activityKey,
 		selfServiceMode: data.selfServiceMode,
@@ -112,12 +112,12 @@ organizationSettingsRouter.patch("/", async (c) => {
 
 // PATCH /api/v1/organization-settings/self-service - Update only self-service settings
 organizationSettingsRouter.patch("/self-service", async (c) => {
-	const organizationId = getOrganizationId(c);
+	const tenant = getTenantContext(c);
 	const prisma = getPrismaClient(c.env.DB);
 	const repository = new OrganizationSettingsRepository(prisma);
 	const service = new OrganizationSettingsService(repository);
 
-	const existing = await service.getByOrganizationId(organizationId);
+	const existing = await service.getByOrganizationId(tenant);
 	if (!existing) {
 		return c.json(
 			{
@@ -132,7 +132,7 @@ organizationSettingsRouter.patch("/self-service", async (c) => {
 
 	const body = await c.req.json();
 	const data = parseWithZod(selfServiceSettingsUpdateSchema, body);
-	const settings = await service.update(organizationId, {
+	const settings = await service.update(tenant, {
 		selfServiceMode: data.selfServiceMode,
 		selfServiceExpiryHours: data.selfServiceExpiryHours,
 		selfServiceRequiredSections: data.selfServiceRequiredSections,

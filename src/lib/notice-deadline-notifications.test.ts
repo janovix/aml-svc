@@ -11,6 +11,9 @@ const { getPrismaClient } = await import("./prisma");
 
 function makeMockEnv(overrides: Partial<Bindings> = {}): Bindings {
 	return {
+		AUTH_SERVICE: {
+			getOrganizationLanguage: vi.fn().mockResolvedValue("en"),
+		},
 		NOTIFICATIONS_SERVICE: {
 			notify: vi.fn().mockResolvedValue({ success: true }),
 			sendEmail: vi.fn(),

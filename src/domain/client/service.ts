@@ -17,78 +17,79 @@ import type {
 	ClientEntity,
 	ListResultWithMeta,
 } from "./types";
+import type { TenantContext } from "../../lib/tenant-context";
 
 export class ClientService {
 	constructor(private readonly repository: ClientRepository) {}
 
 	list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: ClientFilters,
 	): Promise<ListResultWithMeta<ClientEntity>> {
-		return this.repository.list(organizationId, filters);
+		return this.repository.list(tenant, filters);
 	}
 
-	async get(organizationId: string, id: string): Promise<ClientEntity> {
-		const client = await this.repository.getById(organizationId, id);
+	async get(tenant: TenantContext, id: string): Promise<ClientEntity> {
+		const client = await this.repository.getById(tenant, id);
 		if (!client) {
 			throw new Error("CLIENT_NOT_FOUND");
 		}
 		return client;
 	}
 
-	findByRfc(organizationId: string, rfc: string): Promise<ClientEntity | null> {
-		return this.repository.findByRfc(organizationId, rfc);
+	findByRfc(tenant: TenantContext, rfc: string): Promise<ClientEntity | null> {
+		return this.repository.findByRfc(tenant, rfc);
 	}
 
 	create(
-		organizationId: string,
+		tenant: TenantContext,
 		input: ClientCreateInput,
 	): Promise<ClientEntity> {
-		return this.repository.create(organizationId, input);
+		return this.repository.create(tenant, input);
 	}
 
 	update(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: ClientUpdateInput,
 	): Promise<ClientEntity> {
-		return this.repository.update(organizationId, id, input);
+		return this.repository.update(tenant, id, input);
 	}
 
 	patch(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: ClientPatchInput,
 	): Promise<ClientEntity> {
-		return this.repository.patch(organizationId, id, input);
+		return this.repository.patch(tenant, id, input);
 	}
 
-	delete(organizationId: string, id: string): Promise<void> {
-		return this.repository.delete(organizationId, id);
+	delete(tenant: TenantContext, id: string): Promise<void> {
+		return this.repository.delete(tenant, id);
 	}
 
 	listDocuments(
-		organizationId: string,
+		tenant: TenantContext,
 		clientId: string,
 	): Promise<ClientDocumentEntity[]> {
-		return this.repository.listDocuments(organizationId, clientId);
+		return this.repository.listDocuments(tenant.organizationId, clientId);
 	}
 
 	createDocument(
-		organizationId: string,
+		tenant: TenantContext,
 		input: ClientDocumentCreateInput,
 	): Promise<ClientDocumentEntity> {
-		return this.repository.createDocument(organizationId, input);
+		return this.repository.createDocument(tenant.organizationId, input);
 	}
 
 	updateDocument(
-		organizationId: string,
+		tenant: TenantContext,
 		clientId: string,
 		documentId: string,
 		input: ClientDocumentUpdateInput,
 	): Promise<ClientDocumentEntity> {
 		return this.repository.updateDocument(
-			organizationId,
+			tenant.organizationId,
 			clientId,
 			documentId,
 			input,
@@ -96,13 +97,13 @@ export class ClientService {
 	}
 
 	patchDocument(
-		organizationId: string,
+		tenant: TenantContext,
 		clientId: string,
 		documentId: string,
 		input: ClientDocumentPatchInput,
 	): Promise<ClientDocumentEntity> {
 		return this.repository.patchDocument(
-			organizationId,
+			tenant.organizationId,
 			clientId,
 			documentId,
 			input,
@@ -110,35 +111,39 @@ export class ClientService {
 	}
 
 	deleteDocument(
-		organizationId: string,
+		tenant: TenantContext,
 		clientId: string,
 		documentId: string,
 	): Promise<void> {
-		return this.repository.deleteDocument(organizationId, clientId, documentId);
+		return this.repository.deleteDocument(
+			tenant.organizationId,
+			clientId,
+			documentId,
+		);
 	}
 
 	listAddresses(
-		organizationId: string,
+		tenant: TenantContext,
 		clientId: string,
 	): Promise<ClientAddressEntity[]> {
-		return this.repository.listAddresses(organizationId, clientId);
+		return this.repository.listAddresses(tenant.organizationId, clientId);
 	}
 
 	createAddress(
-		organizationId: string,
+		tenant: TenantContext,
 		input: ClientAddressCreateInput,
 	): Promise<ClientAddressEntity> {
-		return this.repository.createAddress(organizationId, input);
+		return this.repository.createAddress(tenant.organizationId, input);
 	}
 
 	updateAddress(
-		organizationId: string,
+		tenant: TenantContext,
 		clientId: string,
 		addressId: string,
 		input: ClientAddressUpdateInput,
 	): Promise<ClientAddressEntity> {
 		return this.repository.updateAddress(
-			organizationId,
+			tenant.organizationId,
 			clientId,
 			addressId,
 			input,
@@ -146,13 +151,13 @@ export class ClientService {
 	}
 
 	patchAddress(
-		organizationId: string,
+		tenant: TenantContext,
 		clientId: string,
 		addressId: string,
 		input: ClientAddressPatchInput,
 	): Promise<ClientAddressEntity> {
 		return this.repository.patchAddress(
-			organizationId,
+			tenant.organizationId,
 			clientId,
 			addressId,
 			input,
@@ -160,18 +165,22 @@ export class ClientService {
 	}
 
 	deleteAddress(
-		organizationId: string,
+		tenant: TenantContext,
 		clientId: string,
 		addressId: string,
 	): Promise<void> {
-		return this.repository.deleteAddress(organizationId, clientId, addressId);
+		return this.repository.deleteAddress(
+			tenant.organizationId,
+			clientId,
+			addressId,
+		);
 	}
 
-	getStats(organizationId: string): Promise<{
+	getStats(tenant: TenantContext): Promise<{
 		totalClients: number;
 		physicalClients: number;
 		moralClients: number;
 	}> {
-		return this.repository.getStats(organizationId);
+		return this.repository.getStats(tenant);
 	}
 }

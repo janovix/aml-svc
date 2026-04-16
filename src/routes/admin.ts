@@ -14,6 +14,7 @@ import {
 	organizationSettingsUpdateSchema,
 } from "../domain/organization-settings";
 import { RiskMethodologyRepository } from "../domain/risk/methodology/repository";
+import { productionTenant } from "../lib/tenant-context";
 
 export const adminRouter = new Hono<{
 	Bindings: Bindings;
@@ -440,7 +441,7 @@ adminRouter.get("/organization-settings/:orgId", async (c) => {
 	const repository = new OrganizationSettingsRepository(prisma);
 	const service = new OrganizationSettingsService(repository);
 
-	const settings = await service.getByOrganizationId(orgId);
+	const settings = await service.getByOrganizationId(productionTenant(orgId));
 
 	if (!settings) {
 		return c.json({
@@ -481,7 +482,10 @@ adminRouter.put("/organization-settings/:orgId", async (c) => {
 		);
 	}
 
-	const settings = await service.createOrUpdate(orgId, parseResult.data);
+	const settings = await service.createOrUpdate(
+		productionTenant(orgId),
+		parseResult.data,
+	);
 	return c.json({ success: true, data: { configured: true, settings } });
 });
 
@@ -498,7 +502,7 @@ adminRouter.patch("/organization-settings/:orgId", async (c) => {
 	const service = new OrganizationSettingsService(repository);
 
 	// Check if settings exist first
-	const existing = await service.getByOrganizationId(orgId);
+	const existing = await service.getByOrganizationId(productionTenant(orgId));
 	if (!existing) {
 		return c.json(
 			{
@@ -537,7 +541,10 @@ adminRouter.patch("/organization-settings/:orgId", async (c) => {
 		);
 	}
 
-	const settings = await service.update(orgId, parseResult.data);
+	const settings = await service.update(
+		productionTenant(orgId),
+		parseResult.data,
+	);
 	return c.json({
 		success: true,
 		data: { configured: true, settings },

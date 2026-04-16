@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { generateId } from "../../../lib/id-generator";
+import type { TenantContext } from "../../../lib/tenant-context";
 import type { ClientRiskResult } from "./types";
 
 export class ClientRiskRepository {
@@ -68,24 +69,28 @@ export class ClientRiskRepository {
 		return { assessment, previousLevel };
 	}
 
-	async getLatest(clientId: string, organizationId: string) {
+	async getLatest(clientId: string, tenant: TenantContext) {
+		const { organizationId, environment } = tenant;
 		return this.prisma.clientRiskAssessment.findFirst({
-			where: { clientId, organizationId },
+			where: { clientId, organizationId, environment },
 			orderBy: { version: "desc" },
 		});
 	}
 
-	async getHistory(clientId: string, organizationId: string) {
+	async getHistory(clientId: string, tenant: TenantContext) {
+		const { organizationId, environment } = tenant;
 		return this.prisma.clientRiskAssessment.findMany({
-			where: { clientId, organizationId },
+			where: { clientId, organizationId, environment },
 			orderBy: { version: "desc" },
 		});
 	}
 
-	async getClientsDueForReview(organizationId: string, asOf: Date) {
+	async getClientsDueForReview(tenant: TenantContext, asOf: Date) {
+		const { organizationId, environment } = tenant;
 		return this.prisma.client.findMany({
 			where: {
 				organizationId,
+				environment,
 				nextRiskReview: { lte: asOf },
 				deletedAt: null,
 			},
@@ -93,9 +98,10 @@ export class ClientRiskRepository {
 		});
 	}
 
-	async getRiskDistribution(organizationId: string) {
+	async getRiskDistribution(tenant: TenantContext) {
+		const { organizationId, environment } = tenant;
 		const clients = await this.prisma.client.findMany({
-			where: { organizationId, deletedAt: null },
+			where: { organizationId, environment, deletedAt: null },
 			select: { riskLevel: true },
 		});
 

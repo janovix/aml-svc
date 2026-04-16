@@ -60,6 +60,10 @@
 				"binding": "IMPORT_PROCESSING_QUEUE",
 				"queue": "aml-imports",
 			},
+			{
+				"binding": "WEBHOOK_QUEUE",
+				"queue": "webhook-events",
+			},
 		],
 		"consumers": [
 			{

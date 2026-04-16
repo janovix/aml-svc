@@ -13,6 +13,7 @@ import {
 	DuplicateOperationError,
 } from "../../operation/service";
 import { createAlertQueueService } from "../../../lib/alert-queue";
+import { productionTenant } from "../../../lib/tenant-context";
 
 export function getOperationRequiredHeaders(): string[] {
 	return [
@@ -312,7 +313,7 @@ export async function processOperationRow(
 	let clientId: string;
 	try {
 		const client = await clientService.findByRfc(
-			organizationId,
+			productionTenant(organizationId),
 			data.client_rfc.toUpperCase(),
 		);
 
@@ -364,7 +365,7 @@ export async function processOperationRow(
 	try {
 		const operationService = new OperationService(prisma);
 		const created = await operationService.create(
-			organizationId,
+			productionTenant(organizationId),
 			operationPayload,
 		);
 

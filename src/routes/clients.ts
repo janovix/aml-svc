@@ -33,9 +33,15 @@ import {
 	handleServiceError,
 	getClientDisplayName,
 } from "../lib/route-helpers";
-import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import {
+	type AuthVariables,
+	getOrganizationId,
+	getTenantContext,
+} from "../middleware/auth";
+import { productionTenant } from "../lib/tenant-context";
 import { APIError } from "../middleware/error";
 import { parseQueryParams } from "../lib/query-params";
+import { emitWebhookEvent, WEBHOOK_EVENT_TYPES } from "../lib/webhook-events";
 
 export const clientsRouter = new Hono<{
 	Bindings: Bindings;
@@ -51,7 +57,6 @@ function getService(
 }
 
 clientsRouter.get("/", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = parseQueryParams(url.searchParams, [
 		"personType",
@@ -61,7 +66,7 @@ clientsRouter.get("/", async (c) => {
 
 	const service = getService(c);
 	const result = await service
-		.list(organizationId, filters)
+		.list(getTenantContext(c), filters)
 		.catch(handleServiceError);
 
 	return c.json(result);
@@ -70,12 +75,11 @@ clientsRouter.get("/", async (c) => {
 // IMPORTANT: named sub-paths must be defined BEFORE /:id to avoid being matched as an id parameter
 
 clientsRouter.get("/check-rfc/:rfc", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const rfc = c.req.param("rfc");
 
 	const service = getService(c);
 	const client = await service
-		.findByRfc(organizationId, rfc)
+		.findByRfc(getTenantContext(c), rfc)
 		.catch(handleServiceError);
 
 	if (!client) {
@@ -90,10 +94,9 @@ clientsRouter.get("/check-rfc/:rfc", async (c) => {
 });
 
 clientsRouter.get("/stats", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const service = getService(c);
 	const stats = await service
-		.getStats(organizationId)
+		.getStats(getTenantContext(c))
 		.catch(handleServiceError);
 	return c.json(stats);
 });
@@ -222,7 +225,7 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 		const umaRepo = new UmaValueRepository(prisma);
 
 		const [orgSettings, umaValue] = await Promise.all([
-			orgSettingsRepo.findByOrganizationId(organizationId),
+			orgSettingsRepo.findByOrganizationId(getTenantContext(c)),
 			umaRepo.getActive(),
 		]);
 
@@ -343,12 +346,11 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 });
 
 clientsRouter.get("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 
 	const service = getService(c);
 	const client = await service
-		.get(organizationId, params.id)
+		.get(getTenantContext(c), params.id)
 		.catch(handleServiceError);
 
 	return c.json(client);
@@ -369,8 +371,19 @@ clientsRouter.post("/", async (c) => {
 
 	const service = getService(c);
 	const created = await service
-		.create(organizationId, payload)
+		.create(getTenantContext(c), payload)
 		.catch(handleServiceError);
+
+	// Emit webhook event
+	const tenant = getTenantContext(c);
+	c.executionCtx.waitUntil(
+		emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+			organizationId,
+			environment: tenant.environment,
+			eventType: WEBHOOK_EVENT_TYPES.CLIENT_CREATED,
+			data: { id: created.id, personType: created.personType },
+		}),
+	);
 
 	// Queue alert detection job for new client
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
@@ -405,7 +418,6 @@ clientsRouter.post("/", async (c) => {
 				});
 
 				if (result?.queryId) {
-					// Update client with watchlistQueryId and sync enrichment flags
 					const prisma = getPrismaClient(c.env.DB);
 					const isFlagged =
 						result.ofacCount > 0 ||
@@ -422,6 +434,16 @@ clientsRouter.post("/", async (c) => {
 							screenedAt: new Date(),
 						},
 					});
+					await emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+						organizationId,
+						environment: tenant.environment,
+						eventType: WEBHOOK_EVENT_TYPES.WATCHLIST_SCREENING_COMPLETE,
+						data: {
+							clientId: created.id,
+							queryId: result.queryId,
+							flagged: isFlagged,
+						},
+					});
 					console.log(
 						`[Client Create] Watchlist search initiated, queryId: ${result.queryId}, sync flags: OFAC=${result.ofacCount > 0}, UNSC=${result.unscCount > 0}, SAT=${result.sat69bCount > 0}`,
 					);
@@ -429,8 +451,6 @@ clientsRouter.post("/", async (c) => {
 			})(),
 		);
 	}
-
-	// In automatic mode, KYC invite is sent only when client reaches ID threshold (see operations route).
 
 	return c.json(created, 201);
 });
@@ -441,10 +461,20 @@ clientsRouter.put("/:id", async (c) => {
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientUpdateSchema, body);
 
+	const tenantCtx = getTenantContext(c);
 	const service = getService(c);
 	const updated = await service
-		.update(organizationId, params.id, payload)
+		.update(tenantCtx, params.id, payload)
 		.catch(handleServiceError);
+
+	c.executionCtx.waitUntil(
+		emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+			organizationId,
+			environment: tenantCtx.environment,
+			eventType: WEBHOOK_EVENT_TYPES.CLIENT_UPDATED,
+			data: { id: updated.id },
+		}),
+	);
 
 	// Queue alert detection job for updated client
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
@@ -469,7 +499,6 @@ clientsRouter.put("/:id", async (c) => {
 				});
 
 				if (result?.queryId) {
-					// Update client with watchlistQueryId and sync enrichment flags
 					const prisma = getPrismaClient(c.env.DB);
 					const isFlagged =
 						result.ofacCount > 0 ||
@@ -484,6 +513,16 @@ clientsRouter.put("/:id", async (c) => {
 							sat69bListed: result.sat69bCount > 0,
 							screeningResult: isFlagged ? "flagged" : "pending",
 							screenedAt: new Date(),
+						},
+					});
+					await emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+						organizationId,
+						environment: tenantCtx.environment,
+						eventType: WEBHOOK_EVENT_TYPES.WATCHLIST_SCREENING_COMPLETE,
+						data: {
+							clientId: updated.id,
+							queryId: result.queryId,
+							flagged: isFlagged,
 						},
 					});
 					console.log(
@@ -507,10 +546,20 @@ clientsRouter.patch("/:id", async (c) => {
 		throw new APIError(400, "Payload is empty");
 	}
 
+	const tenantCtx = getTenantContext(c);
 	const service = getService(c);
 	const updated = await service
-		.patch(organizationId, params.id, payload)
+		.patch(tenantCtx, params.id, payload)
 		.catch(handleServiceError);
+
+	c.executionCtx.waitUntil(
+		emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+			organizationId,
+			environment: tenantCtx.environment,
+			eventType: WEBHOOK_EVENT_TYPES.CLIENT_UPDATED,
+			data: { id: updated.id },
+		}),
+	);
 
 	// Queue alert detection job for updated client
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
@@ -547,7 +596,6 @@ clientsRouter.patch("/:id", async (c) => {
 					});
 
 					if (result?.queryId) {
-						// Update client with watchlistQueryId and sync enrichment flags
 						const prisma = getPrismaClient(c.env.DB);
 						const isFlagged =
 							result.ofacCount > 0 ||
@@ -564,6 +612,16 @@ clientsRouter.patch("/:id", async (c) => {
 								screenedAt: new Date(),
 							},
 						});
+						await emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+							organizationId,
+							environment: tenantCtx.environment,
+							eventType: WEBHOOK_EVENT_TYPES.WATCHLIST_SCREENING_COMPLETE,
+							data: {
+								clientId: updated.id,
+								queryId: result.queryId,
+								flagged: isFlagged,
+							},
+						});
 						console.log(
 							`[Client Patch] Watchlist search initiated, queryId: ${result.queryId}, sync flags: OFAC=${result.ofacCount > 0}, UNSC=${result.unscCount > 0}, SAT=${result.sat69bCount > 0}`,
 						);
@@ -577,27 +635,26 @@ clientsRouter.patch("/:id", async (c) => {
 });
 
 clientsRouter.delete("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	await service.delete(organizationId, params.id).catch(handleServiceError);
+	await service
+		.delete(getTenantContext(c), params.id)
+		.catch(handleServiceError);
 
 	return c.body(null, 204);
 });
 
 clientsRouter.get("/:id/documents", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 	const service = getService(c);
 	const documents = await service
-		.listDocuments(organizationId, params.id)
+		.listDocuments(getTenantContext(c), params.id)
 		.catch(handleServiceError);
 	return c.json({ data: documents });
 });
 
 clientsRouter.post("/:id/documents", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientDocumentCreateSchema, {
@@ -606,57 +663,62 @@ clientsRouter.post("/:id/documents", async (c) => {
 	});
 	const service = getService(c);
 	const created = await service
-		.createDocument(organizationId, payload)
+		.createDocument(getTenantContext(c), payload)
 		.catch(handleServiceError);
 	return c.json(created, 201);
 });
 
 clientsRouter.put("/:clientId/documents/:documentId", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(DocumentIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientDocumentUpdateSchema, body);
 	const service = getService(c);
 	const updated = await service
-		.updateDocument(organizationId, params.clientId, params.documentId, payload)
+		.updateDocument(
+			getTenantContext(c),
+			params.clientId,
+			params.documentId,
+			payload,
+		)
 		.catch(handleServiceError);
 	return c.json(updated);
 });
 
 clientsRouter.patch("/:clientId/documents/:documentId", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(DocumentIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientDocumentPatchSchema, body);
 	const service = getService(c);
 	const updated = await service
-		.patchDocument(organizationId, params.clientId, params.documentId, payload)
+		.patchDocument(
+			getTenantContext(c),
+			params.clientId,
+			params.documentId,
+			payload,
+		)
 		.catch(handleServiceError);
 	return c.json(updated);
 });
 
 clientsRouter.delete("/:clientId/documents/:documentId", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(DocumentIdParamSchema, c.req.param());
 	const service = getService(c);
 	await service
-		.deleteDocument(organizationId, params.clientId, params.documentId)
+		.deleteDocument(getTenantContext(c), params.clientId, params.documentId)
 		.catch(handleServiceError);
 	return c.body(null, 204);
 });
 
 clientsRouter.get("/:id/addresses", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 	const service = getService(c);
 	const addresses = await service
-		.listAddresses(organizationId, params.id)
+		.listAddresses(getTenantContext(c), params.id)
 		.catch(handleServiceError);
 	return c.json({ data: addresses });
 });
 
 clientsRouter.post("/:id/addresses", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(ClientIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientAddressCreateSchema, {
@@ -665,41 +727,48 @@ clientsRouter.post("/:id/addresses", async (c) => {
 	});
 	const service = getService(c);
 	const created = await service
-		.createAddress(organizationId, payload)
+		.createAddress(getTenantContext(c), payload)
 		.catch(handleServiceError);
 	return c.json(created, 201);
 });
 
 clientsRouter.put("/:clientId/addresses/:addressId", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AddressIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientAddressUpdateSchema, body);
 	const service = getService(c);
 	const updated = await service
-		.updateAddress(organizationId, params.clientId, params.addressId, payload)
+		.updateAddress(
+			getTenantContext(c),
+			params.clientId,
+			params.addressId,
+			payload,
+		)
 		.catch(handleServiceError);
 	return c.json(updated);
 });
 
 clientsRouter.patch("/:clientId/addresses/:addressId", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AddressIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(ClientAddressPatchSchema, body);
 	const service = getService(c);
 	const updated = await service
-		.patchAddress(organizationId, params.clientId, params.addressId, payload)
+		.patchAddress(
+			getTenantContext(c),
+			params.clientId,
+			params.addressId,
+			payload,
+		)
 		.catch(handleServiceError);
 	return c.json(updated);
 });
 
 clientsRouter.delete("/:clientId/addresses/:addressId", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(AddressIdParamSchema, c.req.param());
 	const service = getService(c);
 	await service
-		.deleteAddress(organizationId, params.clientId, params.addressId)
+		.deleteAddress(getTenantContext(c), params.clientId, params.addressId)
 		.catch(handleServiceError);
 	return c.body(null, 204);
 });
@@ -782,7 +851,10 @@ clientsInternalRouter.get("/", async (c) => {
 		const filters = parseWithZod(ClientFilterSchema, queryObject);
 
 		const service = getInternalService(c);
-		const result = await service.list(organizationId, filters);
+		const result = await service.list(
+			productionTenant(organizationId),
+			filters,
+		);
 
 		return c.json(result);
 	} catch (error) {
@@ -812,7 +884,10 @@ clientsInternalRouter.get("/by-rfc/:rfc", async (c) => {
 
 	try {
 		const service = getInternalService(c);
-		const client = await service.findByRfc(organizationId, rfc);
+		const client = await service.findByRfc(
+			productionTenant(organizationId),
+			rfc,
+		);
 
 		if (!client) {
 			return c.json({ error: "Not Found", message: "Client not found" }, 404);
@@ -847,7 +922,10 @@ clientsInternalRouter.post("/", async (c) => {
 		const payload = parseWithZod(ClientCreateSchema, body);
 
 		const service = getInternalService(c);
-		const created = await service.create(organizationId, payload);
+		const created = await service.create(
+			productionTenant(organizationId),
+			payload,
+		);
 
 		// Queue alert detection job for new client
 		const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);

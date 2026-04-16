@@ -2,11 +2,12 @@
  * KYC Self-Service Email Helper
  *
  * Sends KYC invite emails to clients via the notifications-svc service binding.
- * Uses the same pattern as watchlist-search.ts for service binding communication.
  */
 
+import { t, type LanguageCode } from "./i18n";
 import type { Bindings } from "../types";
 import type { KycSessionEntity } from "../domain/kyc-session";
+import { getOrganizationLanguageForTenant } from "./org-language";
 
 export interface KYCEmailOptions {
 	/** Human-readable client name (or business name) */
@@ -19,7 +20,6 @@ export interface KYCEmailOptions {
 
 /**
  * Builds the KYC self-service URL for the client.
- * Requires the KYC_SELF_SERVICE_URL env variable to be set.
  */
 function buildKycUrl(env: Bindings, token: string): string {
 	const baseUrl = env.KYC_SELF_SERVICE_URL ?? "https://kyc.janovix.com";
@@ -28,12 +28,6 @@ function buildKycUrl(env: Bindings, token: string): string {
 
 /**
  * Sends a KYC invite email to a client.
- *
- * Uses the /internal/email endpoint (email-only, no notification record created).
- * External clients have no notification inbox, so a pure transactional email is correct here.
- *
- * This function is designed to be called inside `waitUntil()` for non-blocking delivery.
- * It will silently fail if notifications-svc is not available (logs error for observability).
  */
 export async function sendKYCInviteEmail(
 	env: Bindings,
@@ -51,6 +45,18 @@ export async function sendKYCInviteEmail(
 
 	const kycUrl = buildKycUrl(env, session.token);
 	const orgName = options.organizationName ?? "Janovix";
+	const lang: LanguageCode = await getOrganizationLanguageForTenant(
+		env,
+		session.organizationId,
+	);
+
+	const expiryDate = options.expiresAt
+		? new Date(options.expiresAt).toLocaleDateString(
+				lang === "es" ? "es-MX" : "en-US",
+			)
+		: lang === "es"
+			? "la fecha configurada"
+			: "the configured date";
 
 	try {
 		const result = await notifService.sendEmail({
@@ -58,15 +64,20 @@ export async function sendKYCInviteEmail(
 				email: clientEmail,
 				name: options.clientName,
 			},
-			subject: `${orgName} - Complete your KYC information`,
+			subject: t(lang, "kyc.invite.subject", { orgName }),
 			content: {
-				title: "Complete your KYC information",
-				body: `Hello ${options.clientName}, you have been invited to complete your identification information for ${orgName}. Click the button below to begin. This link will expire on ${options.expiresAt ? new Date(options.expiresAt).toLocaleDateString() : "the configured date"}.`,
+				title: t(lang, "kyc.invite.title"),
+				body: t(lang, "kyc.invite.body", {
+					clientName: options.clientName,
+					orgName,
+					expiryDate,
+				}),
 				callbackUrl: kycUrl,
 			},
 			tags: ["kyc_invite"],
 			sourceService: "aml-svc",
 			sourceEvent: "kyc_invite",
+			language: lang,
 		});
 
 		if (!result.success) {
@@ -85,7 +96,6 @@ export async function sendKYCInviteEmail(
 
 /**
  * Sends a KYC submission notification to the org (compliance officer alert).
- * Called after a client submits their KYC session.
  */
 export async function sendKYCSubmissionNotification(
 	env: Bindings,
@@ -100,12 +110,17 @@ export async function sendKYCSubmissionNotification(
 		return false;
 	}
 
+	const lang = await getOrganizationLanguageForTenant(
+		env,
+		session.organizationId,
+	);
+
 	try {
 		await notifService.notify({
 			tenantId: session.organizationId,
 			type: "kyc_submitted",
-			title: "KYC Session Submitted for Review",
-			body: `${clientName} has submitted their KYC information and it is ready for your review.`,
+			title: t(lang, "kyc.submitted.title"),
+			body: t(lang, "kyc.submitted.body", { clientName }),
 			severity: "warning",
 			target: { kind: "org" },
 			payload: {
@@ -118,6 +133,11 @@ export async function sendKYCSubmissionNotification(
 			callbackUrl: undefined,
 			sourceService: "aml-svc",
 			sourceEvent: "kyc_submitted",
+			emailI18n: {
+				titleKey: "kyc.submitted.title",
+				bodyKey: "kyc.submitted.body",
+				bodyParams: { clientName },
+			},
 		});
 
 		return true;

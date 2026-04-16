@@ -8,6 +8,7 @@ import type { Bindings } from "../../../types";
 import type { ParsedRow, RowProcessingResult, ClientRowData } from "../types";
 import type { ClientCreateInput } from "../../client/schemas";
 import { ClientRepository } from "../../client/repository";
+import { productionTenant } from "../../../lib/tenant-context";
 import { ClientService } from "../../client/service";
 import { createAlertQueueService } from "../../../lib/alert-queue";
 import { createRiskQueueService, type RiskJob } from "../../../lib/risk-queue";
@@ -255,7 +256,10 @@ export async function processClientRow(
 	try {
 		const repository = new ClientRepository(prisma);
 		const service = new ClientService(repository);
-		const created = await service.create(organizationId, clientPayload);
+		const created = await service.create(
+			productionTenant(organizationId),
+			clientPayload,
+		);
 
 		// Side-effects (non-blocking, mirror internal route behaviour)
 		try {

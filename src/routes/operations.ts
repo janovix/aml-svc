@@ -18,7 +18,12 @@ import { getAllActivities } from "../domain/operation/activities";
 import type { Bindings } from "../types";
 import { getPrismaClient } from "../lib/prisma";
 import { APIError } from "../middleware/error";
-import { type AuthVariables, getOrganizationId } from "../middleware/auth";
+import {
+	type AuthVariables,
+	getOrganizationId,
+	getTenantContext,
+} from "../middleware/auth";
+import { productionTenant } from "../lib/tenant-context";
 import { createAlertQueueService } from "../lib/alert-queue";
 import { createRiskQueueService, type RiskJob } from "../lib/risk-queue";
 import {
@@ -35,6 +40,7 @@ import {
 import type { ActivityCode } from "../domain/operation/types";
 import { sendKYCInviteEmail } from "../lib/kyc-email";
 import { parseQueryParams } from "../lib/query-params";
+import { emitWebhookEvent, WEBHOOK_EVENT_TYPES } from "../lib/webhook-events";
 
 export const operationsRouter = new Hono<{
 	Bindings: Bindings;
@@ -112,7 +118,6 @@ function handleServiceError(error: unknown): never {
  * List all operations with optional filters
  */
 operationsRouter.get("/", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const url = new URL(c.req.url);
 	const queryObject = parseQueryParams(url.searchParams, [
 		"activityCode",
@@ -123,7 +128,7 @@ operationsRouter.get("/", async (c) => {
 
 	const service = getService(c);
 	const result = await service
-		.list(organizationId, filters)
+		.list(getTenantContext(c), filters)
 		.catch(handleServiceError);
 
 	return c.json(result);
@@ -143,7 +148,7 @@ operationsRouter.get("/stats", async (c) => {
 
 	const [rawStats, suspiciousOperations, completeCount, incompleteCount] =
 		await Promise.all([
-			service.getStats(organizationId).catch(handleServiceError),
+			service.getStats(getTenantContext(c)).catch(handleServiceError),
 			prisma.alert.count({
 				where: {
 					organizationId,
@@ -455,12 +460,11 @@ operationsRouter.get("/thresholds", async (c) => {
  * Get a single operation by ID
  */
 operationsRouter.get("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(OperationIdParamSchema, c.req.param());
 
 	const service = getService(c);
 	const record = await service
-		.getById(organizationId, params.id)
+		.getById(getTenantContext(c), params.id)
 		.catch(handleServiceError);
 
 	return c.json(record);
@@ -485,10 +489,24 @@ operationsRouter.post("/", async (c) => {
 		return c.json(buildGateDenialBody("operations", gateResult), 403);
 	}
 
+	const tenantCtx = getTenantContext(c);
 	const service = getService(c);
 	const created = await service
-		.create(organizationId, payload)
+		.create(tenantCtx, payload)
 		.catch(handleServiceError);
+
+	c.executionCtx.waitUntil(
+		emitWebhookEvent(c.env.WEBHOOK_QUEUE, {
+			organizationId,
+			environment: tenantCtx.environment,
+			eventType: WEBHOOK_EVENT_TYPES.OPERATION_CREATED,
+			data: {
+				id: created.id,
+				clientId: created.clientId,
+				activityCode: created.activityCode,
+			},
+		}),
+	);
 
 	// Queue alert detection job for new operation
 	const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);
@@ -520,7 +538,7 @@ operationsRouter.post("/", async (c) => {
 				const umaRepo = new UmaValueRepository(prisma);
 
 				const [orgSettings, umaValue] = await Promise.all([
-					orgSettingsRepo.findByOrganizationId(organizationId),
+					orgSettingsRepo.findByOrganizationId(getTenantContext(c)),
 					umaRepo.getActive(),
 				]);
 
@@ -591,7 +609,7 @@ operationsRouter.post("/", async (c) => {
 
 				const kycService = new KycSessionService(prisma);
 				const session = await kycService.create(
-					organizationId,
+					getTenantContext(c),
 					{
 						clientId: created.clientId,
 						createdBy: "system",
@@ -708,7 +726,7 @@ operationsRouter.post("/bulk-import", async (c) => {
 			};
 
 			const created = await service
-				.create(organizationId, payload)
+				.create(getTenantContext(c), payload)
 				.catch(handleServiceError);
 
 			// Queue alert detection
@@ -781,14 +799,13 @@ operationsRouter.post("/bulk-import", async (c) => {
  * Update an existing operation
  */
 operationsRouter.put("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(OperationIdParamSchema, c.req.param());
 	const body = await c.req.json();
 	const payload = parseWithZod(OperationUpdateSchema, body);
 
 	const service = getService(c);
 	const updated = await service
-		.update(organizationId, params.id, payload)
+		.update(getTenantContext(c), params.id, payload)
 		.catch(handleServiceError);
 
 	return c.json(updated);
@@ -799,11 +816,12 @@ operationsRouter.put("/:id", async (c) => {
  * Soft delete an operation
  */
 operationsRouter.delete("/:id", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const params = parseWithZod(OperationIdParamSchema, c.req.param());
 
 	const service = getService(c);
-	await service.delete(organizationId, params.id).catch(handleServiceError);
+	await service
+		.delete(getTenantContext(c), params.id)
+		.catch(handleServiceError);
 
 	return c.body(null, 204);
 });
@@ -813,7 +831,6 @@ operationsRouter.delete("/:id", async (c) => {
  * Get accumulated amounts for a client within a period
  */
 operationsRouter.get("/client/:clientId/accumulated", async (c) => {
-	const organizationId = getOrganizationId(c);
 	const clientId = c.req.param("clientId");
 	const url = new URL(c.req.url);
 
@@ -832,7 +849,7 @@ operationsRouter.get("/client/:clientId/accumulated", async (c) => {
 	const service = getService(c);
 	const result = await service
 		.calculateAccumulatedAmount(
-			organizationId,
+			getTenantContext(c),
 			clientId,
 			activityCode as Parameters<typeof service.calculateAccumulatedAmount>[2],
 			startDate
@@ -925,7 +942,10 @@ operationsInternalRouter.post("/", async (c) => {
 		}
 
 		const service = getInternalService(c);
-		const created = await service.create(organizationId, payload);
+		const created = await service.create(
+			productionTenant(organizationId),
+			payload,
+		);
 
 		// Queue alert detection job for new operation
 		const alertQueue = createAlertQueueService(c.env.ALERT_DETECTION_QUEUE);

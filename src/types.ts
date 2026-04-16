@@ -58,6 +58,7 @@ type AuditLogRpcResult = { id: string; signature: string };
  */
 export interface AuthSvcRpc {
 	fetch(request: Request): Promise<Response>;
+	getOrganizationLanguage?(organizationId: string): Promise<string>;
 	getJwks(): Promise<JwksResult>;
 	getResolvedSettings(
 		userId: string,
@@ -90,6 +91,13 @@ type NotificationsTarget =
 	| { kind: "org" }
 	| { kind: "user"; userId: string; email?: string; name?: string };
 
+interface EmailI18nRpcPayload {
+	titleKey: string;
+	bodyKey: string;
+	titleParams?: Record<string, string | number>;
+	bodyParams?: Record<string, string | number>;
+}
+
 interface NotifyRpcInput {
 	tenantId: string;
 	target: NotificationsTarget;
@@ -101,6 +109,8 @@ interface NotifyRpcInput {
 	severity?: string;
 	callbackUrl?: string;
 	sendEmail?: boolean;
+	emailI18n?: EmailI18nRpcPayload;
+	emailLocale?: "en" | "es";
 	sourceService: string;
 	sourceEvent?: string;
 }
@@ -118,6 +128,7 @@ interface EmailSendRpcInput {
 	tags?: string[];
 	sourceService: string;
 	sourceEvent?: string;
+	language?: "en" | "es";
 }
 
 interface EmailSendRpcResult {
@@ -190,6 +201,8 @@ export type Bindings = Omit<
 	IMPORT_PROCESSING_QUEUE?: Queue<import("./domain/import").ImportJob>;
 	/** Queue for risk assessment jobs (consumed by aml-svc itself) */
 	RISK_ASSESSMENT_QUEUE?: Queue<import("./lib/risk-queue").RiskJob>;
+	/** Queue for webhook event delivery (consumed by webhook-delivery-worker) */
+	WEBHOOK_QUEUE?: Queue<import("./lib/webhook-events").WebhookEvent>;
 	/**
 	 * Auth service binding via `AuthSvcEntrypoint`.
 	 * Caller wrangler config must include `"entrypoint": "AuthSvcEntrypoint"`.

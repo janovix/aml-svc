@@ -43,6 +43,7 @@ import {
 } from "../catalog/name-resolver";
 import { CatalogRepository } from "../catalog/repository";
 import { recalculateKycProgress } from "./kyc-progress";
+import type { TenantContext } from "../../lib/tenant-context";
 
 /**
  * Catalog fields configuration for clients.
@@ -88,14 +89,16 @@ export class ClientRepository {
 	}
 
 	async list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: ClientFilters,
 	): Promise<ListResultWithMeta<ClientEntity>> {
+		const { organizationId, environment } = tenant;
 		const { page, limit, search, rfc, personType, stateCode } = filters;
 
 		// Base where clause – applies to data fetch AND to each filter's count query
 		const baseWhere: Prisma.ClientWhereInput = {
 			organizationId,
+			environment,
 			deletedAt: null,
 		};
 
@@ -185,29 +188,37 @@ export class ClientRepository {
 	}
 
 	async getById(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 	): Promise<ClientEntity | null> {
+		const { organizationId, environment } = tenant;
 		const record = await this.prisma.client.findFirst({
-			where: { organizationId, id, deletedAt: null },
+			where: { organizationId, environment, id, deletedAt: null },
 		});
 		return record ? mapPrismaClient(record) : null;
 	}
 
 	async findByRfc(
-		organizationId: string,
+		tenant: TenantContext,
 		rfc: string,
 	): Promise<ClientEntity | null> {
+		const { organizationId, environment } = tenant;
 		const record = await this.prisma.client.findFirst({
-			where: { organizationId, rfc: rfc.toUpperCase(), deletedAt: null },
+			where: {
+				organizationId,
+				environment,
+				rfc: rfc.toUpperCase(),
+				deletedAt: null,
+			},
 		});
 		return record ? mapPrismaClient(record) : null;
 	}
 
 	async create(
-		organizationId: string,
+		tenant: TenantContext,
 		input: ClientCreateInput,
 	): Promise<ClientEntity> {
+		const { organizationId, environment } = tenant;
 		const normalized = withCountryCodeSyncedFromNationalityWhenMissing(input);
 		const prismaData = mapCreateInputToPrisma(normalized);
 		const { completenessStatus, missingFields } =
@@ -223,6 +234,7 @@ export class ClientRepository {
 			data: {
 				...prismaData,
 				organizationId,
+				environment,
 				completenessStatus,
 				missingFields:
 					missingFields.length > 0 ? JSON.stringify(missingFields) : null,
@@ -240,11 +252,12 @@ export class ClientRepository {
 	}
 
 	async update(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: ClientUpdateInput,
 	): Promise<ClientEntity> {
-		await this.ensureExists(organizationId, id);
+		const { organizationId, environment } = tenant;
+		await this.ensureExists(organizationId, id, environment);
 
 		const normalized = withCountryCodeSyncedFromNationalityWhenMissing(input);
 		const prismaData = mapUpdateInputToPrisma(normalized);
@@ -278,11 +291,12 @@ export class ClientRepository {
 	}
 
 	async patch(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: ClientPatchInput,
 	): Promise<ClientEntity> {
-		await this.ensureExists(organizationId, id);
+		const { organizationId, environment } = tenant;
+		await this.ensureExists(organizationId, id, environment);
 
 		const payload = mapPatchInputToPrisma(input) as Prisma.ClientUpdateInput;
 
@@ -334,8 +348,9 @@ export class ClientRepository {
 		return mapPrismaClient(updated);
 	}
 
-	async delete(organizationId: string, id: string): Promise<void> {
-		await this.ensureExists(organizationId, id);
+	async delete(tenant: TenantContext, id: string): Promise<void> {
+		const { organizationId, environment } = tenant;
+		await this.ensureExists(organizationId, id, environment);
 
 		await this.prisma.client.update({
 			where: { id },
@@ -489,9 +504,16 @@ export class ClientRepository {
 	private async ensureExists(
 		organizationId: string,
 		id: string,
+		environment?: string,
 	): Promise<void> {
+		const where: Prisma.ClientWhereInput = {
+			organizationId,
+			id,
+			deletedAt: null,
+		};
+		if (environment) where.environment = environment;
 		const exists = await this.prisma.client.findFirst({
-			where: { organizationId, id, deletedAt: null },
+			where,
 			select: { id: true },
 		});
 
@@ -602,25 +624,41 @@ export class ClientRepository {
 		return { completenessStatus, missingFields: missing };
 	}
 
-	async getStats(organizationId: string): Promise<{
+	async getStats(tenant: TenantContext): Promise<{
 		totalClients: number;
 		physicalClients: number;
 		moralClients: number;
 		trustClients: number;
 	}> {
+		const { organizationId, environment } = tenant;
 		const [totalClients, physicalClients, moralClients, trustClients] =
 			await Promise.all([
 				this.prisma.client.count({
-					where: { organizationId, deletedAt: null },
+					where: { organizationId, environment, deletedAt: null },
 				}),
 				this.prisma.client.count({
-					where: { organizationId, deletedAt: null, personType: "PHYSICAL" },
+					where: {
+						organizationId,
+						environment,
+						deletedAt: null,
+						personType: "PHYSICAL",
+					},
 				}),
 				this.prisma.client.count({
-					where: { organizationId, deletedAt: null, personType: "MORAL" },
+					where: {
+						organizationId,
+						environment,
+						deletedAt: null,
+						personType: "MORAL",
+					},
 				}),
 				this.prisma.client.count({
-					where: { organizationId, deletedAt: null, personType: "TRUST" },
+					where: {
+						organizationId,
+						environment,
+						deletedAt: null,
+						personType: "TRUST",
+					},
 				}),
 			]);
 

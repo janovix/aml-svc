@@ -10,6 +10,7 @@ import {
 	mapReportCreateInputToPrisma,
 	mapReportPatchInputToPrisma,
 } from "./mappers";
+import type { TenantContext } from "../../lib/tenant-context";
 
 export class ReportRepository {
 	constructor(private readonly prisma: PrismaClient) {}
@@ -18,9 +19,10 @@ export class ReportRepository {
 	 * List reports with pagination and filters
 	 */
 	async list(
-		organizationId: string,
+		tenant: TenantContext,
 		filters: ReportFilterInput,
 	): Promise<ListResult<ReportEntity>> {
+		const { organizationId, environment } = tenant;
 		const {
 			page,
 			limit,
@@ -35,6 +37,7 @@ export class ReportRepository {
 
 		const where: Prisma.ReportWhereInput = {
 			organizationId,
+			environment,
 		};
 
 		if (template?.length) {
@@ -80,9 +83,10 @@ export class ReportRepository {
 	/**
 	 * Get a single report by ID
 	 */
-	async get(organizationId: string, id: string): Promise<ReportEntity> {
+	async get(tenant: TenantContext, id: string): Promise<ReportEntity> {
+		const { organizationId, environment } = tenant;
 		const report = await this.prisma.report.findFirst({
-			where: { id, organizationId },
+			where: { id, organizationId, environment },
 		});
 
 		if (!report) {
@@ -96,14 +100,14 @@ export class ReportRepository {
 	 * Get a report with alert summary
 	 */
 	async getWithAlertSummary(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 	): Promise<ReportWithAlertSummary> {
-		const report = await this.get(organizationId, id);
+		const { organizationId, environment } = tenant;
+		const report = await this.get(tenant, id);
 
-		// Get alert statistics for this report
 		const alerts = await this.prisma.alert.findMany({
-			where: { reportId: id, organizationId },
+			where: { reportId: id, organizationId, environment },
 			include: { alertRule: true },
 		});
 
@@ -113,13 +117,10 @@ export class ReportRepository {
 			new Map();
 
 		for (const alert of alerts) {
-			// Count by severity
 			bySeverity[alert.severity] = (bySeverity[alert.severity] || 0) + 1;
 
-			// Count by status
 			byStatus[alert.status] = (byStatus[alert.status] || 0) + 1;
 
-			// Count by rule
 			const existing = byRuleMap.get(alert.alertRuleId);
 			if (existing) {
 				existing.count++;
@@ -155,13 +156,17 @@ export class ReportRepository {
 	 */
 	async create(
 		input: ReportCreateInput,
-		organizationId: string,
+		tenant: TenantContext,
 		createdBy?: string,
 	): Promise<ReportEntity> {
+		const { organizationId, environment } = tenant;
 		const data = mapReportCreateInputToPrisma(input, organizationId, createdBy);
 
 		const report = await this.prisma.report.create({
-			data,
+			data: {
+				...data,
+				environment,
+			},
 		});
 
 		return mapPrismaReport(report);
@@ -171,11 +176,11 @@ export class ReportRepository {
 	 * Update a report (partial)
 	 */
 	async patch(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		input: ReportPatchInput,
 	): Promise<ReportEntity> {
-		await this.ensureExists(organizationId, id);
+		await this.ensureExists(tenant, id);
 
 		const data = mapReportPatchInputToPrisma(input);
 
@@ -190,12 +195,12 @@ export class ReportRepository {
 	/**
 	 * Delete a report
 	 */
-	async delete(organizationId: string, id: string): Promise<void> {
-		await this.ensureExists(organizationId, id);
+	async delete(tenant: TenantContext, id: string): Promise<void> {
+		const { organizationId, environment } = tenant;
+		await this.ensureExists(tenant, id);
 
-		// First, remove the reportId from all alerts linked to this report
 		await this.prisma.alert.updateMany({
-			where: { reportId: id, organizationId },
+			where: { reportId: id, organizationId, environment },
 			data: { reportId: null },
 		});
 
@@ -208,7 +213,7 @@ export class ReportRepository {
 	 * Count alerts in a period (for analytics reports)
 	 */
 	async countAlertsForPeriod(
-		organizationId: string,
+		tenant: TenantContext,
 		periodStart: Date,
 		periodEnd: Date,
 		filters?: {
@@ -221,8 +226,10 @@ export class ReportRepository {
 		bySeverity: Record<string, number>;
 		byStatus: Record<string, number>;
 	}> {
+		const { organizationId, environment } = tenant;
 		const where: Prisma.AlertWhereInput = {
 			organizationId,
+			environment,
 			createdAt: {
 				gte: periodStart,
 				lte: periodEnd,
@@ -273,14 +280,14 @@ export class ReportRepository {
 	 * Mark a report as generated with PDF file URL
 	 */
 	async markAsGenerated(
-		organizationId: string,
+		tenant: TenantContext,
 		id: string,
 		options: {
 			pdfFileUrl?: string | null;
 			fileSize?: number | null;
 		},
 	): Promise<ReportEntity> {
-		await this.ensureExists(organizationId, id);
+		await this.ensureExists(tenant, id);
 
 		const now = new Date();
 
@@ -299,12 +306,10 @@ export class ReportRepository {
 		return mapPrismaReport(report);
 	}
 
-	private async ensureExists(
-		organizationId: string,
-		id: string,
-	): Promise<void> {
+	private async ensureExists(tenant: TenantContext, id: string): Promise<void> {
+		const { organizationId, environment } = tenant;
 		const report = await this.prisma.report.findFirst({
-			where: { id, organizationId },
+			where: { id, organizationId, environment },
 		});
 		if (!report) {
 			throw new Error("REPORT_NOT_FOUND");
