@@ -61,6 +61,10 @@
 				"queue": "aml-imports",
 			},
 			{
+				"binding": "RISK_ASSESSMENT_QUEUE",
+				"queue": "aml-risk-assessment",
+			},
+			{
 				"binding": "WEBHOOK_QUEUE",
 				"queue": "webhook-events",
 			},
@@ -76,14 +80,13 @@
 				"max_batch_size": 5,
 				"max_batch_timeout": 60,
 			},
+			{
+				"queue": "aml-risk-assessment",
+				"max_batch_size": 10,
+				"max_retries": 3,
+			},
 		],
 	},
-	"r2_buckets": [
-		{
-			"binding": "R2_BUCKET",
-			"bucket_name": "aml",
-		},
-	],
 	"triggers": {
 		"crons": ["0 14 * * *"],
 	},
