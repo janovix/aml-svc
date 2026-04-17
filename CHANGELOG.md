@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/janovix/aml-svc/compare/v1.14.0...v1.15.0) (2026-04-17)
+
+
+### Features
+
+* **queues:** add RISK_ASSESSMENT_QUEUE to wrangler configuration ([c218ff0](https://github.com/janovix/aml-svc/commit/c218ff0164f1c11fed7e037c2453c55f3d1e11b5))
+
 # [1.14.0](https://github.com/janovix/aml-svc/compare/v1.13.0...v1.14.0) (2026-04-16)
 
 
