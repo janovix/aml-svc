@@ -1,3 +1,10 @@
+# [1.14.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.2...v1.14.0-rc.3) (2026-04-18)
+
+
+### Features
+
+* **config:** update AML frontend URLs and adjust queue settings in wrangler configuration ([febf1c7](https://github.com/janovix/aml-svc/commit/febf1c7889843d6f3e05ef56a3ba594d7e034883))
+
 # [1.14.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.1...v1.14.0-rc.2) (2026-04-17)
 
 
