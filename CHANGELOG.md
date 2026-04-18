@@ -1,3 +1,10 @@
+# [1.14.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.3...v1.14.0-rc.4) (2026-04-18)
+
+
+### Features
+
+* **chat:** implement Janbot chat persistence with threads, messages, tool calls, attachments, and abuse events ([042d103](https://github.com/janovix/aml-svc/commit/042d10366ffe34b5d904f77a946a0a3cba767abb))
+
 # [1.14.0-rc.3](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.2...v1.14.0-rc.3) (2026-04-18)
 
 
