@@ -11,9 +11,9 @@ export class OrganizationSettingsRepository {
 	async findByOrganizationId(
 		tenant: TenantContext,
 	): Promise<OrganizationSettingsEntity | null> {
-		const { organizationId, environment } = tenant;
-		const record = await this.prisma.organizationSettings.findFirst({
-			where: { organizationId, environment },
+		const { organizationId } = tenant;
+		const record = await this.prisma.organizationSettings.findUnique({
+			where: { organizationId },
 		});
 
 		if (!record) {
@@ -34,12 +34,11 @@ export class OrganizationSettingsRepository {
 			selfServiceSendEmail?: boolean;
 		},
 	): Promise<OrganizationSettingsEntity> {
-		const { organizationId, environment } = tenant;
+		const { organizationId } = tenant;
 		const record = await this.prisma.organizationSettings.create({
 			data: {
 				id: generateId("ORGANIZATION_SETTINGS"),
 				organizationId,
-				environment,
 				obligatedSubjectKey: data.obligatedSubjectKey,
 				activityKey: data.activityKey,
 				selfServiceMode: data.selfServiceMode ?? "automatic",
@@ -66,15 +65,15 @@ export class OrganizationSettingsRepository {
 			selfServiceSendEmail?: boolean;
 		},
 	): Promise<OrganizationSettingsEntity> {
-		const { organizationId, environment } = tenant;
-		const existing = await this.prisma.organizationSettings.findFirst({
-			where: { organizationId, environment },
+		const { organizationId } = tenant;
+		const existing = await this.prisma.organizationSettings.findUnique({
+			where: { organizationId },
 			select: { id: true },
 		});
 
 		if (!existing) {
 			throw new Error(
-				`Organization settings not found for org ${organizationId} env ${environment}`,
+				`Organization settings not found for org ${organizationId}`,
 			);
 		}
 
@@ -119,43 +118,12 @@ export class OrganizationSettingsRepository {
 			selfServiceSendEmail?: boolean;
 		},
 	): Promise<OrganizationSettingsEntity> {
-		const { organizationId, environment } = tenant;
-		const existing = await this.prisma.organizationSettings.findFirst({
-			where: { organizationId, environment },
-			select: { id: true },
-		});
-
-		if (existing) {
-			const record = await this.prisma.organizationSettings.update({
-				where: { id: existing.id },
-				data: {
-					obligatedSubjectKey: data.obligatedSubjectKey,
-					activityKey: data.activityKey,
-					...(data.selfServiceMode !== undefined && {
-						selfServiceMode: data.selfServiceMode,
-					}),
-					...(data.selfServiceExpiryHours !== undefined && {
-						selfServiceExpiryHours: data.selfServiceExpiryHours,
-					}),
-					...(data.selfServiceSendEmail !== undefined && {
-						selfServiceSendEmail: data.selfServiceSendEmail,
-					}),
-					...(data.selfServiceRequiredSections !== undefined && {
-						selfServiceRequiredSections:
-							data.selfServiceRequiredSections != null
-								? JSON.stringify(data.selfServiceRequiredSections)
-								: null,
-					}),
-				},
-			});
-			return mapPrismaOrganizationSettings(record);
-		}
-
-		const record = await this.prisma.organizationSettings.create({
-			data: {
+		const { organizationId } = tenant;
+		const record = await this.prisma.organizationSettings.upsert({
+			where: { organizationId },
+			create: {
 				id: generateId("ORGANIZATION_SETTINGS"),
 				organizationId,
-				environment,
 				obligatedSubjectKey: data.obligatedSubjectKey,
 				activityKey: data.activityKey,
 				selfServiceMode: data.selfServiceMode ?? "automatic",
@@ -165,6 +133,25 @@ export class OrganizationSettingsRepository {
 					data.selfServiceRequiredSections != null
 						? JSON.stringify(data.selfServiceRequiredSections)
 						: null,
+			},
+			update: {
+				obligatedSubjectKey: data.obligatedSubjectKey,
+				activityKey: data.activityKey,
+				...(data.selfServiceMode !== undefined && {
+					selfServiceMode: data.selfServiceMode,
+				}),
+				...(data.selfServiceExpiryHours !== undefined && {
+					selfServiceExpiryHours: data.selfServiceExpiryHours,
+				}),
+				...(data.selfServiceSendEmail !== undefined && {
+					selfServiceSendEmail: data.selfServiceSendEmail,
+				}),
+				...(data.selfServiceRequiredSections !== undefined && {
+					selfServiceRequiredSections:
+						data.selfServiceRequiredSections != null
+							? JSON.stringify(data.selfServiceRequiredSections)
+							: null,
+				}),
 			},
 		});
 		return mapPrismaOrganizationSettings(record);

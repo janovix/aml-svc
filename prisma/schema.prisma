@@ -1238,7 +1238,6 @@ model UmaValue {
 model OrganizationSettings {
   id                          String   @id
   organizationId              String   @unique @map("organization_id")
-  environment                 String   @default("production") @map("environment")
   obligatedSubjectKey         String   @map("obligated_subject_key")
   activityKey                 String   @map("activity_key")
   // KYC Self-Service settings
