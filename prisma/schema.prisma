@@ -1858,3 +1858,94 @@ model MethodologyAuditLog {
   @@index([methodologyId])
   @@map("methodology_audit_logs")
 }
+
+// ============================================================================
+// Janbot (AI chat) persistence
+// ============================================================================
+
+model ChatThread {
+  id                 String    @id
+  organizationId     String    @map("organization_id")
+  userId             String    @map("user_id")
+  title              String?
+  model              String?
+  status             String    @default("active")
+  tokenBudget        Int       @default(50000) @map("token_budget")
+  tokensUsed         Int       @default(0) @map("tokens_used")
+  autoApproveLowRisk Boolean   @default(false) @map("auto_approve_low_risk")
+  activeStreamId     String?   @map("active_stream_id")
+  userStatus         String?   @map("user_status")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  archivedAt         DateTime? @map("archived_at")
+
+  messages ChatMessage[]
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("chat_thread")
+}
+
+model ChatMessage {
+  id             String   @id
+  threadId       String   @map("thread_id")
+  role           String
+  partsJson      String   @map("parts_json")
+  model          String?
+  metadataJson   String?  @map("metadata_json")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  thread      ChatThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  toolCalls   ChatToolCall[]
+  attachments ChatAttachment[]
+
+  @@index([threadId])
+  @@map("chat_message")
+}
+
+model ChatToolCall {
+  id         String    @id
+  messageId  String    @map("message_id")
+  toolName   String    @map("tool_name")
+  inputJson  String?   @map("input_json")
+  outputJson String?   @map("output_json")
+  status     String    @default("completed")
+  approvedBy String?   @map("approved_by")
+  approvedAt DateTime? @map("approved_at")
+  latencyMs  Int?      @map("latency_ms")
+  error      String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("chat_tool_call")
+}
+
+model ChatAttachment {
+  id         String   @id
+  messageId  String   @map("message_id")
+  r2Key      String   @map("r2_key")
+  mimeType   String   @map("mime_type")
+  sizeBytes  Int      @map("size_bytes")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("chat_attachment")
+}
+
+model ChatAbuseEvent {
+  id             String   @id
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  threadId       String?  @map("thread_id")
+  kind           String
+  snippet        String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("chat_abuse_event")
+}

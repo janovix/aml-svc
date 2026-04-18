@@ -32,6 +32,8 @@ import { kycSessionsRouter } from "./kyc-sessions";
 import { publicKycRouter } from "./public-kyc";
 import { maintenanceRouter } from "./internal-maintenance";
 import { riskRouter } from "./risk";
+import { chatRouter } from "./chat";
+import { janbotWatchlistRouter } from "./janbot-watchlist";
 
 export function createRouter() {
 	const router = new Hono<{
@@ -103,6 +105,23 @@ export function createRouter() {
 	router.use("/risk/*", authMiddleware({ requireOrganization: true }));
 	router.use("/risk/*", requireActiveOrganization());
 
+	// Janbot chat persistence (org-scoped)
+	router.use("/chat/*", authMiddleware({ requireOrganization: true }));
+	router.use("/chat/*", requireActiveOrganization());
+	router.use("/chat", authMiddleware({ requireOrganization: true }));
+	router.use("/chat", requireActiveOrganization());
+
+	router.use(
+		"/janbot/watchlist/*",
+		authMiddleware({ requireOrganization: true }),
+	);
+	router.use("/janbot/watchlist/*", requireActiveOrganization());
+	router.use(
+		"/janbot/watchlist",
+		authMiddleware({ requireOrganization: true }),
+	);
+	router.use("/janbot/watchlist", requireActiveOrganization());
+
 	// Exchange rates are global utility - auth required but no org
 	router.use("/exchange-rates/*", authMiddleware());
 
@@ -130,6 +149,8 @@ export function createRouter() {
 	router.route("/imports", importsRouter);
 	router.route("/kyc-sessions", kycSessionsRouter);
 	router.route("/risk", riskRouter);
+	router.route("/chat", chatRouter);
+	router.route("/janbot/watchlist", janbotWatchlistRouter);
 
 	return router;
 }
