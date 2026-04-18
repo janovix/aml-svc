@@ -77,8 +77,9 @@
 			},
 			{
 				"queue": "aml-imports",
-				"max_batch_size": 5,
-				"max_batch_timeout": 60,
+				"max_batch_size": 1,
+				"max_batch_timeout": 1,
+				"max_retries": 3,
 			},
 			{
 				"queue": "aml-risk-assessment",
@@ -94,5 +95,6 @@
 		"ENVIRONMENT": "production",
 		"AUTH_JWKS_CACHE_TTL": "3600",
 		"TRUSTED_ORIGINS": "*.janovix.com,https://janovix.com",
+		"AML_FRONTEND_URL": "https://aml.janovix.com",
 	},
 }

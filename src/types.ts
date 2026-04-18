@@ -218,6 +218,8 @@ export type Bindings = Omit<
 	 * Caller wrangler config must include `"entrypoint": "NotificationsEntrypoint"`.
 	 */
 	NOTIFICATIONS_SERVICE?: NotificationsRpc;
+	/** Public AML frontend URL used to build notification callback links */
+	AML_FRONTEND_URL?: string;
 	/** KYC Self-Service app URL for generating invite links */
 	KYC_SELF_SERVICE_URL?: string;
 	/** Internal service-to-service shared secret */
