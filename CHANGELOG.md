@@ -1,3 +1,10 @@
+# [1.14.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.4...v1.14.0-rc.5) (2026-04-19)
+
+
+### Bug Fixes
+
+* **config:** update TRUSTED_ORIGINS in wrangler configuration to use ngrok URL ([e44d8cd](https://github.com/janovix/aml-svc/commit/e44d8cd5384acdfb5aeff999deb673756660c155))
+
 # [1.14.0-rc.4](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.3...v1.14.0-rc.4) (2026-04-18)
 
 
