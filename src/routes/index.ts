@@ -31,6 +31,7 @@ import { exchangeRatesRouter } from "./exchange-rates";
 import { kycSessionsRouter } from "./kyc-sessions";
 import { publicKycRouter } from "./public-kyc";
 import { maintenanceRouter } from "./internal-maintenance";
+import { internalE2eRouter } from "./internal-e2e";
 import { riskRouter } from "./risk";
 import { chatRouter } from "./chat";
 import { janbotWatchlistRouter } from "./janbot-watchlist";
@@ -48,6 +49,7 @@ export function createRouter() {
 	router.route("/imports", importEventsRouter);
 	// Internal routes for worker-to-service communication (no auth, service binding only)
 	router.route("/internal/maintenance", maintenanceRouter);
+	router.route("/internal/e2e", internalE2eRouter);
 	router.route("/internal/imports", importInternalRouter);
 	router.route("/internal/clients", clientsInternalRouter);
 	// Transaction internal routes deprecated - use operations

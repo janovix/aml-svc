@@ -100,5 +100,6 @@
 		"TRUSTED_ORIGINS": "*.janovix.workers.dev,https://unfilmed-surprisedly-raquel.ngrok-free.dev",
 		"AML_FRONTEND_URL": "https://aml.janovix.workers.dev",
 		"KYC_SELF_SERVICE_URL": "https://kyc.janovix.workers.dev",
+		"E2E_API_KEY": "",
 	},
 }

@@ -197,6 +197,8 @@ export type Bindings = Omit<
 	 * Example: "https://aml.janovix.com,https://auth.janovix.com,http://localhost:3000"
 	 */
 	TRUSTED_ORIGINS?: string;
+	/** Shared secret for internal E2E routes (alert thresholds, org purge). */
+	E2E_API_KEY?: string;
 	/** Queue for import processing jobs */
 	IMPORT_PROCESSING_QUEUE?: Queue<import("./domain/import").ImportJob>;
 	/** Queue for risk assessment jobs (consumed by aml-svc itself) */
