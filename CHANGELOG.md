@@ -1,3 +1,10 @@
+# [1.14.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.5...v1.14.0-rc.6) (2026-04-22)
+
+
+### Features
+
+* **config:** add E2E_API_KEY to wrangler configuration and internal E2E routes ([8a5868a](https://github.com/janovix/aml-svc/commit/8a5868aebe8b55bbe92323d5f129054c3bb7fadf))
+
 # [1.14.0-rc.5](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.4...v1.14.0-rc.5) (2026-04-19)
 
 
