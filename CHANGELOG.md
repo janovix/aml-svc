@@ -1,3 +1,10 @@
+# [1.14.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.6...v1.14.0-rc.7) (2026-04-24)
+
+
+### Features
+
+* **watchlist:** implement watchlist rescan settings and historical screening records ([e20d735](https://github.com/janovix/aml-svc/commit/e20d735721ca999a35fa4fe4bd8b0620a45b946e))
+
 # [1.14.0-rc.6](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.5...v1.14.0-rc.6) (2026-04-22)
 
 
