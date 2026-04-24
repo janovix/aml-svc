@@ -1,20 +1,54 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	defineWorkersConfig,
 	readD1Migrations,
 } from "@cloudflare/vitest-pool-workers/config";
 
-const migrationsPath = path.join(__dirname, "..", "migrations");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.join(__dirname, "..");
+const prismaWasmEngineEdge = path.join(
+	repoRoot,
+	"node_modules/@prisma/client/runtime/wasm-engine-edge.mjs",
+);
+
+/**
+ * Only the generated Prisma client imports the Node engine (`library` →
+ * `node:child_process`). App code (e.g. `Decimal`) must use `wasm-engine-edge` in
+ * source. This redirect must not apply to all `library` imports or Vitest
+ * `vi.mock` can break (duplicate module graph).
+ */
+function prismaWorkerWasmRuntimePlugin() {
+	return {
+		name: "prisma-workerd-wasm-engine",
+		enforce: "pre" as const,
+		resolveId(id: string, importer: string | undefined) {
+			const n = id.replace(/\\/g, "/");
+			if (!n.includes("prisma/client/runtime/library")) {
+				return null;
+			}
+			const fromGenerated =
+				importer != null &&
+				importer.replace(/\\/g, "/").includes(".prisma/client");
+			if (!fromGenerated) {
+				return null;
+			}
+			return prismaWasmEngineEdge;
+		},
+	};
+}
+
+const migrationsPath = path.join(repoRoot, "migrations");
 const migrations = await readD1Migrations(migrationsPath);
 
 export default defineWorkersConfig({
+	plugins: [prismaWorkerWasmRuntimePlugin()],
 	esbuild: {
 		target: "esnext",
 	},
 	// Required for zod which fails to import in Workers runtime on Windows
 	// See: https://developers.cloudflare.com/workers/testing/vitest-integration/known-issues/#module-resolution
 	ssr: {
-		// Force Vite to bundle zod instead of externalizing it
 		noExternal: ["zod"],
 	},
 	test: {
@@ -85,6 +119,8 @@ export default defineWorkersConfig({
 				"src/domain/uma/schemas.ts",
 				// Organization settings domain (integration + unit service tests; repos/mappers thin)
 				"src/domain/organization-settings/**",
+				// Art. 17 threshold tier: unit tests mock it (dynamic import); real path covered in integration/HTTP
+				"src/domain/client/identification-tier.ts",
 				// Repositories are covered by integration; domain service/schemas/mappers have unit tests
 				"src/domain/beneficial-controller/repository.ts",
 				"src/domain/shareholder/repository.ts",

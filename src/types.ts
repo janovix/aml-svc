@@ -161,6 +161,9 @@ export interface WatchlistRpc {
 			identifiers?: string[];
 			topK?: number;
 			threshold?: number;
+			environment?: string;
+			entityId?: string;
+			entityKind?: "client" | "beneficial_controller";
 		},
 		organizationId: string,
 		userId: string,
@@ -169,6 +172,16 @@ export interface WatchlistRpc {
 		ofacCount: number;
 		unscCount: number;
 		sat69bCount: number;
+	}>;
+	listByEntity?(
+		organizationId: string,
+		entityId: string,
+		options?: { limit?: number; offset?: number },
+	): Promise<{
+		data: unknown[];
+		total: number;
+		limit: number;
+		offset: number;
 	}>;
 }
 
@@ -203,6 +216,10 @@ export type Bindings = Omit<
 	IMPORT_PROCESSING_QUEUE?: Queue<import("./domain/import").ImportJob>;
 	/** Queue for risk assessment jobs (consumed by aml-svc itself) */
 	RISK_ASSESSMENT_QUEUE?: Queue<import("./lib/risk-queue").RiskJob>;
+	/** Watchlist re-screen jobs (pep-check replacement; consumed by aml-svc) */
+	AML_SCREENING_REFRESH_QUEUE?: Queue<
+		import("./lib/watchlist-rescan-types").ScreeningRescanJob
+	>;
 	/** Queue for webhook event delivery (consumed by webhook-delivery-worker) */
 	WEBHOOK_QUEUE?: Queue<import("./lib/webhook-events").WebhookEvent>;
 	/**

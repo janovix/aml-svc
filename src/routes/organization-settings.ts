@@ -64,14 +64,7 @@ organizationSettingsRouter.put("/", async (c) => {
 	const body = await c.req.json();
 	const data = parseWithZod(organizationSettingsCreateSchema, body);
 
-	const settings = await service.createOrUpdate(tenant, {
-		obligatedSubjectKey: data.obligatedSubjectKey,
-		activityKey: data.activityKey,
-		selfServiceMode: data.selfServiceMode,
-		selfServiceExpiryHours: data.selfServiceExpiryHours,
-		selfServiceRequiredSections: data.selfServiceRequiredSections,
-		selfServiceSendEmail: data.selfServiceSendEmail,
-	});
+	const settings = await service.createOrUpdate(tenant, data);
 
 	return c.json({ configured: true, settings }, 200);
 });
@@ -98,14 +91,7 @@ organizationSettingsRouter.patch("/", async (c) => {
 
 	const body = await c.req.json();
 	const data = parseWithZod(organizationSettingsUpdateSchema, body);
-	const settings = await service.update(tenant, {
-		obligatedSubjectKey: data.obligatedSubjectKey,
-		activityKey: data.activityKey,
-		selfServiceMode: data.selfServiceMode,
-		selfServiceExpiryHours: data.selfServiceExpiryHours,
-		selfServiceRequiredSections: data.selfServiceRequiredSections,
-		selfServiceSendEmail: data.selfServiceSendEmail,
-	});
+	const settings = await service.update(tenant, data);
 
 	return c.json({ configured: true, settings });
 });

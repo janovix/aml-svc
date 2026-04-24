@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { Decimal } from "@prisma/client/runtime/library";
+import { Decimal } from "@prisma/client/runtime/wasm-engine-edge";
 
 /**
  * Document requirements per person type
@@ -116,6 +116,24 @@ export async function recalculateKycProgress(
 		throw new Error(`Client not found: ${clientId}`);
 	}
 
+	const { computeClientIdentificationTier } = await import(
+		"./identification-tier"
+	);
+	const tierInfo = await computeClientIdentificationTier(
+		prisma,
+		client.organizationId,
+		clientId,
+	);
+	const { identificationTier, identificationRequired } = tierInfo;
+	const identificationThresholdMxn: Decimal | null =
+		tierInfo.identificationThresholdMxn !== null
+			? new Decimal(tierInfo.identificationThresholdMxn)
+			: null;
+	const noticeThresholdMxn: Decimal | null =
+		tierInfo.noticeThresholdMxn !== null
+			? new Decimal(tierInfo.noticeThresholdMxn)
+			: null;
+
 	// 1. FIELD COMPLETENESS — all sections aligned with frontend (aml/src/lib/kyc-status.ts)
 	const clientRecord = client as Record<string, unknown>;
 	let fieldWeight = 0;
@@ -161,13 +179,16 @@ export async function recalculateKycProgress(
 		(sectionCompletedCount(clientRecord, pepFields) / pepFields.length) *
 		SECTION_WEIGHTS.pepInfo;
 
-	// 2. DOCUMENT COMPLETENESS
+	// 2. DOCUMENT COMPLETENESS (Art. 17: optional below identification threshold)
 	const requiredDocTypes = DOCUMENT_REQUIREMENTS[client.personType] || [];
 	const uploadedDocTypes = new Set(
 		client.documents.map((d) => d.documentType as string),
 	);
 	let documentsComplete: 0 | 1;
-	if (requiredDocTypes.length === 0) {
+	if (identificationTier === "BELOW_THRESHOLD") {
+		documentsComplete = 1;
+		fieldWeight += SECTION_WEIGHTS.documents;
+	} else if (requiredDocTypes.length === 0) {
 		documentsComplete = 1;
 		fieldWeight += SECTION_WEIGHTS.documents;
 	} else {
@@ -209,19 +230,7 @@ export async function recalculateKycProgress(
 
 	const kycCompletionPct = Math.round((fieldWeight / totalWeight) * 100);
 
-	// 5. THRESHOLD-AWARE KYC (Art. 17 LFPIORPI)
-	// For now, default to ALWAYS identification required
-	// This would require org settings and UMA value lookup for full implementation
-	const identificationRequired = true;
-	const identificationTier: "ALWAYS" | "ABOVE_THRESHOLD" | "BELOW_THRESHOLD" =
-		"ALWAYS";
-	const identificationThresholdMxn: Decimal | null = null;
-	const noticeThresholdMxn: Decimal | null = null;
-
-	// TODO: Integrate with org settings and UMA to compute actual thresholds
-	// For now, store defaults
-
-	// 6. UPDATE CLIENT RECORD
+	// 5. UPDATE CLIENT RECORD
 	await prisma.client.update({
 		where: { id: clientId },
 		data: {

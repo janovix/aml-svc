@@ -17,6 +17,13 @@ describe("OrganizationSettingsService", () => {
 		selfServiceExpiryHours: 72,
 		selfServiceSendEmail: true,
 		selfServiceRequiredSections: null,
+		watchlistRescanEnabled: true,
+		watchlistRescanIntervalDays: 30,
+		watchlistRescanIncludeBcs: true,
+		watchlistRescanNotifyOnStatusChange: true,
+		watchlistRescanDailyCap: 500,
+		watchlistRescanNotifyChannels: ["in_app"],
+		watchlistRescanSources: ["ofac", "un", "sat69b", "pep", "adverse_media"],
 		createdAt: "2024-01-01T00:00:00.000Z",
 		updatedAt: "2024-01-01T00:00:00.000Z",
 	};

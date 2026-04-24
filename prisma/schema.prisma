@@ -262,6 +262,8 @@ model Client {
   beneficialControllers  BeneficialController[]
   uploadLinks            UploadLink[]
   riskAssessments        ClientRiskAssessment[]
+  watchlistScreenings   ClientWatchlistScreening[]
+  beneficialControllerWatchlistScreenings BeneficialControllerWatchlistScreening[]
 
   @@index([organizationId])
   @@index([organizationId, environment])
@@ -478,6 +480,7 @@ model BeneficialController {
   addressProofDoc      ClientDocument?  @relation("BCAddressProof", fields: [addressProofDocId], references: [id], onDelete: SetNull)
   constanciaBcDoc      ClientDocument?  @relation("BCConstanciaBC", fields: [constanciaBcDocId], references: [id], onDelete: SetNull)
   powerOfAttorneyDoc   ClientDocument?  @relation("BCPowerOfAttorney", fields: [powerOfAttorneyDocId], references: [id], onDelete: SetNull)
+  watchlistScreenings  BeneficialControllerWatchlistScreening[]
 
   @@index([clientId])
   @@index([shareholderId])
@@ -1245,6 +1248,14 @@ model OrganizationSettings {
   selfServiceExpiryHours      Int      @default(72) @map("self_service_expiry_hours")
   selfServiceRequiredSections String?  @map("self_service_required_sections") // JSON array
   selfServiceSendEmail        Boolean  @default(true) @map("self_service_send_email")
+  // Watchlist re-screen (scheduled cron)
+  watchlistRescanEnabled               Boolean  @default(true) @map("watchlist_rescan_enabled")
+  watchlistRescanIntervalDays          Int      @default(30) @map("watchlist_rescan_interval_days")
+  watchlistRescanIncludeBcs            Boolean  @default(true) @map("watchlist_rescan_include_bcs")
+  watchlistRescanNotifyOnStatusChange  Boolean  @default(true) @map("watchlist_rescan_notify_on_status_change")
+  watchlistRescanDailyCap              Int      @default(500) @map("watchlist_rescan_daily_cap")
+  watchlistRescanNotifyChannels        String   @default("[\"in_app\"]") @map("watchlist_rescan_notify_channels") // JSON: in_app, email
+  watchlistRescanSources               String   @default("[\"ofac\",\"un\",\"sat69b\",\"pep\",\"adverse_media\"]") @map("watchlist_rescan_sources") // JSON
   createdAt                   DateTime @default(now()) @map("created_at")
   updatedAt                   DateTime @updatedAt @map("updated_at")
 
@@ -1252,6 +1263,65 @@ model OrganizationSettings {
   @@index([obligatedSubjectKey])
   @@index([activityKey])
   @@map("organization_settings")
+}
+
+// Historical snapshots for watchlist screening (AML Core)
+model ClientWatchlistScreening {
+  id                 String  @id
+  organizationId     String  @map("organization_id")
+  clientId           String  @map("client_id")
+  watchlistQueryId   String? @map("watchlist_query_id")
+  screenedAt         DateTime @map("screened_at")
+  triggeredBy        String  @map("triggered_by")
+  screeningResult    String  @map("screening_result")
+  ofacSanctioned     Boolean  @default(false) @map("ofac_sanctioned")
+  unscSanctioned     Boolean  @default(false) @map("unsc_sanctioned")
+  sat69bListed       Boolean  @default(false) @map("sat69b_listed")
+  isPep              Boolean  @default(false) @map("is_pep")
+  adverseMediaFlagged Boolean  @default(false) @map("adverse_media_flagged")
+  changeFlags        String?  @map("change_flags")
+  prevSnapshotId     String?  @map("prev_snapshot_id")
+  errorMessage       String?  @map("error_message")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  client       Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  prevSnapshot ClientWatchlistScreening?  @relation("ClientWatchlistScreeningChain", fields: [prevSnapshotId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  nextSnapshots ClientWatchlistScreening[] @relation("ClientWatchlistScreeningChain")
+
+  @@index([clientId, screenedAt(sort: Desc)])
+  @@index([organizationId, screenedAt(sort: Desc)])
+  @@index([organizationId])
+  @@map("client_watchlist_screening")
+}
+
+model BeneficialControllerWatchlistScreening {
+  id                     String   @id
+  organizationId         String   @map("organization_id")
+  beneficialControllerId String   @map("beneficial_controller_id")
+  clientId               String   @map("client_id")
+  watchlistQueryId       String?  @map("watchlist_query_id")
+  screenedAt             DateTime @map("screened_at")
+  triggeredBy            String   @map("triggered_by")
+  screeningResult        String   @map("screening_result")
+  ofacSanctioned         Boolean  @default(false) @map("ofac_sanctioned")
+  unscSanctioned         Boolean  @default(false) @map("unsc_sanctioned")
+  sat69bListed           Boolean  @default(false) @map("sat69b_listed")
+  isPep                  Boolean  @default(false) @map("is_pep")
+  adverseMediaFlagged     Boolean  @default(false) @map("adverse_media_flagged")
+  changeFlags            String?  @map("change_flags")
+  prevSnapshotId         String?  @map("prev_snapshot_id")
+  errorMessage           String?  @map("error_message")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  beneficialController BeneficialController @relation(fields: [beneficialControllerId], references: [id], onDelete: Cascade)
+  parentClient         Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  prevSnapshot         BeneficialControllerWatchlistScreening?  @relation("BcWatchlistScreeningChain", fields: [prevSnapshotId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  nextSnapshots        BeneficialControllerWatchlistScreening[] @relation("BcWatchlistScreeningChain")
+
+  @@index([beneficialControllerId, screenedAt(sort: Desc)])
+  @@index([organizationId, screenedAt(sort: Desc)])
+  @@index([clientId, screenedAt(sort: Desc)])
+  @@map("beneficial_controller_watchlist_screening")
 }
 
 // ============================================================================

@@ -48,6 +48,8 @@ export const MESSAGE_KEYS = [
 	"screening.adverse_media.body",
 	"screening.label.beneficial_controller",
 	"screening.label.client",
+	"screening.status_changed.title",
+	"screening.status_changed.body",
 	"notice.deadline.title_tomorrow",
 	"notice.deadline.title_days",
 	"notice.deadline.body",
@@ -141,6 +143,9 @@ const en: Record<MessageKey, string> = {
 		"{{entityLabel}} {{entityName}} has been flagged for adverse media findings.",
 	"screening.label.beneficial_controller": "Beneficial controller",
 	"screening.label.client": "Client",
+	"screening.status_changed.title": "Watchlist: new match on existing alert",
+	"screening.status_changed.body":
+		"{{entityName}} has new list hits: {{sources}}. Review the client file.",
 	"notice.deadline.title_tomorrow":
 		"Due tomorrow: {{pendingAlertCount}} unreported alerts",
 	"notice.deadline.title_days":
@@ -235,6 +240,10 @@ const es: Record<MessageKey, string> = {
 		"{{entityLabel}} {{entityName}} fue marcado por hallazgos en medios adversos.",
 	"screening.label.beneficial_controller": "Controlador beneficiario",
 	"screening.label.client": "Cliente",
+	"screening.status_changed.title":
+		"Listas: nuevas coincidencias en alerta existente",
+	"screening.status_changed.body":
+		"{{entityName}} tiene nuevas coincidencias: {{sources}}. Revise el expediente del cliente.",
 	"notice.deadline.title_tomorrow":
 		"Vencimiento mañana: {{pendingAlertCount}} alertas sin reportar",
 	"notice.deadline.title_days":

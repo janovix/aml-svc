@@ -337,6 +337,12 @@ See [Catalog Population Guide](CATALOG-POPULATION-GUIDE.md) for complete details
 - `pnpm run vitest` - Run tests
 - `pnpm run deploy` - Deploy to Cloudflare Workers
 
+## Watchlist rescan vs `pep-check-worker` (decommission)
+
+Scheduled watchlist re-screening (interval-based, org caps, history snapshots, notifications) is **owned by aml-svc**: Cloudflare `scheduled` + queue `aml-screening-refresh` and `processWatchlistRescan` in `src/lib/watchlist-rescan.ts`.
+
+The standalone **`pep-check-worker`** package (legacy day-of-week rotation and `/internal/.../stale-pep-checks` polling) is **slated for removal** once the aml-svc cron/queue path is verified in preview/production. **Do not delete the worker in the same PR as the new rescan** — use a follow-up PR after production validation to drop CI deploys and remove the package safely.
+
 ## Contributing
 
 1. Follow the existing code style (enforced by ESLint and Prettier)

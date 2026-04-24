@@ -71,6 +71,10 @@
 				"binding": "WEBHOOK_QUEUE",
 				"queue": "webhook-events-dev",
 			},
+			{
+				"binding": "AML_SCREENING_REFRESH_QUEUE",
+				"queue": "aml-screening-refresh-dev",
+			},
 		],
 		"consumers": [
 			{
@@ -89,10 +93,16 @@
 				"max_batch_timeout": 1,
 				"max_retries": 3,
 			},
+			{
+				"queue": "aml-screening-refresh-dev",
+				"max_batch_size": 5,
+				"max_batch_timeout": 5,
+				"max_retries": 3,
+			},
 		],
 	},
 	"triggers": {
-		"crons": ["0 14 * * *"],
+		"crons": ["0 2 * * *", "0 14 * * *"],
 	},
 	"vars": {
 		"ENVIRONMENT": "dev",

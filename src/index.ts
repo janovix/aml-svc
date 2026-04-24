@@ -329,6 +329,24 @@ export default {
 		);
 
 		// Risk review: enqueue reassessment for clients past their review date
+		// Watchlist: enqueue stale client/BC rescreens (uses org watchlist rescan settings)
+		ctx.waitUntil(
+			(async () => {
+				const { processWatchlistRescan } = await import(
+					"./lib/watchlist-rescan"
+				);
+				return processWatchlistRescan(env, new Date(event.scheduledTime));
+			})()
+				.then((r) =>
+					console.log(
+						`[scheduled] Watchlist rescan: enqueued ${r.enqueued} jobs, ${r.organizationsProcessed} orgs`,
+					),
+				)
+				.catch((err) =>
+					console.error("[scheduled] Watchlist rescan failed:", err),
+				),
+		);
+
 		ctx.waitUntil(
 			(async () => {
 				try {
@@ -413,6 +431,29 @@ export default {
 				batch as MessageBatch<import("./domain/import").ImportJob>,
 				env,
 			);
+		}
+
+		if (queueName.startsWith("aml-screening-refresh")) {
+			const { processOneRescanJob } = await import(
+				"./lib/watchlist-rescan-processor"
+			);
+			for (const message of batch.messages) {
+				try {
+					await processOneRescanJob(
+						env,
+						(
+							message as Message<
+								import("./lib/watchlist-rescan-types").ScreeningRescanJob
+							>
+						).body,
+					);
+					message.ack();
+				} catch (err) {
+					console.error("[aml-screening-refresh] Job failed:", err);
+					message.retry();
+				}
+			}
+			return;
 		}
 
 		// Default: risk assessment queue

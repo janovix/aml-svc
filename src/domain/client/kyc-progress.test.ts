@@ -1,6 +1,45 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PrismaClient, PersonType } from "@prisma/client";
+
+// recalculateKycProgress uses a dynamic import of this module so Vitest mocks apply
+// under the Workers test pool.
+vi.mock("./identification-tier", () => ({
+	computeClientIdentificationTier: vi.fn(),
+}));
+
 import { recalculateKycProgress } from "./kyc-progress";
+import { computeClientIdentificationTier } from "./identification-tier";
+
+const mockComputeTier = vi.mocked(computeClientIdentificationTier);
+
+const ALWAYS_TIER = {
+	identificationTier: "ALWAYS" as const,
+	identificationRequired: true,
+	identificationThresholdMxn: null as number | null,
+	noticeThresholdMxn: null as number | null,
+	maxSingleOperationMxn: 0,
+	sixMonthCumulativeMxn: 0,
+	singleOpExceedsThreshold: false,
+	cumulativeExceedsNoticeThreshold: false,
+	identificationThresholdPct: 100,
+	noticeThresholdPct: 100,
+};
+
+const BELOW_TIER = {
+	...ALWAYS_TIER,
+	identificationTier: "BELOW_THRESHOLD" as const,
+	identificationRequired: false,
+	identificationThresholdMxn: 500_000,
+	noticeThresholdMxn: 1_000_000,
+};
+
+const ABOVE_TIER = {
+	...ALWAYS_TIER,
+	identificationTier: "ABOVE_THRESHOLD" as const,
+	identificationRequired: true,
+	identificationThresholdMxn: 500_000,
+	noticeThresholdMxn: 1_000_000,
+};
 
 function makeMockPrisma(
 	clientData: Record<string, unknown> | null = null,
@@ -38,6 +77,10 @@ const BASE_CLIENT = {
 };
 
 describe("recalculateKycProgress", () => {
+	beforeEach(() => {
+		mockComputeTier.mockResolvedValue(ALWAYS_TIER);
+	});
+
 	it("throws when client is not found", async () => {
 		const prisma = makeMockPrisma(null);
 		await expect(recalculateKycProgress(prisma, "nonexistent")).rejects.toThrow(
@@ -190,5 +233,61 @@ describe("recalculateKycProgress", () => {
 		};
 		expect(updateCall.data.kycCompletionPct).toBeGreaterThan(0);
 		expect(updateCall.data.kycCompletionPct).toBeLessThan(100);
+	});
+
+	it("credits document section and marks documentsComplete when BELOW identification threshold (no docs)", async () => {
+		mockComputeTier.mockResolvedValue(BELOW_TIER);
+		const partialPhysical = {
+			...BASE_CLIENT,
+			secondLastName: null,
+			birthDate: null,
+			curp: null,
+			nationality: null,
+			economicActivityCode: null,
+			gender: null,
+			occupation: null,
+			maritalStatus: null,
+			screeningResult: "clear",
+			screenedAt: new Date("2025-01-01"),
+			documents: [],
+		};
+		const prisma = makeMockPrisma(partialPhysical);
+		await recalculateKycProgress(prisma, "c-1");
+		const updateCall = vi.mocked(prisma.client.update).mock.calls[0][0] as {
+			data: {
+				documentsComplete: number;
+				identificationTier: string;
+				identificationRequired: boolean;
+			};
+		};
+		expect(updateCall.data.documentsComplete).toBe(1);
+		expect(updateCall.data.identificationTier).toBe("BELOW_THRESHOLD");
+		expect(updateCall.data.identificationRequired).toBe(false);
+	});
+
+	it("when ABOVE threshold and no docs, documentsComplete is 0 and tier persisted", async () => {
+		mockComputeTier.mockResolvedValue(ABOVE_TIER);
+		const partialPhysical = {
+			...BASE_CLIENT,
+			secondLastName: "López",
+			birthDate: "1990-01-15",
+			curp: "PELJ900115HDFRRN01",
+			nationality: "MX",
+			economicActivityCode: "123",
+			gender: "M",
+			occupation: "Engineer",
+			maritalStatus: "single",
+			sourceOfFunds: "employment",
+			screeningResult: "clear",
+			screenedAt: new Date("2025-01-01"),
+			documents: [],
+		};
+		const prisma = makeMockPrisma(partialPhysical);
+		await recalculateKycProgress(prisma, "c-1");
+		const updateCall = vi.mocked(prisma.client.update).mock.calls[0][0] as {
+			data: { documentsComplete: number; identificationTier: string };
+		};
+		expect(updateCall.data.documentsComplete).toBe(0);
+		expect(updateCall.data.identificationTier).toBe("ABOVE_THRESHOLD");
 	});
 });

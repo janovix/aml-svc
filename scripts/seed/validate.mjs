@@ -28,6 +28,8 @@ const EXCLUDED_MODELS = new Set([
 	"Import", // Created via import worker, not seeded
 	"ImportRowResult", // Created via import worker, not seeded
 	"NoticeEvent", // Created by notice operations (system-generated events), not seeded
+	"ClientWatchlistScreening", // Created by watchlist screening service; snapshot history, not seeded
+	"BeneficialControllerWatchlistScreening", // Created by watchlist screening service; snapshot history, not seeded
 	// Invoice domain - created via CFDI parsing/import, not seeded
 	"Invoice",
 	"InvoiceItem",

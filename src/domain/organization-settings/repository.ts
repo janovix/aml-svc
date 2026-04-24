@@ -5,6 +5,16 @@ import type { TenantContext } from "../../lib/tenant-context";
 import type { OrganizationSettingsEntity } from "./types";
 import { mapPrismaOrganizationSettings } from "./mappers";
 
+const WATCHLIST_DEFAULTS = {
+	watchlistRescanEnabled: true,
+	watchlistRescanIntervalDays: 30,
+	watchlistRescanIncludeBcs: true,
+	watchlistRescanNotifyOnStatusChange: true,
+	watchlistRescanDailyCap: 500,
+	watchlistRescanNotifyChannels: '["in_app"]',
+	watchlistRescanSources: '["ofac","un","sat69b","pep","adverse_media"]',
+} as const;
+
 export class OrganizationSettingsRepository {
 	constructor(private readonly prisma: PrismaClient) {}
 
@@ -32,6 +42,13 @@ export class OrganizationSettingsRepository {
 			selfServiceExpiryHours?: number;
 			selfServiceRequiredSections?: string[] | null;
 			selfServiceSendEmail?: boolean;
+			watchlistRescanEnabled?: boolean;
+			watchlistRescanIntervalDays?: number;
+			watchlistRescanIncludeBcs?: boolean;
+			watchlistRescanNotifyOnStatusChange?: boolean;
+			watchlistRescanDailyCap?: number;
+			watchlistRescanNotifyChannels?: string[] | null;
+			watchlistRescanSources?: string[] | null;
 		},
 	): Promise<OrganizationSettingsEntity> {
 		const { organizationId } = tenant;
@@ -48,6 +65,31 @@ export class OrganizationSettingsRepository {
 					data.selfServiceRequiredSections != null
 						? JSON.stringify(data.selfServiceRequiredSections)
 						: null,
+				...WATCHLIST_DEFAULTS,
+				...(data.watchlistRescanEnabled !== undefined && {
+					watchlistRescanEnabled: data.watchlistRescanEnabled,
+				}),
+				...(data.watchlistRescanIntervalDays !== undefined && {
+					watchlistRescanIntervalDays: data.watchlistRescanIntervalDays,
+				}),
+				...(data.watchlistRescanIncludeBcs !== undefined && {
+					watchlistRescanIncludeBcs: data.watchlistRescanIncludeBcs,
+				}),
+				...(data.watchlistRescanNotifyOnStatusChange !== undefined && {
+					watchlistRescanNotifyOnStatusChange:
+						data.watchlistRescanNotifyOnStatusChange,
+				}),
+				...(data.watchlistRescanDailyCap !== undefined && {
+					watchlistRescanDailyCap: data.watchlistRescanDailyCap,
+				}),
+				...(data.watchlistRescanNotifyChannels != null && {
+					watchlistRescanNotifyChannels: JSON.stringify(
+						data.watchlistRescanNotifyChannels,
+					),
+				}),
+				...(data.watchlistRescanSources != null && {
+					watchlistRescanSources: JSON.stringify(data.watchlistRescanSources),
+				}),
 			},
 		});
 
@@ -63,6 +105,13 @@ export class OrganizationSettingsRepository {
 			selfServiceExpiryHours?: number;
 			selfServiceRequiredSections?: string[] | null;
 			selfServiceSendEmail?: boolean;
+			watchlistRescanEnabled?: boolean;
+			watchlistRescanIntervalDays?: number;
+			watchlistRescanIncludeBcs?: boolean;
+			watchlistRescanNotifyOnStatusChange?: boolean;
+			watchlistRescanDailyCap?: number;
+			watchlistRescanNotifyChannels?: string[] | null;
+			watchlistRescanSources?: string[] | null;
 		},
 	): Promise<OrganizationSettingsEntity> {
 		const { organizationId } = tenant;
@@ -101,6 +150,34 @@ export class OrganizationSettingsRepository {
 							? JSON.stringify(data.selfServiceRequiredSections)
 							: null,
 				}),
+				...(data.watchlistRescanEnabled !== undefined && {
+					watchlistRescanEnabled: data.watchlistRescanEnabled,
+				}),
+				...(data.watchlistRescanIntervalDays !== undefined && {
+					watchlistRescanIntervalDays: data.watchlistRescanIntervalDays,
+				}),
+				...(data.watchlistRescanIncludeBcs !== undefined && {
+					watchlistRescanIncludeBcs: data.watchlistRescanIncludeBcs,
+				}),
+				...(data.watchlistRescanNotifyOnStatusChange !== undefined && {
+					watchlistRescanNotifyOnStatusChange:
+						data.watchlistRescanNotifyOnStatusChange,
+				}),
+				...(data.watchlistRescanDailyCap !== undefined && {
+					watchlistRescanDailyCap: data.watchlistRescanDailyCap,
+				}),
+				...(data.watchlistRescanNotifyChannels !== undefined && {
+					watchlistRescanNotifyChannels:
+						data.watchlistRescanNotifyChannels != null
+							? JSON.stringify(data.watchlistRescanNotifyChannels)
+							: WATCHLIST_DEFAULTS.watchlistRescanNotifyChannels,
+				}),
+				...(data.watchlistRescanSources !== undefined && {
+					watchlistRescanSources:
+						data.watchlistRescanSources != null
+							? JSON.stringify(data.watchlistRescanSources)
+							: WATCHLIST_DEFAULTS.watchlistRescanSources,
+				}),
 			},
 		});
 
@@ -116,6 +193,13 @@ export class OrganizationSettingsRepository {
 			selfServiceExpiryHours?: number;
 			selfServiceRequiredSections?: string[] | null;
 			selfServiceSendEmail?: boolean;
+			watchlistRescanEnabled?: boolean;
+			watchlistRescanIntervalDays?: number;
+			watchlistRescanIncludeBcs?: boolean;
+			watchlistRescanNotifyOnStatusChange?: boolean;
+			watchlistRescanDailyCap?: number;
+			watchlistRescanNotifyChannels?: string[] | null;
+			watchlistRescanSources?: string[] | null;
 		},
 	): Promise<OrganizationSettingsEntity> {
 		const { organizationId } = tenant;
@@ -133,6 +217,31 @@ export class OrganizationSettingsRepository {
 					data.selfServiceRequiredSections != null
 						? JSON.stringify(data.selfServiceRequiredSections)
 						: null,
+				...WATCHLIST_DEFAULTS,
+				...(data.watchlistRescanEnabled !== undefined && {
+					watchlistRescanEnabled: data.watchlistRescanEnabled,
+				}),
+				...(data.watchlistRescanIntervalDays !== undefined && {
+					watchlistRescanIntervalDays: data.watchlistRescanIntervalDays,
+				}),
+				...(data.watchlistRescanIncludeBcs !== undefined && {
+					watchlistRescanIncludeBcs: data.watchlistRescanIncludeBcs,
+				}),
+				...(data.watchlistRescanNotifyOnStatusChange !== undefined && {
+					watchlistRescanNotifyOnStatusChange:
+						data.watchlistRescanNotifyOnStatusChange,
+				}),
+				...(data.watchlistRescanDailyCap !== undefined && {
+					watchlistRescanDailyCap: data.watchlistRescanDailyCap,
+				}),
+				...(data.watchlistRescanNotifyChannels != null && {
+					watchlistRescanNotifyChannels: JSON.stringify(
+						data.watchlistRescanNotifyChannels,
+					),
+				}),
+				...(data.watchlistRescanSources != null && {
+					watchlistRescanSources: JSON.stringify(data.watchlistRescanSources),
+				}),
 			},
 			update: {
 				obligatedSubjectKey: data.obligatedSubjectKey,
@@ -151,6 +260,34 @@ export class OrganizationSettingsRepository {
 						data.selfServiceRequiredSections != null
 							? JSON.stringify(data.selfServiceRequiredSections)
 							: null,
+				}),
+				...(data.watchlistRescanEnabled !== undefined && {
+					watchlistRescanEnabled: data.watchlistRescanEnabled,
+				}),
+				...(data.watchlistRescanIntervalDays !== undefined && {
+					watchlistRescanIntervalDays: data.watchlistRescanIntervalDays,
+				}),
+				...(data.watchlistRescanIncludeBcs !== undefined && {
+					watchlistRescanIncludeBcs: data.watchlistRescanIncludeBcs,
+				}),
+				...(data.watchlistRescanNotifyOnStatusChange !== undefined && {
+					watchlistRescanNotifyOnStatusChange:
+						data.watchlistRescanNotifyOnStatusChange,
+				}),
+				...(data.watchlistRescanDailyCap !== undefined && {
+					watchlistRescanDailyCap: data.watchlistRescanDailyCap,
+				}),
+				...(data.watchlistRescanNotifyChannels !== undefined && {
+					watchlistRescanNotifyChannels:
+						data.watchlistRescanNotifyChannels != null
+							? JSON.stringify(data.watchlistRescanNotifyChannels)
+							: WATCHLIST_DEFAULTS.watchlistRescanNotifyChannels,
+				}),
+				...(data.watchlistRescanSources !== undefined && {
+					watchlistRescanSources:
+						data.watchlistRescanSources != null
+							? JSON.stringify(data.watchlistRescanSources)
+							: WATCHLIST_DEFAULTS.watchlistRescanSources,
 				}),
 			},
 		});

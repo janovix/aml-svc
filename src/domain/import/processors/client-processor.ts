@@ -299,6 +299,9 @@ export async function processClientRow(
 					birthDate: created.birthDate || undefined,
 					identifiers: created.rfc ? [created.rfc] : undefined,
 					countries: created.nationality ? [created.nationality] : undefined,
+					entityId: created.id,
+					entityKind: "client",
+					environment: productionTenant(organizationId).environment,
 				});
 
 				if (result?.queryId) {

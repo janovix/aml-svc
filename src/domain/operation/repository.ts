@@ -19,6 +19,7 @@ import {
 import { CatalogNameResolver } from "../catalog/name-resolver";
 import type { CatalogFieldsConfig } from "../catalog/name-resolver";
 import { CatalogRepository } from "../catalog/repository";
+import { recalculateKycProgress } from "../client/kyc-progress";
 import { CATALOG_FIELDS as VEH_CATALOG_FIELDS } from "./activities/veh";
 import { CATALOG_FIELDS as INM_CATALOG_FIELDS } from "./activities/inm";
 import { CATALOG_FIELDS as MJR_CATALOG_FIELDS } from "./activities/mjr";
@@ -237,6 +238,7 @@ export class OperationRepository {
 		if (!result) {
 			throw new Error(`Operation ${operationId} not found after creation`);
 		}
+		await recalculateKycProgress(this.prisma, input.clientId);
 		return mapOperationToEntity(result);
 	}
 
@@ -923,7 +925,11 @@ export class OperationRepository {
 
 		await this.prisma.$transaction(queries);
 
-		return this.findById(tenant, id);
+		const updated = await this.findById(tenant, id);
+		if (updated) {
+			await recalculateKycProgress(this.prisma, existing.clientId);
+		}
+		return updated;
 	}
 
 	/**
@@ -1255,6 +1261,8 @@ export class OperationRepository {
 			where: { id },
 			data: { deletedAt: new Date() },
 		});
+
+		await recalculateKycProgress(this.prisma, existing.clientId);
 
 		return true;
 	}

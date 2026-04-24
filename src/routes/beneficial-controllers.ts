@@ -17,7 +17,11 @@ import { ClientRepository } from "../domain/client/index.js";
 import type { Bindings } from "../types.js";
 import { createWatchlistSearchService } from "../lib/watchlist-search.js";
 import { getPrismaClient } from "../lib/prisma.js";
-import { type AuthVariables, getOrganizationId } from "../middleware/auth.js";
+import {
+	type AuthVariables,
+	getOrganizationId,
+	getTenantContext,
+} from "../middleware/auth.js";
 import { APIError } from "../middleware/error.js";
 import { productionTenant } from "../lib/tenant-context.js";
 
@@ -150,6 +154,94 @@ beneficialControllersRouter.get(
 );
 
 /**
+ * GET /:clientId/beneficial-controllers/:bcId/screening-history
+ */
+beneficialControllersRouter.get(
+	"/:clientId/beneficial-controllers/:bcId/screening-history",
+	async (c) => {
+		try {
+			const { clientId } = parseWithZod(ClientIdParamSchema, c.req.param());
+			const { bcId } = parseWithZod(
+				BeneficialControllerIdParamSchema,
+				c.req.param(),
+			);
+			await verifyClientOwnership(c, clientId);
+			const tenant = getTenantContext(c);
+			const url = new URL(c.req.url);
+			const limit = Math.min(
+				100,
+				Math.max(1, parseInt(url.searchParams.get("limit") || "20", 10) || 20),
+			);
+			const offset = Math.max(
+				0,
+				parseInt(url.searchParams.get("offset") || "0", 10) || 0,
+			);
+			const prisma = getPrismaClient(c.env.DB);
+			const bc = await prisma.beneficialController.findFirst({
+				where: { id: bcId, clientId },
+				select: { id: true, client: { select: { organizationId: true } } },
+			});
+			if (!bc || bc.client.organizationId !== tenant.organizationId) {
+				throw new APIError(404, "Beneficial controller not found");
+			}
+			const [rows, total] = await Promise.all([
+				prisma.beneficialControllerWatchlistScreening.findMany({
+					where: {
+						beneficialControllerId: bcId,
+						organizationId: tenant.organizationId,
+					},
+					orderBy: { screenedAt: "desc" },
+					take: limit,
+					skip: offset,
+				}),
+				prisma.beneficialControllerWatchlistScreening.count({
+					where: {
+						beneficialControllerId: bcId,
+						organizationId: tenant.organizationId,
+					},
+				}),
+			]);
+			const items = rows.map((r) => {
+				let changeFlags: Record<string, "new"> | null = null;
+				if (r.changeFlags) {
+					try {
+						changeFlags = JSON.parse(r.changeFlags) as Record<string, "new">;
+					} catch {
+						changeFlags = null;
+					}
+				}
+				return {
+					id: r.id,
+					watchlistQueryId: r.watchlistQueryId,
+					screenedAt: r.screenedAt.toISOString(),
+					triggeredBy: r.triggeredBy,
+					screeningResult: r.screeningResult,
+					ofacSanctioned: r.ofacSanctioned,
+					unscSanctioned: r.unscSanctioned,
+					sat69bListed: r.sat69bListed,
+					isPEP: r.isPep,
+					adverseMediaFlagged: r.adverseMediaFlagged,
+					changeFlags,
+					errorMessage: r.errorMessage,
+					createdAt: r.createdAt.toISOString(),
+				};
+			});
+			return c.json({
+				items,
+				pagination: {
+					limit,
+					offset,
+					total,
+					hasMore: offset + items.length < total,
+				},
+			});
+		} catch (error) {
+			handleServiceError(error);
+		}
+	},
+);
+
+/**
  * GET /:clientId/beneficial-controllers/:bcId
  * Get a single beneficial controller by ID
  */
@@ -216,6 +308,14 @@ beneficialControllersRouter.post(
 							userId,
 							organizationId,
 							source: "aml:bc",
+							birthDate: bc.birthDate
+								? new Date(bc.birthDate).toISOString().split("T")[0]
+								: undefined,
+							identifiers: bc.rfc ? [bc.rfc] : undefined,
+							countries: bc.nationality ? [bc.nationality] : undefined,
+							entityId: bc.id,
+							entityKind: "beneficial_controller",
+							environment: (c.get("environment") as string) ?? "production",
 						});
 
 						if (searchResult) {
@@ -303,6 +403,14 @@ beneficialControllersRouter.put(
 								userId,
 								organizationId,
 								source: "aml:bc",
+								birthDate: bc.birthDate
+									? new Date(bc.birthDate).toISOString().split("T")[0]
+									: undefined,
+								identifiers: bc.rfc ? [bc.rfc] : undefined,
+								countries: bc.nationality ? [bc.nationality] : undefined,
+								entityId: bc.id,
+								entityKind: "beneficial_controller",
+								environment: (c.get("environment") as string) ?? "production",
 							});
 
 							if (searchResult) {
@@ -388,6 +496,14 @@ beneficialControllersRouter.patch(
 								userId,
 								organizationId,
 								source: "aml:bc",
+								birthDate: bc.birthDate
+									? new Date(bc.birthDate).toISOString().split("T")[0]
+									: undefined,
+								identifiers: bc.rfc ? [bc.rfc] : undefined,
+								countries: bc.nationality ? [bc.nationality] : undefined,
+								entityId: bc.id,
+								entityKind: "beneficial_controller",
+								environment: (c.get("environment") as string) ?? "production",
 							});
 
 							if (searchResult) {
