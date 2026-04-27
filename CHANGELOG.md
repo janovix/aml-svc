@@ -1,3 +1,10 @@
+# [1.14.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.7...v1.14.0-rc.8) (2026-04-27)
+
+
+### Features
+
+* **cors:** add 'x-e2e-turnstile-bypass' to allowed CORS headers for Playwright E2E compatibility ([71482c5](https://github.com/janovix/aml-svc/commit/71482c56ec67ab4d48c862ab39689f1076cd57d8))
+
 # [1.14.0-rc.7](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.6...v1.14.0-rc.7) (2026-04-24)
 
 
