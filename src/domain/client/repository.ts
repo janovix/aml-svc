@@ -46,20 +46,41 @@ import { recalculateKycProgress } from "./kyc-progress";
 import type { TenantContext } from "../../lib/tenant-context";
 
 /**
- * Catalog fields configuration for clients.
- * Maps client field names to their catalog keys and resolution strategies.
+ * Catalog fields for client name resolution, by person type (SAT UIF).
+ * - Persona física: `economic-activities` (actividad_economica)
+ * - Persona moral: `business-activities` (giro_mercantil)
+ * - Fideicomiso: no activity catalog in core XSD; only geography / countries
  */
-const CLIENT_CATALOG_FIELDS: CatalogFieldsConfig = {
-	stateCode: { catalog: "states", strategy: "BY_CODE" },
-	countryCode: { catalog: "countries", strategy: "BY_CODE" },
-	/** Address-level country (ISO code), same catalog as countryCode */
-	country: { catalog: "countries", strategy: "BY_CODE" },
-	economicActivityCode: {
-		catalog: "economic-activities",
-		strategy: "BY_CODE",
-	},
-	nationality: { catalog: "countries", strategy: "BY_CODE" },
-};
+export function getClientCatalogFields(
+	personType: string | undefined,
+): CatalogFieldsConfig {
+	const pt = String(personType ?? "physical").toUpperCase();
+	const base: CatalogFieldsConfig = {
+		stateCode: { catalog: "states", strategy: "BY_CODE" },
+		countryCode: { catalog: "countries", strategy: "BY_CODE" },
+		country: { catalog: "countries", strategy: "BY_CODE" },
+		nationality: { catalog: "countries", strategy: "BY_CODE" },
+	};
+	if (pt === "PHYSICAL") {
+		return {
+			...base,
+			economicActivityCode: {
+				catalog: "economic-activities",
+				strategy: "BY_CODE",
+			},
+		};
+	}
+	if (pt === "MORAL") {
+		return {
+			...base,
+			commercialActivityCode: {
+				catalog: "business-activities",
+				strategy: "BY_CODE",
+			},
+		};
+	}
+	return base;
+}
 
 /**
  * País/Nacionalidad (código) uses `countryCode`; the countries catalog also backs
@@ -79,13 +100,93 @@ function withCountryCodeSyncedFromNationalityWhenMissing<
 
 export class ClientRepository {
 	private catalogResolver: CatalogNameResolver;
+	private readonly catalogRepo: CatalogRepository;
 
 	constructor(
 		private readonly prisma: PrismaClient,
 		catalogResolver?: CatalogNameResolver,
+		catalogRepository?: CatalogRepository,
 	) {
+		this.catalogRepo = catalogRepository ?? new CatalogRepository(prisma);
 		this.catalogResolver =
-			catalogResolver || new CatalogNameResolver(new CatalogRepository(prisma));
+			catalogResolver ?? new CatalogNameResolver(this.catalogRepo);
+	}
+
+	/**
+	 * Normalize ISO-3166 alpha-3 / legacy catalog item IDs to alpha-2 and SAT activity codes.
+	 */
+	private async normalizeClientCatalogValues(
+		input: Record<string, unknown>,
+	): Promise<Record<string, unknown>> {
+		const out: Record<string, unknown> = { ...input };
+		const pt = String(out.personType ?? "physical").toUpperCase();
+
+		const normCountry = async (key: string) => {
+			const v = out[key];
+			if (typeof v !== "string" || !v.trim()) return;
+			const resolved = await this.catalogRepo.resolveStoredCountryCode(v);
+			if (resolved) out[key] = resolved;
+		};
+
+		await normCountry("nationality");
+		await normCountry("countryCode");
+		await normCountry("country");
+
+		if (pt === "PHYSICAL") {
+			const v = out.economicActivityCode;
+			if (typeof v === "string" && v.trim()) {
+				const r = await this.catalogRepo.resolveStoredActivityCode(
+					"economic-activities",
+					v,
+				);
+				out.economicActivityCode = r ?? null;
+			}
+		} else if (pt === "MORAL") {
+			if (
+				!out.commercialActivityCode &&
+				typeof out.economicActivityCode === "string" &&
+				out.economicActivityCode.trim()
+			) {
+				out.commercialActivityCode = out.economicActivityCode;
+			}
+			out.economicActivityCode = null;
+			const v = out.commercialActivityCode;
+			if (typeof v === "string" && v.trim()) {
+				const r = await this.catalogRepo.resolveStoredActivityCode(
+					"business-activities",
+					v,
+				);
+				out.commercialActivityCode = r ?? null;
+			}
+		}
+
+		return out;
+	}
+
+	private async enrichResolvedNamesIfStale(
+		entity: ClientEntity,
+	): Promise<ClientEntity> {
+		const fields = getClientCatalogFields(entity.personType);
+		const data = entity as unknown as Record<string, unknown>;
+		const resolved = entity.resolvedNames ?? {};
+		let needs = false;
+		for (const fieldName of Object.keys(fields)) {
+			const val = data[fieldName];
+			if (
+				typeof val === "string" &&
+				val.trim() !== "" &&
+				resolved[fieldName] === undefined
+			) {
+				needs = true;
+				break;
+			}
+		}
+		if (!needs) return entity;
+		const fresh = await this.catalogResolver.resolveNames(data, fields);
+		return {
+			...entity,
+			resolvedNames: { ...resolved, ...fresh },
+		};
 	}
 
 	async list(
@@ -195,7 +296,9 @@ export class ClientRepository {
 		const record = await this.prisma.client.findFirst({
 			where: { organizationId, environment, id, deletedAt: null },
 		});
-		return record ? mapPrismaClient(record) : null;
+		if (!record) return null;
+		const entity = mapPrismaClient(record);
+		return this.enrichResolvedNamesIfStale(entity);
 	}
 
 	async findByRfc(
@@ -211,7 +314,9 @@ export class ClientRepository {
 				deletedAt: null,
 			},
 		});
-		return record ? mapPrismaClient(record) : null;
+		if (!record) return null;
+		const entity = mapPrismaClient(record);
+		return this.enrichResolvedNamesIfStale(entity);
 	}
 
 	async create(
@@ -219,15 +324,18 @@ export class ClientRepository {
 		input: ClientCreateInput,
 	): Promise<ClientEntity> {
 		const { organizationId, environment } = tenant;
-		const normalized = withCountryCodeSyncedFromNationalityWhenMissing(input);
+		const synced = withCountryCodeSyncedFromNationalityWhenMissing(input);
+		const catalogNormalized = await this.normalizeClientCatalogValues(
+			synced as unknown as Record<string, unknown>,
+		);
+		const normalized = catalogNormalized as unknown as ClientCreateInput;
 		const prismaData = mapCreateInputToPrisma(normalized);
 		const { completenessStatus, missingFields } =
-			this.detectCompleteness(normalized);
+			this.detectCompleteness(catalogNormalized);
 
-		// Resolve catalog names for *Code fields
 		const resolvedNames = await this.catalogResolver.resolveNames(
-			normalized as Record<string, unknown>,
-			CLIENT_CATALOG_FIELDS,
+			catalogNormalized,
+			getClientCatalogFields(String(normalized.personType)),
 		);
 
 		const created = await this.prisma.client.create({
@@ -245,10 +353,10 @@ export class ClientRepository {
 			},
 		});
 
-		// Recalculate KYC progress after creation
 		await recalculateKycProgress(this.prisma, created.id);
 
-		return mapPrismaClient(created);
+		const entity = mapPrismaClient(created);
+		return this.enrichResolvedNamesIfStale(entity);
 	}
 
 	async update(
@@ -259,15 +367,18 @@ export class ClientRepository {
 		const { organizationId, environment } = tenant;
 		await this.ensureExists(organizationId, id, environment);
 
-		const normalized = withCountryCodeSyncedFromNationalityWhenMissing(input);
+		const synced = withCountryCodeSyncedFromNationalityWhenMissing(input);
+		const catalogNormalized = await this.normalizeClientCatalogValues(
+			synced as unknown as Record<string, unknown>,
+		);
+		const normalized = catalogNormalized as unknown as ClientUpdateInput;
 		const prismaData = mapUpdateInputToPrisma(normalized);
 		const { completenessStatus, missingFields } =
-			this.detectCompleteness(normalized);
+			this.detectCompleteness(catalogNormalized);
 
-		// Resolve catalog names for *Code fields
 		const resolvedNames = await this.catalogResolver.resolveNames(
-			normalized as Record<string, unknown>,
-			CLIENT_CATALOG_FIELDS,
+			catalogNormalized,
+			getClientCatalogFields(String(normalized.personType)),
 		);
 
 		const updated = await this.prisma.client.update({
@@ -284,10 +395,10 @@ export class ClientRepository {
 			},
 		});
 
-		// Recalculate KYC progress after update
 		await recalculateKycProgress(this.prisma, updated.id);
 
-		return mapPrismaClient(updated);
+		const entity = mapPrismaClient(updated);
+		return this.enrichResolvedNamesIfStale(entity);
 	}
 
 	async patch(
@@ -300,7 +411,6 @@ export class ClientRepository {
 
 		const payload = mapPatchInputToPrisma(input) as Prisma.ClientUpdateInput;
 
-		// For patches, re-check completeness by fetching the current record first
 		const current = await this.prisma.client.findFirst({
 			where: { id, deletedAt: null },
 		});
@@ -309,29 +419,36 @@ export class ClientRepository {
 				...current,
 				...input,
 			});
+			const catalogNormalized = await this.normalizeClientCatalogValues(
+				merged as unknown as Record<string, unknown>,
+			);
+			const forCompleteness = {
+				...merged,
+				...catalogNormalized,
+			};
 			const { completenessStatus, missingFields } =
-				this.detectCompleteness(merged);
+				this.detectCompleteness(forCompleteness as Record<string, unknown>);
 			(payload as Record<string, unknown>).completenessStatus =
 				completenessStatus;
 			(payload as Record<string, unknown>).missingFields =
 				missingFields.length > 0 ? JSON.stringify(missingFields) : null;
 
-			// Persist inferred countryCode when patch did not explicitly set it
-			const inputRecord = input as Record<string, unknown>;
-			if (
-				!("countryCode" in inputRecord) &&
-				typeof merged.countryCode === "string" &&
-				merged.countryCode !== (current.countryCode ?? "")
-			) {
-				(payload as Record<string, unknown>).countryCode = merged.countryCode;
-			}
+			const p = payload as Record<string, unknown>;
+			p.nationality = catalogNormalized.nationality ?? current.nationality;
+			p.countryCode = catalogNormalized.countryCode ?? current.countryCode;
+			p.country = catalogNormalized.country ?? current.country;
+			p.economicActivityCode =
+				catalogNormalized.economicActivityCode ?? null;
+			p.commercialActivityCode =
+				catalogNormalized.commercialActivityCode ?? null;
 
-			// Resolve catalog names for *Code fields
 			const resolvedNames = await this.catalogResolver.resolveNames(
-				merged as Record<string, unknown>,
-				CLIENT_CATALOG_FIELDS,
+				catalogNormalized,
+				getClientCatalogFields(
+					String(catalogNormalized.personType ?? current.personType),
+				),
 			);
-			(payload as Record<string, unknown>).resolvedNames =
+			p.resolvedNames =
 				Object.keys(resolvedNames).length > 0
 					? JSON.stringify(resolvedNames)
 					: null;
@@ -342,10 +459,10 @@ export class ClientRepository {
 			data: payload,
 		});
 
-		// Recalculate KYC progress after patch
 		await recalculateKycProgress(this.prisma, updated.id);
 
-		return mapPrismaClient(updated);
+		const entity = mapPrismaClient(updated);
+		return this.enrichResolvedNamesIfStale(entity);
 	}
 
 	async delete(tenant: TenantContext, id: string): Promise<void> {
@@ -555,7 +672,9 @@ export class ClientRepository {
 		missingFields: string[];
 	} {
 		const missing: string[] = [];
-		const personType = input.personType as string | undefined;
+		const personType = String(input.personType ?? "")
+			.toUpperCase()
+			.trim() as "PHYSICAL" | "MORAL" | "TRUST" | "";
 
 		// Core fields required for all person types (LFPIORPI Art. 17+18)
 		const coreFields = [
@@ -604,7 +723,12 @@ export class ClientRepository {
 		}
 
 		// KYC-relevant fields (important but not blocking)
-		if (!input.economicActivityCode) missing.push("economicActivityCode");
+		if (personType === "PHYSICAL") {
+			if (!input.economicActivityCode) missing.push("economicActivityCode");
+		} else if (personType === "MORAL") {
+			if (!input.commercialActivityCode)
+				missing.push("commercialActivityCode");
+		}
 		if (!input.sourceOfFunds) missing.push("sourceOfFunds");
 
 		// Determine status

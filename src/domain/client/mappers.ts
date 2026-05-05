@@ -149,6 +149,10 @@ function basePrismaPayload(input: ClientCreateInput | ClientUpdateInput) {
 			"economicActivityCode" in input
 				? normalizeOptional(input.economicActivityCode)
 				: undefined,
+		commercialActivityCode:
+			"commercialActivityCode" in input
+				? normalizeOptional(input.commercialActivityCode)
+				: undefined,
 		// Enhanced KYC fields
 		gender: "gender" in input ? normalizeOptional(input.gender) : undefined,
 		occupation:
@@ -215,6 +219,7 @@ export function mapPatchInputToPrisma(input: ClientPatchInput) {
 		"notes",
 		"countryCode",
 		"economicActivityCode",
+		"commercialActivityCode",
 		// Enhanced KYC fields
 		"gender",
 		"occupation",
@@ -280,6 +285,7 @@ export function mapPrismaClient(
 		notes: record.notes ?? null,
 		countryCode: record.countryCode ?? null,
 		economicActivityCode: record.economicActivityCode ?? null,
+		commercialActivityCode: record.commercialActivityCode ?? null,
 		// Enhanced KYC fields
 		gender: (record.gender as "M" | "F" | "OTHER" | null) ?? null,
 		occupation: record.occupation ?? null,

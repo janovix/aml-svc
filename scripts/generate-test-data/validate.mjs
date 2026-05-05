@@ -23,6 +23,8 @@ const RFC_MORAL = /^[A-ZÑ&]{3}\d{6}[A-Z0-9]{3}$/i;
 const CURP_RE = /^[A-Z][AEIOUX][A-Z]{2}\d{6}[HM][A-Z]{5}[A-Z0-9]{2}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO3166_A2 = /^[A-Z]{2}$/;
+const SAT_ACTIVITY_CODE = /^\d{7}$/;
 
 // ── Thresholds from template-columns.ts (required fields per activity) ────────
 const ACT_REQUIRED = {
@@ -150,6 +152,7 @@ const EXPECTED_CLIENT_HEADERS = [
 	"notes",
 	"country_code",
 	"economic_activity_code",
+	"commercial_activity_code",
 	"gender",
 	"occupation",
 	"marital_status",
@@ -277,6 +280,63 @@ for (let i = 0; i < clients.length; i++) {
 			);
 	} else {
 		fail("clients.csv", row, `Unknown person_type: "${r.person_type}"`);
+	}
+
+	if (r.country_code) {
+		const cc = String(r.country_code).trim().toUpperCase();
+		if (!ISO3166_A2.test(cc)) {
+			fail(
+				"clients.csv",
+				row,
+				`country_code must be ISO-3166 alpha-2 (e.g. MX), got "${r.country_code}"`,
+			);
+		}
+	}
+
+	if (pt === "physical") {
+		if (
+			r.economic_activity_code &&
+			!SAT_ACTIVITY_CODE.test(String(r.economic_activity_code).trim())
+		) {
+			fail(
+				"clients.csv",
+				row,
+				`economic_activity_code must be a 7-digit SAT code when set, got "${r.economic_activity_code}"`,
+			);
+		}
+		if (r.commercial_activity_code) {
+			fail(
+				"clients.csv",
+				row,
+				`physical clients must not set commercial_activity_code`,
+			);
+		}
+	} else if (pt === "moral") {
+		if (
+			!r.commercial_activity_code ||
+			!SAT_ACTIVITY_CODE.test(String(r.commercial_activity_code).trim())
+		) {
+			fail(
+				"clients.csv",
+				row,
+				`moral clients require commercial_activity_code (7-digit SAT code)`,
+			);
+		}
+		if (r.economic_activity_code) {
+			fail(
+				"clients.csv",
+				row,
+				`moral clients must leave economic_activity_code empty (use commercial_activity_code)`,
+			);
+		}
+	} else if (pt === "trust") {
+		if (r.economic_activity_code || r.commercial_activity_code) {
+			fail(
+				"clients.csv",
+				row,
+				`trust clients must not set economic_activity_code or commercial_activity_code`,
+			);
+		}
 	}
 
 	// Email

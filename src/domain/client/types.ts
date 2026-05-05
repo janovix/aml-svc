@@ -28,7 +28,8 @@ export interface ClientEntity {
 	reference?: string | null;
 	notes?: string | null;
 	countryCode?: string | null; // Reference to countries catalog (metadata.code)
-	economicActivityCode?: string | null; // Reference to economic activity catalog (7-digit code)
+	economicActivityCode?: string | null; // Persona física: economic-activities catalog (7-digit)
+	commercialActivityCode?: string | null; // Persona moral: business-activities / giro mercantil (7-digit)
 	// Enhanced KYC fields
 	gender?: Gender | null;
 	occupation?: string | null;

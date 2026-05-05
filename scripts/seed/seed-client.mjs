@@ -1,22 +1,24 @@
 #!/usr/bin/env node
 /**
- * Seed Clients
+ * Seed Clients — invokes SyntheticDataGenerator via generate-synthetic-data.mjs
  *
- * Generates synthetic client data for dev/preview environments.
- * This is SEED data (not real data) and should NOT run in production.
+ * Requires USER_ID / ORGANIZATION_ID unless SEED_USER_ID / SEED_ORGANIZATION_ID are set.
+ * Default client count: SEED_CLIENTS_COUNT (default 50).
  */
 
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { writeFileSync, unlinkSync } from "node:fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const __filepath = resolve(__filename);
+const repoRoot = join(__dirname, "..", "..");
+const genScript = join(repoRoot, "scripts", "generate-synthetic-data.mjs");
 
 async function seedClients() {
 	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
-	// Use WRANGLER_CONFIG if set, otherwise detect preview environment
 	let configFile = process.env.WRANGLER_CONFIG;
 	if (!configFile) {
 		if (
@@ -33,10 +35,10 @@ async function seedClients() {
 	try {
 		console.log(`🌱 Seeding clients (${isRemote ? "remote" : "local"})...`);
 
-		// Check if clients already exist
 		const checkSql = "SELECT COUNT(*) as count FROM clients;";
-		const checkFile = join(__dirname, `temp-check-clients-${Date.now()}.sql`);
+		let checkFile = "";
 		try {
+			checkFile = join(__dirname, `temp-check-clients-${Date.now()}.sql`);
 			writeFileSync(checkFile, checkSql);
 			const wranglerCmd =
 				process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
@@ -44,46 +46,63 @@ async function seedClients() {
 				? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${checkFile}"`
 				: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${checkFile}"`;
 			const checkOutput = execSync(checkCommand, { encoding: "utf-8" });
-			// Parse the count from output (format may vary)
 			const countMatch = checkOutput.match(/count\s*\|\s*(\d+)/i);
 			if (countMatch && parseInt(countMatch[1], 10) > 0) {
 				console.log(`⏭️  Clients already exist. Skipping seed.`);
 				return;
 			}
 		} catch {
-			// If check fails, continue with seeding
 			console.warn(
 				"⚠️  Could not check existing clients, proceeding with seed...",
 			);
 		} finally {
-			try {
-				unlinkSync(checkFile);
-			} catch {
-				// Ignore cleanup errors
+			if (checkFile) {
+				try {
+					unlinkSync(checkFile);
+				} catch {
+					/* ignore */
+				}
 			}
 		}
 
-		// TODO: Implement client seeding logic
-		// Generate synthetic clients with realistic data for testing
-		// For now, skip if no clients exist
-		console.log("✅ Client seeding completed (no synthetic data generated)");
+		const userId =
+			process.env.USER_ID ||
+			process.env.SEED_USER_ID ||
+			"seed-local-user";
+		const organizationId =
+			process.env.ORGANIZATION_ID ||
+			process.env.SEED_ORGANIZATION_ID ||
+			"seed-local-org";
+		const clientsCount =
+			process.env.SEED_CLIENTS_COUNT ||
+			process.env.CLIENTS_COUNT ||
+			"50";
+
+		const env = {
+			...process.env,
+			USER_ID: userId,
+			ORGANIZATION_ID: organizationId,
+			MODELS: "clients",
+			CLIENTS_COUNT: clientsCount,
+			REMOTE: isRemote ? "true" : process.env.REMOTE ?? "false",
+			...(configFile ? { WRANGLER_CONFIG: configFile } : {}),
+		};
+
+		execSync(`node "${genScript}"`, {
+			cwd: repoRoot,
+			stdio: "inherit",
+			env,
+		});
+
+		console.log("✅ Client seeding completed.");
 	} catch (error) {
 		console.error("❌ Error seeding clients:", error);
 		throw error;
 	}
 }
 
-// Export for use in all.mjs
 export { seedClients };
 
-// If run directly, execute seed
-// Compare normalized paths for cross-platform compatibility
-const isDirectRun =
-	process.argv[1] && __filename.toLowerCase() === process.argv[1].toLowerCase();
-
-if (isDirectRun) {
-	seedClients().catch((error) => {
-		console.error("Fatal error:", error);
-		process.exit(1);
-	});
+if (process.argv[1] && resolve(process.argv[1]) === __filepath) {
+	seedClients().catch(() => process.exit(1));
 }
