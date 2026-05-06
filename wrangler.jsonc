@@ -128,8 +128,7 @@
 		"TRUSTED_ORIGINS": "*.janovix.workers.dev,https://unfilmed-surprisedly-raquel.ngrok-free.dev",
 		"AML_FRONTEND_URL": "https://aml.janovix.workers.dev",
 		"KYC_SELF_SERVICE_URL": "https://kyc.janovix.workers.dev",
-		"E2E_API_KEY": "",
-		"CF_ACCOUNT_ID": "",
-		"STREAM_CUSTOMER_CODE": "",
+		"CF_ACCOUNT_ID": "37d5ea9be13559a1ea8f5a46068eac99",
+		"STREAM_CUSTOMER_CODE": "n1sjdl6wu01jpe2h",
 	},
 }

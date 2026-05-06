@@ -114,7 +114,8 @@
 		"AUTH_JWKS_CACHE_TTL": "3600",
 		"TRUSTED_ORIGINS": "*.janovix.com,https://janovix.com",
 		"AML_FRONTEND_URL": "https://aml.janovix.com",
-		"CF_ACCOUNT_ID": "",
-		"STREAM_CUSTOMER_CODE": "",
+		"CF_ACCOUNT_ID": "37d5ea9be13559a1ea8f5a46068eac99",
+		"STREAM_CUSTOMER_CODE": "n1sjdl6wu01jpe2h",
+		"KYC_SELF_SERVICE_URL": "https://kyc.janovix.com",
 	},
 }
