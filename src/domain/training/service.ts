@@ -1073,6 +1073,15 @@ export class TrainingService {
 				course: {
 					select: { id: true, slug: true, titleI18n: true, version: true },
 				},
+				certification: {
+					select: {
+						id: true,
+						certificateNumber: true,
+						score: true,
+						issuedAt: true,
+						expiresAt: true,
+					},
+				},
 			},
 		});
 	}

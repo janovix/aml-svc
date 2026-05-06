@@ -41,6 +41,40 @@ describe("TrainingService", () => {
 		);
 	});
 
+	it("listEnrollmentsAdmin includes course and certification", async () => {
+		const findMany = vi.fn().mockResolvedValue([]);
+		const prisma = {
+			trainingEnrollment: { findMany },
+		} as unknown as PrismaClient;
+
+		const svc = new TrainingService(prisma, env);
+		await svc.listEnrollmentsAdmin({ organizationId: "org-1" });
+
+		expect(findMany).toHaveBeenCalledWith(
+			expect.objectContaining({
+				include: expect.objectContaining({
+					course: {
+						select: {
+							id: true,
+							slug: true,
+							titleI18n: true,
+							version: true,
+						},
+					},
+					certification: {
+						select: {
+							id: true,
+							certificateNumber: true,
+							score: true,
+							issuedAt: true,
+							expiresAt: true,
+						},
+					},
+				}),
+			}),
+		);
+	});
+
 	it("listCoursesWithEnrollment attaches enrollment and ensures mandatory", async () => {
 		const publishedCourse = {
 			id: "c1",
