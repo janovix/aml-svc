@@ -1,3 +1,10 @@
+# [1.14.0-rc.9](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.8...v1.14.0-rc.9) (2026-05-06)
+
+
+### Features
+
+* **training:** implement AML training features including course management, enrollment, and certification processes ([d172fc9](https://github.com/janovix/aml-svc/commit/d172fc92900ddbe23670f977b9fd9fb65c5d6aaa))
+
 # [1.14.0-rc.8](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.7...v1.14.0-rc.8) (2026-04-27)
 
 
