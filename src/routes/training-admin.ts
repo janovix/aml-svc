@@ -13,7 +13,6 @@ import {
 	trainingVideoUploadRequestSchema,
 } from "../domain/training/schemas";
 import { createStreamDirectUpload } from "../lib/training/stream";
-import { uploadToR2 } from "../lib/r2-upload";
 import { getPrismaClient } from "../lib/prisma";
 import type { Bindings } from "../types";
 import type { AdminAuthVariables } from "../middleware/admin-auth";
@@ -185,44 +184,13 @@ trainingAdminRouter.post("/uploads/asset", async (c) => {
 
 	const base = new URL(c.req.url).origin;
 	return c.json({
-		putUrl: `${base}/api/v1/admin/training/uploads/asset/${token}`,
+		putUrl: `${base}/api/v1/public/uploads/asset/${token}`,
 		key,
 		method: "PUT",
 		headers: {
 			"Content-Type": body.contentType,
 		},
 	});
-});
-
-trainingAdminRouter.put("/uploads/asset/:token", async (c) => {
-	const token = c.req.param("token");
-	const raw = await c.env.CACHE.get(`training:upload:${token}`);
-	if (!raw) {
-		throw new APIError(400, "Invalid or expired upload token");
-	}
-
-	const meta = JSON.parse(raw) as {
-		key: string;
-		contentType: string;
-		exp: number;
-	};
-
-	if (Date.now() > meta.exp) {
-		throw new APIError(400, "Upload token expired");
-	}
-
-	const buf = await c.req.arrayBuffer();
-
-	await uploadToR2({
-		bucket: c.env.R2_BUCKET,
-		key: meta.key,
-		content: buf,
-		contentType: meta.contentType,
-	});
-
-	await c.env.CACHE.delete(`training:upload:${token}`);
-
-	return c.json({ key: meta.key });
 });
 
 trainingAdminRouter.get("/compliance", async (c) => {

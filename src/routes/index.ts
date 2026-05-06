@@ -30,6 +30,7 @@ import {
 import { exchangeRatesRouter } from "./exchange-rates";
 import { kycSessionsRouter } from "./kyc-sessions";
 import { publicKycRouter } from "./public-kyc";
+import { publicUploadsRouter } from "./public-uploads";
 import { maintenanceRouter } from "./internal-maintenance";
 import { internalE2eRouter } from "./internal-e2e";
 import { riskRouter } from "./risk";
@@ -63,6 +64,9 @@ export function createRouter() {
 
 	// Public catalogs (reference data — countries, economic activities, etc.)
 	router.route("/public/catalogs", catalogsRouter);
+
+	// Public uploads (token-based, no auth required)
+	router.route("/public/uploads", publicUploadsRouter);
 
 	// KYC Self-Service public endpoints (no auth, token-based)
 	router.route("/public/kyc", publicKycRouter);
