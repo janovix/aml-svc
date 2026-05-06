@@ -12,7 +12,11 @@ import {
 	trainingModuleCreateSchema,
 	trainingVideoUploadRequestSchema,
 } from "../domain/training/schemas";
-import { createStreamDirectUpload } from "../lib/training/stream";
+import {
+	createStreamDirectUpload,
+	getSignedStreamPlaybackToken,
+	streamIframePlayerUrl,
+} from "../lib/training/stream";
 import { getPrismaClient } from "../lib/prisma";
 import type { Bindings } from "../types";
 import type { AdminAuthVariables } from "../middleware/admin-auth";
@@ -191,6 +195,54 @@ trainingAdminRouter.post("/uploads/asset", async (c) => {
 			"Content-Type": body.contentType,
 		},
 	});
+});
+
+trainingAdminRouter.get("/modules/:moduleId/asset", async (c) => {
+	const moduleId = c.req.param("moduleId");
+	const prisma = getPrismaClient(c.env.DB);
+
+	const mod = await prisma.trainingCourseModule.findUnique({
+		where: { id: moduleId },
+	});
+
+	if (!mod || !["PDF", "IMAGE"].includes(mod.kind)) {
+		throw new APIError(404, "Asset not found");
+	}
+
+	const obj = await c.env.R2_BUCKET.get(mod.assetRef);
+	if (!obj?.body) {
+		throw new APIError(404, "Asset not found");
+	}
+
+	return new Response(obj.body, {
+		headers: {
+			"Content-Type":
+				obj.httpMetadata?.contentType ?? "application/octet-stream",
+			"Cache-Control": "private, max-age=3600",
+		},
+	});
+});
+
+trainingAdminRouter.get("/modules/:moduleId/player-url", async (c) => {
+	const moduleId = c.req.param("moduleId");
+	const prisma = getPrismaClient(c.env.DB);
+
+	const mod = await prisma.trainingCourseModule.findUnique({
+		where: { id: moduleId },
+	});
+
+	if (!mod || mod.kind !== "VIDEO") {
+		throw new APIError(404, "Not a video module");
+	}
+
+	const token = await getSignedStreamPlaybackToken(c.env, mod.assetRef);
+	const playerUrl = streamIframePlayerUrl(
+		c.env.STREAM_CUSTOMER_CODE ?? "",
+		mod.assetRef,
+		token,
+	);
+
+	return c.json({ playerUrl });
 });
 
 trainingAdminRouter.get("/compliance", async (c) => {
