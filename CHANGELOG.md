@@ -1,3 +1,10 @@
+# [1.14.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.14...v1.14.0-rc.15) (2026-05-06)
+
+
+### Features
+
+* **sidebar:** implement sidebar badge service with counters and routes for badge retrieval ([bb25d85](https://github.com/janovix/aml-svc/commit/bb25d85bf87d9e8e5b3c33515a2e13401046a1f9))
+
 # [1.14.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.13...v1.14.0-rc.14) (2026-05-06)
 
 
