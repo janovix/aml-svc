@@ -1,3 +1,10 @@
+# [1.14.0-rc.12](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.11...v1.14.0-rc.12) (2026-05-06)
+
+
+### Features
+
+* **training:** add optional description field to training course module ([1600600](https://github.com/janovix/aml-svc/commit/1600600d51665fb77c4a437dc60b3ac2db1fa08e))
+
 # [1.14.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.10...v1.14.0-rc.11) (2026-05-06)
 
 
