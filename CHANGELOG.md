@@ -1,3 +1,10 @@
+# [1.14.0-rc.16](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.15...v1.14.0-rc.16) (2026-05-06)
+
+
+### Features
+
+* **training:** add certification details to listEnrollmentsAdmin and update service test ([0ff713d](https://github.com/janovix/aml-svc/commit/0ff713dc3c8cb0e9d1588c4b34a26133a3eda6b2))
+
 # [1.14.0-rc.15](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.14...v1.14.0-rc.15) (2026-05-06)
 
 
