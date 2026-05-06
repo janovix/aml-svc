@@ -75,6 +75,14 @@
 				"binding": "AML_SCREENING_REFRESH_QUEUE",
 				"queue": "aml-screening-refresh-dev",
 			},
+			{
+				"binding": "TRAINING_CERT_GEN_QUEUE",
+				"queue": "aml-training-cert-gen-dev",
+			},
+			{
+				"binding": "TRAINING_NOTIFICATION_QUEUE",
+				"queue": "aml-training-notifications-dev",
+			},
 		],
 		"consumers": [
 			{
@@ -99,10 +107,20 @@
 				"max_batch_timeout": 5,
 				"max_retries": 3,
 			},
+			{
+				"queue": "aml-training-cert-gen-dev",
+				"max_batch_size": 5,
+				"max_retries": 3,
+			},
+			{
+				"queue": "aml-training-notifications-dev",
+				"max_batch_size": 5,
+				"max_retries": 3,
+			},
 		],
 	},
 	"triggers": {
-		"crons": ["0 2 * * *", "0 14 * * *"],
+		"crons": ["0 2 * * *", "0 14 * * *", "0 5 * * *", "0 6 * * *", "0 7 * * *"],
 	},
 	"vars": {
 		"ENVIRONMENT": "dev",
@@ -111,5 +129,7 @@
 		"AML_FRONTEND_URL": "https://aml.janovix.workers.dev",
 		"KYC_SELF_SERVICE_URL": "https://kyc.janovix.workers.dev",
 		"E2E_API_KEY": "",
+		"CF_ACCOUNT_ID": "",
+		"STREAM_CUSTOMER_CODE": "",
 	},
 }

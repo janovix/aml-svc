@@ -27,7 +27,12 @@ declare namespace Cloudflare {
 		IMPORT_PROCESSING_QUEUE: Queue;
 		RISK_ASSESSMENT_QUEUE: Queue;
 		WEBHOOK_QUEUE: Queue;
+		AML_SCREENING_REFRESH_QUEUE: Queue;
+		TRAINING_CERT_GEN_QUEUE: Queue;
+		TRAINING_NOTIFICATION_QUEUE: Queue;
 		CF_VERSION_METADATA: WorkerVersionMetadata;
+		CF_ACCOUNT_ID: string;
+		STREAM_CUSTOMER_CODE: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

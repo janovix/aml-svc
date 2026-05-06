@@ -112,6 +112,16 @@ export const openAPISpec = {
 			description:
 				"Client and organization risk assessment (EBR), dashboards, authority reporting, and exports. Requires authentication and active organization.",
 		},
+		{
+			name: "Training",
+			description:
+				"AML mandatory training (LMS): courses, enrollments, quizzes, certifications. Requires authentication and active organization.",
+		},
+		{
+			name: "Training Admin",
+			description:
+				"Platform admin training catalog authoring and cross-org compliance (requires admin role).",
+		},
 	],
 	paths: {
 		"/healthz": {

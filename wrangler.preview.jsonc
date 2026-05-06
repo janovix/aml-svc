@@ -51,6 +51,14 @@
 				"binding": "WEBHOOK_QUEUE",
 				"queue": "webhook-events-preview",
 			},
+			{
+				"binding": "TRAINING_CERT_GEN_QUEUE",
+				"queue": "aml-training-cert-gen-preview",
+			},
+			{
+				"binding": "TRAINING_NOTIFICATION_QUEUE",
+				"queue": "aml-training-notifications-preview",
+			},
 		],
 		"consumers": [
 			{
@@ -62,6 +70,16 @@
 				"queue": "aml-imports-preview",
 				"max_batch_size": 5,
 				"max_batch_timeout": 60,
+			},
+			{
+				"queue": "aml-training-cert-gen-preview",
+				"max_batch_size": 5,
+				"max_retries": 3,
+			},
+			{
+				"queue": "aml-training-notifications-preview",
+				"max_batch_size": 5,
+				"max_retries": 3,
 			},
 		],
 	},
@@ -77,5 +95,10 @@
 		"TRUSTED_ORIGINS": "*.janovix.workers.dev,http://localhost:*",
 		"AML_FRONTEND_URL": "https://aml.janovix.workers.dev",
 		"KYC_SELF_SERVICE_URL": "https://kyc.janovix.workers.dev",
+		"CF_ACCOUNT_ID": "",
+		"STREAM_CUSTOMER_CODE": "",
+	},
+	"triggers": {
+		"crons": ["0 5 * * *", "0 6 * * *", "0 7 * * *"],
 	},
 }

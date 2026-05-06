@@ -291,6 +291,59 @@ export default {
 		env: Bindings,
 		ctx: ExecutionContext,
 	): Promise<void> {
+		const cron = event.cron ?? "";
+		const trainingOnlyCrons = new Set(["0 5 * * *", "0 6 * * *", "0 7 * * *"]);
+		const runLegacyScheduledTasks = !trainingOnlyCrons.has(cron);
+
+		if (cron === "0 5 * * *") {
+			ctx.waitUntil(
+				import("./cron/training-enrollment-sync")
+					.then((m) => m.runTrainingEnrollmentSync(env))
+					.then((r) =>
+						console.log(
+							`[scheduled] Training enrollment sync: ${r.upserts} upserts`,
+						),
+					)
+					.catch((err) =>
+						console.error("[scheduled] Training enrollment sync failed:", err),
+					),
+			);
+		}
+
+		if (cron === "0 6 * * *") {
+			ctx.waitUntil(
+				import("./cron/training-expiration")
+					.then((m) => m.runTrainingExpiration(env))
+					.then((r) =>
+						console.log(
+							`[scheduled] Training expiration: ${r.expiredEnrollments} enrollments`,
+						),
+					)
+					.catch((err) =>
+						console.error("[scheduled] Training expiration failed:", err),
+					),
+			);
+		}
+
+		if (cron === "0 7 * * *") {
+			ctx.waitUntil(
+				import("./cron/training-reminders")
+					.then((m) => m.runTrainingReminders(env))
+					.then((r) =>
+						console.log(
+							`[scheduled] Training reminders: ${r.enqueued} enqueued`,
+						),
+					)
+					.catch((err) =>
+						console.error("[scheduled] Training reminders failed:", err),
+					),
+			);
+		}
+
+		if (!runLegacyScheduledTasks) {
+			return;
+		}
+
 		const { processNoticeDeadlineNotifications } = await import(
 			"./lib/notice-deadline-notifications"
 		);
@@ -431,6 +484,52 @@ export default {
 				batch as MessageBatch<import("./domain/import").ImportJob>,
 				env,
 			);
+		}
+
+		if (queueName.startsWith("aml-training-cert-gen")) {
+			const { processTrainingCertGenJob } = await import(
+				"./queues/training-cert-gen.consumer"
+			);
+			for (const message of batch.messages) {
+				try {
+					await processTrainingCertGenJob(
+						env,
+						(
+							message as Message<
+								import("./lib/training/jobs").TrainingCertGenJob
+							>
+						).body,
+					);
+					message.ack();
+				} catch (err) {
+					console.error("[aml-training-cert-gen] Job failed:", err);
+					message.retry();
+				}
+			}
+			return;
+		}
+
+		if (queueName.startsWith("aml-training-notifications")) {
+			const { processTrainingNotificationJob } = await import(
+				"./queues/training-notification.consumer"
+			);
+			for (const message of batch.messages) {
+				try {
+					await processTrainingNotificationJob(
+						env,
+						(
+							message as Message<
+								import("./lib/training/jobs").TrainingNotificationJob
+							>
+						).body,
+					);
+					message.ack();
+				} catch (err) {
+					console.error("[aml-training-notifications] Job failed:", err);
+					message.retry();
+				}
+			}
+			return;
 		}
 
 		if (queueName.startsWith("aml-screening-refresh")) {

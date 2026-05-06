@@ -6,6 +6,8 @@ KYC/AML core API service built with Hono on Cloudflare Workers, using D1 databas
 
 ## Features
 
+- **AML Training (LMS)**: Mandatory annual training courses with quizzes and certifications; platform admins author global courses in the admin app (`/api/v1/admin/training/*`); learners use the AML app (`/api/v1/training/*`). Video uses **Cloudflare Stream** (configure `CF_ACCOUNT_ID`, `CLOUDFLARE_STREAM_API_TOKEN`, `STREAM_CUSTOMER_CODE`, `STREAM_SIGNING_KEY_ID`, `STREAM_SIGNING_KEY_PRIVATE_PEM` as secrets). PDF/images/certificates use **R2** under keys prefixed `lms/`. Cron schedules `0 5`, `0 6`, `0 7` UTC drive enrollment sync, expiration, and reminders (see `wrangler.jsonc`).
+
 - **Client Management**: Complete KYC data management for physical persons, legal entities (moral), and trusts
 - **Operation Tracking**: Vehicle operation management (land, marine, air) with UMA value calculations
 - **Alert System**: Dynamic alert rule engine with SAT file generation and submission tracking

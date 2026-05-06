@@ -115,6 +115,9 @@ export default defineWorkersConfig({
 				"src/middleware/admin-auth.ts",
 				"src/middleware/auth.ts",
 				"src/middleware/usage-rights.ts",
+				"src/middleware/org-membership.ts",
+				"src/routes/training.ts",
+				"src/routes/training-admin.ts",
 				// Schema files with mostly type definitions (validated via integration)
 				"src/domain/uma/schemas.ts",
 				// Organization settings domain (integration + unit service tests; repos/mappers thin)
@@ -150,6 +153,8 @@ export default defineWorkersConfig({
 				// Client risk engine: methodology branches are covered via integration; unit tests target factors/engine.test scenarios only
 				"src/domain/risk/client/engine.ts",
 				"src/domain/risk/client/service.ts",
+				// Training LMS: ~1k-line Prisma service; exercised via HTTP/integration; unit tests cover quiz-score/schemas/stream helpers
+				"src/domain/training/service.ts",
 			],
 			thresholds: {
 				lines: 75,

@@ -85,6 +85,24 @@ export interface AuthSvcRpc {
 		metadata: Record<string, unknown> | null;
 		status: string;
 	} | null>;
+	/** Better Auth member.role for the given user + org (training org-level routes). */
+	getMemberRole?(
+		userId: string,
+		organizationId: string,
+	): Promise<"owner" | "admin" | "member" | null>;
+	/** Paginated active org members for training enrollment sync. */
+	listActiveMembers?(
+		organizationId?: string,
+		cursor?: string,
+	): Promise<{
+		items: Array<{
+			userId: string;
+			organizationId: string;
+			email: string;
+			name: string;
+		}>;
+		nextCursor: string | null;
+	}>;
 }
 
 type NotificationsTarget =
@@ -264,6 +282,24 @@ export type Bindings = Omit<
 	CURRENCYLAYER_API_KEY?: string;
 	/** API version override (defaults to package.json version) */
 	API_VERSION?: string;
+	/** Cloudflare account id (Stream direct upload API). */
+	CF_ACCOUNT_ID?: string;
+	/** Stream customer subdomain code for iframe URLs (`customer-{code}.cloudflarestream.com`). */
+	STREAM_CUSTOMER_CODE?: string;
+	/** Cloudflare Stream API token (direct upload). */
+	CLOUDFLARE_STREAM_API_TOKEN?: string;
+	/** Stream signing key id (JWT kid) for signed playback. */
+	STREAM_SIGNING_KEY_ID?: string;
+	/** PEM PKCS8 private key for Stream playback JWT signing. */
+	STREAM_SIGNING_KEY_PRIVATE_PEM?: string;
+	/** Training certificate PDF generation queue */
+	TRAINING_CERT_GEN_QUEUE?: Queue<
+		import("./lib/training/jobs").TrainingCertGenJob
+	>;
+	/** Training notification dispatch queue */
+	TRAINING_NOTIFICATION_QUEUE?: Queue<
+		import("./lib/training/jobs").TrainingNotificationJob
+	>;
 	/**
 	 * Cloudflare Worker version metadata.
 	 * Used for Sentry release tracking.

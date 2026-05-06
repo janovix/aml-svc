@@ -2019,3 +2019,190 @@ model ChatAbuseEvent {
   @@index([userId, createdAt])
   @@map("chat_abuse_event")
 }
+
+// ============================================================================
+// AML Training (LMS) — global catalog + per-org enrollments / certifications
+// ============================================================================
+
+enum TrainingCourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TrainingModuleKind {
+  VIDEO
+  PDF
+  IMAGE
+  TEXT
+}
+
+enum TrainingQuizQuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+}
+
+enum TrainingEnrollmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+  FAILED
+}
+
+model TrainingCourse {
+  id               String               @id @default(uuid())
+  slug             String               @unique
+  titleI18n        Json                 @map("title_i18n")
+  descriptionI18n  Json                 @map("description_i18n")
+  status           TrainingCourseStatus @default(DRAFT)
+  version          Int                  @default(1)
+  isMandatory      Boolean              @default(true) @map("is_mandatory")
+  validityMonths   Int                  @default(12) @map("validity_months")
+  passingScore     Int                  @default(80) @map("passing_score")
+  maxAttempts      Int                  @default(3) @map("max_attempts")
+  cooldownHours    Int                  @default(24) @map("cooldown_hours")
+  publishedAt      DateTime?            @map("published_at")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  modules     TrainingCourseModule[]
+  quiz        TrainingCourseQuiz?
+  enrollments TrainingEnrollment[]
+
+  @@map("training_course")
+}
+
+model TrainingCourseModule {
+  id              String           @id @default(uuid())
+  courseId        String           @map("course_id")
+  sortOrder       Int              @map("sort_order")
+  kind            TrainingModuleKind
+  titleI18n       Json             @map("title_i18n")
+  assetRef        String           @map("asset_ref")
+  durationSeconds Int?             @map("duration_seconds")
+  required        Boolean          @default(true)
+
+  course TrainingCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  progress TrainingEnrollmentProgress[]
+
+  @@index([courseId])
+  @@map("training_course_module")
+}
+
+model TrainingCourseQuiz {
+  id                String  @id @default(uuid())
+  courseId          String  @unique @map("course_id")
+  shuffleQuestions  Boolean @default(false) @map("shuffle_questions")
+  timeLimitMinutes  Int?    @map("time_limit_minutes")
+
+  course    TrainingCourse       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions TrainingQuizQuestion[]
+
+  @@map("training_course_quiz")
+}
+
+model TrainingQuizQuestion {
+  id             String                   @id @default(uuid())
+  quizId         String                   @map("quiz_id")
+  sortOrder      Int                      @map("sort_order")
+  promptI18n     Json                     @map("prompt_i18n")
+  type           TrainingQuizQuestionType
+  explanationI18n Json?                   @map("explanation_i18n")
+
+  quiz    TrainingCourseQuiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options TrainingQuizOption[]
+
+  @@index([quizId])
+  @@map("training_quiz_question")
+}
+
+model TrainingQuizOption {
+  id          String  @id @default(uuid())
+  questionId  String  @map("question_id")
+  sortOrder   Int     @map("sort_order")
+  textI18n    Json    @map("text_i18n")
+  isCorrect   Boolean @map("is_correct")
+
+  question TrainingQuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@map("training_quiz_option")
+}
+
+model TrainingEnrollment {
+  id              String                   @id @default(uuid())
+  organizationId  String                   @map("organization_id")
+  userId          String                   @map("user_id")
+  courseId        String                   @map("course_id")
+  courseVersion   Int                      @map("course_version")
+  status          TrainingEnrollmentStatus @default(ASSIGNED)
+  enrolledAt      DateTime                 @default(now()) @map("enrolled_at")
+  dueAt           DateTime?                @map("due_at")
+  completedAt     DateTime?                @map("completed_at")
+  validUntil      DateTime?                @map("valid_until")
+  attemptCount    Int                      @default(0) @map("attempt_count")
+
+  course   TrainingCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progress TrainingEnrollmentProgress[]
+  attempts TrainingQuizAttempt[]
+  certification TrainingCertification?
+
+  @@unique([organizationId, userId, courseId])
+  @@index([organizationId, status])
+  @@index([organizationId, userId])
+  @@index([validUntil])
+  @@map("training_enrollment")
+}
+
+model TrainingEnrollmentProgress {
+  id             String    @id @default(uuid())
+  enrollmentId   String    @map("enrollment_id")
+  moduleId       String    @map("module_id")
+  completedAt    DateTime? @map("completed_at")
+  watchedSeconds Int?      @map("watched_seconds")
+
+  enrollment TrainingEnrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  module     TrainingCourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, moduleId])
+  @@index([enrollmentId])
+  @@map("training_enrollment_progress")
+}
+
+model TrainingQuizAttempt {
+  id           String    @id @default(uuid())
+  enrollmentId String    @map("enrollment_id")
+  attemptNumber Int      @map("attempt_number")
+  startedAt    DateTime  @default(now()) @map("started_at")
+  submittedAt  DateTime? @map("submitted_at")
+  score        Int?
+  passed       Boolean?
+  answers      Json?
+
+  enrollment TrainingEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([enrollmentId])
+  @@map("training_quiz_attempt")
+}
+
+model TrainingCertification {
+  id                String    @id @default(uuid())
+  enrollmentId      String    @unique @map("enrollment_id")
+  organizationId    String    @map("organization_id")
+  userId            String    @map("user_id")
+  courseId          String    @map("course_id")
+  certificateNumber String    @unique @map("certificate_number")
+  score             Int
+  issuedAt          DateTime  @default(now()) @map("issued_at")
+  expiresAt         DateTime  @map("expires_at")
+  pdfR2Key          String?   @map("pdf_r2_key")
+
+  enrollment TrainingEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, userId])
+  @@index([expiresAt])
+  @@map("training_certification")
+}

@@ -35,6 +35,7 @@ import { internalE2eRouter } from "./internal-e2e";
 import { riskRouter } from "./risk";
 import { chatRouter } from "./chat";
 import { janbotWatchlistRouter } from "./janbot-watchlist";
+import { trainingRouter } from "./training";
 
 export function createRouter() {
 	const router = new Hono<{
@@ -124,6 +125,12 @@ export function createRouter() {
 	);
 	router.use("/janbot/watchlist", requireActiveOrganization());
 
+	// AML Training (LMS) — org-scoped learner + org-admin views
+	router.use("/training/*", authMiddleware({ requireOrganization: true }));
+	router.use("/training/*", requireActiveOrganization());
+	router.use("/training", authMiddleware({ requireOrganization: true }));
+	router.use("/training", requireActiveOrganization());
+
 	// Exchange rates are global utility - auth required but no org
 	router.use("/exchange-rates/*", authMiddleware());
 
@@ -153,6 +160,7 @@ export function createRouter() {
 	router.route("/risk", riskRouter);
 	router.route("/chat", chatRouter);
 	router.route("/janbot/watchlist", janbotWatchlistRouter);
+	router.route("/training", trainingRouter);
 
 	return router;
 }
