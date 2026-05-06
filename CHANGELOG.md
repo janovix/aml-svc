@@ -1,3 +1,10 @@
+# [1.14.0-rc.14](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.13...v1.14.0-rc.14) (2026-05-06)
+
+
+### Features
+
+* **training:** enhance module asset handling with support for multiple image references and improved asset retrieval ([fc76dd8](https://github.com/janovix/aml-svc/commit/fc76dd8e1bbb4c252de1cb2c075c67115c982a5f))
+
 # [1.14.0-rc.13](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.12...v1.14.0-rc.13) (2026-05-06)
 
 
