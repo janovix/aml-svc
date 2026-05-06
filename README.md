@@ -491,15 +491,14 @@ Non-secret configuration; often in `wrangler*.jsonc`:
 
 Use `wrangler secret put <NAME>` or Cloudflare Dashboard. **Never commit** to `.env` or git:
 
-| Name                             | Purpose                                                                                                                                                                                                                                         | Example / Notes                              |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `SENTRY_DSN`                     | Sentry error tracking DSN; **if unset, Sentry is disabled**                                                                                                                                                                                     | `https://xxxxx@xxxxx.ingest.sentry.io/xxxxx` |
-| `INTERNAL_SERVICE_SECRET`        | Bearer token for internal service-to-service endpoints (e.g., `/internal/maintenance`); see [`scripts/kyc-recalculate-all.mjs`](scripts/kyc-recalculate-all.mjs) and [`src/routes/internal-maintenance.ts`](src/routes/internal-maintenance.ts) | (randomly generated secret)                  |
-| `SYNTHETIC_DATA_SECRET`          | Secret for POST `/internal/synthetic-data` header `X-Synthetic-Data-Secret`; **local dev only** (disabled in production; see [`src/index.ts`](src/index.ts) check)                                                                              | (randomly generated)                         |
-| `CLOUDFLARE_STREAM_API_TOKEN`    | Cloudflare Stream API token for direct video upload in training                                                                                                                                                                                 | (API token from Cloudflare Dashboard)        |
-| `STREAM_SIGNING_KEY_ID`          | Stream signing key ID (JWT kid) for signed video playback                                                                                                                                                                                       | (key ID from Cloudflare Dashboard)           |
-| `STREAM_SIGNING_KEY_PRIVATE_PEM` | PEM PKCS8 private key for Stream JWT signing                                                                                                                                                                                                    | (multiline PEM key; keep newlines)           |
-| `CURRENCYLAYER_API_KEY`          | CurrencyLayer API key for real-time exchange rates ([get key](https://currencylayer.com/))                                                                                                                                                      | (API key from CurrencyLayer)                 |
+| Name                          | Purpose                                                                                                                                                                                                                                                                                              | Example / Notes                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `SENTRY_DSN`                  | Sentry error tracking DSN; **if unset, Sentry is disabled**                                                                                                                                                                                                                                          | `https://xxxxx@xxxxx.ingest.sentry.io/xxxxx` |
+| `INTERNAL_SERVICE_SECRET`     | Bearer token for internal service-to-service endpoints (e.g., `/internal/maintenance`); see [`scripts/kyc-recalculate-all.mjs`](scripts/kyc-recalculate-all.mjs) and [`src/routes/internal-maintenance.ts`](src/routes/internal-maintenance.ts)                                                      | (randomly generated secret)                  |
+| `SYNTHETIC_DATA_SECRET`       | Secret for POST `/internal/synthetic-data` header `X-Synthetic-Data-Secret`; **local dev only** (disabled in production; see [`src/index.ts`](src/index.ts) check)                                                                                                                                   | (randomly generated)                         |
+| `CLOUDFLARE_STREAM_API_TOKEN` | Cloudflare Stream API token for direct video upload in training                                                                                                                                                                                                                                      | (API token from Cloudflare Dashboard)        |
+| `STREAM_SIGNING_KEY_JWK`      | Base64-encoded JWK from Cloudflare `POST /stream/keys` for signing Stream playback JWTs. The JWK's `kid` is used directly. See [Cloudflare Stream signing keys](https://developers.cloudflare.com/stream/viewing-videos/securing-your-stream/#option-2-using-a-signing-key-to-create-signed-tokens). | (base64 JWK from Cloudflare Dashboard)       |
+| `CURRENCYLAYER_API_KEY`       | CurrencyLayer API key for real-time exchange rates ([get key](https://currencylayer.com/))                                                                                                                                                                                                           | (API key from CurrencyLayer)                 |
 
 #### Optional / Reserved Secrets
 
@@ -525,8 +524,7 @@ The following are declared in types but currently **not used** unless SAT XML ge
   INTERNAL_SERVICE_SECRET=test-secret
   SYNTHETIC_DATA_SECRET=test-secret
   CLOUDFLARE_STREAM_API_TOKEN=token_abc123
-  STREAM_SIGNING_KEY_ID=key_123
-  STREAM_SIGNING_KEY_PRIVATE_PEM=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----
+  STREAM_SIGNING_KEY_JWK=eyJ1c2UiOiJzaWciLCJrdHkiOiJSU0EiLCJraWQiOiIwNzIzZGY0YzYyNTZkZTRkODI1ZmYyNDE3NTg5MmE0OSIsImFsZyI6IlJTMjU2IiwibSI6In...
   CURRENCYLAYER_API_KEY=api_key_xyz
   ```
 

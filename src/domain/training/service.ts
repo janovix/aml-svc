@@ -176,7 +176,7 @@ export class TrainingService {
 					base.playbackToken = token;
 					base.playerUrl =
 						customerCode !== ""
-							? streamIframePlayerUrl(customerCode, m.assetRef, token)
+							? streamIframePlayerUrl(customerCode, token)
 							: null;
 				} catch {
 					base.playbackError = "Stream signing unavailable";

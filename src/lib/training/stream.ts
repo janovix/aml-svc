@@ -61,8 +61,10 @@ export async function createStreamDirectUpload(
 }
 
 /**
- * Sign a Stream playback token (RS256). Cache in KV for ~half TTL.
- * @see https://developers.cloudflare.com/stream/viewing-videos/securing-your-stream/
+ * Sign a Stream playback token (RS256) using the base64 JWK returned by
+ * Cloudflare's `POST /stream/keys` endpoint. Cached in KV for ~half TTL.
+ *
+ * @see https://developers.cloudflare.com/stream/viewing-videos/securing-your-stream/#option-2-using-a-signing-key-to-create-signed-tokens
  */
 export async function getSignedStreamPlaybackToken(
 	env: Bindings,
@@ -77,24 +79,30 @@ export async function getSignedStreamPlaybackToken(
 		if (cached) return cached;
 	}
 
-	const pem = env.STREAM_SIGNING_KEY_PRIVATE_PEM;
-	const kid = env.STREAM_SIGNING_KEY_ID;
-	if (!pem || !kid) {
+	const jwkRaw = env.STREAM_SIGNING_KEY_JWK;
+	if (!jwkRaw) {
+		throw new Error("Stream signing not configured (STREAM_SIGNING_KEY_JWK)");
+	}
+
+	let jwk: jose.JWK & { kid?: string };
+	try {
+		jwk = JSON.parse(atob(jwkRaw)) as jose.JWK & { kid?: string };
+	} catch (err) {
 		throw new Error(
-			"Stream signing not configured (STREAM_SIGNING_KEY_ID / STREAM_SIGNING_KEY_PRIVATE_PEM)",
+			`STREAM_SIGNING_KEY_JWK is not a base64-encoded JSON JWK: ${(err as Error).message}`,
 		);
 	}
 
-	const privateKey = await jose.importPKCS8(pem, "RS256");
+	const kid = jwk.kid;
+	if (!kid) {
+		throw new Error("STREAM_SIGNING_KEY_JWK is missing `kid`");
+	}
+
+	const privateKey = await jose.importJWK(jwk, "RS256");
 
 	const now = Math.floor(Date.now() / 1000);
-	const token = await new jose.SignJWT({
-		sub: uid,
-		kid,
-	})
+	const token = await new jose.SignJWT({ sub: uid, kid, exp: now + ttlSeconds })
 		.setProtectedHeader({ alg: "RS256", kid })
-		.setIssuedAt(now)
-		.setExpirationTime(now + ttlSeconds)
 		.sign(privateKey);
 
 	if (env.CACHE) {
@@ -106,9 +114,8 @@ export async function getSignedStreamPlaybackToken(
 
 export function streamIframePlayerUrl(
 	customerCode: string,
-	uid: string,
 	token: string,
 ): string {
 	const code = customerCode.replace(/^customer-/, "");
-	return `https://customer-${code}.cloudflarestream.com/${uid}/iframe?token=${encodeURIComponent(token)}`;
+	return `https://customer-${code}.cloudflarestream.com/${token}/iframe`;
 }

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import * as jose from "jose";
+
 import type { Bindings } from "../../types";
 import {
 	createStreamDirectUpload,
@@ -8,15 +10,21 @@ import {
 } from "./stream";
 
 describe("streamIframePlayerUrl", () => {
+	it("puts token in the path", () => {
+		expect(streamIframePlayerUrl("customer-abc", "eyJhbGc...")).toBe(
+			"https://customer-abc.cloudflarestream.com/eyJhbGc.../iframe",
+		);
+	});
+
 	it("strips customer- prefix from customer code", () => {
-		expect(streamIframePlayerUrl("customer-abc", "uid1", "tok%2F")).toBe(
-			"https://customer-abc.cloudflarestream.com/uid1/iframe?token=tok%252F",
+		expect(streamIframePlayerUrl("customer-xyz", "token123")).toBe(
+			"https://customer-xyz.cloudflarestream.com/token123/iframe",
 		);
 	});
 
 	it("passes through codes without prefix", () => {
-		expect(streamIframePlayerUrl("xyz", "u", "t")).toBe(
-			"https://customer-xyz.cloudflarestream.com/u/iframe?token=t",
+		expect(streamIframePlayerUrl("xyz", "token456")).toBe(
+			"https://customer-xyz.cloudflarestream.com/token456/iframe",
 		);
 	});
 });
@@ -90,8 +98,9 @@ describe("getSignedStreamPlaybackToken", () => {
 		const get = vi.fn().mockResolvedValue("cached-jwt");
 		const env = {
 			CACHE: { get, put: vi.fn() },
-			STREAM_SIGNING_KEY_PRIVATE_PEM: "pem",
-			STREAM_SIGNING_KEY_ID: "kid",
+			STREAM_SIGNING_KEY_JWK: btoa(
+				JSON.stringify({ kid: "test-kid", kty: "RSA", use: "sig" }),
+			),
 		} as unknown as Bindings;
 
 		await expect(
@@ -100,7 +109,7 @@ describe("getSignedStreamPlaybackToken", () => {
 		expect(get).toHaveBeenCalledWith("stream:playback:stream-uid");
 	});
 
-	it("throws when signing keys missing after cache miss", async () => {
+	it("throws when JWK is missing", async () => {
 		const get = vi.fn().mockResolvedValue(null);
 		const env = {
 			CACHE: { get, put: vi.fn() },
@@ -108,6 +117,62 @@ describe("getSignedStreamPlaybackToken", () => {
 
 		await expect(
 			getSignedStreamPlaybackToken(env, "uid", 3600),
-		).rejects.toThrow(/signing not configured/);
+		).rejects.toThrow(/STREAM_SIGNING_KEY_JWK/);
+	});
+
+	it("throws when JWK is not base64-encoded JSON", async () => {
+		const get = vi.fn().mockResolvedValue(null);
+		const env = {
+			CACHE: { get, put: vi.fn() },
+			STREAM_SIGNING_KEY_JWK: "not-base64!!!!!",
+		} as unknown as Bindings;
+
+		await expect(
+			getSignedStreamPlaybackToken(env, "uid", 3600),
+		).rejects.toThrow(/base64-encoded JSON JWK/);
+	});
+
+	it("throws when JWK is missing kid", async () => {
+		const get = vi.fn().mockResolvedValue(null);
+		const env = {
+			CACHE: { get, put: vi.fn() },
+			STREAM_SIGNING_KEY_JWK: btoa(JSON.stringify({ kty: "RSA", use: "sig" })),
+		} as unknown as Bindings;
+
+		await expect(
+			getSignedStreamPlaybackToken(env, "uid", 3600),
+		).rejects.toThrow(/missing `kid`/);
+	});
+
+	it("signs a token with JWK and caches it", async () => {
+		const { privateKey, publicKey } = await jose.generateKeyPair("RS256", {
+			extractable: true,
+		});
+		const jwkWithKid = {
+			...(await jose.exportJWK(privateKey)),
+			kid: "test-key-id",
+		};
+		const jwkBase64 = btoa(JSON.stringify(jwkWithKid));
+
+		const put = vi.fn();
+		const get = vi.fn().mockResolvedValue(null);
+		const env = {
+			CACHE: { get, put },
+			STREAM_SIGNING_KEY_JWK: jwkBase64,
+		} as unknown as Bindings;
+
+		const token = await getSignedStreamPlaybackToken(env, "video-123", 3600);
+
+		const decoded = await jose.jwtVerify(token, publicKey);
+
+		expect(decoded.payload.sub).toBe("video-123");
+		expect(decoded.payload.kid).toBe("test-key-id");
+		expect(decoded.payload.exp).toBeDefined();
+		expect(decoded.protectedHeader.alg).toBe("RS256");
+		expect(decoded.protectedHeader.kid).toBe("test-key-id");
+
+		expect(put).toHaveBeenCalled();
+		const [, tokenStored] = put.mock.calls[0];
+		expect(tokenStored).toBe(token);
 	});
 });

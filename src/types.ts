@@ -288,10 +288,12 @@ export type Bindings = Omit<
 	STREAM_CUSTOMER_CODE?: string;
 	/** Cloudflare Stream API token (direct upload). */
 	CLOUDFLARE_STREAM_API_TOKEN?: string;
-	/** Stream signing key id (JWT kid) for signed playback. */
-	STREAM_SIGNING_KEY_ID?: string;
-	/** PEM PKCS8 private key for Stream playback JWT signing. */
-	STREAM_SIGNING_KEY_PRIVATE_PEM?: string;
+	/**
+	 * Base64-encoded JWK private key from Cloudflare `POST /stream/keys` for
+	 * signing Stream playback JWTs. The JWK's `kid` is used directly.
+	 * @see https://developers.cloudflare.com/stream/viewing-videos/securing-your-stream/#step-1-call-the-streamkey-endpoint-once-to-obtain-a-key
+	 */
+	STREAM_SIGNING_KEY_JWK?: string;
 	/** Training certificate PDF generation queue */
 	TRAINING_CERT_GEN_QUEUE?: Queue<
 		import("./lib/training/jobs").TrainingCertGenJob

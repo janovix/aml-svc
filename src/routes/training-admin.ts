@@ -238,7 +238,6 @@ trainingAdminRouter.get("/modules/:moduleId/player-url", async (c) => {
 	const token = await getSignedStreamPlaybackToken(c.env, mod.assetRef);
 	const playerUrl = streamIframePlayerUrl(
 		c.env.STREAM_CUSTOMER_CODE ?? "",
-		mod.assetRef,
 		token,
 	);
 
