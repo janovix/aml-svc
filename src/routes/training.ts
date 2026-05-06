@@ -181,11 +181,14 @@ trainingRouter.get("/module-assets/:moduleId", async (c) => {
 	const prisma = getPrismaClient(c.env.DB);
 	const svc = new TrainingService(prisma, c.env);
 	const moduleId = c.req.param("moduleId");
+	const rawIndex = c.req.query("index") ?? "0";
+	const index = Number.parseInt(rawIndex, 10);
 
-	const { key, contentType } = await svc.getModuleAssetStreamKey(
+	const { key, contentType, total } = await svc.getModuleAssetStreamKey(
 		moduleId,
 		org.id,
 		user.id,
+		Number.isFinite(index) ? index : 0,
 	);
 
 	const obj = await c.env.R2_BUCKET.get(key);
@@ -197,6 +200,7 @@ trainingRouter.get("/module-assets/:moduleId", async (c) => {
 		headers: {
 			"Content-Type": contentType,
 			"Cache-Control": "private, max-age=3600",
+			"X-Total-Count": String(total),
 		},
 	});
 });

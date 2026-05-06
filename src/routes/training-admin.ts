@@ -199,26 +199,26 @@ trainingAdminRouter.post("/uploads/asset", async (c) => {
 
 trainingAdminRouter.get("/modules/:moduleId/asset", async (c) => {
 	const moduleId = c.req.param("moduleId");
+	const rawIndex = c.req.query("index") ?? "0";
+	const index = Number.parseInt(rawIndex, 10);
 	const prisma = getPrismaClient(c.env.DB);
+	const svc = new TrainingService(prisma, c.env);
 
-	const mod = await prisma.trainingCourseModule.findUnique({
-		where: { id: moduleId },
-	});
+	const { key, contentType, total } = await svc.getModuleAssetStreamKeyAdmin(
+		moduleId,
+		Number.isFinite(index) ? index : 0,
+	);
 
-	if (!mod || !["PDF", "IMAGE"].includes(mod.kind)) {
-		throw new APIError(404, "Asset not found");
-	}
-
-	const obj = await c.env.R2_BUCKET.get(mod.assetRef);
+	const obj = await c.env.R2_BUCKET.get(key);
 	if (!obj?.body) {
 		throw new APIError(404, "Asset not found");
 	}
 
 	return new Response(obj.body, {
 		headers: {
-			"Content-Type":
-				obj.httpMetadata?.contentType ?? "application/octet-stream",
+			"Content-Type": contentType,
 			"Cache-Control": "private, max-age=3600",
+			"X-Total-Count": String(total),
 		},
 	});
 });

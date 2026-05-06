@@ -27,6 +27,34 @@ import type {
 } from "../../lib/training/jobs";
 import { scoreTrainingQuiz } from "./quiz-score";
 
+/** IMAGE modules may store multiple R2 keys as a JSON array string; PDF remains a single key. */
+export function parseImageRefs(assetRef: string): string[] {
+	if (assetRef.startsWith("[")) {
+		try {
+			const parsed = JSON.parse(assetRef) as unknown;
+			if (
+				Array.isArray(parsed) &&
+				parsed.length > 0 &&
+				parsed.every((x) => typeof x === "string" && x.length > 0)
+			) {
+				return parsed;
+			}
+		} catch {
+			/* legacy fallback */
+		}
+	}
+	return [assetRef];
+}
+
+function imageContentTypeFromKey(key: string): string {
+	const lower = key.toLowerCase();
+	if (lower.endsWith(".png")) return "image/png";
+	if (lower.endsWith(".webp")) return "image/webp";
+	if (lower.endsWith(".gif")) return "image/gif";
+	if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+	return "image/jpeg";
+}
+
 function addMonths(d: Date, months: number): Date {
 	const out = new Date(d);
 	out.setMonth(out.getMonth() + months);
@@ -157,21 +185,24 @@ export class TrainingService {
 
 		const modulesOut = [] as Record<string, unknown>[];
 		for (const m of course.modules) {
+			const modRow = m as typeof m & {
+				descriptionI18n?: Prisma.JsonValue | null;
+			};
 			const base: Record<string, unknown> = {
-				id: m.id,
-				sortOrder: m.sortOrder,
-				kind: m.kind,
-				titleI18n: m.titleI18n,
-				descriptionI18n: m.descriptionI18n ?? null,
-				required: m.required,
-				durationSeconds: m.durationSeconds,
+				id: modRow.id,
+				sortOrder: modRow.sortOrder,
+				kind: modRow.kind,
+				titleI18n: modRow.titleI18n,
+				descriptionI18n: modRow.descriptionI18n ?? null,
+				required: modRow.required,
+				durationSeconds: modRow.durationSeconds,
 			};
 
-			if (m.kind === "VIDEO" && m.assetRef) {
+			if (modRow.kind === "VIDEO" && modRow.assetRef) {
 				try {
 					const token = await getSignedStreamPlaybackToken(
 						this.env,
-						m.assetRef,
+						modRow.assetRef,
 					);
 					base.playbackToken = token;
 					base.playerUrl =
@@ -181,10 +212,13 @@ export class TrainingService {
 				} catch {
 					base.playbackError = "Stream signing unavailable";
 				}
-			} else if (m.kind === "PDF" || m.kind === "IMAGE") {
-				base.assetPath = `/api/v1/training/module-assets/${m.id}`;
+			} else if (modRow.kind === "PDF" || modRow.kind === "IMAGE") {
+				base.assetPath = `/api/v1/training/module-assets/${modRow.id}`;
+				if (modRow.kind === "IMAGE") {
+					base.imageCount = parseImageRefs(modRow.assetRef).length;
+				}
 			} else {
-				base.body = m.kind === "TEXT" ? m.assetRef : null;
+				base.body = modRow.kind === "TEXT" ? modRow.assetRef : null;
 			}
 
 			modulesOut.push(base);
@@ -620,11 +654,37 @@ export class TrainingService {
 		});
 	}
 
+	async getModuleAssetStreamKeyAdmin(
+		moduleId: string,
+		index = 0,
+	): Promise<{ key: string; contentType: string; total: number }> {
+		const mod = await this.prisma.trainingCourseModule.findUnique({
+			where: { id: moduleId },
+		});
+
+		if (!mod || (mod.kind !== "PDF" && mod.kind !== "IMAGE")) {
+			throw new APIError(404, "Asset not found");
+		}
+
+		const keys = parseImageRefs(mod.assetRef);
+		if (keys.length === 0) {
+			throw new APIError(404, "Asset not found");
+		}
+
+		const safeIndex = Math.min(Math.max(0, index), keys.length - 1);
+		const key = keys[safeIndex]!;
+		const contentType =
+			mod.kind === "PDF" ? "application/pdf" : imageContentTypeFromKey(key);
+
+		return { key, contentType, total: keys.length };
+	}
+
 	async getModuleAssetStreamKey(
 		moduleId: string,
 		organizationId: string,
 		userId: string,
-	): Promise<{ key: string; contentType: string }> {
+		index = 0,
+	): Promise<{ key: string; contentType: string; total: number }> {
 		const mod = await this.prisma.trainingCourseModule.findUnique({
 			where: { id: moduleId },
 			include: { course: true },
@@ -652,14 +712,17 @@ export class TrainingService {
 			throw new APIError(400, "Not a file module");
 		}
 
-		const mime =
-			mod.kind === "PDF"
-				? "application/pdf"
-				: mod.assetRef.endsWith(".png")
-					? "image/png"
-					: "image/jpeg";
+		const keys = parseImageRefs(mod.assetRef);
+		if (keys.length === 0) {
+			throw new APIError(404, "Asset not found");
+		}
 
-		return { key: mod.assetRef, contentType: mime };
+		const safeIndex = Math.min(Math.max(0, index), keys.length - 1);
+		const key = keys[safeIndex]!;
+		const contentType =
+			mod.kind === "PDF" ? "application/pdf" : imageContentTypeFromKey(key);
+
+		return { key, contentType, total: keys.length };
 	}
 
 	async getCertificationDownloadStream(
