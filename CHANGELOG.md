@@ -1,3 +1,10 @@
+# [1.14.0-rc.13](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.12...v1.14.0-rc.13) (2026-05-06)
+
+
+### Features
+
+* **training:** update Stream signing implementation to use JWK instead of PEM ([e378ed0](https://github.com/janovix/aml-svc/commit/e378ed0c6903712265361df4cbcbec5c21b8164f))
+
 # [1.14.0-rc.12](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.11...v1.14.0-rc.12) (2026-05-06)
 
 
