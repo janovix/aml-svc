@@ -1,3 +1,10 @@
+# [1.14.0-rc.11](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.10...v1.14.0-rc.11) (2026-05-06)
+
+
+### Features
+
+* **training:** add endpoints for retrieving module assets and video player URLs ([597e93a](https://github.com/janovix/aml-svc/commit/597e93a1aa2905b8e3646012f94b6ad6fa5c5f85))
+
 # [1.14.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.9...v1.14.0-rc.10) (2026-05-06)
 
 
