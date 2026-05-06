@@ -1,3 +1,10 @@
+# [1.14.0-rc.10](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.9...v1.14.0-rc.10) (2026-05-06)
+
+
+### Features
+
+* **upload:** add public upload routes for asset uploads using temporary tokens ([2d71fc2](https://github.com/janovix/aml-svc/commit/2d71fc24212b818203fc34a9f04e0c38395ae8f4))
+
 # [1.14.0-rc.9](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.8...v1.14.0-rc.9) (2026-05-06)
 
 
