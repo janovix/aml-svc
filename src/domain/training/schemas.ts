@@ -30,6 +30,7 @@ export const trainingModuleCreateSchema = z.object({
 	sortOrder: z.number().int().min(0),
 	kind: z.enum(["VIDEO", "PDF", "IMAGE", "TEXT"]),
 	titleI18n: z.record(z.string()),
+	descriptionI18n: z.record(z.string()).optional().nullable(),
 	assetRef: z.string().min(1),
 	durationSeconds: z.number().int().min(0).optional().nullable(),
 	required: z.boolean().optional(),

@@ -162,6 +162,7 @@ export class TrainingService {
 				sortOrder: m.sortOrder,
 				kind: m.kind,
 				titleI18n: m.titleI18n,
+				descriptionI18n: m.descriptionI18n ?? null,
 				required: m.required,
 				durationSeconds: m.durationSeconds,
 			};
@@ -877,6 +878,7 @@ export class TrainingService {
 			sortOrder: number;
 			kind: "VIDEO" | "PDF" | "IMAGE" | "TEXT";
 			titleI18n: Record<string, string>;
+			descriptionI18n?: Record<string, string> | null;
 			assetRef: string;
 			durationSeconds?: number | null;
 			required?: boolean;
@@ -889,6 +891,9 @@ export class TrainingService {
 					sortOrder: payload.sortOrder,
 					kind: payload.kind,
 					titleI18n: payload.titleI18n,
+					...(payload.descriptionI18n
+						? { descriptionI18n: payload.descriptionI18n }
+						: {}),
 					assetRef: payload.assetRef,
 					durationSeconds: payload.durationSeconds ?? null,
 					required: payload.required ?? true,
@@ -903,6 +908,9 @@ export class TrainingService {
 				sortOrder: payload.sortOrder,
 				kind: payload.kind,
 				titleI18n: payload.titleI18n,
+				...(payload.descriptionI18n
+					? { descriptionI18n: payload.descriptionI18n }
+					: {}),
 				assetRef: payload.assetRef,
 				durationSeconds: payload.durationSeconds ?? null,
 				required: payload.required ?? true,

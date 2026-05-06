@@ -2079,6 +2079,7 @@ model TrainingCourseModule {
   sortOrder       Int              @map("sort_order")
   kind            TrainingModuleKind
   titleI18n       Json             @map("title_i18n")
+  descriptionI18n Json?            @map("description_i18n")
   assetRef        String           @map("asset_ref")
   durationSeconds Int?             @map("duration_seconds")
   required        Boolean          @default(true)
