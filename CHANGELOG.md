@@ -1,3 +1,10 @@
+# [1.14.0-rc.17](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.16...v1.14.0-rc.17) (2026-05-07)
+
+
+### Features
+
+* **headers:** implement lmsStreamedBinaryHeaders for consistent binary response headers ([66ee198](https://github.com/janovix/aml-svc/commit/66ee198cd34403e1ac090d491d94d231b834a3ce))
+
 # [1.14.0-rc.16](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.15...v1.14.0-rc.16) (2026-05-06)
 
 
