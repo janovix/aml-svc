@@ -1,3 +1,10 @@
+# [1.14.0-rc.18](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.17...v1.14.0-rc.18) (2026-05-07)
+
+
+### Features
+
+* **training:** add progress tracking to course details for learners ([df9f3fb](https://github.com/janovix/aml-svc/commit/df9f3fb6a229be4adbe7be8d9ca8006b0a663537))
+
 # [1.14.0-rc.17](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.16...v1.14.0-rc.17) (2026-05-07)
 
 
