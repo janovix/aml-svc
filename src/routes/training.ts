@@ -11,9 +11,10 @@ import {
 	trainingQuizSubmitSchema,
 } from "../domain/training/schemas";
 import { getPrismaClient } from "../lib/prisma";
+import { lmsStreamedBinaryHeaders } from "../lib/lms-streamed-binary-headers";
+import { parseWithZod } from "../lib/route-helpers";
 import type { Bindings } from "../types";
 import type { AuthVariables } from "../middleware/auth";
-import { parseWithZod } from "../lib/route-helpers";
 import { APIError } from "../middleware/error";
 import { requireOrgOwnerOrAdmin } from "../middleware/org-membership";
 
@@ -197,11 +198,10 @@ trainingRouter.get("/module-assets/:moduleId", async (c) => {
 	}
 
 	return new Response(obj.body, {
-		headers: {
-			"Content-Type": contentType,
-			"Cache-Control": "private, max-age=3600",
-			"X-Total-Count": String(total),
-		},
+		headers: lmsStreamedBinaryHeaders({
+			contentType,
+			xTotalCount: total,
+		}),
 	});
 });
 

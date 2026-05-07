@@ -17,6 +17,7 @@ import {
 	getSignedStreamPlaybackToken,
 	streamIframePlayerUrl,
 } from "../lib/training/stream";
+import { lmsStreamedBinaryHeaders } from "../lib/lms-streamed-binary-headers";
 import { getPrismaClient } from "../lib/prisma";
 import type { Bindings } from "../types";
 import type { AdminAuthVariables } from "../middleware/admin-auth";
@@ -215,11 +216,10 @@ trainingAdminRouter.get("/modules/:moduleId/asset", async (c) => {
 	}
 
 	return new Response(obj.body, {
-		headers: {
-			"Content-Type": contentType,
-			"Cache-Control": "private, max-age=3600",
-			"X-Total-Count": String(total),
-		},
+		headers: lmsStreamedBinaryHeaders({
+			contentType,
+			xTotalCount: total,
+		}),
 	});
 });
 
