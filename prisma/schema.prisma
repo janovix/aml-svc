@@ -2195,6 +2195,10 @@ model TrainingCertification {
   userId            String    @map("user_id")
   courseId          String    @map("course_id")
   certificateNumber String    @unique @map("certificate_number")
+  /// Display name at issuance (JWT / profile); immutable on the certificate.
+  userName          String?   @map("user_name")
+  /// Organization legal/display name at issuance; immutable on the certificate.
+  organizationName  String?   @map("organization_name")
   score             Int
   issuedAt          DateTime  @default(now()) @map("issued_at")
   expiresAt         DateTime  @map("expires_at")

@@ -237,4 +237,99 @@ describe("TrainingService", () => {
 			watchedSeconds: null,
 		});
 	});
+
+	it("submitQuiz persists snapshot userName and organizationName when issuing a certification", async () => {
+		const questionId = "q1";
+		const correctOptionId = "opt-yes";
+		const enrollment = {
+			id: "enr-1",
+			organizationId: "org-1",
+			userId: "user-1",
+			courseId: "course-1",
+			course: {
+				id: "course-1",
+				passingScore: 70,
+				maxAttempts: 3,
+				validityMonths: 12,
+			},
+		};
+		const quiz = {
+			questions: [
+				{
+					id: questionId,
+					type: "SINGLE_CHOICE" as const,
+					options: [
+						{ id: "opt-no", isCorrect: false },
+						{ id: correctOptionId, isCorrect: true },
+					],
+				},
+			],
+		};
+
+		const trainingCertificationCreate = vi.fn().mockResolvedValue({
+			id: "cert-new",
+		});
+		const prisma = {
+			trainingEnrollment: {
+				findFirst: vi.fn().mockResolvedValue(enrollment),
+				update: vi.fn().mockResolvedValue(undefined),
+			},
+			trainingCourseQuiz: {
+				findUnique: vi.fn().mockResolvedValue(quiz),
+			},
+			trainingQuizAttempt: {
+				findFirst: vi
+					.fn()
+					.mockResolvedValue({ id: "att-1", submittedAt: null }),
+				update: vi.fn().mockResolvedValue(undefined),
+				count: vi.fn().mockResolvedValue(1),
+			},
+			trainingCertification: {
+				findFirst: vi.fn().mockResolvedValue(null),
+				create: trainingCertificationCreate,
+			},
+		} as unknown as PrismaClient;
+
+		const sendCert = vi.fn().mockResolvedValue(undefined);
+		const sendNotif = vi.fn().mockResolvedValue(undefined);
+		const env = {
+			AUTH_SERVICE: {
+				getOrganization: vi.fn().mockResolvedValue({ name: "Acme Org" }),
+			},
+			TRAINING_CERT_GEN_QUEUE: { send: sendCert },
+			TRAINING_NOTIFICATION_QUEUE: { send: sendNotif },
+		} as unknown as Bindings;
+
+		const svc = new TrainingService(prisma, env);
+		const result = await svc.submitQuiz(
+			"enr-1",
+			"att-1",
+			{ [questionId]: correctOptionId },
+			"org-1",
+			"user-1",
+			"Jane Doe",
+		);
+
+		expect(result).toEqual(
+			expect.objectContaining({
+				passed: true,
+				score: 100,
+				certificationId: "cert-new",
+			}),
+		);
+		expect(trainingCertificationCreate).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				enrollmentId: "enr-1",
+				organizationId: "org-1",
+				userId: "user-1",
+				courseId: "course-1",
+				userName: "Jane Doe",
+				organizationName: "Acme Org",
+				score: 100,
+			}),
+		});
+		expect(sendCert).toHaveBeenCalledWith({
+			certificationId: "cert-new",
+		});
+	});
 });

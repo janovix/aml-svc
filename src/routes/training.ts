@@ -123,6 +123,7 @@ trainingRouter.post("/enrollments/:id/quiz/submit", async (c) => {
 		body.answers,
 		org.id,
 		user.id,
+		user.name,
 	);
 
 	return c.json(result);

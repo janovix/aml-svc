@@ -505,6 +505,7 @@ export class TrainingService {
 		answers: Record<string, string | string[]>,
 		organizationId: string,
 		userId: string,
+		userDisplayName?: string | null,
 	) {
 		const enrollment = await this.prisma.trainingEnrollment.findFirst({
 			where: { id: enrollmentId, organizationId, userId },
@@ -602,6 +603,17 @@ export class TrainingService {
 		});
 
 		const certNumber = await this.nextCertificateNumber();
+
+		const orgRow = await this.env.AUTH_SERVICE?.getOrganization(organizationId);
+		const organizationNameSnapshot =
+			orgRow?.name != null && orgRow.name.trim().length > 0
+				? orgRow.name.trim()
+				: null;
+		const userNameSnapshot =
+			userDisplayName != null && userDisplayName.trim().length > 0
+				? userDisplayName.trim()
+				: null;
+
 		const cert = await this.prisma.trainingCertification.create({
 			data: {
 				id: crypto.randomUUID(),
@@ -610,6 +622,8 @@ export class TrainingService {
 				userId,
 				courseId: enrollment.courseId,
 				certificateNumber: certNumber,
+				userName: userNameSnapshot,
+				organizationName: organizationNameSnapshot,
 				score: scorePercent,
 				issuedAt: now,
 				expiresAt: validUntil,
