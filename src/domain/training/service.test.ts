@@ -140,4 +140,101 @@ describe("TrainingService", () => {
 			}),
 		);
 	});
+
+	it("getCourseDetailForLearner attaches per-module progress from enrollment progress rows", async () => {
+		const completedAt = new Date("2025-01-01T12:00:00.000Z");
+		const findManyCourse = vi.fn().mockResolvedValue([]);
+		const findFirstCourse = vi.fn().mockResolvedValue({
+			id: "course-1",
+			slug: "aml-101",
+			status: "PUBLISHED",
+			titleI18n: {},
+			descriptionI18n: {},
+			version: 1,
+			passingScore: 70,
+			maxAttempts: 3,
+			cooldownHours: 0,
+			validityMonths: 12,
+			modules: [
+				{
+					id: "mod-done",
+					sortOrder: 0,
+					kind: "TEXT",
+					titleI18n: {},
+					descriptionI18n: null,
+					required: true,
+					durationSeconds: null,
+					assetRef: "x",
+				},
+				{
+					id: "mod-open",
+					sortOrder: 1,
+					kind: "TEXT",
+					titleI18n: {},
+					descriptionI18n: null,
+					required: true,
+					durationSeconds: null,
+					assetRef: "y",
+				},
+			],
+			quiz: null,
+		});
+		const findUniqueEnrollment = vi.fn().mockResolvedValue({
+			id: "enr-1",
+			organizationId: "org-1",
+			userId: "user-1",
+			courseId: "course-1",
+			status: "ASSIGNED",
+		});
+		const findManyProgress = vi.fn().mockResolvedValue([
+			{
+				moduleId: "mod-done",
+				completedAt,
+				watchedSeconds: 99,
+			},
+		]);
+		const prisma = {
+			trainingCourse: {
+				findMany: findManyCourse,
+				findFirst: findFirstCourse,
+			},
+			trainingEnrollment: { findUnique: findUniqueEnrollment },
+			trainingEnrollmentProgress: { findMany: findManyProgress },
+		} as unknown as PrismaClient;
+
+		const svc = new TrainingService(prisma, env);
+		const detail = await svc.getCourseDetailForLearner(
+			"aml-101",
+			"org-1",
+			"user-1",
+		);
+
+		expect(findManyProgress).toHaveBeenCalledWith(
+			expect.objectContaining({
+				where: { enrollmentId: "enr-1" },
+				select: expect.objectContaining({
+					moduleId: true,
+					completedAt: true,
+					watchedSeconds: true,
+				}),
+			}),
+		);
+
+		const modules = detail.modules as Array<{
+			id: string;
+			progress: {
+				completedAt: string | null;
+				watchedSeconds: number | null;
+			};
+		}>;
+
+		expect(modules.find((m) => m.id === "mod-done")?.progress).toEqual({
+			completedAt: completedAt.toISOString(),
+			watchedSeconds: 99,
+		});
+		expect(modules.find((m) => m.id === "mod-open")?.progress).toEqual({
+			completedAt: null,
+			watchedSeconds: null,
+		});
+	});
 });

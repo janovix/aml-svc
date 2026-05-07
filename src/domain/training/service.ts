@@ -181,6 +181,24 @@ export class TrainingService {
 			});
 		}
 
+		const progressRows = await this.prisma.trainingEnrollmentProgress.findMany({
+			where: { enrollmentId: enrollment.id },
+			select: {
+				moduleId: true,
+				completedAt: true,
+				watchedSeconds: true,
+			},
+		});
+		const progressByModuleId = new Map(
+			progressRows.map((p) => [
+				p.moduleId,
+				{
+					completedAt: p.completedAt?.toISOString() ?? null,
+					watchedSeconds: p.watchedSeconds ?? null,
+				},
+			]),
+		);
+
 		const customerCode = this.env.STREAM_CUSTOMER_CODE ?? "";
 
 		const modulesOut = [] as Record<string, unknown>[];
@@ -188,6 +206,7 @@ export class TrainingService {
 			const modRow = m as typeof m & {
 				descriptionI18n?: Prisma.JsonValue | null;
 			};
+			const prog = progressByModuleId.get(modRow.id);
 			const base: Record<string, unknown> = {
 				id: modRow.id,
 				sortOrder: modRow.sortOrder,
@@ -196,6 +215,10 @@ export class TrainingService {
 				descriptionI18n: modRow.descriptionI18n ?? null,
 				required: modRow.required,
 				durationSeconds: modRow.durationSeconds,
+				progress: prog ?? {
+					completedAt: null,
+					watchedSeconds: null,
+				},
 			};
 
 			if (modRow.kind === "VIDEO" && modRow.assetRef) {
