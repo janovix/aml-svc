@@ -5,7 +5,8 @@ import type {
 	ClientDocument,
 	ClientAddress,
 } from "@prisma/client";
-import { ClientRepository } from "./repository";
+import { ClientRepository, getClientCatalogFields } from "./repository";
+import type { CatalogRepository } from "../catalog/repository";
 import type {
 	ClientCreateInput,
 	ClientUpdateInput,
@@ -79,6 +80,7 @@ describe("ClientRepository", () => {
 		reference: null,
 		countryCode: null,
 		economicActivityCode: null,
+		commercialActivityCode: null,
 		sourceOfFunds: null,
 		sourceOfWealth: null,
 		incorporationDate: null,
@@ -287,6 +289,29 @@ describe("ClientRepository", () => {
 			expect(result?.id).toBe("CLT123456789");
 		});
 
+		it("should merge resolved catalog names at read-time when stored resolved_names is stale", async () => {
+			const staleRow = {
+				...mockClient,
+				resolvedNames: null,
+				nationality: "MX",
+				countryCode: null,
+			};
+			vi.mocked(mockPrisma.client.findFirst).mockResolvedValue(staleRow);
+			vi.mocked(mockCatalogResolver.resolveNames).mockResolvedValue({
+				nationality: "México",
+				countryCode: "México",
+			});
+
+			const result = await repository.getById(
+				productionTenant("org-123"),
+				"CLT123456789",
+			);
+
+			expect(mockCatalogResolver.resolveNames).toHaveBeenCalled();
+			expect(result?.resolvedNames?.nationality).toBe("México");
+			expect(result?.resolvedNames?.countryCode).toBe("México");
+		});
+
 		it("should return null when client not found", async () => {
 			vi.mocked(mockPrisma.client.findFirst).mockResolvedValue(null);
 
@@ -397,7 +422,7 @@ describe("ClientRepository", () => {
 			const completeClient: Client = {
 				...mockClient,
 				completenessStatus: "COMPLETE",
-				economicActivityCode: "VEH",
+				economicActivityCode: "1110100",
 				sourceOfFunds: "salary",
 				gender: "M",
 				curp: "ABCD900515HDFLRN01",
@@ -422,7 +447,7 @@ describe("ClientRepository", () => {
 				street: "Calle Principal",
 				externalNumber: "123",
 				postalCode: "06000",
-				economicActivityCode: "VEH",
+				economicActivityCode: "1110100",
 				sourceOfFunds: "salary",
 			};
 
@@ -912,6 +937,170 @@ describe("ClientRepository", () => {
 				moralClients: 30,
 				trustClients: 10,
 			});
+		});
+	});
+
+	describe("getClientCatalogFields", () => {
+		it("routes physical person economic codes to economic-activities", () => {
+			const f = getClientCatalogFields("physical");
+			expect(f.economicActivityCode?.catalog).toBe("economic-activities");
+			expect(
+				(f as { commercialActivityCode?: { catalog: string } })
+					.commercialActivityCode,
+			).toBeUndefined();
+		});
+
+		it("routes moral person commercial codes to business-activities", () => {
+			const f = getClientCatalogFields("moral");
+			expect(f.commercialActivityCode?.catalog).toBe("business-activities");
+			expect(
+				(f as { economicActivityCode?: { catalog: string } })
+					.economicActivityCode,
+			).toBeUndefined();
+		});
+
+		it("does not attach activity catalogs for trust (fideicomiso)", () => {
+			const f = getClientCatalogFields("trust");
+			expect(
+				(f as { economicActivityCode?: unknown }).economicActivityCode,
+			).toBeUndefined();
+			expect(
+				(f as { commercialActivityCode?: unknown }).commercialActivityCode,
+			).toBeUndefined();
+		});
+	});
+
+	describe("create - ISO-3166 and activity catalog normalization", () => {
+		let mockCatalogRepo: CatalogRepository;
+
+		beforeEach(() => {
+			mockCatalogRepo = {
+				resolveStoredCountryCode: vi.fn(async (v: string) =>
+					v === "MEX" ? "MX" : v,
+				),
+				resolveStoredActivityCode: vi.fn(
+					async (catalog: string, v: string) => {
+						if (catalog === "economic-activities" && v === "legacy-eco")
+							return "1110100";
+						if (catalog === "business-activities" && v === "legacy-biz")
+							return "5520014";
+						return v;
+					},
+				),
+			} as unknown as CatalogRepository;
+
+			repository = new ClientRepository(
+				mockPrisma,
+				mockCatalogResolver,
+				mockCatalogRepo,
+			);
+		});
+
+		it("normalizes ISO-3 nationality/country fields to ISO-2 before persist", async () => {
+			const input: ClientCreateInput = {
+				rfc: "ABCD123456EF7",
+				personType: "physical",
+				firstName: "Juan",
+				lastName: "Pérez",
+				birthDate: "1990-05-15",
+				curp: "ABCD900515HDFLRN01",
+				nationality: "MEX",
+				email: "juan@example.com",
+				phone: "+521234567890",
+				country: "MEX",
+				stateCode: "DIF",
+				city: "Ciudad de México",
+				municipality: "Ciudad de México",
+				neighborhood: "Colonia Centro",
+				street: "Calle Principal",
+				externalNumber: "123",
+				postalCode: "06000",
+			};
+
+			vi.mocked(mockPrisma.client.create).mockResolvedValue({
+				...mockClient,
+				nationality: "MX",
+				country: "MX",
+			});
+			vi.mocked(mockPrisma.client.findUnique).mockResolvedValue({
+				...mockClient,
+				nationality: "MX",
+				country: "MX",
+				documents: [],
+				beneficialControllers: [],
+				shareholders: [],
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any);
+			vi.mocked(mockPrisma.client.update).mockResolvedValue(mockClient);
+
+			await repository.create(productionTenant("org-123"), input);
+
+			expect(mockCatalogRepo.resolveStoredCountryCode).toHaveBeenCalledWith(
+				"MEX",
+			);
+			expect(mockPrisma.client.create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						nationality: "MX",
+						country: "MX",
+						countryCode: "MX",
+					}),
+				}),
+			);
+		});
+
+		it("resolves moral commercialActivityCode via business-activities catalog", async () => {
+			const moralRow: Client = {
+				...mockClient,
+				personType: "MORAL",
+				firstName: null,
+				businessName: "ACME SA",
+				commercialActivityCode: "5520014",
+				economicActivityCode: null,
+			};
+
+			const input: ClientCreateInput = {
+				rfc: "ACME123456XY7",
+				personType: "moral",
+				businessName: "ACME SA",
+				nationality: "MX",
+				commercialActivityCode: "legacy-biz",
+				email: "a@b.co",
+				phone: "+521234567890",
+				country: "MX",
+				stateCode: "DIF",
+				city: "CDMX",
+				municipality: "CDMX",
+				neighborhood: "Centro",
+				street: "Reforma",
+				externalNumber: "1",
+				postalCode: "06600",
+			};
+
+			vi.mocked(mockPrisma.client.create).mockResolvedValue(moralRow);
+			vi.mocked(mockPrisma.client.findUnique).mockResolvedValue({
+				...moralRow,
+				documents: [],
+				beneficialControllers: [],
+				shareholders: [],
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any);
+			vi.mocked(mockPrisma.client.update).mockResolvedValue(moralRow);
+
+			await repository.create(productionTenant("org-123"), input);
+
+			expect(mockCatalogRepo.resolveStoredActivityCode).toHaveBeenCalledWith(
+				"business-activities",
+				"legacy-biz",
+			);
+			expect(mockPrisma.client.create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						commercialActivityCode: "5520014",
+						economicActivityCode: null,
+					}),
+				}),
+			);
 		});
 	});
 });

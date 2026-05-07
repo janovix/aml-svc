@@ -269,7 +269,8 @@ const CommonSchemaBase = z
 			.optional(),
 		notes: z.string().max(500).optional().nullable(),
 		countryCode: z.string().optional().nullable(), // Reference to countries catalog (metadata.code)
-		economicActivityCode: z.string().optional().nullable(), // Reference to economic activity catalog (7-digit code)
+		economicActivityCode: z.string().optional().nullable(), // Persona física: economic-activities (7-digit)
+		commercialActivityCode: z.string().optional().nullable(), // Persona moral: business-activities (7-digit)
 	})
 	.merge(AddressSchema)
 	.merge(ContactSchema);
@@ -282,6 +283,7 @@ const CommonSchemaPhysical = z
 		notes: z.string().max(500).optional().nullable(),
 		countryCode: z.string().optional().nullable(), // Reference to countries catalog (metadata.code)
 		economicActivityCode: z.string().optional().nullable(), // Reference to economic activity catalog (7-digit code)
+		commercialActivityCode: z.string().optional().nullable(),
 	})
 	.merge(AddressSchema)
 	.merge(ContactSchema);
@@ -387,6 +389,7 @@ const MinimalCommonBase = z
 		notes: z.string().max(500).optional().nullable(),
 		countryCode: z.string().optional().nullable(),
 		economicActivityCode: z.string().optional().nullable(),
+		commercialActivityCode: z.string().optional().nullable(),
 	})
 	.merge(OptionalAddressSchema)
 	.merge(OptionalContactSchema);
@@ -398,6 +401,7 @@ const MinimalCommonPhysical = z
 		notes: z.string().max(500).optional().nullable(),
 		countryCode: z.string().optional().nullable(),
 		economicActivityCode: z.string().optional().nullable(),
+		commercialActivityCode: z.string().optional().nullable(),
 	})
 	.merge(OptionalAddressSchema)
 	.merge(OptionalContactSchema);
@@ -460,6 +464,7 @@ const UpdateCommonBase = z
 		notes: z.string().max(500).optional().nullable(),
 		countryCode: z.string().optional().nullable(),
 		economicActivityCode: z.string().optional().nullable(),
+		commercialActivityCode: z.string().optional().nullable(),
 	})
 	.merge(OptionalAddressSchema)
 	.merge(OptionalContactSchema);
@@ -470,6 +475,7 @@ const UpdateCommonPhysical = z
 		notes: z.string().max(500).optional().nullable(),
 		countryCode: z.string().optional().nullable(),
 		economicActivityCode: z.string().optional().nullable(),
+		commercialActivityCode: z.string().optional().nullable(),
 	})
 	.merge(OptionalAddressSchema)
 	.merge(OptionalContactSchema);
@@ -536,6 +542,7 @@ export const ClientPatchSchema = z.object({
 	notes: z.string().max(500).optional().nullable(),
 	countryCode: z.string().optional().nullable(), // Reference to countries catalog (metadata.code)
 	economicActivityCode: z.string().optional().nullable(), // Reference to economic activity catalog (7-digit code)
+	commercialActivityCode: z.string().optional().nullable(), // Persona moral: business-activities
 	// Enhanced KYC fields
 	gender: GenderSchema.optional().nullable(),
 	occupation: z.string().max(200).optional().nullable(),

@@ -9,6 +9,11 @@ import * as Sentry from "@sentry/cloudflare";
 import type { PrismaClient, DocumentType, AddressType } from "@prisma/client";
 import { generateId } from "./id-generator";
 import type { ClientCreateInput } from "../domain/client/schemas";
+import { ClientRepository } from "../domain/client/repository";
+import { ClientRiskService } from "../domain/risk/client/service";
+import { loadRiskLookups } from "../domain/risk";
+import type { TenantContext } from "../lib/tenant-context";
+import { newScreeningSnapshotId } from "../lib/screening-snapshot";
 
 /**
  * Synthetic operation data for VEH activity
@@ -32,11 +37,22 @@ export interface SyntheticVehicleOperationInput {
 	paymentMethods: Array<{ method: string; amount: string }>;
 }
 
+export type SyntheticRiskProfile =
+	| "LOW"
+	| "MEDIUM"
+	| "MEDIUM_HIGH"
+	| "PEP"
+	| "SANCTIONED";
+
 export interface SyntheticDataOptions {
 	clients?: {
 		count: number;
 		includeDocuments?: boolean;
 		includeAddresses?: boolean;
+		/** Relative weights for risk-driven profiles (defaults match LFPIORPI training mix). */
+		riskMix?: Partial<Record<SyntheticRiskProfile, number>>;
+		includePep?: boolean;
+		includeSanctioned?: boolean;
 	};
 	operations?: {
 		count: number;
@@ -339,6 +355,26 @@ const PAYMENT_METHODS = [
 	"Financiamiento",
 ];
 
+const DEFAULT_SYNTHETIC_RISK_WEIGHTS: Record<SyntheticRiskProfile, number> = {
+	LOW: 40,
+	MEDIUM: 30,
+	MEDIUM_HIGH: 15,
+	PEP: 10,
+	SANCTIONED: 5,
+};
+
+const SANCTIONED_JURISDICTIONS = ["KP", "IR", "RU", "VE", "SY", "MM"] as const;
+
+const PEP_SAMPLE_TITLES = [
+	"PRESIDENTE DE LA REPUBLICA",
+	"SECRETARIO DE GOBERNACION",
+	"SECRETARIO DE HACIENDA Y CREDITO PUBLICO",
+	"GOBERNADOR CONSTITUCIONAL DEL ESTADO",
+];
+
+const FALLBACK_ECONOMIC_CODES = ["1110100", "8120100", "5410100"];
+const FALLBACK_BUSINESS_CODES = ["5520014", "7140019", "2600003"];
+
 /**
  * Generates a synthetic physical client
  */
@@ -534,6 +570,11 @@ function generateVehicleOperation(
  */
 export class SyntheticDataGenerator {
 	private readonly organizationId: string;
+	private activeClientsOptions?: SyntheticDataOptions["clients"];
+	private catalogPoolsCache: Promise<{
+		economic: string[];
+		business: string[];
+	}> | null = null;
 
 	constructor(
 		private readonly prisma: PrismaClient,
@@ -546,6 +587,9 @@ export class SyntheticDataGenerator {
 	 * Generates synthetic data based on the provided options
 	 */
 	async generate(options: SyntheticDataOptions): Promise<SyntheticDataResult> {
+		this.activeClientsOptions = options.clients;
+		this.catalogPoolsCache = null;
+
 		const result: SyntheticDataResult = {
 			clients: {
 				created: 0,
@@ -561,58 +605,61 @@ export class SyntheticDataGenerator {
 			},
 		};
 
-		// Generate clients if requested
-		if (options.clients && options.clients.count > 0) {
-			const clientResult = await this.generateClients(
-				options.clients.count,
-				options.clients.includeDocuments,
-				options.clients.includeAddresses,
-			);
-			result.clients = clientResult;
-		}
-
-		// Generate operations if requested (or use deprecated transactions option)
-		const operationsConfig = options.operations || options.transactions;
-		if (operationsConfig && operationsConfig.count > 0) {
-			// If we have clients, use them; otherwise generate new ones
-			const clientRfcs =
-				result.clients.rfcList.length > 0
-					? result.clients.rfcList
-					: await this.ensureClientsForOperations(
-							operationsConfig.perClient || 1,
-						);
-
-			// Get activity code - default to VEH if using deprecated transactions option
-			const activityCode: string = options.operations?.activityCode ?? "VEH";
-
-			const skipClients = options.operations?.skipClients ?? 3;
-
-			// Auto-adjust count: when not using perClient, ensure there are enough
-			// operations for every active client to receive at least one.
-			let operationCount = operationsConfig.count;
-			if (!operationsConfig.perClient && clientRfcs.length > 0) {
-				const activeClientCount = Math.max(0, clientRfcs.length - skipClients);
-				if (operationCount < activeClientCount) {
-					operationCount = activeClientCount;
-				}
+		try {
+			// Generate clients if requested
+			if (options.clients && options.clients.count > 0) {
+				const clientResult = await this.generateClients(
+					options.clients.count,
+					options.clients.includeDocuments,
+					options.clients.includeAddresses,
+				);
+				result.clients = clientResult;
 			}
 
-			const operationResult = await this.generateOperations(
-				operationCount,
-				clientRfcs,
-				activityCode,
-				operationsConfig.perClient,
-				skipClients,
-			);
-			result.operations = operationResult;
-			// For backwards compatibility
-			result.transactions = {
-				created: operationResult.created,
-				transactionIds: operationResult.operationIds,
-			};
-		}
+			// Generate operations if requested (or use deprecated transactions option)
+			const operationsConfig = options.operations || options.transactions;
+			if (operationsConfig && operationsConfig.count > 0) {
+				const clientRfcs =
+					result.clients.rfcList.length > 0
+						? result.clients.rfcList
+						: await this.ensureClientsForOperations(
+								operationsConfig.perClient || 1,
+							);
 
-		return result;
+				const activityCode: string = options.operations?.activityCode ?? "VEH";
+
+				const skipClients = options.operations?.skipClients ?? 3;
+
+				let operationCount = operationsConfig.count;
+				if (!operationsConfig.perClient && clientRfcs.length > 0) {
+					const activeClientCount = Math.max(
+						0,
+						clientRfcs.length - skipClients,
+					);
+					if (operationCount < activeClientCount) {
+						operationCount = activeClientCount;
+					}
+				}
+
+				const operationResult = await this.generateOperations(
+					operationCount,
+					clientRfcs,
+					activityCode,
+					operationsConfig.perClient,
+					skipClients,
+				);
+				result.operations = operationResult;
+				result.transactions = {
+					created: operationResult.created,
+					transactionIds: operationResult.operationIds,
+				};
+			}
+
+			return result;
+		} finally {
+			this.activeClientsOptions = undefined;
+			this.catalogPoolsCache = null;
+		}
 	}
 
 	/**
@@ -626,68 +673,44 @@ export class SyntheticDataGenerator {
 		const rfcList: string[] = [];
 		let created = 0;
 
+		const tenant: TenantContext = {
+			organizationId: this.organizationId,
+			environment: "production",
+		};
+
+		const clientRepo = new ClientRepository(this.prisma);
+		const riskService = new ClientRiskService(this.prisma);
+		const lookups = await loadRiskLookups(this.prisma);
+		const pools = await this.loadCatalogActivityPools();
+
 		for (let i = 0; i < count; i++) {
 			try {
-				// Mix of physical and moral clients (70% physical, 30% moral)
-				const isPhysical = Math.random() > 0.3;
-				const clientData = isPhysical
-					? generatePhysicalClient(i)
-					: generateMoralClient(i);
+				const profile = this.pickRiskProfile();
+				const input = this.buildClientCreateInputForProfile(i, profile, pools);
 
-				// Create client using Prisma directly
-				const client = await this.prisma.client.create({
-					data: {
-						id: generateId("CLIENT"),
-						rfc: clientData.rfc,
-						organizationId: this.organizationId,
-						personType: clientData.personType.toUpperCase() as
-							| "PHYSICAL"
-							| "MORAL"
-							| "TRUST",
-						firstName: clientData.firstName ?? null,
-						lastName: clientData.lastName ?? null,
-						secondLastName: clientData.secondLastName ?? null,
-						birthDate: clientData.birthDate
-							? new Date(clientData.birthDate)
-							: null,
-						curp: clientData.curp ?? null,
-						businessName: clientData.businessName ?? null,
-						incorporationDate: clientData.incorporationDate
-							? new Date(clientData.incorporationDate)
-							: null,
-						nationality: clientData.nationality ?? null,
-						email: clientData.email,
-						phone: clientData.phone,
-						country: clientData.country,
-						stateCode: clientData.stateCode,
-						city: clientData.city,
-						municipality: clientData.municipality,
-						neighborhood: clientData.neighborhood,
-						street: clientData.street,
-						externalNumber: clientData.externalNumber,
-						internalNumber: clientData.internalNumber ?? null,
-						postalCode: clientData.postalCode,
-						reference: clientData.reference ?? null,
-						notes: clientData.notes ?? null,
-						countryCode: clientData.countryCode ?? null,
-						economicActivityCode: clientData.economicActivityCode ?? null,
-					},
-				});
+				const entity = await clientRepo.create(tenant, input);
 
-				rfcList.push(client.rfc);
+				await this.applyRiskScreeningProfile(entity.id, profile);
+
+				await riskService.assessClient(
+					entity.id,
+					tenant,
+					lookups,
+					"synthetic_data_seed",
+					"SYSTEM",
+				);
+
+				rfcList.push(entity.rfc);
 				created++;
 
-				// Generate documents if requested
+				const isPhysical = entity.personType === "physical";
 				if (includeDocuments && isPhysical) {
-					await this.generateClientDocuments(client.id);
+					await this.generateClientDocuments(entity.id);
 				}
-
-				// Generate addresses if requested
 				if (includeAddresses) {
-					await this.generateClientAddresses(client.id);
+					await this.generateClientAddresses(entity.id);
 				}
 			} catch (error) {
-				// Skip if RFC already exists (collision)
 				if (
 					error instanceof Error &&
 					error.message.includes("UNIQUE constraint")
@@ -699,6 +722,298 @@ export class SyntheticDataGenerator {
 		}
 
 		return { created, rfcList };
+	}
+
+	private buildRiskWeights(): Record<SyntheticRiskProfile, number> {
+		const base = { ...DEFAULT_SYNTHETIC_RISK_WEIGHTS };
+		const opts = this.activeClientsOptions;
+		if (opts?.riskMix) {
+			for (const key of Object.keys(opts.riskMix) as SyntheticRiskProfile[]) {
+				const v = opts.riskMix[key];
+				if (typeof v === "number" && v >= 0) {
+					base[key] = v;
+				}
+			}
+		}
+		if (opts?.includePep === false) {
+			base.PEP = 0;
+		}
+		if (opts?.includeSanctioned === false) {
+			base.SANCTIONED = 0;
+		}
+		return base;
+	}
+
+	private pickRiskProfile(): SyntheticRiskProfile {
+		const w = this.buildRiskWeights();
+		const entries = (
+			Object.entries(w) as [SyntheticRiskProfile, number][]
+		).filter(([, weight]) => weight > 0);
+		if (entries.length === 0) {
+			return "LOW";
+		}
+		const sum = entries.reduce((s, [, wt]) => s + wt, 0);
+		let r = Math.random() * sum;
+		for (const [k, wt] of entries) {
+			r -= wt;
+			if (r <= 0) {
+				return k;
+			}
+		}
+		return entries[entries.length - 1][0];
+	}
+
+	private async loadCatalogActivityPools(): Promise<{
+		economic: string[];
+		business: string[];
+	}> {
+		if (!this.catalogPoolsCache) {
+			this.catalogPoolsCache = (async () => {
+				const parseCodes = async (catalogKey: string): Promise<string[]> => {
+					const cat = await this.prisma.catalog.findUnique({
+						where: { key: catalogKey },
+					});
+					if (!cat) {
+						return [];
+					}
+					const items = await this.prisma.catalogItem.findMany({
+						where: { catalogId: cat.id, active: true },
+						select: { metadata: true },
+						take: 8000,
+					});
+					const codes = new Set<string>();
+					for (const it of items) {
+						let meta: unknown = it.metadata;
+						if (typeof meta === "string") {
+							try {
+								meta = JSON.parse(meta);
+							} catch {
+								continue;
+							}
+						}
+						if (
+							meta &&
+							typeof meta === "object" &&
+							typeof (meta as { code?: unknown }).code === "string"
+						) {
+							const c = (meta as { code: string }).code;
+							if (/^\d{7}$/.test(c) && c !== "1000000") {
+								codes.add(c);
+							}
+						}
+					}
+					return [...codes];
+				};
+
+				const [economic, business] = await Promise.all([
+					parseCodes("economic-activities"),
+					parseCodes("business-activities"),
+				]);
+
+				return {
+					economic: economic.length ? economic : [...FALLBACK_ECONOMIC_CODES],
+					business: business.length ? business : [...FALLBACK_BUSINESS_CODES],
+				};
+			})();
+		}
+		return this.catalogPoolsCache;
+	}
+
+	private pickCode(pool: string[], preferred: string[]): string {
+		const allowed = preferred.filter((c) => pool.includes(c));
+		const src = allowed.length > 0 ? allowed : pool;
+		return (
+			src[Math.floor(Math.random() * Math.max(1, src.length))] ??
+			preferred[0] ??
+			FALLBACK_ECONOMIC_CODES[0]
+		);
+	}
+
+	private buildClientCreateInputForProfile(
+		index: number,
+		profile: SyntheticRiskProfile,
+		pools: { economic: string[]; business: string[] },
+	): ClientCreateInput {
+		const physicalBase = generatePhysicalClient(index);
+		const moralBase = generateMoralClient(index);
+
+		switch (profile) {
+			case "LOW":
+				return {
+					...physicalBase,
+					nationality: "MX",
+					countryCode: "MX",
+					country: "MX",
+					economicActivityCode: this.pickCode(pools.economic, [
+						"1110100",
+						"1110400",
+						"1220100",
+					]),
+				} as ClientCreateInput;
+			case "MEDIUM":
+				return {
+					...moralBase,
+					nationality: "MX",
+					countryCode: "MX",
+					country: "MX",
+					commercialActivityCode: this.pickCode(pools.business, [
+						"5520014",
+						"5610015",
+						"5690015",
+					]),
+				} as ClientCreateInput;
+			case "MEDIUM_HIGH":
+				if (Math.random() > 0.45) {
+					const nat = Math.random() > 0.6 ? "US" : "MX";
+					return {
+						...physicalBase,
+						nationality: nat,
+						countryCode: nat,
+						country: nat,
+						economicActivityCode: this.pickCode(pools.economic, [
+							"8120100",
+							"5410100",
+						]),
+					} as ClientCreateInput;
+				}
+				return {
+					...moralBase,
+					nationality: "MX",
+					countryCode: "MX",
+					country: "MX",
+					commercialActivityCode: this.pickCode(pools.business, [
+						"7140019",
+						"7130019",
+						"2200002",
+					]),
+				} as ClientCreateInput;
+			case "PEP":
+				if (Math.random() > 0.35) {
+					return {
+						...physicalBase,
+						nationality: "MX",
+						countryCode: "MX",
+						country: "MX",
+						economicActivityCode: this.pickCode(pools.economic, [
+							"2420100",
+							"2420200",
+						]),
+						occupation: PEP_SAMPLE_TITLES[index % PEP_SAMPLE_TITLES.length],
+					} as ClientCreateInput;
+				}
+				return {
+					...moralBase,
+					nationality: "MX",
+					countryCode: "MX",
+					country: "MX",
+					commercialActivityCode: this.pickCode(pools.business, [
+						"2600003",
+						"2720004",
+					]),
+				} as ClientCreateInput;
+			case "SANCTIONED": {
+				const nat =
+					SANCTIONED_JURISDICTIONS[
+						Math.floor(Math.random() * SANCTIONED_JURISDICTIONS.length)
+					];
+				if (Math.random() > 0.4) {
+					return {
+						...physicalBase,
+						nationality: nat,
+						countryCode: nat,
+						country: nat,
+						economicActivityCode: this.pickCode(pools.economic, [
+							"8120100",
+							"2240200",
+						]),
+					} as ClientCreateInput;
+				}
+				return {
+					...moralBase,
+					nationality: nat,
+					countryCode: nat,
+					country: nat,
+					commercialActivityCode: this.pickCode(pools.business, [
+						"7140019",
+						"2200002",
+					]),
+				} as ClientCreateInput;
+			}
+			default:
+				return {
+					...physicalBase,
+					nationality: "MX",
+					countryCode: "MX",
+					country: "MX",
+					economicActivityCode: this.pickCode(pools.economic, ["1110100"]),
+				} as ClientCreateInput;
+		}
+	}
+
+	private async applyRiskScreeningProfile(
+		clientId: string,
+		profile: SyntheticRiskProfile,
+	): Promise<void> {
+		const now = new Date();
+
+		if (profile === "PEP") {
+			await this.prisma.client.update({
+				where: { id: clientId },
+				data: {
+					isPEP: true,
+					screeningResult: "pending",
+					screenedAt: now,
+				},
+			});
+			await this.prisma.clientWatchlistScreening.create({
+				data: {
+					id: newScreeningSnapshotId(),
+					organizationId: this.organizationId,
+					clientId,
+					watchlistQueryId: null,
+					screenedAt: now,
+					triggeredBy: "synthetic_data_generator",
+					screeningResult: "pending",
+					ofacSanctioned: false,
+					unscSanctioned: false,
+					sat69bListed: false,
+					isPep: true,
+					adverseMediaFlagged: false,
+					prevSnapshotId: null,
+				},
+			});
+			return;
+		}
+
+		if (profile === "SANCTIONED") {
+			const unsc = Math.random() > 0.5;
+			await this.prisma.client.update({
+				where: { id: clientId },
+				data: {
+					ofacSanctioned: true,
+					unscSanctioned: unsc,
+					screeningResult: "flagged",
+					screenedAt: now,
+				},
+			});
+			await this.prisma.clientWatchlistScreening.create({
+				data: {
+					id: newScreeningSnapshotId(),
+					organizationId: this.organizationId,
+					clientId,
+					watchlistQueryId: null,
+					screenedAt: now,
+					triggeredBy: "synthetic_data_generator",
+					screeningResult: "flagged",
+					ofacSanctioned: true,
+					unscSanctioned: unsc,
+					sat69bListed: false,
+					isPep: false,
+					adverseMediaFlagged: false,
+					prevSnapshotId: null,
+				},
+			});
+		}
 	}
 
 	/**

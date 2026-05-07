@@ -36,12 +36,18 @@ const SECTION_FIELDS: Record<string, string[]> = {
 		"nationality",
 		"countryCode",
 	],
-	companyInfo: [
+	companyInfoMoral: [
 		"businessName",
 		"incorporationDate",
 		"rfc",
 		"countryCode",
-		"economicActivityCode",
+		"commercialActivityCode",
+	],
+	companyInfoTrust: [
+		"businessName",
+		"incorporationDate",
+		"rfc",
+		"countryCode",
 	],
 	contactInfo: ["email", "phone"],
 	addressInfo: [
@@ -146,8 +152,12 @@ export async function recalculateKycProgress(
 	}
 
 	// Company info (MORAL/TRUST only)
-	if (client.personType === "MORAL" || client.personType === "TRUST") {
-		const fields = SECTION_FIELDS.companyInfo;
+	if (client.personType === "MORAL") {
+		const fields = SECTION_FIELDS.companyInfoMoral;
+		const completed = sectionCompletedCount(clientRecord, fields);
+		fieldWeight += (completed / fields.length) * SECTION_WEIGHTS.companyInfo;
+	} else if (client.personType === "TRUST") {
+		const fields = SECTION_FIELDS.companyInfoTrust;
 		const completed = sectionCompletedCount(clientRecord, fields);
 		fieldWeight += (completed / fields.length) * SECTION_WEIGHTS.companyInfo;
 	}

@@ -527,4 +527,67 @@ export class CatalogRepository {
 
 		return resultMap;
 	}
+
+	/**
+	 * Normalize country-related stored values to ISO-3166 alpha-2 (SAT `pais_type`).
+	 */
+	async resolveStoredCountryCode(
+		raw: string | null | undefined,
+	): Promise<string | null> {
+		if (raw === null || raw === undefined) return null;
+		const s = String(raw).trim().toUpperCase();
+		if (!s) return null;
+		if (/^[A-Z]{2}$/.test(s)) return s;
+		if (/^[A-Z]{3}$/.test(s)) {
+			return await this.findIso2ByIso3(s);
+		}
+		if (/^[A-F0-9]{32}$/i.test(s)) {
+			const map = await this.findItemsByIds([s], ["countries"]);
+			const item = map.get(s);
+			const code = item?.metadata?.code;
+			return typeof code === "string" ? code.toUpperCase() : null;
+		}
+		return null;
+	}
+
+	private async findIso2ByIso3(iso3: string): Promise<string | null> {
+		const catalog = await this.prisma.catalog.findUnique({
+			where: { key: "countries" },
+		});
+		if (!catalog) return null;
+		const items = await this.prisma.catalogItem.findMany({
+			where: { catalogId: catalog.id, active: true },
+		});
+		for (const item of items) {
+			const metadata = parseMetadata(item.metadata);
+			if (
+				metadata &&
+				metadata.iso3 === iso3 &&
+				typeof metadata.code === "string"
+			) {
+				return metadata.code.toUpperCase();
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Normalize activity stored values to catalog `metadata.code` (7-digit SAT codes).
+	 */
+	async resolveStoredActivityCode(
+		catalogKey: string,
+		raw: string | null | undefined,
+	): Promise<string | null> {
+		if (raw === null || raw === undefined) return null;
+		const s = String(raw).trim();
+		if (!s) return null;
+		if (/^\d{7}$/.test(s)) return s;
+		if (/^[a-f0-9]{32}$/i.test(s)) {
+			const map = await this.findItemsByIds([s], [catalogKey]);
+			const item = map.get(s);
+			const code = item?.metadata?.code;
+			return typeof code === "string" ? code : null;
+		}
+		return null;
+	}
 }
