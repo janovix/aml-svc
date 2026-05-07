@@ -1,3 +1,10 @@
+# [1.14.0-rc.19](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.18...v1.14.0-rc.19) (2026-05-07)
+
+
+### Features
+
+* **training:** add userName and organizationName to training certification for PDF snapshots ([c9ba84d](https://github.com/janovix/aml-svc/commit/c9ba84dc0c99b073b7bc898bfe88b5224e79b552))
+
 # [1.14.0-rc.18](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.17...v1.14.0-rc.18) (2026-05-07)
 
 
