@@ -1,3 +1,10 @@
+# [1.14.0-rc.21](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.20...v1.14.0-rc.21) (2026-05-08)
+
+
+### Features
+
+* **tests:** add unit tests for training enrollment sync, expiration, reminders, and alert mappers ([4160cc0](https://github.com/janovix/aml-svc/commit/4160cc04bbcead7947373de71146a5ff13d2330b))
+
 # [1.14.0-rc.20](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.19...v1.14.0-rc.20) (2026-05-08)
 
 
