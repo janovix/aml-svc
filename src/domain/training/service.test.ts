@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 
 import type { Bindings } from "../../types";
-import { TrainingService } from "./service";
+import { APIError } from "../../middleware/error";
+import { parseImageRefs, TrainingService } from "./service";
 
 describe("TrainingService", () => {
 	const env = {} as Bindings;
@@ -331,5 +332,242 @@ describe("TrainingService", () => {
 		expect(sendCert).toHaveBeenCalledWith({
 			certificationId: "cert-new",
 		});
+	});
+});
+
+describe("parseImageRefs", () => {
+	it("parses JSON array of string refs", () => {
+		expect(parseImageRefs('["a.png","b.png"]')).toEqual(["a.png", "b.png"]);
+	});
+
+	it("returns single-element array for non-JSON ref", () => {
+		expect(parseImageRefs("key-only")).toEqual(["key-only"]);
+	});
+
+	it("falls back to single ref when JSON is invalid", () => {
+		expect(parseImageRefs("[not-json")).toEqual(["[not-json"]);
+	});
+});
+
+describe("TrainingService extra branches", () => {
+	const env = {} as Bindings;
+
+	it("getCourseDetailForLearner throws when course is missing", async () => {
+		const prisma = {
+			trainingCourse: {
+				findMany: vi.fn().mockResolvedValue([]),
+				findFirst: vi.fn().mockResolvedValue(null),
+			},
+			trainingEnrollment: { findUnique: vi.fn() },
+			trainingEnrollmentProgress: { findMany: vi.fn() },
+		} as unknown as import("@prisma/client").PrismaClient;
+		const svc = new TrainingService(prisma, env);
+		vi.spyOn(svc, "ensureMandatoryEnrollments").mockResolvedValue(undefined);
+
+		await expect(
+			svc.getCourseDetailForLearner("missing", "org", "user"),
+		).rejects.toBeInstanceOf(APIError);
+	});
+
+	it("getCourseAdminById throws 404 when not found", async () => {
+		const prisma = {
+			trainingCourse: { findUnique: vi.fn().mockResolvedValue(null) },
+		} as unknown as import("@prisma/client").PrismaClient;
+		const svc = new TrainingService(prisma, env);
+		await expect(svc.getCourseAdminById("nope")).rejects.toBeInstanceOf(
+			APIError,
+		);
+	});
+
+	it("publishCourse throws when quiz is missing", async () => {
+		const prisma = {
+			trainingCourse: {
+				findUnique: vi.fn().mockResolvedValue({ id: "c1", quiz: null }),
+				update: vi.fn(),
+			},
+		} as unknown as import("@prisma/client").PrismaClient;
+		const svc = new TrainingService(prisma, env);
+		await expect(svc.publishCourse("c1")).rejects.toBeInstanceOf(APIError);
+	});
+
+	it("publishCourse increments version when quiz exists", async () => {
+		const update = vi.fn().mockResolvedValue({ status: "PUBLISHED" });
+		const prisma = {
+			trainingCourse: {
+				findUnique: vi.fn().mockResolvedValue({ id: "c1", quiz: { id: "q1" } }),
+				update,
+			},
+		} as unknown as import("@prisma/client").PrismaClient;
+		const svc = new TrainingService(prisma, env);
+		await svc.publishCourse("c1");
+		expect(update).toHaveBeenCalledWith(
+			expect.objectContaining({
+				data: expect.objectContaining({ status: "PUBLISHED" }),
+			}),
+		);
+	});
+
+	it("recordProgress updates enrollment status from ASSIGNED", async () => {
+		const upsert = vi.fn().mockResolvedValue({});
+		const update = vi.fn().mockResolvedValue({});
+		const prisma = {
+			trainingEnrollment: {
+				findFirst: vi.fn().mockResolvedValue({
+					id: "enr-1",
+					status: "ASSIGNED",
+					course: {
+						modules: [{ id: "m1", required: true }],
+					},
+				}),
+				update,
+			},
+			trainingEnrollmentProgress: { upsert },
+		} as unknown as import("@prisma/client").PrismaClient;
+		const svc = new TrainingService(prisma, env);
+		await svc.recordProgress("enr-1", "m1", "org", "user", 10);
+		expect(upsert).toHaveBeenCalled();
+		expect(update).toHaveBeenCalledWith(
+			expect.objectContaining({
+				data: { status: "IN_PROGRESS" },
+			}),
+		);
+	});
+
+	it("recordProgress throws when enrollment missing", async () => {
+		const prisma = {
+			trainingEnrollment: {
+				findFirst: vi.fn().mockResolvedValue(null),
+			},
+		} as unknown as import("@prisma/client").PrismaClient;
+		const svc = new TrainingService(prisma, env);
+		await expect(
+			svc.recordProgress("x", "m", "org", "user"),
+		).rejects.toBeInstanceOf(APIError);
+	});
+
+	it("startQuiz throws when course has no quiz", async () => {
+		const prisma = {
+			trainingEnrollment: {
+				findFirst: vi.fn().mockResolvedValue({
+					course: { modules: [], quiz: null },
+					progress: [],
+				}),
+			},
+		} as unknown as import("@prisma/client").PrismaClient;
+		const svc = new TrainingService(prisma, env);
+		await expect(svc.startQuiz("e", "org", "user")).rejects.toBeInstanceOf(
+			APIError,
+		);
+	});
+
+	it("listMyCertifications delegates to prisma", async () => {
+		const findMany = vi.fn().mockResolvedValue([]);
+		const prisma = {
+			trainingCertification: { findMany },
+		} as unknown as import("@prisma/client").PrismaClient;
+		const svc = new TrainingService(prisma, env);
+		await svc.listMyCertifications("org", "user");
+		expect(findMany).toHaveBeenCalledWith(
+			expect.objectContaining({
+				where: { organizationId: "org", userId: "user" },
+			}),
+		);
+	});
+
+	it("createCourseAdmin applies defaults", async () => {
+		const create = vi.fn().mockResolvedValue({ id: "new" });
+		const prisma = {
+			trainingCourse: { create },
+		} as unknown as import("@prisma/client").PrismaClient;
+		const svc = new TrainingService(prisma, env);
+		await svc.createCourseAdmin({
+			slug: "s",
+			titleI18n: { en: "T" },
+		});
+		expect(create).toHaveBeenCalledWith(
+			expect.objectContaining({
+				data: expect.objectContaining({
+					slug: "s",
+					status: "DRAFT",
+					passingScore: 80,
+					maxAttempts: 3,
+				}),
+			}),
+		);
+	});
+
+	it("upsertModule creates when id omitted", async () => {
+		const create = vi.fn().mockResolvedValue({});
+		const prisma = {
+			trainingCourseModule: { create, update: vi.fn() },
+		} as unknown as import("@prisma/client").PrismaClient;
+		const svc = new TrainingService(prisma, env);
+		await svc.upsertModule("c1", {
+			sortOrder: 0,
+			kind: "TEXT",
+			titleI18n: { en: "M" },
+			assetRef: "ref",
+		});
+		expect(create).toHaveBeenCalled();
+		expect(prisma.trainingCourseModule.update).not.toHaveBeenCalled();
+	});
+
+	it("upsertQuizFull replaces questions", async () => {
+		const upsert = vi.fn().mockResolvedValue({ id: "quiz-1" });
+		const deleteMany = vi.fn().mockResolvedValue({});
+		const createQ = vi.fn().mockResolvedValue({});
+		const prisma = {
+			trainingCourseQuiz: { upsert },
+			trainingQuizQuestion: { deleteMany, create: createQ },
+		} as unknown as import("@prisma/client").PrismaClient;
+		const svc = new TrainingService(prisma, env);
+		await svc.upsertQuizFull("c1", {
+			questions: [
+				{
+					sortOrder: 0,
+					type: "SINGLE_CHOICE",
+					promptI18n: { en: "Q?" },
+					options: [
+						{
+							sortOrder: 0,
+							textI18n: { en: "A" },
+							isCorrect: true,
+						},
+					],
+				},
+			],
+		});
+		expect(deleteMany).toHaveBeenCalled();
+		expect(createQ).toHaveBeenCalled();
+	});
+
+	it("listOrgCertifications queries prisma", async () => {
+		const findManyCert = vi.fn().mockResolvedValue([]);
+		const prisma = {
+			trainingCertification: { findMany: findManyCert },
+		} as unknown as import("@prisma/client").PrismaClient;
+		const svc = new TrainingService(prisma, env);
+		await svc.listOrgCertifications("org-z");
+		expect(findManyCert).toHaveBeenCalled();
+	});
+
+	it("orgComplianceSummary aggregates enrollment and certification counts", async () => {
+		const groupBy = vi
+			.fn()
+			.mockResolvedValue([{ status: "COMPLETED", _count: { status: 2 } }]);
+		const findMany = vi
+			.fn()
+			.mockResolvedValue([{ userId: "u1" }, { userId: "u2" }]);
+		const count = vi.fn().mockResolvedValueOnce(3).mockResolvedValueOnce(1);
+		const prisma = {
+			trainingEnrollment: { groupBy, findMany },
+			trainingCertification: { count },
+		} as unknown as import("@prisma/client").PrismaClient;
+		const svc = new TrainingService(prisma, env);
+		const summary = await svc.orgComplianceSummary("org-z");
+		expect(summary.distinctMembers).toBe(2);
+		expect(summary.activeCertifications).toBe(3);
+		expect(summary.expiringWithin30Days).toBe(1);
+		expect(summary.byStatus.COMPLETED).toBe(2);
 	});
 });
