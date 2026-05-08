@@ -1,3 +1,10 @@
+# [1.14.0-rc.22](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.21...v1.14.0-rc.22) (2026-05-08)
+
+
+### Features
+
+* **alert-detection:** add new cash limit rules and update alert patterns ([7901485](https://github.com/janovix/aml-svc/commit/790148597b13dba42bc06a3b596832cc5c6d3ed2))
+
 # [1.14.0-rc.21](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.20...v1.14.0-rc.21) (2026-05-08)
 
 
