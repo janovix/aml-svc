@@ -49,7 +49,8 @@ export default defineWorkersConfig({
 	// Required for zod which fails to import in Workers runtime on Windows
 	// See: https://developers.cloudflare.com/workers/testing/vitest-integration/known-issues/#module-resolution
 	ssr: {
-		noExternal: ["zod"],
+		// pdf-lib pulls tslib@1.x with a subpath that workerd/vite-node fails to resolve on Windows unless bundled
+		noExternal: ["zod", "pdf-lib", "tslib"],
 	},
 	test: {
 		coverage: {

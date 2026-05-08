@@ -1,23 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { SyntheticDataGenerator } from "../src/lib/synthetic-data-generator";
 import type { PrismaClient } from "@prisma/client";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-function makeBaseClient(id: string, rfc: string, organizationId: string) {
-	return {
-		id,
-		rfc,
-		organizationId,
-		personType: "PHYSICAL" as const,
-		firstName: "Juan",
-		lastName: "Pérez",
-		createdAt: new Date(),
-		updatedAt: new Date(),
-	};
-}
+import type { ClientCreateInput } from "../src/domain/client/schemas";
+import type { ClientEntity } from "../src/domain/client/types";
+import { ClientRepository } from "../src/domain/client/repository";
+import { ClientRiskService } from "../src/domain/risk/client/service";
 
 function makeBaseOperation(id: string, clientId: string) {
 	return {
@@ -29,21 +16,74 @@ function makeBaseOperation(id: string, clientId: string) {
 	};
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Test suite
-// ─────────────────────────────────────────────────────────────────────────────
+function stubClientEntity(
+	organizationId: string,
+	input: ClientCreateInput,
+): ClientEntity {
+	const base = input as Record<string, unknown>;
+	return {
+		id: `CLIENT_${input.rfc}`,
+		rfc: input.rfc,
+		organizationId,
+		personType: input.personType,
+		firstName: base.firstName ?? null,
+		lastName: base.lastName ?? null,
+		secondLastName: base.secondLastName ?? null,
+		birthDate: base.birthDate ?? null,
+		curp: base.curp ?? null,
+		businessName: base.businessName ?? null,
+		incorporationDate: base.incorporationDate ?? null,
+		nationality: base.nationality ?? null,
+		email: input.email,
+		phone: input.phone,
+		country: input.country,
+		stateCode: input.stateCode,
+		city: input.city,
+		municipality: input.municipality,
+		neighborhood: input.neighborhood,
+		street: input.street,
+		externalNumber: input.externalNumber,
+		internalNumber: base.internalNumber ?? null,
+		postalCode: input.postalCode,
+		reference: base.reference ?? null,
+		notes: base.notes ?? null,
+		countryCode: base.countryCode ?? null,
+		economicActivityCode: base.economicActivityCode ?? null,
+		commercialActivityCode: base.commercialActivityCode ?? null,
+		gender: base.gender ?? null,
+		occupation: base.occupation ?? null,
+		maritalStatus: base.maritalStatus ?? null,
+		sourceOfFunds: base.sourceOfFunds ?? null,
+		sourceOfWealth: base.sourceOfWealth ?? null,
+		kycStatus: "INCOMPLETE",
+		completenessStatus: "MINIMUM",
+		missingFields: null,
+		kycCompletionPct: 0,
+		documentsComplete: 0,
+		documentsCount: 0,
+		documentsRequired: 0,
+		shareholdersCount: 0,
+		beneficialControllersCount: 0,
+		identificationRequired: true,
+		identificationTier: "ALWAYS",
+		createdAt: new Date().toISOString(),
+		updatedAt: new Date().toISOString(),
+	} as unknown as ClientEntity;
+}
 
 describe("SyntheticDataGenerator", () => {
 	let mockPrisma: PrismaClient;
 	const organizationId = "org-123";
 	const originalRandom = Math.random;
+	/** Vitest `MockInstance` vs method arity is mismatching under `tsc -p tests/tsconfig.json`. */
+	let repoCreateSpy: any;
+	let assessSpy: any;
 
 	beforeEach(() => {
 		mockPrisma = {
 			client: {
-				create: vi.fn(),
 				findMany: vi.fn(),
-				findUnique: vi.fn(),
+				update: vi.fn().mockResolvedValue({}),
 			},
 			operation: {
 				create: vi.fn(),
@@ -54,83 +94,104 @@ describe("SyntheticDataGenerator", () => {
 			clientAddress: {
 				create: vi.fn(),
 			},
+			clientWatchlistScreening: {
+				findFirst: vi.fn().mockResolvedValue(null),
+				create: vi.fn().mockResolvedValue({}),
+			},
+			catalogItem: {
+				findMany: vi
+					.fn()
+					.mockResolvedValue([
+						{ metadata: JSON.stringify({ code: "MX" }) },
+						{ metadata: JSON.stringify({ code: "1110100" }) },
+						{ metadata: JSON.stringify({ code: "2720004" }) },
+					]),
+			},
+			geographicRiskZone: {
+				findMany: vi.fn().mockResolvedValue([]),
+			},
+			jurisdictionRisk: {
+				findMany: vi.fn().mockResolvedValue([]),
+			},
+			activityRiskProfile: {
+				findMany: vi.fn().mockResolvedValue([]),
+			},
 		} as unknown as PrismaClient;
+
+		repoCreateSpy = vi
+			.spyOn(ClientRepository.prototype, "create")
+			.mockImplementation(async (...args: unknown[]) =>
+				stubClientEntity(organizationId, args[1] as ClientCreateInput),
+			);
+
+		assessSpy = vi
+			.spyOn(ClientRiskService.prototype, "assessClient")
+			.mockResolvedValue({
+				result: {
+					clientId: "stub",
+					organizationId,
+					inherentRiskScore: 1,
+					residualRiskScore: 1,
+					riskLevel: "LOW",
+					dueDiligenceLevel: "SIMPLIFIED",
+					ddProfile: {},
+					elements: {} as never,
+					mitigantEffect: 0,
+					mitigantFactors: [],
+					nextReviewMonths: 12,
+				},
+				previousLevel: null,
+			} as never);
 	});
 
 	afterEach(() => {
 		Math.random = originalRandom;
+		vi.restoreAllMocks();
 	});
-
-	// ── Client generation ────────────────────────────────────────────────────
 
 	describe("client generation", () => {
 		it("should generate the requested number of clients", async () => {
-			vi.mocked(mockPrisma.client.create).mockResolvedValue(
-				makeBaseClient("CLIENT_1", "ABCD123456EF7", organizationId) as any,
-			);
-
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			const result = await generator.generate({ clients: { count: 2 } });
 
 			expect(result.clients.created).toBe(2);
 			expect(result.clients.rfcList).toHaveLength(2);
-			expect(mockPrisma.client.create).toHaveBeenCalledTimes(2);
+			expect(repoCreateSpy).toHaveBeenCalledTimes(2);
+			expect(assessSpy).toHaveBeenCalledTimes(2);
 		});
 
-		it("should generate a mix of physical and moral clients", async () => {
-			let callCount = 0;
-			vi.mocked(mockPrisma.client.create).mockImplementation((async (
-				args: any,
-			) => {
-				callCount++;
-				return {
-					...makeBaseClient(
-						`CLIENT_${callCount}`,
-						`RFC${callCount}`,
-						organizationId,
-					),
-					personType: args.data.personType,
-				};
-			}) as any);
-
+		it("should produce physical and moral personas across profiles", async () => {
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
-			const result = await generator.generate({ clients: { count: 10 } });
+			const result = await generator.generate({ clients: { count: 24 } });
 
-			expect(result.clients.created).toBe(10);
-
-			const calls = vi.mocked(mockPrisma.client.create).mock.calls;
-			const moral = calls.filter((c) => c[0].data.personType === "MORAL");
-			const physical = calls.filter((c) => c[0].data.personType === "PHYSICAL");
-
-			// With 10 clients and 70/30 split we cannot guarantee both in a small
-			// sample, but the generator must never return an invalid type.
-			expect(moral.length + physical.length).toBe(10);
+			expect(result.clients.created).toBe(24);
+			const types = repoCreateSpy.mock.calls.map(
+				(c: unknown[]) => (c[1] as ClientCreateInput).personType,
+			);
+			expect(types.some((t: string) => t === "physical")).toBe(true);
+			expect(types.some((t: string) => t === "moral")).toBe(true);
 		});
 
 		it("should handle RFC collisions gracefully", async () => {
-			vi.mocked(mockPrisma.client.create)
+			repoCreateSpy
 				.mockRejectedValueOnce(new Error("UNIQUE constraint failed"))
-				.mockResolvedValueOnce(
-					makeBaseClient("CLIENT_1", "RFC1", organizationId) as any,
+				.mockImplementation(async (...args: unknown[]) =>
+					stubClientEntity(organizationId, args[1] as ClientCreateInput),
 				);
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			const result = await generator.generate({ clients: { count: 2 } });
 
-			// Collision skipped → only the successful one counts
 			expect(result.clients.created).toBeGreaterThanOrEqual(1);
 		});
 
 		it("should generate documents when includeDocuments is true", async () => {
-			vi.mocked(mockPrisma.client.create).mockResolvedValue(
-				makeBaseClient("CLIENT_1", "ABCD123456EF7", organizationId) as any,
-			);
 			vi.mocked(mockPrisma.clientDocument.create).mockResolvedValue({
 				id: "DOC_1",
 				clientId: "CLIENT_1",
 				createdAt: new Date(),
 				updatedAt: new Date(),
-			} as any);
+			} as never);
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			await generator.generate({
@@ -141,15 +202,12 @@ describe("SyntheticDataGenerator", () => {
 		});
 
 		it("should generate addresses when includeAddresses is true", async () => {
-			vi.mocked(mockPrisma.client.create).mockResolvedValue(
-				makeBaseClient("CLIENT_1", "ABCD123456EF7", organizationId) as any,
-			);
 			vi.mocked(mockPrisma.clientAddress.create).mockResolvedValue({
 				id: "ADDR_1",
 				clientId: "CLIENT_1",
 				createdAt: new Date(),
 				updatedAt: new Date(),
-			} as any);
+			} as never);
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			await generator.generate({
@@ -158,22 +216,33 @@ describe("SyntheticDataGenerator", () => {
 
 			expect(mockPrisma.clientAddress.create).toHaveBeenCalled();
 		});
-	});
 
-	// ── Operation generation ─────────────────────────────────────────────────
+		it("writes screening snapshots for PEP and sanctioned profiles sometimes", async () => {
+			Math.random = () => 0.99;
+			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
+			await generator.generate({
+				clients: {
+					count: 30,
+					riskMix: { PEP: 50, SANCTIONED: 50 },
+					includePep: true,
+					includeSanctioned: true,
+				},
+			});
+			expect(mockPrisma.clientWatchlistScreening.create).toHaveBeenCalled();
+		});
+	});
 
 	describe("operation generation", () => {
 		it("should generate operations for existing clients when no clients are requested", async () => {
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([
 				{ id: "CLIENT_1", rfc: "RFC1" },
 				{ id: "CLIENT_2", rfc: "RFC2" },
-			] as any);
+			] as never);
 
 			let opCount = 0;
-			vi.mocked(mockPrisma.operation.create).mockImplementation((async () => {
-				opCount++;
-				return makeBaseOperation(`OP_${opCount}`, "CLIENT_1");
-			}) as any);
+			(mockPrisma as any).operation.create.mockImplementation(async () =>
+				makeBaseOperation(`OP_${++opCount}`, "CLIENT_1"),
+			);
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			const result = await generator.generate({
@@ -186,9 +255,7 @@ describe("SyntheticDataGenerator", () => {
 
 		it("should throw when no clients are available and none can be created", async () => {
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([]);
-			vi.mocked(mockPrisma.client.create).mockRejectedValue(
-				new Error("All clients failed"),
-			);
+			repoCreateSpy.mockRejectedValue(new Error("All clients failed"));
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			await expect(
@@ -199,11 +266,11 @@ describe("SyntheticDataGenerator", () => {
 		it("should handle individual operation creation errors gracefully", async () => {
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([
 				{ id: "CLIENT_1", rfc: "RFC1" },
-			] as any);
+			] as never);
 
 			vi.mocked(mockPrisma.operation.create)
 				.mockRejectedValueOnce(new Error("Operation error"))
-				.mockResolvedValueOnce(makeBaseOperation("OP_2", "CLIENT_1") as any);
+				.mockResolvedValueOnce(makeBaseOperation("OP_2", "CLIENT_1") as never);
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			const result = await generator.generate({
@@ -214,8 +281,6 @@ describe("SyntheticDataGenerator", () => {
 		});
 	});
 
-	// ── Two-pass distribution ────────────────────────────────────────────────
-
 	describe("two-pass distribution (no perClient)", () => {
 		function setupClientsAndOps(clientCount: number) {
 			const clientList = Array.from({ length: clientCount }, (_, i) => ({
@@ -224,17 +289,17 @@ describe("SyntheticDataGenerator", () => {
 			}));
 
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue(
-				clientList as any,
+				clientList as never,
 			);
 
 			const createdOpsByClient = new Map<string, number>();
-			vi.mocked(mockPrisma.operation.create).mockImplementation((async (
-				args: any,
-			) => {
-				const cid = args.data.clientId as string;
-				createdOpsByClient.set(cid, (createdOpsByClient.get(cid) ?? 0) + 1);
-				return makeBaseOperation(`OP_${cid}`, cid);
-			}) as any);
+			(mockPrisma as any).operation.create.mockImplementation(
+				async (args: { data: { clientId: string } }) => {
+					const cid = args.data.clientId;
+					createdOpsByClient.set(cid, (createdOpsByClient.get(cid) ?? 0) + 1);
+					return makeBaseOperation(`OP_${cid}`, cid);
+				},
+			);
 
 			return { clientList, createdOpsByClient };
 		}
@@ -245,15 +310,17 @@ describe("SyntheticDataGenerator", () => {
 			const { clientList, createdOpsByClient } =
 				setupClientsAndOps(CLIENT_COUNT);
 
-			// Seed rfcList via client creation mock (bypasses createClients path)
-			// For this test we call generate with both clients and operations so the
-			// rfcList path is exercised.
 			let createCallCount = 0;
-			vi.mocked(mockPrisma.client.create).mockImplementation((async () => {
-				const c = clientList[createCallCount % clientList.length];
+			repoCreateSpy.mockImplementation(async (...args: unknown[]) => {
+				const input = args[1] as ClientCreateInput;
+				const c = clientList[createCallCount % clientList.length]!;
 				createCallCount++;
-				return makeBaseClient(c.id, c.rfc, organizationId);
-			}) as any);
+				return stubClientEntity(organizationId, {
+					...(input as Record<string, unknown>),
+					rfc: c.rfc,
+					personType: input.personType,
+				} as ClientCreateInput);
+			});
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			await generator.generate({
@@ -261,10 +328,7 @@ describe("SyntheticDataGenerator", () => {
 				operations: { count: CLIENT_COUNT, skipClients: SKIP },
 			});
 
-			// Active clients = CLIENT_COUNT - SKIP = 7
-			// Every active client must have >= 1 operation
-			const clientsWithOps = createdOpsByClient.size;
-			expect(clientsWithOps).toBe(CLIENT_COUNT - SKIP);
+			expect(createdOpsByClient.size).toBe(CLIENT_COUNT - SKIP);
 		});
 
 		it("exactly skipClients clients are left without operations", async () => {
@@ -274,11 +338,16 @@ describe("SyntheticDataGenerator", () => {
 				setupClientsAndOps(CLIENT_COUNT);
 
 			let createCallCount = 0;
-			vi.mocked(mockPrisma.client.create).mockImplementation((async () => {
-				const c = clientList[createCallCount % clientList.length];
+			repoCreateSpy.mockImplementation(async (...args: unknown[]) => {
+				const input = args[1] as ClientCreateInput;
+				const c = clientList[createCallCount % clientList.length]!;
 				createCallCount++;
-				return makeBaseClient(c.id, c.rfc, organizationId);
-			}) as any);
+				return stubClientEntity(organizationId, {
+					...(input as Record<string, unknown>),
+					rfc: c.rfc,
+					personType: input.personType,
+				} as ClientCreateInput);
+			});
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			await generator.generate({
@@ -297,36 +366,44 @@ describe("SyntheticDataGenerator", () => {
 				setupClientsAndOps(CLIENT_COUNT);
 
 			let createCallCount = 0;
-			vi.mocked(mockPrisma.client.create).mockImplementation((async () => {
-				const c = clientList[createCallCount % clientList.length];
+			repoCreateSpy.mockImplementation(async (...args: unknown[]) => {
+				const input = args[1] as ClientCreateInput;
+				const c = clientList[createCallCount % clientList.length]!;
 				createCallCount++;
-				return makeBaseClient(c.id, c.rfc, organizationId);
-			}) as any);
+				return stubClientEntity(organizationId, {
+					...(input as Record<string, unknown>),
+					rfc: c.rfc,
+					personType: input.personType,
+				} as ClientCreateInput);
+			});
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
-			// Intentionally pass a count lower than active clients (10 - 3 = 7)
 			await generator.generate({
 				clients: { count: CLIENT_COUNT },
 				operations: { count: 2, skipClients: SKIP },
 			});
 
-			// Despite count: 2, all 7 active clients should have operations
 			expect(createdOpsByClient.size).toBe(CLIENT_COUNT - SKIP);
 		});
 
 		it("distributes extra operations across active clients when count > active clients", async () => {
 			const CLIENT_COUNT = 5;
 			const SKIP = 0;
-			const TOTAL_OPS = 15; // 3× the number of clients
+			const TOTAL_OPS = 15;
 			const { clientList, createdOpsByClient } =
 				setupClientsAndOps(CLIENT_COUNT);
 
 			let createCallCount = 0;
-			vi.mocked(mockPrisma.client.create).mockImplementation((async () => {
-				const c = clientList[createCallCount % clientList.length];
+			repoCreateSpy.mockImplementation(async (...args: unknown[]) => {
+				const input = args[1] as ClientCreateInput;
+				const c = clientList[createCallCount % clientList.length]!;
 				createCallCount++;
-				return makeBaseClient(c.id, c.rfc, organizationId);
-			}) as any);
+				return stubClientEntity(organizationId, {
+					...(input as Record<string, unknown>),
+					rfc: c.rfc,
+					personType: input.personType,
+				} as ClientCreateInput);
+			});
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			const result = await generator.generate({
@@ -335,25 +412,21 @@ describe("SyntheticDataGenerator", () => {
 			});
 
 			expect(result.operations.created).toBe(TOTAL_OPS);
-			// All clients must have at least 1 operation
 			expect(createdOpsByClient.size).toBe(CLIENT_COUNT);
 		});
 	});
-
-	// ── Legacy perClient mode ────────────────────────────────────────────────
 
 	describe("legacy perClient distribution", () => {
 		it("respects perClient and distributes evenly", async () => {
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([
 				{ id: "CLIENT_1", rfc: "RFC1" },
 				{ id: "CLIENT_2", rfc: "RFC2" },
-			] as any);
+			] as never);
 
 			let opCount = 0;
-			vi.mocked(mockPrisma.operation.create).mockImplementation((async () => {
-				opCount++;
-				return makeBaseOperation(`OP_${opCount}`, "CLIENT_1");
-			}) as any);
+			(mockPrisma as any).operation.create.mockImplementation(async () =>
+				makeBaseOperation(`OP_${++opCount}`, "CLIENT_1"),
+			);
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);
 			const result = await generator.generate({
@@ -365,20 +438,23 @@ describe("SyntheticDataGenerator", () => {
 		});
 	});
 
-	// ── Combined clients + operations ────────────────────────────────────────
-
 	describe("combined generation", () => {
 		it("generates clients then uses their RFCs for operations", async () => {
-			vi.mocked(mockPrisma.client.create).mockResolvedValue(
-				makeBaseClient("CLIENT_1", "RFC_COMBO", organizationId) as any,
-			);
+			repoCreateSpy.mockImplementation(async (...args: unknown[]) => {
+				const input = args[1] as ClientCreateInput;
+				return stubClientEntity(organizationId, {
+					...(input as Record<string, unknown>),
+					rfc: "RFC_COMBO",
+					personType: input.personType,
+				} as ClientCreateInput);
+			});
 
 			vi.mocked(mockPrisma.client.findMany).mockResolvedValue([
-				{ id: "CLIENT_1", rfc: "RFC_COMBO" },
-			] as any);
+				{ id: "CLIENT_RFC_COMBO", rfc: "RFC_COMBO" },
+			] as never);
 
 			vi.mocked(mockPrisma.operation.create).mockResolvedValue(
-				makeBaseOperation("OP_1", "CLIENT_1") as any,
+				makeBaseOperation("OP_1", "CLIENT_RFC_COMBO") as never,
 			);
 
 			const generator = new SyntheticDataGenerator(mockPrisma, organizationId);

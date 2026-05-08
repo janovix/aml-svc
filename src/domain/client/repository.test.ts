@@ -79,6 +79,7 @@ describe("ClientRepository", () => {
 		reference: null,
 		countryCode: null,
 		economicActivityCode: null,
+		commercialActivityCode: null,
 		sourceOfFunds: null,
 		sourceOfWealth: null,
 		incorporationDate: null,
@@ -397,7 +398,7 @@ describe("ClientRepository", () => {
 			const completeClient: Client = {
 				...mockClient,
 				completenessStatus: "COMPLETE",
-				economicActivityCode: "VEH",
+				economicActivityCode: "1110100",
 				sourceOfFunds: "salary",
 				gender: "M",
 				curp: "ABCD900515HDFLRN01",
@@ -422,7 +423,7 @@ describe("ClientRepository", () => {
 				street: "Calle Principal",
 				externalNumber: "123",
 				postalCode: "06000",
-				economicActivityCode: "VEH",
+				economicActivityCode: "1110100",
 				sourceOfFunds: "salary",
 			};
 

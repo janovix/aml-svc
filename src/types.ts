@@ -191,16 +191,6 @@ export interface WatchlistRpc {
 		unscCount: number;
 		sat69bCount: number;
 	}>;
-	listByEntity?(
-		organizationId: string,
-		entityId: string,
-		options?: { limit?: number; offset?: number },
-	): Promise<{
-		data: unknown[];
-		total: number;
-		limit: number;
-		offset: number;
-	}>;
 }
 
 // =============================================================================

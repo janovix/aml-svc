@@ -150,14 +150,17 @@ export class ClientRiskService {
 				unscSanctioned: client.unscSanctioned,
 				sat69bListed: client.sat69bListed,
 				adverseMediaFlagged: client.adverseMediaFlagged,
-				economicActivityCode: client.economicActivityCode,
+				economicActivityCode:
+					client.personType === "MORAL"
+						? (client.commercialActivityCode ?? client.economicActivityCode)
+						: client.economicActivityCode,
 				createdAt: client.createdAt.toISOString(),
 			},
 			geographic: {
 				clientStateCode: client.stateCode,
 				operationStateCodes: uniqueStateCodes,
 				clientCountryCode: client.countryCode,
-				hasCrossBorderOps: client.countryCode !== "MEX",
+				hasCrossBorderOps: (client.countryCode ?? "").toUpperCase() !== "MX",
 			},
 			activity: {
 				activityCodes: uniqueActivityCodes,

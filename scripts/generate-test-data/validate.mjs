@@ -7,9 +7,12 @@
  *   - aml-svc/src/domain/client/schemas.ts  (RFC / CURP regex)
  *
  * Exit 0 = all checks pass.  Exit 1 = failures found.
+ *
+ * Requires `output/generate-meta.json` from the latest `generate.mjs` run
+ * (risk-profile markers + tier validation).
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -150,6 +153,7 @@ const EXPECTED_CLIENT_HEADERS = [
 	"notes",
 	"country_code",
 	"economic_activity_code",
+	"commercial_activity_code",
 	"gender",
 	"occupation",
 	"marital_status",
@@ -282,8 +286,302 @@ for (let i = 0; i < clients.length; i++) {
 	// Email
 	if (r.email && !EMAIL_RE.test(r.email))
 		fail("clients.csv", row, `Invalid email: "${r.email}"`);
+
+	const iso2 = /^[A-Z]{2}$/;
+	if (r.country_code?.trim() && !iso2.test(r.country_code.trim())) {
+		fail(
+			"clients.csv",
+			row,
+			`country_code must be ISO-3166 alpha-2 (uppercase), got "${r.country_code}"`,
+		);
+	}
+
+	const sat7 = /^\d{7}$/;
+	if (pt === "physical") {
+		if (r.commercial_activity_code?.trim()) {
+			fail(
+				"clients.csv",
+				row,
+				`physical row must not set commercial_activity_code`,
+			);
+		}
+		if (
+			r.economic_activity_code?.trim() &&
+			!sat7.test(r.economic_activity_code.trim())
+		) {
+			fail(
+				"clients.csv",
+				row,
+				`economic_activity_code must be 7-digit SAT code when set`,
+			);
+		}
+	} else if (pt === "moral") {
+		if (r.economic_activity_code?.trim()) {
+			fail("clients.csv", row, `moral row must not set economic_activity_code`);
+		}
+		if (
+			!r.commercial_activity_code?.trim() ||
+			!sat7.test(r.commercial_activity_code.trim())
+		) {
+			fail(
+				"clients.csv",
+				row,
+				`moral row requires commercial_activity_code (7-digit SAT code)`,
+			);
+		}
+	} else if (pt === "trust") {
+		if (
+			r.economic_activity_code?.trim() ||
+			r.commercial_activity_code?.trim()
+		) {
+			fail("clients.csv", row, `trust row must not set activity codes`);
+		}
+	}
 }
 pass(`Per-row validation complete for clients.csv`);
+
+// ── Risk-profile markers & tier sets (generate-meta.json + pep-sample.json) ───
+console.log("\n── Validating risk-profile rows (generate-meta.json) ─────────");
+const metaPath = join(OUT, "generate-meta.json");
+if (!existsSync(metaPath)) {
+	fail(
+		"generate-meta.json",
+		"-",
+		"Missing output/generate-meta.json — run node scripts/generate-test-data/generate.mjs first",
+	);
+} else {
+	/** @type {Record<string, unknown>} */
+	let riskMeta;
+	try {
+		riskMeta = JSON.parse(readFileSync(metaPath, "utf8"));
+	} catch {
+		fail("generate-meta.json", "-", "Invalid JSON");
+		riskMeta = {};
+	}
+
+	const pepPath = join(__dirname, "data", "pep-sample.json");
+	if (riskMeta.version !== 1) {
+		fail(
+			"generate-meta.json",
+			"-",
+			`Expected version 1 metadata, got ${JSON.stringify(riskMeta.version)} — regenerate with generate.mjs`,
+		);
+	} else if (!existsSync(pepPath)) {
+		fail("pep-sample.json", "-", `Missing ${pepPath}`);
+	} else {
+		/** @type {{ peps: Array<Record<string, string>>; sanctioned: Array<Record<string, string>> }} */
+		const pepPool = JSON.parse(readFileSync(pepPath, "utf8"));
+
+		const mc = /** @type {{ PEP: number; SANCTIONED: number; MH: number }} */ (
+			riskMeta.markerCounts || {}
+		);
+		let notePep = 0,
+			noteSan = 0,
+			noteMh = 0;
+		for (const r of clients) {
+			if (/\[PEP\s/.test(r.notes || "")) notePep++;
+			if (/\[SANCTIONED\s/.test(r.notes || "")) noteSan++;
+			if (/\[MH\]/.test(r.notes || "")) noteMh++;
+		}
+		if (notePep !== mc.PEP)
+			fail(
+				"clients.csv",
+				"-",
+				`PEP marker count ${notePep} !== generate-meta markerCounts.PEP (${mc.PEP})`,
+			);
+		else pass(`PEP notes markers: ${notePep}`);
+		if (noteSan !== mc.SANCTIONED)
+			fail(
+				"clients.csv",
+				"-",
+				`SANCTIONED marker count ${noteSan} !== meta (${mc.SANCTIONED})`,
+			);
+		else pass(`SANCTIONED notes markers: ${noteSan}`);
+		if (noteMh !== mc.MH)
+			fail("clients.csv", "-", `[MH] count ${noteMh} !== meta (${mc.MH})`);
+		else pass(`[MH] notes markers: ${noteMh}`);
+
+		const physRisk = new Set(
+			/** @type {number[]} */ (riskMeta.riskIndices?.physical || []),
+		);
+		const moralRisk = new Set(
+			/** @type {number[]} */ (riskMeta.riskIndices?.moral || []),
+		);
+		const TS = /** @type {Record<string, string[]>} */ (
+			riskMeta.tierSets || {}
+		);
+		const profMap = /** @type {Record<string, string>} */ (
+			riskMeta.profileByIndex || {}
+		);
+
+		const pepTriples = new Set(
+			pepPool.peps.map((p) =>
+				[
+					(p.first_name || "").trim().toUpperCase(),
+					(p.last_name || "").trim().toUpperCase(),
+					(p.occupation || "").trim(),
+				].join("|"),
+			),
+		);
+		const sanPairs = new Map(
+			pepPool.sanctioned.map((s) => {
+				const key = [
+					(s.first_name || "").trim().toUpperCase(),
+					(s.last_name || "").trim().toUpperCase(),
+				].join("|");
+				return [key, (s.country_code || "").trim().toUpperCase()];
+			}),
+		);
+
+		function inSet(code, arr) {
+			return Array.isArray(arr) && arr.includes(code?.trim());
+		}
+
+		for (let i = 0; i < clients.length; i++) {
+			const r = clients[i];
+			const row = i + 2;
+			const notes = r.notes || "";
+			const inPhysRisk = physRisk.has(i);
+			const inMoralRisk = moralRisk.has(i);
+
+			if (!inPhysRisk && !inMoralRisk) {
+				if (/\[PEP\s/.test(notes) || /\[SANCTIONED\s/.test(notes))
+					fail(
+						"clients.csv",
+						row,
+						"PEP/SANCTIONED marker outside risk slot indices",
+					);
+				continue;
+			}
+
+			const prof = profMap[String(i)];
+			if (!prof)
+				fail(
+					"clients.csv",
+					row,
+					`risk slot ${i} missing profileByIndex in meta`,
+				);
+
+			if (inPhysRisk && r.person_type !== "physical") {
+				fail("clients.csv", row, "expected physical row in physical risk slot");
+				continue;
+			}
+			if (inMoralRisk && r.person_type !== "moral") {
+				fail("clients.csv", row, "expected moral row in moral risk slot");
+				continue;
+			}
+
+			if (inPhysRisk) {
+				if (prof === "PEP") {
+					if (!/\[PEP\s/.test(notes))
+						fail("clients.csv", row, "expected [PEP …] in notes");
+					const triple = [
+						(r.first_name || "").trim().toUpperCase(),
+						(r.last_name || "").trim().toUpperCase(),
+						(r.occupation || "").trim(),
+					].join("|");
+					if (!pepTriples.has(triple))
+						fail(
+							"clients.csv",
+							row,
+							`(first_name,last_name,occupation) not found in pep-sample peps`,
+						);
+					if ((r.nationality || "").trim() !== (r.country_code || "").trim())
+						fail(
+							"clients.csv",
+							row,
+							"PEP row nationality must equal country_code",
+						);
+				} else if (prof === "SANCTIONED") {
+					if (!/\[SANCTIONED\s/.test(notes))
+						fail("clients.csv", row, "expected [SANCTIONED …] in notes");
+					const pair = [
+						(r.first_name || "").trim().toUpperCase(),
+						(r.last_name || "").trim().toUpperCase(),
+					].join("|");
+					const expectedCc = sanPairs.get(pair);
+					if (!expectedCc)
+						fail(
+							"clients.csv",
+							row,
+							`(first_name,last_name) not found in pep-sample sanctioned`,
+						);
+					else if (
+						(r.nationality || "").trim().toUpperCase() !== expectedCc ||
+						(r.country_code || "").trim().toUpperCase() !== expectedCc ||
+						(r.country || "").trim().toUpperCase() !== expectedCc
+					)
+						fail(
+							"clients.csv",
+							row,
+							`SANCTIONED row country fields must match pool (${expectedCc})`,
+						);
+				} else if (prof === "LOW") {
+					if (/\[MH\]/.test(notes))
+						fail("clients.csv", row, "LOW physical row must not have [MH]");
+					const eco = (r.economic_activity_code || "").trim();
+					if (eco && !inSet(eco, TS.LOW_ECO))
+						fail(
+							"clients.csv",
+							row,
+							`LOW physical economic_activity_code ${eco} not in tier LOW_ECO`,
+						);
+				} else if (prof === "MEDIUM_HIGH") {
+					if (!/\[MH\]/.test(notes))
+						fail(
+							"clients.csv",
+							row,
+							"MEDIUM_HIGH physical row needs [MH] in notes",
+						);
+					const eco = (r.economic_activity_code || "").trim();
+					if (eco && !inSet(eco, TS.MH_ECO))
+						fail(
+							"clients.csv",
+							row,
+							`MH physical economic_activity_code ${eco} not in tier MH_ECO`,
+						);
+				}
+			}
+
+			if (inMoralRisk) {
+				const biz = (r.commercial_activity_code || "").trim();
+				if (prof === "LOW") {
+					if (/\[MH\]/.test(notes))
+						fail("clients.csv", row, "LOW moral row must not have [MH]");
+					if (biz && !inSet(biz, TS.LOW_BIZ))
+						fail(
+							"clients.csv",
+							row,
+							`LOW moral commercial_activity_code ${biz} not in LOW_BIZ`,
+						);
+				} else if (prof === "MEDIUM") {
+					if (/\[MH\]/.test(notes))
+						fail("clients.csv", row, "MEDIUM moral row must not have [MH]");
+					if (biz && !inSet(biz, TS.MEDIUM_BIZ))
+						fail(
+							"clients.csv",
+							row,
+							`MEDIUM moral commercial_activity_code ${biz} not in MEDIUM_BIZ`,
+						);
+				} else if (prof === "MEDIUM_HIGH") {
+					if (!/\[MH\]/.test(notes))
+						fail(
+							"clients.csv",
+							row,
+							"MEDIUM_HIGH moral row needs [MH] in notes",
+						);
+					if (biz && !inSet(biz, TS.MH_BIZ))
+						fail(
+							"clients.csv",
+							row,
+							`MH moral commercial_activity_code ${biz} not in MH_BIZ`,
+						);
+				}
+			}
+		}
+		pass("Risk-slot profiles vs notes / activity tiers validated");
+	}
+}
 
 // Special client scenarios
 const minors = clients.filter((r) => {

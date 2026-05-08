@@ -207,6 +207,7 @@ model Client {
   notes                String?
   countryCode          String?    @map("country_code")
   economicActivityCode String?    @map("economic_activity_code")
+  commercialActivityCode String?  @map("commercial_activity_code")
   // Enhanced KYC fields
   gender               String?
   occupation           String?
@@ -272,6 +273,7 @@ model Client {
   @@index([deletedAt])
   @@index([countryCode])
   @@index([economicActivityCode])
+  @@index([commercialActivityCode])
   @@index([kycStatus])
   @@index([screeningResult])
   @@index([riskLevel])

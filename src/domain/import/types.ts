@@ -146,6 +146,7 @@ export interface ClientRowData {
 	notes?: string;
 	country_code?: string;
 	economic_activity_code?: string;
+	commercial_activity_code?: string;
 	gender?: string;
 	occupation?: string;
 	marital_status?: string;

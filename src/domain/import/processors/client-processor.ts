@@ -180,6 +180,7 @@ function validateClientRow(data: Record<string, string>): {
 		notes: data.notes,
 		country_code: data.country_code?.toUpperCase(),
 		economic_activity_code: data.economic_activity_code,
+		commercial_activity_code: data.commercial_activity_code,
 		gender: data.gender?.toUpperCase(),
 		occupation: data.occupation,
 		marital_status: data.marital_status?.toUpperCase(),
@@ -218,7 +219,11 @@ export async function processClientRow(
 
 	const str = (v: string | undefined) => v || undefined;
 
-	const clientPayload: ClientCreateInput = {
+	const commercialOrLegacy =
+		str(rowData.commercial_activity_code) ||
+		str(rowData.economic_activity_code);
+
+	const clientPayload = {
 		personType: rowData.person_type as "physical" | "moral" | "trust",
 		rfc: rowData.rfc,
 		firstName: str(rowData.first_name),
@@ -245,7 +250,12 @@ export async function processClientRow(
 		reference: str(rowData.reference),
 		notes: str(rowData.notes),
 		countryCode: str(rowData.country_code),
-		economicActivityCode: str(rowData.economic_activity_code),
+		...(rowData.person_type === "physical"
+			? { economicActivityCode: str(rowData.economic_activity_code) }
+			: {}),
+		...(rowData.person_type === "moral"
+			? { commercialActivityCode: commercialOrLegacy }
+			: {}),
 		gender: str(rowData.gender),
 		occupation: str(rowData.occupation),
 		maritalStatus: str(rowData.marital_status),

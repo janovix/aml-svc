@@ -1,83 +1,133 @@
 #!/usr/bin/env node
 /**
- * Seed Clients
- *
- * Generates synthetic client data for dev/preview environments.
- * This is SEED data (not real data) and should NOT run in production.
+ * Seed synthetic clients via SyntheticDataGenerator (AML Core).
+ * Requires remote D1 access (REMOTE=true) like generate-synthetic-data.
  */
 
-import { execSync } from "node:child_process";
+import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 import { writeFileSync, unlinkSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { openD1Database } from "../lib/d1-database.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const amlSvcRoot = join(__dirname, "..", "..");
+
+function wranglerConfigFromEnv() {
+	if (process.env.WRANGLER_CONFIG) return process.env.WRANGLER_CONFIG;
+	if (
+		process.env.CF_PAGES_BRANCH ||
+		(process.env.WORKERS_CI_BRANCH &&
+			process.env.WORKERS_CI_BRANCH !== "main") ||
+		process.env.PREVIEW === "true"
+	) {
+		return "wrangler.preview.jsonc";
+	}
+	return "wrangler.jsonc";
+}
 
 async function seedClients() {
 	const isRemote = process.env.CI === "true" || process.env.REMOTE === "true";
-	// Use WRANGLER_CONFIG if set, otherwise detect preview environment
-	let configFile = process.env.WRANGLER_CONFIG;
-	if (!configFile) {
-		if (
-			process.env.CF_PAGES_BRANCH ||
-			(process.env.WORKERS_CI_BRANCH &&
-				process.env.WORKERS_CI_BRANCH !== "main") ||
-			process.env.PREVIEW === "true"
-		) {
-			configFile = "wrangler.preview.jsonc";
-		}
+	const configFile = wranglerConfigFromEnv();
+	const organizationId =
+		process.env.SEED_ORGANIZATION_ID ||
+		process.env.ORGANIZATION_ID ||
+		process.env.AML_ORGANIZATION_ID;
+	const clientsCount = parseInt(
+		process.env.CLIENTS_COUNT || process.env.SEED_CLIENTS_COUNT || "50",
+		10,
+	);
+
+	if (!organizationId) {
+		console.warn(
+			"⏭️  Skipping client seed: set SEED_ORGANIZATION_ID or ORGANIZATION_ID",
+		);
+		return;
 	}
-	const configFlag = configFile ? `--config ${configFile}` : "";
 
+	console.log(
+		`🌱 Seeding ${clientsCount} synthetic clients (${isRemote ? "remote" : "local"})…`,
+	);
+
+	const checkSql = `SELECT COUNT(*) as count FROM clients WHERE organization_id = '${organizationId.replace(/'/g, "''")}' AND deleted_at IS NULL;`;
+	let checkFile = null;
 	try {
-		console.log(`🌱 Seeding clients (${isRemote ? "remote" : "local"})...`);
-
-		// Check if clients already exist
-		const checkSql = "SELECT COUNT(*) as count FROM clients;";
-		const checkFile = join(__dirname, `temp-check-clients-${Date.now()}.sql`);
-		try {
-			writeFileSync(checkFile, checkSql);
-			const wranglerCmd =
-				process.env.CI === "true" ? "pnpm wrangler" : "wrangler";
-			const checkCommand = isRemote
-				? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${checkFile}"`
-				: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${checkFile}"`;
-			const checkOutput = execSync(checkCommand, { encoding: "utf-8" });
-			// Parse the count from output (format may vary)
-			const countMatch = checkOutput.match(/count\s*\|\s*(\d+)/i);
-			if (countMatch && parseInt(countMatch[1], 10) > 0) {
-				console.log(`⏭️  Clients already exist. Skipping seed.`);
-				return;
-			}
-		} catch {
-			// If check fails, continue with seeding
-			console.warn(
-				"⚠️  Could not check existing clients, proceeding with seed...",
-			);
-		} finally {
+		checkFile = join(__dirname, `temp-check-clients-${Date.now()}.sql`);
+		writeFileSync(checkFile, checkSql);
+		const wranglerCmd =
+			process.env.CI === "true" ? "pnpm wrangler" : "pnpm wrangler";
+		const configFlag = `--config ${configFile}`;
+		const checkCommand = isRemote
+			? `${wranglerCmd} d1 execute DB ${configFlag} --remote --file "${checkFile}"`
+			: `${wranglerCmd} d1 execute DB ${configFlag} --local --file "${checkFile}"`;
+		const checkOutput = execSync(checkCommand, { encoding: "utf-8" });
+		const countMatch = checkOutput.match(/count\s*\|\s*(\d+)/i);
+		if (countMatch && parseInt(countMatch[1], 10) > 0) {
+			console.log(`⏭️  Clients already exist for org. Skipping seed.`);
+			return;
+		}
+	} catch {
+		console.warn(
+			"⚠️  Could not check existing clients via wrangler; attempting Prisma path…",
+		);
+	} finally {
+		if (checkFile) {
 			try {
 				unlinkSync(checkFile);
 			} catch {
-				// Ignore cleanup errors
+				// ignore
 			}
 		}
-
-		// TODO: Implement client seeding logic
-		// Generate synthetic clients with realistic data for testing
-		// For now, skip if no clients exist
-		console.log("✅ Client seeding completed (no synthetic data generated)");
-	} catch (error) {
-		console.error("❌ Error seeding clients:", error);
-		throw error;
 	}
+
+	const db = await openD1Database({
+		amlSvcRoot,
+		resolvedWranglerConfigFile: configFile,
+		isRemote,
+	});
+
+	const { SyntheticDataGenerator } = await import(
+		"../../src/lib/synthetic-data-generator.ts"
+	);
+	const { getPrismaClient } = await import("../../src/lib/prisma.ts");
+
+	const prisma = getPrismaClient(db);
+	const tenantEnvironment =
+		process.env.TENANT_ENVIRONMENT === "staging" ||
+		process.env.TENANT_ENVIRONMENT === "development"
+			? process.env.TENANT_ENVIRONMENT
+			: "production";
+
+	const generator = new SyntheticDataGenerator(
+		prisma,
+		organizationId,
+		tenantEnvironment,
+	);
+
+	let riskMix;
+	if (process.env.RISK_MIX) {
+		riskMix = JSON.parse(process.env.RISK_MIX);
+	}
+
+	const result = await generator.generate({
+		clients: {
+			count: clientsCount,
+			includeDocuments: process.env.SEED_CLIENT_DOCUMENTS === "true",
+			includeAddresses: process.env.SEED_CLIENT_ADDRESSES === "true",
+			riskMix,
+			includePep: process.env.INCLUDE_PEP !== "false",
+			includeSanctioned: process.env.INCLUDE_SANCTIONED !== "false",
+		},
+	});
+
+	console.log(
+		`✅ Client seed complete — created ${result.clients.created} client(s)`,
+	);
 }
 
-// Export for use in all.mjs
 export { seedClients };
 
-// If run directly, execute seed
-// Compare normalized paths for cross-platform compatibility
 const isDirectRun =
 	process.argv[1] && __filename.toLowerCase() === process.argv[1].toLowerCase();
 

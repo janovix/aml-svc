@@ -191,7 +191,8 @@ describe("recalculateKycProgress", () => {
 			businessName: "Empresa SA de CV",
 			incorporationDate: "2020-06-01",
 			countryCode: "MX",
-			economicActivityCode: "456",
+			economicActivityCode: null,
+			commercialActivityCode: "2720004",
 			screeningResult: "clear",
 			screenedAt: new Date("2025-01-01"),
 			documents: [

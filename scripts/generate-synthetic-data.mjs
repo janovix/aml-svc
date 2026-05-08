@@ -24,7 +24,7 @@
 
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { readFileSync } from "node:fs";
+import { openD1Database } from "./lib/d1-database.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -38,6 +38,19 @@ const clientsIncludeDocuments =
 	process.env.CLIENTS_INCLUDE_DOCUMENTS === "true";
 const clientsIncludeAddresses =
 	process.env.CLIENTS_INCLUDE_ADDRESSES === "true";
+/** Optional JSON map of LOW|MEDIUM|MEDIUM_HIGH|PEP|SANCTIONED weights */
+let riskMixJson = undefined;
+if (process.env.RISK_MIX) {
+	try {
+		riskMixJson = JSON.parse(process.env.RISK_MIX);
+	} catch {
+		console.error("❌ Error: RISK_MIX must be valid JSON");
+		process.exit(1);
+	}
+}
+const includePep = process.env.INCLUDE_PEP !== "false";
+const includeSanctioned = process.env.INCLUDE_SANCTIONED !== "false";
+const tenantEnvironment = process.env.TENANT_ENVIRONMENT || "production";
 // Default 0 — the generator auto-adjusts to ensure every client has at least one operation
 const operationsCount = parseInt(process.env.OPERATIONS_COUNT || "0", 10);
 const operationsPerClient = process.env.OPERATIONS_PER_CLIENT
@@ -87,310 +100,12 @@ if (invalidModels.length > 0) {
 	process.exit(1);
 }
 
-/**
- * Creates a D1Database instance
- * For remote: uses Cloudflare REST API
- * For local: requires wrangler dev to be running
- */
 async function getD1Database() {
-	// Read wrangler config
-	const configPath = join(__dirname, "..", resolvedWranglerConfigFile);
-	let config;
-	try {
-		const configContent = readFileSync(configPath, "utf-8");
-
-		// Parse JSONC manually - handle comments and trailing commas
-		// This is a simple parser that handles the common cases
-		let jsonContent = configContent;
-		let inString = false;
-		let escapeNext = false;
-		let result = "";
-
-		// Process character by character to properly handle strings
-		for (let i = 0; i < jsonContent.length; i++) {
-			const char = jsonContent[i];
-			const nextChar = jsonContent[i + 1];
-
-			if (escapeNext) {
-				result += char;
-				escapeNext = false;
-				continue;
-			}
-
-			if (char === "\\" && inString) {
-				result += char;
-				escapeNext = true;
-				continue;
-			}
-
-			if (char === '"' && !escapeNext) {
-				inString = !inString;
-				result += char;
-				continue;
-			}
-
-			// Outside strings, handle comments and trailing commas
-			if (!inString) {
-				// Single-line comment
-				if (char === "/" && nextChar === "/") {
-					// Skip until end of line
-					while (i < jsonContent.length && jsonContent[i] !== "\n") {
-						i++;
-					}
-					continue;
-				}
-
-				// Multi-line comment
-				if (char === "/" && nextChar === "*") {
-					// Skip until */
-					i += 2;
-					while (i < jsonContent.length - 1) {
-						if (jsonContent[i] === "*" && jsonContent[i + 1] === "/") {
-							i++;
-							break;
-						}
-						i++;
-					}
-					continue;
-				}
-
-				// Remove trailing commas before } or ]
-				if (char === ",") {
-					// Look ahead to see if next non-whitespace is } or ]
-					let j = i + 1;
-					let isTrailing = false;
-					while (j < jsonContent.length) {
-						const next = jsonContent[j];
-						if (next === "}" || next === "]") {
-							isTrailing = true;
-							break;
-						}
-						if (
-							next !== " " &&
-							next !== "\t" &&
-							next !== "\n" &&
-							next !== "\r"
-						) {
-							break;
-						}
-						j++;
-					}
-					if (isTrailing) {
-						// Skip trailing comma
-						continue;
-					}
-				}
-			}
-
-			result += char;
-		}
-
-		jsonContent = result;
-		config = JSON.parse(jsonContent);
-	} catch (error) {
-		console.error(
-			`❌ Error reading wrangler config from ${resolvedWranglerConfigFile}:`,
-			error,
-		);
-		if (error instanceof SyntaxError) {
-			console.error(
-				"   Tip: Make sure the config file is valid JSONC (JSON with Comments)",
-			);
-		}
-		process.exit(1);
-	}
-
-	// Get D1 database config
-	const d1Database = config.d1_databases?.find((db) => db.binding === "DB");
-	if (!d1Database) {
-		console.error("❌ Error: No D1 database with binding 'DB' found in config");
-		process.exit(1);
-	}
-
-	if (isRemote) {
-		console.log(
-			`📡 Connecting to remote D1 database: ${d1Database.database_name}`,
-		);
-
-		if (!process.env.CLOUDFLARE_API_TOKEN) {
-			throw new Error(
-				"CLOUDFLARE_API_TOKEN is required for remote D1 connection",
-			);
-		}
-		if (!process.env.CLOUDFLARE_ACCOUNT_ID) {
-			throw new Error(
-				"CLOUDFLARE_ACCOUNT_ID is required for remote D1 connection",
-			);
-		}
-
-		// Create remote D1Database implementation using Cloudflare REST API
-		return createRemoteD1Database(
-			process.env.CLOUDFLARE_ACCOUNT_ID,
-			d1Database.database_id,
-			process.env.CLOUDFLARE_API_TOKEN,
-		);
-	} else {
-		console.log(
-			`💾 Connecting to local D1 database: ${d1Database.database_name}`,
-		);
-		console.log("   Note: This requires wrangler dev to be running");
-
-		// For local, we need wrangler dev to be running
-		// We can't easily create a local D1 instance without wrangler dev
-		// So we'll throw an error and suggest using REMOTE=true
-		throw new Error(
-			"Local D1 connection requires wrangler dev to be running.\n" +
-				"   For GitHub Actions, use REMOTE=true with CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID",
-		);
-	}
-}
-
-/**
- * Creates a D1Database instance that connects to Cloudflare D1 via REST API
- * This implementation matches the Workers runtime D1Database interface
- */
-function createRemoteD1Database(accountId, databaseId, apiToken) {
-	const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}`;
-
-	class RemoteD1PreparedStatement {
-		constructor(query, db) {
-			this.query = query;
-			this.db = db;
-			this.boundValues = [];
-		}
-
-		bind(...values) {
-			this.boundValues = values;
-			return this;
-		}
-
-		async first(colName) {
-			const result = await this.all();
-			if (!result.results || result.results.length === 0) {
-				return null;
-			}
-			const first = result.results[0];
-			if (colName) {
-				return first[colName] ?? null;
-			}
-			return first;
-		}
-
-		async run() {
-			return this.executeQuery();
-		}
-
-		async all() {
-			return this.executeQuery();
-		}
-
-		async raw() {
-			const result = await this.executeQuery();
-			return result.results || [];
-		}
-
-		async executeQuery() {
-			const response = await fetch(`${baseUrl}/query`, {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${apiToken}`,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					sql: this.query,
-					params: this.boundValues,
-				}),
-			});
-
-			if (!response.ok) {
-				const error = await response.text();
-				throw new Error(`D1 query failed: ${error}`);
-			}
-
-			const data = await response.json();
-			return {
-				success: data.success ?? true,
-				meta: {
-					duration: data.meta?.duration ?? 0,
-					rows_read: data.meta?.rows_read ?? 0,
-					rows_written: data.meta?.rows_written ?? 0,
-					last_row_id: data.meta?.last_row_id ?? 0,
-					changed_db: data.meta?.changed_db ?? false,
-					changes: data.meta?.changes ?? 0,
-					size_after: data.meta?.size_after ?? 0,
-				},
-				results: data.results || [],
-			};
-		}
-	}
-
-	return {
-		prepare(query) {
-			return new RemoteD1PreparedStatement(query, this);
-		},
-
-		async exec(query) {
-			const response = await fetch(`${baseUrl}/query`, {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${apiToken}`,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					sql: query,
-				}),
-			});
-
-			if (!response.ok) {
-				const error = await response.text();
-				throw new Error(`D1 exec failed: ${error}`);
-			}
-
-			const data = await response.json();
-			return {
-				count: data.meta?.changes ?? 0,
-				duration: data.meta?.duration ?? 0,
-			};
-		},
-
-		async batch(statements) {
-			const queries = statements.map((stmt) => {
-				return {
-					sql: stmt.query,
-					params: stmt.boundValues,
-				};
-			});
-
-			const response = await fetch(`${baseUrl}/batch`, {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${apiToken}`,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(queries),
-			});
-
-			if (!response.ok) {
-				const error = await response.text();
-				throw new Error(`D1 batch failed: ${error}`);
-			}
-
-			const data = await response.json();
-			return (data.results || []).map((result) => ({
-				success: true,
-				meta: {
-					duration: 0,
-					rows_read: 0,
-					rows_written: 0,
-					last_row_id: 0,
-					changed_db: false,
-					changes: 0,
-					size_after: 0,
-				},
-				results: result || [],
-			}));
-		},
-	};
+	return openD1Database({
+		amlSvcRoot: join(__dirname, ".."),
+		resolvedWranglerConfigFile,
+		isRemote,
+	});
 }
 
 async function generateSyntheticData() {
@@ -409,9 +124,15 @@ async function generateSyntheticData() {
 			count: clientsCount,
 			includeDocuments: clientsIncludeDocuments,
 			includeAddresses: clientsIncludeAddresses,
+			riskMix: riskMixJson,
+			includePep,
+			includeSanctioned,
 		};
 		console.log(
 			`   Clients: ${clientsCount} (documents: ${clientsIncludeDocuments}, addresses: ${clientsIncludeAddresses})`,
+		);
+		console.log(
+			`   Risk: INCLUDE_PEP=${includePep} INCLUDE_SANCTIONED=${includeSanctioned}${riskMixJson ? " RISK_MIX=custom" : ""}`,
 		);
 	}
 	if (models.includes("operations")) {
@@ -437,7 +158,11 @@ async function generateSyntheticData() {
 
 		// Create Prisma client with D1 adapter
 		const prisma = getPrismaClient(db);
-		const generator = new SyntheticDataGenerator(prisma, organizationId);
+		const generator = new SyntheticDataGenerator(
+			prisma,
+			organizationId,
+			tenantEnvironment,
+		);
 
 		// Generate synthetic data
 		console.log("⏳ Generating synthetic data...");

@@ -8,7 +8,7 @@ KYC/AML core API service built with Hono on Cloudflare Workers, using D1 databas
 
 ### Core Data Management
 
-- **Client Management**: Complete KYC data for physical persons, legal entities, and trusts with documents and addresses
+- **Client Management**: Complete KYC data for physical persons (persona física), legal entities (persona moral), and trusts (fideicomiso) with documents and addresses. Country and nationality fields align with SAT/UIF expectations: **ISO-3166 alpha-2** codes at rest (`nationality`, `country_code`, address `country`). **Persona física** uses **actividad económica** (`economic_activity_code`) resolved against the **economic-activities** catalog (7-digit SAT codes). **Persona moral** uses **giro mercantil** (`commercial_activity_code`) resolved against **business-activities** — distinct from the física catalog. **Fideicomiso** does not use activity columns in the XSD-aligned model. APIs persist canonical codes and **`resolved_names`** JSON for display labels. Optional **`pnpm normalize:clients`** backfills legacy rows (ISO-3 → ISO-2, catalog IDs → codes, moral commercial column, trust activity clears).
 - **Shareholders & Beneficial Controllers**: Multi-level ownership tracking, Anexo 3 compliance, and automated watchlist screening via watchlist-svc binding
 - **Operations**: Tracked across 11+ PLD vulnerable activity types (vehicle, real estate, jewelry, virtual assets, gambling, donations, loans, armoring, professional services, etc.) with payment methods and UMA value calculations
 - **Invoices**: CFDI invoice parsing and storage for supply chain transparency
@@ -29,8 +29,8 @@ KYC/AML core API service built with Hono on Cloudflare Workers, using D1 databas
 ### Productivity & Analytics
 
 - **Reports**: Aggregated PDF analytics reports (EBR summaries, compliance dashboards)
-- **Imports**: Bulk CSV/Excel data import for clients and operations with queue-backed row processing and event-stream error reporting
-- **Catalogs**: Reference data (countries, states, currencies, payment methods, vehicle brands, CFDI codes, economic activities, vulnerable activities) with pre-populated and open-edit modes
+- **Imports**: Bulk CSV/Excel data import for clients and operations with queue-backed row processing and event-stream error reporting (client rows support **`commercial_activity_code`** for persona moral alongside ISO-2 country codes)
+- **Catalogs**: Reference data (countries, states, currencies, payment methods, vehicle brands, CFDI codes, **economic activities** (física), **business activities / giro mercantil** (moral), vulnerable activities) with pre-populated and open-edit modes
 - **Files**: R2 storage for documents, certificates, reports, and training materials
 - **Exchange Rates**: CurrencyLayer-backed real-time rates (1h cache via KV)
 - **UMA Values**: Unidad de Medida y Actualización reference data for operation calculations
@@ -93,6 +93,7 @@ IDs are designed to be human-readable, type-identifiable, collision-resistant, a
 - **Queue**: Cloudflare Queues (alert detection, imports, risk assessment, screening, training, webhooks)
 - **API Documentation**: OpenAPI 3.1 specification (`src/openapi.ts`) with Scalar UI at `/docsz`
 - **Testing**: [Vitest](https://vitest.dev/) with Cloudflare Workers pool
+- **PDF**: [pdf-lib](https://pdf-lib.js.org/) for training certificate generation (Worker-compatible build; types resolved via dependency install)
 - **Authentication**: JWT-based authentication via auth-svc binding
 - **Error Tracking**: Sentry (configurable via `SENTRY_DSN`)
 
@@ -126,6 +127,8 @@ IDs are designed to be human-readable, type-identifiable, collision-resistant, a
    Update `database_id` in `wrangler.jsonc` with the new database ID.
 
 4. Run database migrations:
+
+   Schema changes ship as **additive SQL files** under [`migrations/`](migrations/) (numbered migrations applied in order). Do not rewrite shipped migration files for environments that already applied them.
 
    ```bash
    # Local development (applies migrations to local D1)
@@ -220,6 +223,8 @@ Run specific test file:
 ```bash
 pnpm run vitest src/lib/id-generator.test.ts
 ```
+
+Tests use the **Cloudflare Vitest Workers pool** ([`tests/vitest.config.mts`](tests/vitest.config.mts)). Some npm dependencies (for example **`pdf-lib`** / **`tslib`**) are listed under `test.ssr.noExternal` so they bundle correctly in the worker test runtime—if you add heavy client-side libraries consumed from Worker code, you may need to extend that list.
 
 ## Quality Gates
 
@@ -325,9 +330,12 @@ aml-svc/
 │   └── openapi.ts                 # OpenAPI 3.1 specification
 ├── prisma/
 │   └── schema.prisma              # Prisma schema (D1 + SQLite)
-├── migrations/                    # Database migration files
-├── tests/                         # Integration tests
-├── scripts/                       # Utility scripts (seed, populate, E2E)
+├── migrations/                    # D1 SQL migrations (additive, ordered)
+├── tests/                         # Vitest config + integration tests
+├── scripts/                       # Seed, populate, normalize, synthetic data, E2E helpers
+│   ├── normalize/                 # Client catalog backfill (ISO-2, SAT codes, resolved_names)
+│   ├── generate-synthetic-data.mjs
+│   └── generate-test-data/        # CSV fixtures for import testing
 └── docs/                          # Documentation
     └── E2E_INTERNAL.md            # Internal E2E testing endpoints
 ```
@@ -344,7 +352,7 @@ Once deployed, the API documentation is available at:
 
 The service uses Prisma with SQLite (D1). Key entities:
 
-- **Client**: KYC data (physical, moral, trust) with RFC and address
+- **Client**: KYC data (physical, moral, trust) with RFC and address; **`commercial_activity_code`** (moral / giro mercantil) and **`economic_activity_code`** (física); **`resolved_names`** for catalog label snapshots; country/nationality fields normalized to **ISO-2** when written through the domain layer
 - **ClientDocument**: Uploaded documents with verification status
 - **ClientAddress**: Multi-address support per client
 - **Shareholder**: Legal ownership structure (1-2 levels)
@@ -408,6 +416,18 @@ For detailed information:
 - `pnpm run seed:preview` - Seed to preview
 - `pnpm run seed:validate` - Validate seed data integrity
 - `pnpm run update:uma-values` - Update UMA values from external source
+
+### Client normalization & synthetic data
+
+- `pnpm run normalize:clients` - Backfill client catalog fields and `resolved_names` (uses `REMOTE` / `WRANGLER_CONFIG` like other D1 scripts; optional **`ORGANIZATION_ID`** to scope updates)
+- `pnpm run normalize:clients:local` - Same against **local** D1 (`REMOTE=false`, `wrangler.local.jsonc` by default)
+- `pnpm run normalize:clients:dev` - Same against **remote** dev D1 (`REMOTE=true`; requires Cloudflare API token / account env vars per [`scripts/lib/d1-database.mjs`](scripts/lib/d1-database.mjs))
+- `pnpm run generate:synthetic` - Generate synthetic clients (and optional operations) via **`SyntheticDataGenerator`** / Prisma; requires **`USER_ID`** and **`ORGANIZATION_ID`**
+- `pnpm run generate:synthetic:local` / `pnpm run generate:synthetic:dev` - Local vs remote D1 targets (same pattern as normalize)
+
+Synthetic generator env highlights (see [`scripts/generate-synthetic-data.mjs`](scripts/generate-synthetic-data.mjs)): **`CLIENTS_COUNT`**, **`MODELS`** (`clients`, `operations`), **`OPERATIONS_COUNT`**, **`RISK_MIX`** (JSON weights for `LOW` \| `MEDIUM` \| `MEDIUM_HIGH` \| `PEP` \| `SANCTIONED`), **`INCLUDE_PEP`**, **`INCLUDE_SANCTIONED`**, **`TENANT_ENVIRONMENT`**.
+
+**CSV fixtures (`scripts/generate-test-data/`)** — `node ./scripts/generate-test-data/generate.mjs` writes `clients.csv`, `operations_*.csv`, plus **`output/generate-meta.json`** for the validator. Uses [`scripts/generate-test-data/data/pep-sample.json`](scripts/generate-test-data/data/pep-sample.json) (PEP + sanctioned name pools). Same **`RISK_MIX` / `INCLUDE_PEP` / `INCLUDE_SANCTIONED`** env vars apply (weights must sum to 100). Run `node ./scripts/generate-test-data/validate.mjs` after generating. On Windows, set env vars via `cmd /c "set VAR=…&& node …"` or spawn from a small script so JSON in `RISK_MIX` is not stripped by the shell.
 
 ### Testing
 
