@@ -1,72 +1,65 @@
 /**
- * Cash Fragmentation Seeker
- *
- * Detects structuring attempts where multiple cash payments are made
- * within a short time period, potentially by different payers.
+ * Universal cash fragmentation seeker (multiple cash payments / structuring signals).
  */
 
 import {
-	CASH_FRAGMENTATION_WINDOW_DAYS,
-	CASH_FRAGMENTATION_MIN_PAYMENTS,
-} from "../constants";
+	DEFAULT_UMA_DAILY_VALUE,
+	getIdentificationThresholdMxn,
+	getNoticeThresholdMxn,
+} from "../../config/activity-thresholds";
 import {
-	BaseAlertSeeker,
+	CASH_FRAGMENTATION_MIN_PAYMENTS,
+	CASH_FRAGMENTATION_WINDOW_DAYS,
+} from "../window-constants";
+import {
+	UniversalAlertSeeker,
 	type AlertContext,
 	type SeekerEvaluationResult,
-	type VulnerableActivityCode,
-	type AlertRuleType,
 	type AlertSeverity,
 	type AlertOperation,
+	type UniversalAlertRuleType,
 } from "../types";
+import type { PatternType } from "../../config/alert-patterns";
 
-/**
- * Seeker for detecting cash fragmentation / structuring
- *
- * Trigger: Multiple cash deposits detected within 30 days
- * Severity: MEDIUM
- */
-export class CashFragmentationSeeker extends BaseAlertSeeker {
-	readonly activityCode: VulnerableActivityCode = "VEH";
-	readonly ruleType: AlertRuleType = "cash_fragmentation";
-	readonly name = "Sistema detecta fraccionamiento de efectivo";
+export class UniversalCashFragmentationSeeker extends UniversalAlertSeeker {
+	readonly patternType: PatternType = "cash_fragmentation";
+	readonly ruleType: UniversalAlertRuleType = "cash_fragmentation";
+	readonly name = "Cash fragmentation pattern detected";
 	readonly description =
-		"Detecta múltiples pagos en efectivo en un periodo corto que podrían indicar fraccionamiento o estructuración";
+		"Detects multiple cash payments in a short window suggesting fragmentation";
 	readonly defaultSeverity: AlertSeverity = "MEDIUM";
 
 	async evaluate(
 		context: AlertContext,
 	): Promise<SeekerEvaluationResult | null> {
 		const { client, operations } = context;
+		const activityCode = context.activityCode;
 
-		// Filter operations within the time window
+		if (!this.appliesTo(activityCode)) return null;
+
 		const recentOperations = this.filterOperationsInWindow(
 			operations,
 			CASH_FRAGMENTATION_WINDOW_DAYS,
 		);
 
-		// Get all cash payments from recent operations
 		const cashPayments = this.getCashPayments(recentOperations);
+		if (cashPayments.length < CASH_FRAGMENTATION_MIN_PAYMENTS) return null;
 
-		// Need at least MIN_CASH_PAYMENTS to detect fragmentation
-		if (cashPayments.length < CASH_FRAGMENTATION_MIN_PAYMENTS) {
-			return null;
-		}
+		const daily = context.umaValue?.dailyValue ?? DEFAULT_UMA_DAILY_VALUE;
+		const fragmentationAnalysis = this.analyzeFragmentation(
+			cashPayments,
+			activityCode,
+			daily,
+		);
 
-		// Analyze payment patterns for fragmentation indicators
-		const fragmentationAnalysis = this.analyzeFragmentation(cashPayments);
+		if (!fragmentationAnalysis.isFragmented) return null;
 
-		if (!fragmentationAnalysis.isFragmented) {
-			return null;
-		}
-
-		// Get unique operations
 		const matchedOperations = this.getUniqueOperations(cashPayments);
 		const totalCashAmount = cashPayments.reduce(
 			(sum, cp) => sum + cp.amount,
 			0,
 		);
 
-		// Find matching rule
 		const matchedRule = this.findMatchingRule(context.alertRules);
 
 		return {
@@ -80,6 +73,7 @@ export class CashFragmentationSeeker extends BaseAlertSeeker {
 				),
 				clientId: client.id,
 				clientName: client.name || client.rfc,
+				activityCode,
 				alertType: "cash_fragmentation",
 				cashPaymentCount: cashPayments.length,
 				windowDays: CASH_FRAGMENTATION_WINDOW_DAYS,
@@ -97,18 +91,17 @@ export class CashFragmentationSeeker extends BaseAlertSeeker {
 			matchedOperations,
 			metadata: {
 				seekerType: this.ruleType,
-				activityCode: this.activityCode,
+				activityCode: context.activityCode,
 				cashPaymentCount: cashPayments.length,
 				fragmentationScore: fragmentationAnalysis.score,
 			},
 		};
 	}
 
-	/**
-	 * Analyzes cash payments for fragmentation patterns
-	 */
 	private analyzeFragmentation(
 		cashPayments: { operation: AlertOperation; amount: number }[],
+		activityCode: string,
+		umaDailyValue: number,
 	): {
 		isFragmented: boolean;
 		indicators: string[];
@@ -119,7 +112,6 @@ export class CashFragmentationSeeker extends BaseAlertSeeker {
 		const indicators: string[] = [];
 		let score = 0;
 
-		// Check for multiple payments
 		if (cashPayments.length >= 2) {
 			indicators.push("multiple_cash_payments");
 			score += 1;
@@ -130,7 +122,6 @@ export class CashFragmentationSeeker extends BaseAlertSeeker {
 			score += 1;
 		}
 
-		// Check for different payers (account holders)
 		const payers = new Set<string>();
 		for (const cp of cashPayments) {
 			const methods = cp.operation.paymentMethods || [];
@@ -147,7 +138,6 @@ export class CashFragmentationSeeker extends BaseAlertSeeker {
 			score += 2;
 		}
 
-		// Check for similar amounts (possible structuring to stay under limits)
 		const amounts = cashPayments.map((cp) => cp.amount);
 		const avgAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length;
 		const variance =
@@ -156,18 +146,26 @@ export class CashFragmentationSeeker extends BaseAlertSeeker {
 		const stdDev = Math.sqrt(variance);
 		const coefficientOfVariation = avgAmount > 0 ? stdDev / avgAmount : 0;
 
-		// Low variance suggests intentional structuring
 		if (coefficientOfVariation < 0.3 && cashPayments.length >= 2) {
 			indicators.push("similar_amounts");
 			score += 1;
 		}
 
-		// Check for payments just under common thresholds
-		const commonThresholds = [10000, 50000, 100000, 500000];
+		let refMxn = getNoticeThresholdMxn(activityCode, umaDailyValue);
+		if (refMxn === null) {
+			refMxn = 1000 * umaDailyValue;
+		} else if (refMxn === 0) {
+			const idMxn = getIdentificationThresholdMxn(activityCode, umaDailyValue);
+			refMxn = idMxn === null || idMxn === 0 ? 1000 * umaDailyValue : idMxn;
+		}
+
+		const commonThresholds = [0.25, 0.5, 0.9, 1.0].map((f) => refMxn * f);
 		const nearThresholdPayments = cashPayments.filter((cp) =>
 			commonThresholds.some(
 				(threshold) =>
-					cp.amount >= threshold * 0.9 && cp.amount <= threshold * 0.99,
+					threshold > 0 &&
+					cp.amount >= threshold * 0.9 &&
+					cp.amount <= threshold * 0.99,
 			),
 		);
 		if (nearThresholdPayments.length > 0) {
@@ -175,7 +173,6 @@ export class CashFragmentationSeeker extends BaseAlertSeeker {
 			score += 2;
 		}
 
-		// Determine risk level
 		let riskLevel: "LOW" | "MEDIUM" | "HIGH" = "LOW";
 		if (score >= 4) {
 			riskLevel = "HIGH";
@@ -192,9 +189,6 @@ export class CashFragmentationSeeker extends BaseAlertSeeker {
 		};
 	}
 
-	/**
-	 * Gets unique operations from cash payments
-	 */
 	private getUniqueOperations(
 		cashPayments: { operation: AlertOperation; amount: number }[],
 	): AlertOperation[] {

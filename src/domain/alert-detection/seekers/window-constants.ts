@@ -1,12 +1,6 @@
 /**
- * Hardcoded constants for alert seekers
- * These values are based on LFPIORPI legal requirements
+ * Time windows and multipliers for alert seekers (LFPIORPI-aligned).
  */
-
-/**
- * UMA threshold for mandatory SAT report (6,420 UMA per Art. 17 LFPIORPI)
- */
-export const UMA_THRESHOLD = 6420;
 
 /**
  * Time window in days for aggregating operations (6 months per LFPIORPI)
@@ -34,13 +28,17 @@ export const CASH_FRAGMENTATION_WINDOW_DAYS = 30;
 export const CASH_FRAGMENTATION_MIN_PAYMENTS = 2;
 
 /**
- * Multiplier for "very high value" determination for new clients
- * An operation is considered very high value if it's >= UMA_THRESHOLD * this multiplier
+ * Multiplier for "very high value" for new clients vs activity notice threshold (MXN).
  */
 export const NEW_CLIENT_HIGH_VALUE_MULTIPLIER = 1.5;
 
 /**
- * Seeker rule types - matches AlertRule.ruleType
+ * Floor (UMA) for new-client high-value when notice threshold is ALWAYS (no numeric notice).
+ */
+export const NEW_CLIENT_HIGH_VALUE_ALWAYS_NOTICE_FLOOR_UMA = 1500;
+
+/**
+ * Seeker rule types - matches AlertRule.ruleType (subset; see UniversalAlertRuleType for full set).
  */
 export const RULE_TYPES = {
 	OPERATION_AMOUNT_UMA: "operation_amount_uma",
@@ -49,6 +47,7 @@ export const RULE_TYPES = {
 	FREQUENT_OPERATIONS: "frequent_operations",
 	THIRD_PARTY_ACCOUNTS: "third_party_accounts",
 	CASH_PAYMENT_LIMIT: "cash_payment_limit",
+	CASH_LIMIT_ART32: "cash_limit_art32",
 	CASH_FRAGMENTATION: "cash_fragmentation",
 	PEP_ABOVE_THRESHOLD: "pep_above_threshold",
 	PEP_OR_HIGH_RISK: "pep_or_high_risk",

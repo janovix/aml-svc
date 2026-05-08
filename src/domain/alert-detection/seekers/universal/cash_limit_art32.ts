@@ -1,10 +1,12 @@
 /**
- * Universal Cash High-Value Seeker
- *
- * Detects cash payments that exceed the legal limit or are unusually
- * high for the activity type. Based on Art. 32 LFPIORPI.
+ * Universal Art. 32 cash payment cap seeker (LFPIORPI).
  */
 
+import {
+	DEFAULT_UMA_DAILY_VALUE,
+	getCashLimitMxn,
+	getCashLimitUma,
+} from "../../config/activity-thresholds";
 import {
 	UniversalAlertSeeker,
 	type AlertContext,
@@ -13,14 +15,13 @@ import {
 	type UniversalAlertRuleType,
 } from "../types";
 import type { PatternType } from "../../config/alert-patterns";
-import { getCashLimitUma } from "../../config/activity-thresholds";
 
-export class UniversalCashHighValueSeeker extends UniversalAlertSeeker {
-	readonly patternType: PatternType = "cash_high_value";
-	readonly ruleType: UniversalAlertRuleType = "cash_high_value";
-	readonly name = "High-value cash payment detected";
+export class UniversalCashLimitArt32Seeker extends UniversalAlertSeeker {
+	readonly patternType: PatternType = "cash_limit_art32";
+	readonly ruleType: UniversalAlertRuleType = "cash_limit_art32";
+	readonly name = "Cash payment exceeds Art. 32 legal cap";
 	readonly description =
-		"Detects cash payments exceeding the legal limit for the activity";
+		"Detects cash payments strictly above the activity-specific Art. 32 UMA limit";
 	readonly defaultSeverity: AlertSeverity = "HIGH";
 
 	async evaluate(
@@ -31,15 +32,9 @@ export class UniversalCashHighValueSeeker extends UniversalAlertSeeker {
 
 		if (!this.appliesTo(activityCode)) return null;
 
-		/** Art. 32 caps are evaluated by `cash_limit_art32`; avoid duplicate alerts. */
-		if (getCashLimitUma(activityCode) !== null) {
-			return null;
-		}
-
-		const maxCashAmount = this.calculateActivityUmaThreshold(
-			activityCode,
-			umaValue,
-		);
+		const daily = umaValue?.dailyValue ?? DEFAULT_UMA_DAILY_VALUE;
+		const maxCashAmount = getCashLimitMxn(activityCode, daily);
+		if (maxCashAmount === null) return null;
 
 		const operationsToEvaluate = triggerOperation
 			? [triggerOperation]
@@ -59,6 +54,7 @@ export class UniversalCashHighValueSeeker extends UniversalAlertSeeker {
 		);
 
 		const matchedRule = this.findMatchingRule(context.alertRules);
+		const umaCap = getCashLimitUma(activityCode);
 
 		return {
 			triggered: true,
@@ -74,6 +70,7 @@ export class UniversalCashHighValueSeeker extends UniversalAlertSeeker {
 				activityCode,
 				alertType: "cash_payment_limit_exceeded",
 				maxCashAmount,
+				cashLimitUma: umaCap,
 				cashPayments: excessivePayments.map((ep) => ({
 					operationId: ep.operation.id,
 					cashAmount: ep.amount,

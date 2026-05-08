@@ -5,7 +5,7 @@
  * threshold to avoid triggering SAT notices (smurfing / structuring).
  */
 
-import { AGGREGATION_WINDOW_DAYS } from "../constants";
+import { AGGREGATION_WINDOW_DAYS } from "../window-constants";
 import {
 	UniversalAlertSeeker,
 	type AlertContext,

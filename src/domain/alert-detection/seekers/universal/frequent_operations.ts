@@ -8,7 +8,7 @@
 import {
 	FREQUENT_OPERATION_WINDOW_DAYS,
 	FREQUENT_OPERATION_MIN_COUNT,
-} from "../constants";
+} from "../window-constants";
 import {
 	UniversalAlertSeeker,
 	type AlertContext,

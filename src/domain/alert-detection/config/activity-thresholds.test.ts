@@ -3,8 +3,11 @@ import {
 	ACTIVITY_THRESHOLDS,
 	ALL_ACTIVITY_CODES,
 	DEFAULT_UMA_DAILY_VALUE,
+	exceedsCashLimit,
 	exceedsIdentificationThreshold,
 	exceedsNoticeThreshold,
+	getCashLimitMxn,
+	getCashLimitUma,
 	getIdentificationThresholdMxn,
 	getIdentificationThresholdUma,
 	getNoticeThresholdMxn,
@@ -45,6 +48,41 @@ describe("ACTIVITY_THRESHOLDS", () => {
 		for (const [key, value] of Object.entries(ACTIVITY_THRESHOLDS)) {
 			expect(value.activityCode).toBe(key);
 		}
+	});
+
+	it("cashLimitUma Art. 32 caps match expected activities", () => {
+		expect(ACTIVITY_THRESHOLDS.VEH.cashLimitUma).toBe(8025);
+		expect(ACTIVITY_THRESHOLDS.INM.cashLimitUma).toBe(8025);
+		expect(ACTIVITY_THRESHOLDS.DIN.cashLimitUma).toBe(8025);
+		expect(ACTIVITY_THRESHOLDS.MJR.cashLimitUma).toBe(3210);
+		expect(ACTIVITY_THRESHOLDS.OBA.cashLimitUma).toBe(3210);
+		expect(ACTIVITY_THRESHOLDS.BLI.cashLimitUma).toBe(3210);
+		expect(ACTIVITY_THRESHOLDS.JYS.cashLimitUma).toBe(3210);
+		expect(ACTIVITY_THRESHOLDS.TPP.cashLimitUma).toBe(3210);
+		expect(ACTIVITY_THRESHOLDS.TSC.cashLimitUma).toBeNull();
+		expect(ACTIVITY_THRESHOLDS.AVI.cashLimitUma).toBeNull();
+	});
+});
+
+describe("getCashLimitUma / getCashLimitMxn / exceedsCashLimit", () => {
+	it("returns Art. 32 UMA for VEH", () => {
+		expect(getCashLimitUma("VEH")).toBe(8025);
+		expect(getCashLimitMxn("VEH", UMA)).toBeCloseTo(8025 * UMA, 2);
+	});
+
+	it("returns null for activities without a configured cash cap", () => {
+		expect(getCashLimitUma("TSC")).toBeNull();
+		expect(getCashLimitMxn("TSC", UMA)).toBeNull();
+	});
+
+	it("exceedsCashLimit when strictly greater than cap", () => {
+		const limit = 8025 * UMA;
+		expect(exceedsCashLimit("VEH", limit, UMA)).toBe(false);
+		expect(exceedsCashLimit("VEH", limit + 0.01, UMA)).toBe(true);
+	});
+
+	it("returns false for unknown activity", () => {
+		expect(exceedsCashLimit("UNKNOWN", 999999, UMA)).toBe(false);
 	});
 });
 

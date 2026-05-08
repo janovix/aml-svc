@@ -41,6 +41,11 @@ export type PatternType =
 	| "foreign_currency_cash"
 	| "virtual_currency_payment"
 	| "cash_high_value"
+	| "cash_limit_art32"
+	| "cash_fragmentation"
+	| "pep_above_threshold"
+	| "pep_or_high_risk"
+	| "new_client_high_value"
 	| "third_party_payer"
 	| "quick_refund_pattern"
 	| "minor_client"
@@ -291,6 +296,156 @@ export const ALERT_PATTERNS: Record<PatternType, PatternConfig> = {
 		defaultSeverity: "HIGH",
 		configKey: "cash_high_value",
 		tier: 1,
+	},
+
+	cash_limit_art32: {
+		name: "Cash exceeds Art. 32 LFPIORPI cap",
+		description:
+			"Cash payment strictly exceeds the activity-specific cash limit (UMA) under Art. 32",
+		alertCodeMapping: {
+			VEH: "2512",
+			INM: "3114",
+			DIN: "3911",
+			MJR: "2911",
+			OBA: "3313",
+			BLI: "2611",
+			JYS: "2121",
+			TPP: "2302",
+			TSC: null,
+			TDR: null,
+			CHV: null,
+			MPC: null,
+			ARI: null,
+			DON: null,
+			AVI: null,
+			FEP: null,
+			FES: null,
+			SPR: null,
+			TCV: null,
+		},
+		defaultSeverity: "HIGH",
+		configKey: "cash_limit_art32",
+		tier: 1,
+	},
+
+	cash_fragmentation: {
+		name: "Cash fragmentation / structuring",
+		description:
+			"Multiple cash payments suggesting structuring or fragmentation",
+		alertCodeMapping: {
+			VEH: "2516",
+			INM: "3103",
+			MJR: "2904",
+			ARI: "3007",
+			BLI: "2603",
+			DON: "2714",
+			MPC: "2805",
+			JYS: "2125",
+			SPR: "3409",
+			FEP: "3508",
+			FES: "1261",
+			OBA: "3309",
+			TCV: "3213",
+			TSC: null,
+			TPP: "2304",
+			TDR: "3711",
+			CHV: null,
+			DIN: "3903",
+			AVI: null,
+		},
+		defaultSeverity: "MEDIUM",
+		configKey: "cash_fragmentation",
+		tier: 1,
+	},
+
+	pep_above_threshold: {
+		name: "PEP operation at or above notice UMA threshold",
+		description:
+			"Politically exposed person with operation meeting activity notice threshold",
+		alertCodeMapping: {
+			VEH: "2506",
+			INM: "3106",
+			MJR: "2906",
+			ARI: null,
+			BLI: "2606",
+			DON: "2705",
+			MPC: "2806",
+			JYS: "2109",
+			SPR: "3406",
+			FEP: null,
+			FES: "1256",
+			OBA: "3306",
+			TCV: "3206",
+			TSC: "2209",
+			TPP: null,
+			TDR: null,
+			CHV: null,
+			DIN: "3905",
+			AVI: "4119",
+		},
+		defaultSeverity: "CRITICAL",
+		configKey: "pep_above_threshold",
+		tier: 1,
+	},
+
+	pep_or_high_risk: {
+		name: "PEP or high-risk client activity",
+		description:
+			"Operation from a PEP or client classified as high risk (enhanced monitoring)",
+		alertCodeMapping: {
+			VEH: "2506",
+			INM: "3106",
+			MJR: "2906",
+			ARI: "3011",
+			BLI: "2606",
+			DON: "2705",
+			MPC: "2806",
+			JYS: "2109",
+			SPR: "3406",
+			FEP: null,
+			FES: "1256",
+			OBA: "3306",
+			TCV: "3206",
+			TSC: "2209",
+			TPP: null,
+			TDR: null,
+			CHV: null,
+			DIN: "3905",
+			AVI: "4119",
+		},
+		defaultSeverity: "HIGH",
+		configKey: "pep_or_high_risk",
+		tier: 1,
+	},
+
+	new_client_high_value: {
+		name: "New client high-value operation",
+		description:
+			"Recently onboarded or low-history client with operation materially above notice threshold",
+		alertCodeMapping: {
+			VEH: "2507",
+			INM: "3107",
+			MJR: "2907",
+			ARI: "3011",
+			BLI: "2607",
+			DON: "2706",
+			MPC: "2807",
+			JYS: "2110",
+			SPR: "3407",
+			FEP: "100",
+			FES: "1257",
+			OBA: "3307",
+			TCV: "3207",
+			TSC: "2210",
+			TPP: "100",
+			TDR: "100",
+			CHV: "100",
+			DIN: "3906",
+			AVI: "4110",
+		},
+		defaultSeverity: "HIGH",
+		configKey: "new_client_high_value",
+		tier: 2,
 	},
 
 	third_party_payer: {

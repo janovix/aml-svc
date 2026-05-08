@@ -18,6 +18,11 @@ import {
 	UniversalStructuringDetectionSeeker,
 	UniversalSharedAddressAnalysisSeeker,
 	UniversalPriceAnomalySeeker,
+	UniversalCashLimitArt32Seeker,
+	UniversalCashFragmentationSeeker,
+	UniversalPepAboveThresholdSeeker,
+	UniversalPepOrHighRiskSeeker,
+	UniversalNewClientHighValueSeeker,
 } from "./index";
 import type {
 	AlertContext,
@@ -25,10 +30,22 @@ import type {
 	UniversalAlertRuleType,
 } from "../types";
 import type { AlertRuleEntity } from "../../../alert/types";
+import {
+	NEW_CLIENT_HIGH_VALUE_ALWAYS_NOTICE_FLOOR_UMA,
+	NEW_CLIENT_HIGH_VALUE_MULTIPLIER,
+} from "../window-constants";
 
 const UMA_DAILY = 117.31;
 /** VEH notice threshold in MXN with default UMA */
 const VEH_NOTICE_MXN = 6420 * UMA_DAILY;
+/** ARI: pattern applies + no Art. 32 cash cap — use for cash_high_value seeker */
+const ARI_NOTICE_MXN = 3210 * UMA_DAILY;
+const VEH_ART32_CAP_MXN = 8025 * UMA_DAILY;
+const JYS_ART32_CAP_MXN = 3210 * UMA_DAILY;
+const SPR_NEW_CLIENT_HIGH_VALUE_MXN =
+	NEW_CLIENT_HIGH_VALUE_ALWAYS_NOTICE_FLOOR_UMA *
+	UMA_DAILY *
+	NEW_CLIENT_HIGH_VALUE_MULTIPLIER;
 
 function daysAgoIso(days: number): string {
 	const d = new Date();
@@ -349,16 +366,17 @@ describe("UniversalVirtualCurrencyPaymentSeeker", () => {
 describe("UniversalCashHighValueSeeker", () => {
 	const seeker = new UniversalCashHighValueSeeker();
 
-	it("triggers when a cash payment exceeds the activity UMA threshold", async () => {
+	it("triggers when a cash payment exceeds the activity notice threshold (no Art. 32 cap)", async () => {
 		const op = makeOp({
 			paymentMethods: [
-				{ id: "pm1", method: "CASH", amount: VEH_NOTICE_MXN + 1 },
+				{ id: "pm1", method: "CASH", amount: ARI_NOTICE_MXN + 1 },
 			],
 		});
 		const ctx = makeContext({
+			activityCode: "ARI",
 			operations: [op],
 			triggerOperation: op,
-			alertRules: [ruleEntity("cash_high_value", "VEH")],
+			alertRules: [ruleEntity("cash_high_value", "ARI")],
 		});
 		const result = await seeker.evaluate(ctx);
 		expect(result).not.toBeNull();
@@ -367,12 +385,212 @@ describe("UniversalCashHighValueSeeker", () => {
 
 	it("does not trigger when cash is at or below threshold", async () => {
 		const op = makeOp({
-			paymentMethods: [{ id: "pm1", method: "CASH", amount: VEH_NOTICE_MXN }],
+			paymentMethods: [{ id: "pm1", method: "CASH", amount: ARI_NOTICE_MXN }],
 		});
 		const ctx = makeContext({
+			activityCode: "ARI",
+			operations: [op],
+			triggerOperation: op,
+			alertRules: [ruleEntity("cash_high_value", "ARI")],
+		});
+		expect(await seeker.evaluate(ctx)).toBeNull();
+	});
+
+	it("does not run for VEH (Art. 32 cap handled by cash_limit_art32)", async () => {
+		const op = makeOp({
+			paymentMethods: [
+				{ id: "pm1", method: "CASH", amount: VEH_NOTICE_MXN + 1 },
+			],
+		});
+		const ctx = makeContext({
+			activityCode: "VEH",
 			operations: [op],
 			triggerOperation: op,
 			alertRules: [ruleEntity("cash_high_value", "VEH")],
+		});
+		expect(await seeker.evaluate(ctx)).toBeNull();
+	});
+});
+
+describe("UniversalCashLimitArt32Seeker", () => {
+	const seeker = new UniversalCashLimitArt32Seeker();
+
+	it.each([
+		["VEH", VEH_ART32_CAP_MXN],
+		["INM", VEH_ART32_CAP_MXN],
+		["JYS", JYS_ART32_CAP_MXN],
+	] as const)(
+		"triggers when cash strictly exceeds Art. 32 cap (%s)",
+		async (activityCode, capMxn) => {
+			const op = makeOp({
+				paymentMethods: [{ id: "pm1", method: "CASH", amount: capMxn + 1 }],
+			});
+			const ctx = makeContext({
+				activityCode,
+				operations: [op],
+				triggerOperation: op,
+				alertRules: [ruleEntity("cash_limit_art32", activityCode)],
+			});
+			const result = await seeker.evaluate(ctx);
+			expect(result?.triggered).toBe(true);
+		},
+	);
+
+	it("does not trigger at or below the cap", async () => {
+		const op = makeOp({
+			paymentMethods: [
+				{ id: "pm1", method: "CASH", amount: VEH_ART32_CAP_MXN },
+			],
+		});
+		const ctx = makeContext({
+			activityCode: "VEH",
+			operations: [op],
+			triggerOperation: op,
+			alertRules: [ruleEntity("cash_limit_art32", "VEH")],
+		});
+		expect(await seeker.evaluate(ctx)).toBeNull();
+	});
+
+	it("returns null when activity has no cash cap (e.g. ARI)", async () => {
+		const op = makeOp({
+			paymentMethods: [{ id: "pm1", method: "CASH", amount: 10_000_000 }],
+		});
+		const ctx = makeContext({
+			activityCode: "ARI",
+			operations: [op],
+			triggerOperation: op,
+			alertRules: [ruleEntity("cash_limit_art32", "ARI")],
+		});
+		expect(await seeker.evaluate(ctx)).toBeNull();
+	});
+});
+
+describe("UniversalCashFragmentationSeeker", () => {
+	const seeker = new UniversalCashFragmentationSeeker();
+
+	it("triggers when multiple similar cash payments score as fragmented", async () => {
+		const op1 = makeOp({
+			id: "frag-1",
+			amount: 50_000,
+			createdAt: daysAgoIso(2),
+			operationDate: daysAgoIso(2),
+			paymentMethods: [{ id: "pm1", method: "CASH", amount: 50_000 }],
+		});
+		const op2 = makeOp({
+			id: "frag-2",
+			amount: 50_000,
+			createdAt: daysAgoIso(1),
+			operationDate: daysAgoIso(1),
+			paymentMethods: [{ id: "pm2", method: "CASH", amount: 50_000 }],
+		});
+		const ctx = makeContext({
+			activityCode: "VEH",
+			operations: [op1, op2],
+			alertRules: [ruleEntity("cash_fragmentation", "VEH")],
+		});
+		const result = await seeker.evaluate(ctx);
+		expect(result?.triggered).toBe(true);
+	});
+});
+
+describe("UniversalPepAboveThresholdSeeker", () => {
+	const seeker = new UniversalPepAboveThresholdSeeker();
+
+	it("triggers for PEP client when MXN operation meets notice threshold", async () => {
+		const op = makeOp({
+			amount: VEH_NOTICE_MXN,
+			createdAt: daysAgoIso(1),
+			operationDate: daysAgoIso(1),
+		});
+		const ctx = makeContext({
+			client: { id: "c1", rfc: "ABC1234567890", name: "PEP", isPep: true },
+			operations: [op],
+			triggerOperation: op,
+			alertRules: [ruleEntity("pep_above_threshold", "VEH")],
+		});
+		const result = await seeker.evaluate(ctx);
+		expect(result?.triggered).toBe(true);
+	});
+
+	it("does not trigger for non-PEP", async () => {
+		const op = makeOp({ amount: VEH_NOTICE_MXN });
+		const ctx = makeContext({
+			client: { id: "c1", rfc: "ABC1234567890", name: "No PEP", isPep: false },
+			operations: [op],
+			triggerOperation: op,
+			alertRules: [ruleEntity("pep_above_threshold", "VEH")],
+		});
+		expect(await seeker.evaluate(ctx)).toBeNull();
+	});
+});
+
+describe("UniversalPepOrHighRiskSeeker", () => {
+	const seeker = new UniversalPepOrHighRiskSeeker();
+
+	it("triggers for high-risk client", async () => {
+		const op = makeOp({
+			createdAt: daysAgoIso(1),
+			operationDate: daysAgoIso(1),
+		});
+		const ctx = makeContext({
+			client: {
+				id: "c1",
+				rfc: "ABC1234567890",
+				name: "Risk",
+				isPep: false,
+				riskLevel: "HIGH",
+			},
+			operations: [op],
+			triggerOperation: op,
+			alertRules: [ruleEntity("pep_or_high_risk", "VEH")],
+		});
+		const result = await seeker.evaluate(ctx);
+		expect(result?.triggered).toBe(true);
+	});
+});
+
+describe("UniversalNewClientHighValueSeeker", () => {
+	const seeker = new UniversalNewClientHighValueSeeker();
+
+	it("triggers for new SPR client above floor × multiplier (notice ALWAYS)", async () => {
+		const op = makeOp({
+			amount: SPR_NEW_CLIENT_HIGH_VALUE_MXN + 1,
+			createdAt: daysAgoIso(1),
+			operationDate: daysAgoIso(1),
+		});
+		const ctx = makeContext({
+			activityCode: "SPR",
+			client: {
+				id: "c1",
+				rfc: "ABC1234567890",
+				name: "New",
+				createdAt: daysAgoIso(5),
+			},
+			operations: [op],
+			triggerOperation: op,
+			alertRules: [ruleEntity("new_client_high_value", "SPR")],
+		});
+		const result = await seeker.evaluate(ctx);
+		expect(result?.triggered).toBe(true);
+	});
+
+	it("does not trigger below threshold", async () => {
+		const op = makeOp({
+			amount: SPR_NEW_CLIENT_HIGH_VALUE_MXN - 1,
+			createdAt: daysAgoIso(1),
+			operationDate: daysAgoIso(1),
+		});
+		const ctx = makeContext({
+			activityCode: "SPR",
+			client: {
+				id: "c1",
+				rfc: "ABC1234567890",
+				name: "New",
+				createdAt: daysAgoIso(5),
+			},
+			operations: [op],
+			triggerOperation: op,
+			alertRules: [ruleEntity("new_client_high_value", "SPR")],
 		});
 		expect(await seeker.evaluate(ctx)).toBeNull();
 	});
