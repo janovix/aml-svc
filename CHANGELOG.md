@@ -1,3 +1,10 @@
+# [1.14.0-rc.23](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.22...v1.14.0-rc.23) (2026-05-13)
+
+
+### Features
+
+* **watchlist:** update watchlist rescan settings to 90-day interval and increase daily cap to 5000; add cron schedule for weekly rescan ([1773da3](https://github.com/janovix/aml-svc/commit/1773da3bb97b5016e84772c464285bd0b3ebd47b))
+
 # [1.14.0-rc.22](https://github.com/janovix/aml-svc/compare/v1.14.0-rc.21...v1.14.0-rc.22) (2026-05-08)
 
 
