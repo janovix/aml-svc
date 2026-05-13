@@ -5,7 +5,7 @@ describe("organizationSettingsUpdateSchema (watchlist rescan)", () => {
 	it("accepts watchlist re-scan fields on PATCH", () => {
 		const r = organizationSettingsUpdateSchema.safeParse({
 			watchlistRescanEnabled: false,
-			watchlistRescanIntervalDays: 14,
+			watchlistRescanIntervalDays: 120,
 			watchlistRescanIncludeBcs: true,
 			watchlistRescanNotifyOnStatusChange: false,
 			watchlistRescanDailyCap: 200,
@@ -17,7 +17,7 @@ describe("organizationSettingsUpdateSchema (watchlist rescan)", () => {
 
 	it("rejects rescan interval out of range", () => {
 		const r = organizationSettingsUpdateSchema.safeParse({
-			watchlistRescanIntervalDays: 5,
+			watchlistRescanIntervalDays: 89,
 		});
 		expect(r.success).toBe(false);
 	});

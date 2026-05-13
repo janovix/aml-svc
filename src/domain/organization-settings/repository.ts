@@ -7,10 +7,10 @@ import { mapPrismaOrganizationSettings } from "./mappers";
 
 const WATCHLIST_DEFAULTS = {
 	watchlistRescanEnabled: true,
-	watchlistRescanIntervalDays: 30,
+	watchlistRescanIntervalDays: 90,
 	watchlistRescanIncludeBcs: true,
 	watchlistRescanNotifyOnStatusChange: true,
-	watchlistRescanDailyCap: 500,
+	watchlistRescanDailyCap: 5000,
 	watchlistRescanNotifyChannels: '["in_app"]',
 	watchlistRescanSources: '["ofac","un","sat69b","pep","adverse_media"]',
 } as const;

@@ -10,6 +10,7 @@ import { openAPISpec } from "./openapi";
 import { createRouter } from "./routes";
 import { handleServiceBindingRequest } from "./lib/alert-service-binding";
 import type { Bindings } from "./types";
+import { isWatchlistRescanCron } from "./lib/watchlist-rescan-schedule";
 
 // Start a Hono app
 const app = new Hono<{ Bindings: Bindings }>();
@@ -292,6 +293,28 @@ export default {
 		ctx: ExecutionContext,
 	): Promise<void> {
 		const cron = event.cron ?? "";
+
+		// Weekly watchlist rescan only (Sundays 03:00 UTC) — do not run legacy daily tasks.
+		if (isWatchlistRescanCron(cron)) {
+			ctx.waitUntil(
+				(async () => {
+					const { processWatchlistRescan } = await import(
+						"./lib/watchlist-rescan"
+					);
+					return processWatchlistRescan(env, new Date(event.scheduledTime));
+				})()
+					.then((r) =>
+						console.log(
+							`[scheduled] Watchlist rescan (weekly): enqueued ${r.enqueued} jobs, ${r.organizationsProcessed} orgs`,
+						),
+					)
+					.catch((err) =>
+						console.error("[scheduled] Watchlist rescan failed:", err),
+					),
+			);
+			return;
+		}
+
 		const trainingOnlyCrons = new Set(["0 5 * * *", "0 6 * * *", "0 7 * * *"]);
 		const runLegacyScheduledTasks = !trainingOnlyCrons.has(cron);
 
@@ -378,25 +401,6 @@ export default {
 				)
 				.catch((err) =>
 					console.error("[scheduled] KYC expiry check failed:", err),
-				),
-		);
-
-		// Risk review: enqueue reassessment for clients past their review date
-		// Watchlist: enqueue stale client/BC rescreens (uses org watchlist rescan settings)
-		ctx.waitUntil(
-			(async () => {
-				const { processWatchlistRescan } = await import(
-					"./lib/watchlist-rescan"
-				);
-				return processWatchlistRescan(env, new Date(event.scheduledTime));
-			})()
-				.then((r) =>
-					console.log(
-						`[scheduled] Watchlist rescan: enqueued ${r.enqueued} jobs, ${r.organizationsProcessed} orgs`,
-					),
-				)
-				.catch((err) =>
-					console.error("[scheduled] Watchlist rescan failed:", err),
 				),
 		);
 

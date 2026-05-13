@@ -26,7 +26,7 @@ function orgSettingsRow(
 		selfServiceRequiredSections: null,
 		selfServiceSendEmail: true,
 		watchlistRescanEnabled: true,
-		watchlistRescanIntervalDays: 30,
+		watchlistRescanIntervalDays: 90,
 		watchlistRescanIncludeBcs: false,
 		watchlistRescanNotifyOnStatusChange: true,
 		watchlistRescanDailyCap: 5,
@@ -101,6 +101,52 @@ describe("processWatchlistRescan (mocked prisma)", () => {
 		expect(result.enqueued).toBe(3);
 		expect(send.mock.calls.length).toBe(3);
 		expect(prisma.beneficialController.findMany).toHaveBeenCalled();
+	});
+
+	it("uses org interval for stale client cutoff", async () => {
+		const send = vi.fn().mockResolvedValue(undefined);
+		const clientFindMany = vi.fn().mockResolvedValue([]);
+		const prisma = {
+			organizationSettings: {
+				findMany: vi
+					.fn()
+					.mockResolvedValue([
+						orgSettingsRow("os1", "org-a", { watchlistRescanIntervalDays: 90 }),
+					]),
+			},
+			client: {
+				findMany: clientFindMany,
+			},
+			beneficialController: {
+				findMany: vi.fn(),
+			},
+		};
+		mockGetPrismaClient.mockReturnValue(prisma);
+
+		const scheduled = new Date("2025-06-15T12:00:00Z");
+		await processWatchlistRescan(
+			{ AML_SCREENING_REFRESH_QUEUE: { send } } as unknown as Bindings,
+			scheduled,
+		);
+
+		expect(clientFindMany).toHaveBeenCalled();
+		const arg = clientFindMany.mock.calls[0][0] as {
+			where: { OR: Array<{ screenedAt?: null | { lt: Date } }> };
+		};
+		const ltClause = arg.where.OR.find(
+			(o): o is { screenedAt: { lt: Date } } =>
+				o !== null &&
+				typeof o === "object" &&
+				"screenedAt" in o &&
+				o.screenedAt !== null &&
+				typeof o.screenedAt === "object" &&
+				"lt" in o.screenedAt,
+		);
+		expect(ltClause).toBeDefined();
+		const cutOff = ltClause!.screenedAt.lt;
+		const expected = new Date(scheduled);
+		expected.setDate(expected.getDate() - 90);
+		expect(cutOff.getTime()).toBe(expected.getTime());
 	});
 
 	it("logs and continues when send rejects", async () => {

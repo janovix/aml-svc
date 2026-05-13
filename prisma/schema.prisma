@@ -1252,10 +1252,10 @@ model OrganizationSettings {
   selfServiceSendEmail        Boolean  @default(true) @map("self_service_send_email")
   // Watchlist re-screen (scheduled cron)
   watchlistRescanEnabled               Boolean  @default(true) @map("watchlist_rescan_enabled")
-  watchlistRescanIntervalDays          Int      @default(30) @map("watchlist_rescan_interval_days")
+  watchlistRescanIntervalDays          Int      @default(90) @map("watchlist_rescan_interval_days")
   watchlistRescanIncludeBcs            Boolean  @default(true) @map("watchlist_rescan_include_bcs")
   watchlistRescanNotifyOnStatusChange  Boolean  @default(true) @map("watchlist_rescan_notify_on_status_change")
-  watchlistRescanDailyCap              Int      @default(500) @map("watchlist_rescan_daily_cap")
+  watchlistRescanDailyCap              Int      @default(5000) @map("watchlist_rescan_daily_cap")
   watchlistRescanNotifyChannels        String   @default("[\"in_app\"]") @map("watchlist_rescan_notify_channels") // JSON: in_app, email
   watchlistRescanSources               String   @default("[\"ofac\",\"un\",\"sat69b\",\"pep\",\"adverse_media\"]") @map("watchlist_rescan_sources") // JSON
   createdAt                   DateTime @default(now()) @map("created_at")

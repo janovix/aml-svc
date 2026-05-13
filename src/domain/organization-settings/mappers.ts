@@ -60,11 +60,11 @@ export function mapPrismaOrganizationSettings(
 		selfServiceSendEmail: prisma.selfServiceSendEmail ?? true,
 		selfServiceRequiredSections,
 		watchlistRescanEnabled: prisma.watchlistRescanEnabled ?? true,
-		watchlistRescanIntervalDays: prisma.watchlistRescanIntervalDays ?? 30,
+		watchlistRescanIntervalDays: prisma.watchlistRescanIntervalDays ?? 90,
 		watchlistRescanIncludeBcs: prisma.watchlistRescanIncludeBcs ?? true,
 		watchlistRescanNotifyOnStatusChange:
 			prisma.watchlistRescanNotifyOnStatusChange ?? true,
-		watchlistRescanDailyCap: prisma.watchlistRescanDailyCap ?? 500,
+		watchlistRescanDailyCap: prisma.watchlistRescanDailyCap ?? 5000,
 		watchlistRescanNotifyChannels:
 			watchlistRescanNotifyChannels.length > 0
 				? watchlistRescanNotifyChannels
