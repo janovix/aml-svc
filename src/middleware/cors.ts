@@ -87,7 +87,15 @@ export function corsMiddleware(): MiddlewareHandler {
 				// Check if origin matches any pattern
 				return isOriginAllowed(origin, trustedPatterns) ? origin : null;
 			},
-			allowHeaders: ["Content-Type", "Authorization", "X-Environment"],
+			allowHeaders: [
+				"Content-Type",
+				"Authorization",
+				"X-Environment",
+				// Playwright E2E: global `x-e2e-turnstile-bypass` (see smoke-tests) is sent on
+				// all browser requests; AML frontend fetch to aml-svc must pass CORS preflight.
+				// Does not affect Stripe (checkout.stripe.com is unrelated to this Worker CORS).
+				"x-e2e-turnstile-bypass",
+			],
 			allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
 			exposeHeaders: ["Content-Length", "X-Request-Id"],
 			maxAge: 600,

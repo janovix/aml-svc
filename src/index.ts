@@ -10,6 +10,7 @@ import { openAPISpec } from "./openapi";
 import { createRouter } from "./routes";
 import { handleServiceBindingRequest } from "./lib/alert-service-binding";
 import type { Bindings } from "./types";
+import { isWatchlistRescanCron } from "./lib/watchlist-rescan-schedule";
 
 // Start a Hono app
 const app = new Hono<{ Bindings: Bindings }>();
@@ -291,6 +292,81 @@ export default {
 		env: Bindings,
 		ctx: ExecutionContext,
 	): Promise<void> {
+		const cron = event.cron ?? "";
+
+		// Weekly watchlist rescan only (Sundays 03:00 UTC) — do not run legacy daily tasks.
+		if (isWatchlistRescanCron(cron)) {
+			ctx.waitUntil(
+				(async () => {
+					const { processWatchlistRescan } = await import(
+						"./lib/watchlist-rescan"
+					);
+					return processWatchlistRescan(env, new Date(event.scheduledTime));
+				})()
+					.then((r) =>
+						console.log(
+							`[scheduled] Watchlist rescan (weekly): enqueued ${r.enqueued} jobs, ${r.organizationsProcessed} orgs`,
+						),
+					)
+					.catch((err) =>
+						console.error("[scheduled] Watchlist rescan failed:", err),
+					),
+			);
+			return;
+		}
+
+		const trainingOnlyCrons = new Set(["0 5 * * *", "0 6 * * *", "0 7 * * *"]);
+		const runLegacyScheduledTasks = !trainingOnlyCrons.has(cron);
+
+		if (cron === "0 5 * * *") {
+			ctx.waitUntil(
+				import("./cron/training-enrollment-sync")
+					.then((m) => m.runTrainingEnrollmentSync(env))
+					.then((r) =>
+						console.log(
+							`[scheduled] Training enrollment sync: ${r.upserts} upserts`,
+						),
+					)
+					.catch((err) =>
+						console.error("[scheduled] Training enrollment sync failed:", err),
+					),
+			);
+		}
+
+		if (cron === "0 6 * * *") {
+			ctx.waitUntil(
+				import("./cron/training-expiration")
+					.then((m) => m.runTrainingExpiration(env))
+					.then((r) =>
+						console.log(
+							`[scheduled] Training expiration: ${r.expiredEnrollments} enrollments`,
+						),
+					)
+					.catch((err) =>
+						console.error("[scheduled] Training expiration failed:", err),
+					),
+			);
+		}
+
+		if (cron === "0 7 * * *") {
+			ctx.waitUntil(
+				import("./cron/training-reminders")
+					.then((m) => m.runTrainingReminders(env))
+					.then((r) =>
+						console.log(
+							`[scheduled] Training reminders: ${r.enqueued} enqueued`,
+						),
+					)
+					.catch((err) =>
+						console.error("[scheduled] Training reminders failed:", err),
+					),
+			);
+		}
+
+		if (!runLegacyScheduledTasks) {
+			return;
+		}
+
 		const { processNoticeDeadlineNotifications } = await import(
 			"./lib/notice-deadline-notifications"
 		);
@@ -328,7 +404,6 @@ export default {
 				),
 		);
 
-		// Risk review: enqueue reassessment for clients past their review date
 		ctx.waitUntil(
 			(async () => {
 				try {
@@ -413,6 +488,75 @@ export default {
 				batch as MessageBatch<import("./domain/import").ImportJob>,
 				env,
 			);
+		}
+
+		if (queueName.startsWith("aml-training-cert-gen")) {
+			const { processTrainingCertGenJob } = await import(
+				"./queues/training-cert-gen.consumer"
+			);
+			for (const message of batch.messages) {
+				try {
+					await processTrainingCertGenJob(
+						env,
+						(
+							message as Message<
+								import("./lib/training/jobs").TrainingCertGenJob
+							>
+						).body,
+					);
+					message.ack();
+				} catch (err) {
+					console.error("[aml-training-cert-gen] Job failed:", err);
+					message.retry();
+				}
+			}
+			return;
+		}
+
+		if (queueName.startsWith("aml-training-notifications")) {
+			const { processTrainingNotificationJob } = await import(
+				"./queues/training-notification.consumer"
+			);
+			for (const message of batch.messages) {
+				try {
+					await processTrainingNotificationJob(
+						env,
+						(
+							message as Message<
+								import("./lib/training/jobs").TrainingNotificationJob
+							>
+						).body,
+					);
+					message.ack();
+				} catch (err) {
+					console.error("[aml-training-notifications] Job failed:", err);
+					message.retry();
+				}
+			}
+			return;
+		}
+
+		if (queueName.startsWith("aml-screening-refresh")) {
+			const { processOneRescanJob } = await import(
+				"./lib/watchlist-rescan-processor"
+			);
+			for (const message of batch.messages) {
+				try {
+					await processOneRescanJob(
+						env,
+						(
+							message as Message<
+								import("./lib/watchlist-rescan-types").ScreeningRescanJob
+							>
+						).body,
+					);
+					message.ack();
+				} catch (err) {
+					console.error("[aml-screening-refresh] Job failed:", err);
+					message.retry();
+				}
+			}
+			return;
 		}
 
 		// Default: risk assessment queue

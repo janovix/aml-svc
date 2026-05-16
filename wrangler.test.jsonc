@@ -24,9 +24,17 @@
 			"id": "test-cache-id",
 		},
 	],
+	"r2_buckets": [
+		{
+			"binding": "R2_BUCKET",
+			"bucket_name": "aml-test-bucket",
+		},
+	],
 	"vars": {
 		"ENVIRONMENT": "test",
 		"AUTH_JWKS_CACHE_TTL": "3600",
 		"TRUSTED_ORIGINS": "*.test.janovix.com,http://localhost:*",
+		"AML_FRONTEND_URL": "https://aml.test.local",
+		"E2E_API_KEY": "test-e2e-api-key",
 	},
 }

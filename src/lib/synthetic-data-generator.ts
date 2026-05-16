@@ -9,6 +9,12 @@ import * as Sentry from "@sentry/cloudflare";
 import type { PrismaClient, DocumentType, AddressType } from "@prisma/client";
 import { generateId } from "./id-generator";
 import type { ClientCreateInput } from "../domain/client/schemas";
+import type { ApiKeyEnvironment, TenantContext } from "../lib/tenant-context";
+import { ClientRepository } from "../domain/client/repository";
+import { ClientRiskService } from "../domain/risk/client/service";
+import { loadRiskLookups } from "../domain/risk";
+import type { RiskLookups } from "../domain/risk/client/engine";
+import { newScreeningSnapshotId } from "../lib/screening-snapshot";
 
 /**
  * Synthetic operation data for VEH activity
@@ -32,11 +38,22 @@ export interface SyntheticVehicleOperationInput {
 	paymentMethods: Array<{ method: string; amount: string }>;
 }
 
+export type SyntheticRiskProfile =
+	| "LOW"
+	| "MEDIUM"
+	| "MEDIUM_HIGH"
+	| "PEP"
+	| "SANCTIONED";
+
 export interface SyntheticDataOptions {
 	clients?: {
 		count: number;
 		includeDocuments?: boolean;
 		includeAddresses?: boolean;
+		/** Weight map for risk personas (defaults follow AML synthetic plan). */
+		riskMix?: Partial<Record<SyntheticRiskProfile, number>>;
+		includePep?: boolean;
+		includeSanctioned?: boolean;
 	};
 	operations?: {
 		count: number;
@@ -339,87 +356,59 @@ const PAYMENT_METHODS = [
 	"Financiamiento",
 ];
 
-/**
- * Generates a synthetic physical client
- */
-function generatePhysicalClient(index: number): ClientCreateInput {
-	const firstName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
-	const lastName = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
-	const secondLastName =
-		Math.random() > 0.3
-			? LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)]
-			: null;
+const SAMPLE_PEP_POSITIONS = [
+	"SECRETARIO DE HACIENDA Y CREDITO PUBLICO",
+	"DIPUTADO FEDERAL",
+	"GOBERNADOR DE ESTADO",
+	"ALCALDE",
+	"MAGISTRADO DE CIRCUITO",
+] as const;
 
-	const birthYear = 1950 + Math.floor(Math.random() * 50);
-	const birthMonth = Math.floor(Math.random() * 12) + 1;
-	const birthDay = Math.floor(Math.random() * 28) + 1;
-	const birthDate = `${birthYear}-${String(birthMonth).padStart(2, "0")}-${String(birthDay).padStart(2, "0")}`;
+const SANCTIONED_JURISDICTIONS = ["KP", "IR", "RU", "VE", "SY", "MM"] as const;
 
-	const rfc = generatePhysicalRFC();
-	const curp = generateCURP();
-	const stateCode =
-		MEXICAN_STATES[Math.floor(Math.random() * MEXICAN_STATES.length)];
-	const city = CITIES[Math.floor(Math.random() * CITIES.length)];
-
-	return {
-		personType: "physical",
-		rfc,
-		firstName,
-		lastName,
-		secondLastName,
-		birthDate,
-		curp,
-		nationality: "MX",
-		email: `client${index}.${rfc.toLowerCase()}@example.com`,
-		phone: `+52${Math.floor(Math.random() * 9000000000) + 1000000000}`,
-		country: "MX",
-		stateCode,
-		city,
-		municipality: city,
-		neighborhood: `Colonia ${Math.floor(Math.random() * 100)}`,
-		street: `Calle ${Math.floor(Math.random() * 200)}`,
-		externalNumber: String(Math.floor(Math.random() * 9999) + 1),
-		internalNumber:
-			Math.random() > 0.7 ? String(Math.floor(Math.random() * 99) + 1) : null,
-		postalCode: String(Math.floor(Math.random() * 90000) + 10000),
-	};
+function catalogMetadataCode(metadata: string | null): string | null {
+	if (!metadata) return null;
+	try {
+		const m = JSON.parse(metadata) as { code?: unknown };
+		const c = m.code;
+		return typeof c === "string" ? c.trim() : null;
+	} catch {
+		return null;
+	}
 }
 
-/**
- * Generates a synthetic legal entity client (moral)
- */
-function generateMoralClient(index: number): ClientCreateInput {
-	const businessName = `${BUSINESS_NAMES[Math.floor(Math.random() * BUSINESS_NAMES.length)]} ${index + 1}`;
-	const rfc = generateMoralRFC();
+function pickWeightedRiskProfile(
+	weights: Record<SyntheticRiskProfile, number>,
+): SyntheticRiskProfile {
+	const entries = Object.entries(weights) as [SyntheticRiskProfile, number][];
+	const total = entries.reduce((sum, [, w]) => sum + w, 0);
+	if (total <= 0) return "LOW";
+	let r = Math.random() * total;
+	for (const [k, w] of entries) {
+		r -= w;
+		if (r <= 0) return k;
+	}
+	return "LOW";
+}
 
-	const incorporationYear = 2000 + Math.floor(Math.random() * 24);
-	const incorporationMonth = Math.floor(Math.random() * 12) + 1;
-	const incorporationDay = Math.floor(Math.random() * 28) + 1;
-	const incorporationDate = `${incorporationYear}-${String(incorporationMonth).padStart(2, "0")}-${String(incorporationDay).padStart(2, "0")}T00:00:00Z`;
-
-	const stateCode =
-		MEXICAN_STATES[Math.floor(Math.random() * MEXICAN_STATES.length)];
-	const city = CITIES[Math.floor(Math.random() * CITIES.length)];
-
-	return {
-		personType: "moral",
-		rfc,
-		businessName,
-		incorporationDate,
-		nationality: null,
-		email: `empresa${index}.${rfc.toLowerCase()}@example.com`,
-		phone: `+52${Math.floor(Math.random() * 9000000000) + 1000000000}`,
-		country: "MX",
-		stateCode,
-		city,
-		municipality: city,
-		neighborhood: `Colonia ${Math.floor(Math.random() * 100)}`,
-		street: `Avenida ${Math.floor(Math.random() * 200)}`,
-		externalNumber: String(Math.floor(Math.random() * 9999) + 1),
-		internalNumber:
-			Math.random() > 0.5 ? String(Math.floor(Math.random() * 99) + 1) : null,
-		postalCode: String(Math.floor(Math.random() * 90000) + 10000),
+function defaultSyntheticRiskMix(
+	includePep: boolean,
+	includeSanctioned: boolean,
+): Record<SyntheticRiskProfile, number> {
+	const mix: Record<SyntheticRiskProfile, number> = {
+		LOW: 40,
+		MEDIUM: 30,
+		MEDIUM_HIGH: 15,
+		PEP: includePep ? 10 : 0,
+		SANCTIONED: includeSanctioned ? 5 : 0,
 	};
+	if (!includePep) mix.LOW += 10;
+	if (!includeSanctioned) mix.LOW += 5;
+	return mix;
+}
+
+function pick<T>(arr: readonly T[]): T {
+	return arr[Math.floor(Math.random() * arr.length)]!;
 }
 
 /**
@@ -533,13 +522,27 @@ function generateVehicleOperation(
  * Synthetic Data Generator Service
  */
 export class SyntheticDataGenerator {
-	private readonly organizationId: string;
+	private readonly tenant: TenantContext;
+	private readonly clientRepo: ClientRepository;
+	private readonly riskService: ClientRiskService;
+	private pools: Promise<{
+		countries: string[];
+		ecoCodes: string[];
+		bizCodes: string[];
+	}> | null = null;
 
 	constructor(
 		private readonly prisma: PrismaClient,
 		organizationId: string,
+		environment: ApiKeyEnvironment = "production",
 	) {
-		this.organizationId = organizationId;
+		this.tenant = { organizationId, environment };
+		this.clientRepo = new ClientRepository(prisma);
+		this.riskService = new ClientRiskService(prisma);
+	}
+
+	private get organizationId(): string {
+		return this.tenant.organizationId;
 	}
 
 	/**
@@ -567,6 +570,11 @@ export class SyntheticDataGenerator {
 				options.clients.count,
 				options.clients.includeDocuments,
 				options.clients.includeAddresses,
+				{
+					riskMix: options.clients.riskMix,
+					includePep: options.clients.includePep,
+					includeSanctioned: options.clients.includeSanctioned,
+				},
 			);
 			result.clients = clientResult;
 		}
@@ -615,6 +623,278 @@ export class SyntheticDataGenerator {
 		return result;
 	}
 
+	private async ensureCodePools(): Promise<{
+		countries: string[];
+		ecoCodes: string[];
+		bizCodes: string[];
+	}> {
+		return (this.pools ??= this.loadCodePools());
+	}
+
+	private async loadCodePools(): Promise<{
+		countries: string[];
+		ecoCodes: string[];
+		bizCodes: string[];
+	}> {
+		const countryRows = await this.prisma.catalogItem.findMany({
+			where: { active: true, catalog: { key: "countries" } },
+			select: { metadata: true },
+			take: 500,
+		});
+		let countries = [
+			...new Set(
+				countryRows
+					.map((r) => catalogMetadataCode(r.metadata))
+					.filter((c): c is string => !!c && /^[A-Z]{2}$/.test(c)),
+			),
+		];
+
+		const ecoRows = await this.prisma.catalogItem.findMany({
+			where: { active: true, catalog: { key: "economic-activities" } },
+			select: { metadata: true },
+			take: 800,
+		});
+		let ecoCodes = [
+			...new Set(
+				ecoRows
+					.map((r) => catalogMetadataCode(r.metadata))
+					.filter((c): c is string => !!c && /^\d{7}$/.test(c)),
+			),
+		];
+
+		const bizRows = await this.prisma.catalogItem.findMany({
+			where: { active: true, catalog: { key: "business-activities" } },
+			select: { metadata: true },
+			take: 800,
+		});
+		let bizCodes = [
+			...new Set(
+				bizRows
+					.map((r) => catalogMetadataCode(r.metadata))
+					.filter((c): c is string => !!c && /^\d{7}$/.test(c)),
+			),
+		];
+
+		if (countries.length === 0) countries = ["MX", "US"];
+		if (ecoCodes.length === 0) ecoCodes = ["1110100"];
+		if (bizCodes.length === 0) bizCodes = ["2720004"];
+
+		return { countries, ecoCodes, bizCodes };
+	}
+
+	private buildSyntheticClientInput(
+		profile: SyntheticRiskProfile,
+		index: number,
+		pools: { countries: string[]; ecoCodes: string[]; bizCodes: string[] },
+	): ClientCreateInput {
+		const stateCode =
+			MEXICAN_STATES[Math.floor(Math.random() * MEXICAN_STATES.length)];
+		const city = CITIES[Math.floor(Math.random() * CITIES.length)];
+
+		const physicalSkeleton = (
+			rfc: string,
+			extras: Partial<ClientCreateInput>,
+		): ClientCreateInput => {
+			const firstName = pick(FIRST_NAMES);
+			const lastName = pick(LAST_NAMES);
+			const secondLastName = Math.random() > 0.3 ? pick(LAST_NAMES) : null;
+			const birthYear = 1950 + Math.floor(Math.random() * 50);
+			const birthMonth = Math.floor(Math.random() * 12) + 1;
+			const birthDay = Math.floor(Math.random() * 28) + 1;
+			const birthDate = `${birthYear}-${String(birthMonth).padStart(2, "0")}-${String(birthDay).padStart(2, "0")}`;
+			return {
+				personType: "physical",
+				rfc,
+				firstName,
+				lastName,
+				secondLastName,
+				birthDate,
+				curp: generateCURP(),
+				email: `client${index}.${rfc.toLowerCase()}@example.com`,
+				phone: `+52${Math.floor(Math.random() * 9000000000) + 1000000000}`,
+				country: "MX",
+				stateCode,
+				city,
+				municipality: city,
+				neighborhood: `Colonia ${Math.floor(Math.random() * 100)}`,
+				street: `Calle ${Math.floor(Math.random() * 200)}`,
+				externalNumber: String(Math.floor(Math.random() * 9999) + 1),
+				internalNumber:
+					Math.random() > 0.7
+						? String(Math.floor(Math.random() * 99) + 1)
+						: null,
+				postalCode: String(Math.floor(Math.random() * 90000) + 10000),
+				...extras,
+			} as ClientCreateInput;
+		};
+
+		const moralSkeleton = (
+			rfc: string,
+			extras: Partial<ClientCreateInput>,
+		): ClientCreateInput => {
+			const businessName = `${pick(BUSINESS_NAMES)} ${index + 1}`;
+			const incorporationYear = 2000 + Math.floor(Math.random() * 24);
+			const incorporationMonth = Math.floor(Math.random() * 12) + 1;
+			const incorporationDay = Math.floor(Math.random() * 28) + 1;
+			const incorporationDate = `${incorporationYear}-${String(incorporationMonth).padStart(2, "0")}-${String(incorporationDay).padStart(2, "0")}T00:00:00Z`;
+			return {
+				personType: "moral",
+				rfc,
+				businessName,
+				incorporationDate,
+				email: `empresa${index}.${rfc.toLowerCase()}@example.com`,
+				phone: `+52${Math.floor(Math.random() * 9000000000) + 1000000000}`,
+				country: "MX",
+				stateCode,
+				city,
+				municipality: city,
+				neighborhood: `Colonia ${Math.floor(Math.random() * 100)}`,
+				street: `Avenida ${Math.floor(Math.random() * 200)}`,
+				externalNumber: String(Math.floor(Math.random() * 9999) + 1),
+				internalNumber:
+					Math.random() > 0.5
+						? String(Math.floor(Math.random() * 99) + 1)
+						: null,
+				postalCode: String(Math.floor(Math.random() * 90000) + 10000),
+				...extras,
+			} as ClientCreateInput;
+		};
+
+		const preferEco = (prefix: string) =>
+			pools.ecoCodes.find((c) => c.startsWith(prefix)) ?? pick(pools.ecoCodes);
+
+		switch (profile) {
+			case "LOW":
+				return physicalSkeleton(generatePhysicalRFC(), {
+					nationality: "MX",
+					countryCode: "MX",
+					economicActivityCode: preferEco("111"),
+				});
+			case "MEDIUM":
+				return moralSkeleton(generateMoralRFC(), {
+					nationality: "MX",
+					countryCode: "MX",
+					commercialActivityCode:
+						pools.bizCodes.find((c) => c.startsWith("272")) ??
+						pick(pools.bizCodes),
+				});
+			case "MEDIUM_HIGH": {
+				if (Math.random() > 0.5) {
+					const nat = Math.random() > 0.5 ? "MX" : "US";
+					return physicalSkeleton(generatePhysicalRFC(), {
+						nationality: nat,
+						countryCode: nat,
+						economicActivityCode:
+							pools.ecoCodes.find((c) => c.startsWith("523")) ??
+							pick(pools.ecoCodes),
+					});
+				}
+				const cashBiz =
+					pools.bizCodes.find((c) => c.startsWith("532")) ??
+					pools.bizCodes.find((c) => c.startsWith("536")) ??
+					pick(pools.bizCodes);
+				return moralSkeleton(generateMoralRFC(), {
+					nationality: "MX",
+					countryCode: "MX",
+					commercialActivityCode: cashBiz,
+				});
+			}
+			case "PEP":
+				return physicalSkeleton(generatePhysicalRFC(), {
+					nationality: "MX",
+					countryCode: "MX",
+					occupation: pick(SAMPLE_PEP_POSITIONS),
+					economicActivityCode:
+						pools.ecoCodes.find((c) => c.startsWith("111")) ??
+						pick(pools.ecoCodes),
+				});
+			case "SANCTIONED": {
+				const jur = pick(SANCTIONED_JURISDICTIONS);
+				return physicalSkeleton(generatePhysicalRFC(), {
+					nationality: jur,
+					countryCode: jur,
+					economicActivityCode: pick(pools.ecoCodes),
+				});
+			}
+		}
+	}
+
+	private async applySyntheticRiskProfile(
+		clientId: string,
+		profile: SyntheticRiskProfile,
+	): Promise<void> {
+		if (profile === "PEP") {
+			await this.prisma.client.update({
+				where: { id: clientId },
+				data: {
+					isPEP: true,
+					screeningResult: "clear",
+					screenedAt: new Date(),
+				},
+			});
+			await this.appendScreeningSnapshot({
+				clientId,
+				screeningResult: "clear",
+				ofacSanctioned: false,
+				unscSanctioned: false,
+				isPep: true,
+			});
+			return;
+		}
+
+		if (profile === "SANCTIONED") {
+			const un = Math.random() > 0.5;
+			await this.prisma.client.update({
+				where: { id: clientId },
+				data: {
+					ofacSanctioned: true,
+					unscSanctioned: un,
+					screeningResult: "flagged",
+					screenedAt: new Date(),
+				},
+			});
+			await this.appendScreeningSnapshot({
+				clientId,
+				screeningResult: "flagged",
+				ofacSanctioned: true,
+				unscSanctioned: un,
+				isPep: false,
+			});
+		}
+	}
+
+	private async appendScreeningSnapshot(params: {
+		clientId: string;
+		screeningResult: string;
+		ofacSanctioned: boolean;
+		unscSanctioned: boolean;
+		isPep: boolean;
+	}): Promise<void> {
+		const last = await this.prisma.clientWatchlistScreening.findFirst({
+			where: { clientId: params.clientId },
+			orderBy: { screenedAt: "desc" },
+			select: { id: true },
+		});
+
+		await this.prisma.clientWatchlistScreening.create({
+			data: {
+				id: newScreeningSnapshotId(),
+				organizationId: this.organizationId,
+				clientId: params.clientId,
+				watchlistQueryId: null,
+				screenedAt: new Date(),
+				triggeredBy: "synthetic_seed",
+				screeningResult: params.screeningResult,
+				ofacSanctioned: params.ofacSanctioned,
+				unscSanctioned: params.unscSanctioned,
+				sat69bListed: false,
+				isPep: params.isPep,
+				adverseMediaFlagged: false,
+				prevSnapshotId: last?.id ?? null,
+			},
+		});
+	}
+
 	/**
 	 * Generates synthetic clients
 	 */
@@ -622,75 +902,57 @@ export class SyntheticDataGenerator {
 		count: number,
 		includeDocuments = false,
 		includeAddresses = false,
+		risk?: {
+			riskMix?: Partial<Record<SyntheticRiskProfile, number>>;
+			includePep?: boolean;
+			includeSanctioned?: boolean;
+		},
 	): Promise<{ created: number; rfcList: string[] }> {
 		const rfcList: string[] = [];
 		let created = 0;
 
+		const pools = await this.ensureCodePools();
+		const lookups: RiskLookups = await loadRiskLookups(this.prisma);
+		const includePep = risk?.includePep ?? true;
+		const includeSanctioned = risk?.includeSanctioned ?? true;
+		const mix: Record<SyntheticRiskProfile, number> = {
+			...defaultSyntheticRiskMix(includePep, includeSanctioned),
+			...risk?.riskMix,
+		};
+
 		for (let i = 0; i < count; i++) {
 			try {
-				// Mix of physical and moral clients (70% physical, 30% moral)
-				const isPhysical = Math.random() > 0.3;
-				const clientData = isPhysical
-					? generatePhysicalClient(i)
-					: generateMoralClient(i);
+				const profile = pickWeightedRiskProfile(mix);
+				const input = this.buildSyntheticClientInput(profile, i, pools);
+				const entity = await this.clientRepo.create(this.tenant, input);
 
-				// Create client using Prisma directly
-				const client = await this.prisma.client.create({
-					data: {
-						id: generateId("CLIENT"),
-						rfc: clientData.rfc,
-						organizationId: this.organizationId,
-						personType: clientData.personType.toUpperCase() as
-							| "PHYSICAL"
-							| "MORAL"
-							| "TRUST",
-						firstName: clientData.firstName ?? null,
-						lastName: clientData.lastName ?? null,
-						secondLastName: clientData.secondLastName ?? null,
-						birthDate: clientData.birthDate
-							? new Date(clientData.birthDate)
-							: null,
-						curp: clientData.curp ?? null,
-						businessName: clientData.businessName ?? null,
-						incorporationDate: clientData.incorporationDate
-							? new Date(clientData.incorporationDate)
-							: null,
-						nationality: clientData.nationality ?? null,
-						email: clientData.email,
-						phone: clientData.phone,
-						country: clientData.country,
-						stateCode: clientData.stateCode,
-						city: clientData.city,
-						municipality: clientData.municipality,
-						neighborhood: clientData.neighborhood,
-						street: clientData.street,
-						externalNumber: clientData.externalNumber,
-						internalNumber: clientData.internalNumber ?? null,
-						postalCode: clientData.postalCode,
-						reference: clientData.reference ?? null,
-						notes: clientData.notes ?? null,
-						countryCode: clientData.countryCode ?? null,
-						economicActivityCode: clientData.economicActivityCode ?? null,
-					},
-				});
+				await this.applySyntheticRiskProfile(entity.id, profile);
 
-				rfcList.push(client.rfc);
+				await this.riskService.assessClient(
+					entity.id,
+					this.tenant,
+					lookups,
+					"synthetic_seed",
+				);
+
+				rfcList.push(entity.rfc);
 				created++;
 
-				// Generate documents if requested
+				const isPhysical = entity.personType === "physical";
+
 				if (includeDocuments && isPhysical) {
-					await this.generateClientDocuments(client.id);
+					await this.generateClientDocuments(entity.id);
 				}
 
-				// Generate addresses if requested
 				if (includeAddresses) {
-					await this.generateClientAddresses(client.id);
+					await this.generateClientAddresses(entity.id);
 				}
 			} catch (error) {
-				// Skip if RFC already exists (collision)
 				if (
 					error instanceof Error &&
-					error.message.includes("UNIQUE constraint")
+					(error.message.includes("UNIQUE constraint") ||
+						error.message.includes("RFC") ||
+						error.message.includes("already"))
 				) {
 					continue;
 				}
@@ -889,6 +1151,7 @@ export class SyntheticDataGenerator {
 			Math.max(5, Math.ceil(operationsPerClient)),
 			false,
 			false,
+			undefined,
 		);
 		return result.rfcList;
 	}

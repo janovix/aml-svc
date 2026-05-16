@@ -8,6 +8,14 @@ import type { Bindings } from "../types";
 import { createHash } from "crypto";
 import { sendScreeningFlaggedNotification } from "../lib/screening-notifications";
 import { createRiskQueueService, type RiskJob } from "../lib/risk-queue";
+import {
+	computeNewPositives,
+	getLastClientScreeningSnapshot,
+	getLastBcScreeningSnapshot,
+	newScreeningSnapshotId,
+	serializeChangeFlags,
+	stateFromClientRow,
+} from "../lib/screening-snapshot";
 
 /**
  * Calculate segment for an entity ID using deterministic hash modulo 7
@@ -204,16 +212,69 @@ export async function handleInternalScreeningRequest(
 			if (body.screenedAt !== undefined)
 				updateData.screenedAt = new Date(body.screenedAt);
 
-			const updatedClient = await prisma.client.update({
+			const prev = await prisma.client.findUniqueOrThrow({
 				where: { id: clientId },
-				data: updateData,
-				select: {
-					organizationId: true,
-					firstName: true,
-					lastName: true,
-					businessName: true,
-				},
 			});
+			const lastSn = await getLastClientScreeningSnapshot(prisma, clientId);
+			const before = stateFromClientRow(prev);
+			const screenedAt =
+				body.screenedAt !== undefined ? new Date(body.screenedAt) : new Date();
+
+			const ofac =
+				body.ofacSanctioned !== undefined
+					? body.ofacSanctioned
+					: prev.ofacSanctioned;
+			const un =
+				body.unscSanctioned !== undefined
+					? body.unscSanctioned
+					: prev.unscSanctioned;
+			const sat =
+				body.sat69bListed !== undefined ? body.sat69bListed : prev.sat69bListed;
+			const res =
+				body.screeningResult !== undefined
+					? body.screeningResult
+					: prev.screeningResult;
+			const after = {
+				ofac,
+				un,
+				sat69b: sat,
+				pep: prev.isPEP,
+				adverse: prev.adverseMediaFlagged,
+			};
+			const changeFlags = computeNewPositives(before, after);
+			const snapId = newScreeningSnapshotId();
+
+			// Batch transaction (D1 does not support interactive $transaction callbacks)
+			const [, updatedClient] = await prisma.$transaction([
+				prisma.clientWatchlistScreening.create({
+					data: {
+						id: snapId,
+						organizationId: prev.organizationId,
+						clientId: prev.id,
+						watchlistQueryId: body.watchlistQueryId,
+						screenedAt,
+						triggeredBy: "callback",
+						screeningResult: res,
+						ofacSanctioned: ofac,
+						unscSanctioned: un,
+						sat69bListed: sat,
+						isPep: prev.isPEP,
+						adverseMediaFlagged: prev.adverseMediaFlagged,
+						changeFlags: serializeChangeFlags(changeFlags),
+						prevSnapshotId: lastSn?.id ?? null,
+					},
+				}),
+				prisma.client.update({
+					where: { id: clientId },
+					data: updateData,
+					select: {
+						organizationId: true,
+						firstName: true,
+						lastName: true,
+						businessName: true,
+					},
+				}),
+			]);
 
 			// Notify the org if this screening result is flagged (sanctions match)
 			if (body.screeningResult === "flagged") {
@@ -300,17 +361,73 @@ export async function handleInternalScreeningRequest(
 			if (body.screenedAt !== undefined)
 				updateData.screenedAt = new Date(body.screenedAt);
 
-			const updatedBc = await prisma.beneficialController.update({
+			const prev = await prisma.beneficialController.findUniqueOrThrow({
 				where: { id: bcId },
-				data: updateData,
-				select: {
-					firstName: true,
-					lastName: true,
-					client: {
-						select: { organizationId: true },
-					},
-				},
+				include: { client: { select: { organizationId: true } } },
 			});
+			const lastSn = await getLastBcScreeningSnapshot(prisma, bcId);
+			const before = stateFromClientRow({
+				...prev,
+				isPEP: prev.isPEP,
+			});
+			const screenedAt =
+				body.screenedAt !== undefined ? new Date(body.screenedAt) : new Date();
+			const ofac =
+				body.ofacSanctioned !== undefined
+					? body.ofacSanctioned
+					: prev.ofacSanctioned;
+			const un =
+				body.unscSanctioned !== undefined
+					? body.unscSanctioned
+					: prev.unscSanctioned;
+			const sat =
+				body.sat69bListed !== undefined ? body.sat69bListed : prev.sat69bListed;
+			const res =
+				body.screeningResult !== undefined
+					? body.screeningResult
+					: prev.screeningResult;
+			const after = {
+				ofac,
+				un,
+				sat69b: sat,
+				pep: prev.isPEP,
+				adverse: prev.adverseMediaFlagged,
+			};
+			const changeFlags = computeNewPositives(before, after);
+			const snapId = newScreeningSnapshotId();
+
+			const [, updatedBc] = await prisma.$transaction([
+				prisma.beneficialControllerWatchlistScreening.create({
+					data: {
+						id: snapId,
+						organizationId: prev.client.organizationId,
+						beneficialControllerId: prev.id,
+						clientId: prev.clientId,
+						watchlistQueryId: body.watchlistQueryId,
+						screenedAt,
+						triggeredBy: "callback",
+						screeningResult: res,
+						ofacSanctioned: ofac,
+						unscSanctioned: un,
+						sat69bListed: sat,
+						isPep: prev.isPEP,
+						adverseMediaFlagged: prev.adverseMediaFlagged,
+						changeFlags: serializeChangeFlags(changeFlags),
+						prevSnapshotId: lastSn?.id ?? null,
+					},
+				}),
+				prisma.beneficialController.update({
+					where: { id: bcId },
+					data: updateData,
+					select: {
+						firstName: true,
+						lastName: true,
+						client: {
+							select: { organizationId: true, id: true },
+						},
+					},
+				}),
+			]);
 
 			// Notify the org if this screening result is flagged (sanctions match)
 			if (body.screeningResult === "flagged") {
@@ -411,20 +528,132 @@ export async function handleInternalScreeningRequest(
 			updateData.screeningResult = isFlagged ? "flagged" : "clear";
 			updateData.screenedAt = new Date();
 
-			// Update the entity
+			const nowAt = new Date();
+
 			if (client) {
-				await prisma.client.update({
-					where: { id: client.id },
-					data: updateData,
-				});
+				const before = stateFromClientRow(client);
+				const lastSn = await getLastClientScreeningSnapshot(prisma, client.id);
+				const isPEP =
+					updateData.isPEP === true
+						? true
+						: updateData.isPEP === false
+							? false
+							: client.isPEP;
+				const adverse =
+					typeof updateData.adverseMediaFlagged === "boolean"
+						? updateData.adverseMediaFlagged
+						: client.adverseMediaFlagged;
+				const after = {
+					ofac: client.ofacSanctioned,
+					un: client.unscSanctioned,
+					sat69b: client.sat69bListed,
+					pep: isPEP,
+					adverse,
+				};
+				const changeFlags = computeNewPositives(before, after);
+				const snapId = newScreeningSnapshotId();
+				if (body.status === "completed") {
+					await prisma.$transaction([
+						prisma.clientWatchlistScreening.create({
+							data: {
+								id: snapId,
+								organizationId: client.organizationId,
+								clientId: client.id,
+								watchlistQueryId: body.queryId,
+								screenedAt: nowAt,
+								triggeredBy: "callback",
+								screeningResult: updateData.screeningResult as string,
+								ofacSanctioned: after.ofac,
+								unscSanctioned: after.un,
+								sat69bListed: after.sat69b,
+								isPep: after.pep,
+								adverseMediaFlagged: after.adverse,
+								changeFlags: serializeChangeFlags(changeFlags),
+								prevSnapshotId: lastSn?.id ?? null,
+							},
+						}),
+						prisma.client.update({
+							where: { id: client.id },
+							data: updateData,
+						}),
+					]);
+				} else {
+					// failed async step: do not change persisted screening
+					// (avoid clearing risk; matches "do not risk on fail" intent)
+					return new Response(
+						JSON.stringify({
+							success: true,
+							skipped: true,
+							reason: "async_failed",
+						}),
+						{ headers: { "Content-Type": "application/json" } },
+					);
+				}
 				console.log(
 					`[InternalScreening] Updated client ${client.id} with callback data: ${body.type}`,
 				);
 			} else if (bc) {
-				await prisma.beneficialController.update({
-					where: { id: bc.id },
-					data: updateData,
+				const pClient = await prisma.client.findUniqueOrThrow({
+					where: { id: bc.clientId },
+					select: { organizationId: true },
 				});
+				const before = stateFromClientRow({ ...bc, isPEP: bc.isPEP });
+				const lastSn = await getLastBcScreeningSnapshot(prisma, bc.id);
+				const isPEP =
+					updateData.isPEP === true
+						? true
+						: updateData.isPEP === false
+							? false
+							: bc.isPEP;
+				const adverse =
+					typeof updateData.adverseMediaFlagged === "boolean"
+						? updateData.adverseMediaFlagged
+						: bc.adverseMediaFlagged;
+				const after = {
+					ofac: bc.ofacSanctioned,
+					un: bc.unscSanctioned,
+					sat69b: bc.sat69bListed,
+					pep: isPEP,
+					adverse,
+				};
+				const changeFlags = computeNewPositives(before, after);
+				const snapId = newScreeningSnapshotId();
+				if (body.status === "completed") {
+					await prisma.$transaction([
+						prisma.beneficialControllerWatchlistScreening.create({
+							data: {
+								id: snapId,
+								organizationId: pClient.organizationId,
+								beneficialControllerId: bc.id,
+								clientId: bc.clientId,
+								watchlistQueryId: body.queryId,
+								screenedAt: nowAt,
+								triggeredBy: "callback",
+								screeningResult: updateData.screeningResult as string,
+								ofacSanctioned: after.ofac,
+								unscSanctioned: after.un,
+								sat69bListed: after.sat69b,
+								isPep: after.pep,
+								adverseMediaFlagged: after.adverse,
+								changeFlags: serializeChangeFlags(changeFlags),
+								prevSnapshotId: lastSn?.id ?? null,
+							},
+						}),
+						prisma.beneficialController.update({
+							where: { id: bc.id },
+							data: updateData,
+						}),
+					]);
+				} else {
+					return new Response(
+						JSON.stringify({
+							success: true,
+							skipped: true,
+							reason: "async_failed",
+						}),
+						{ headers: { "Content-Type": "application/json" } },
+					);
+				}
 				console.log(
 					`[InternalScreening] Updated BC ${bc.id} with callback data: ${body.type}`,
 				);
@@ -482,8 +711,8 @@ export async function handleInternalScreeningRequest(
 				}
 			}
 
-			// Trigger risk reassessment after screening data changes
-			if (client) {
+			// Trigger risk reassessment after successful screening data changes
+			if (body.status === "completed" && client) {
 				const riskQueue = createRiskQueueService(
 					env.RISK_ASSESSMENT_QUEUE as Queue<RiskJob> | undefined,
 				);
@@ -496,6 +725,27 @@ export async function handleInternalScreeningRequest(
 					.catch((err) =>
 						console.error(
 							"[InternalScreening] Failed to queue risk reassessment:",
+							err,
+						),
+					);
+			}
+			if (body.status === "completed" && bc) {
+				const riskQueue = createRiskQueueService(
+					env.RISK_ASSESSMENT_QUEUE as Queue<RiskJob> | undefined,
+				);
+				const parent = await prisma.client.findUniqueOrThrow({
+					where: { id: bc.clientId },
+					select: { organizationId: true },
+				});
+				riskQueue
+					.queueScreeningRiskUpdate(
+						parent.organizationId,
+						bc.clientId,
+						`screening_callback_${body.type}_bc`,
+					)
+					.catch((err) =>
+						console.error(
+							"[InternalScreening] Failed to queue risk reassessment (BC):",
 							err,
 						),
 					);

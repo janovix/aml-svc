@@ -13,6 +13,7 @@ import {
 	type UniversalAlertRuleType,
 } from "../types";
 import type { PatternType } from "../../config/alert-patterns";
+import { getCashLimitUma } from "../../config/activity-thresholds";
 
 export class UniversalCashHighValueSeeker extends UniversalAlertSeeker {
 	readonly patternType: PatternType = "cash_high_value";
@@ -29,6 +30,11 @@ export class UniversalCashHighValueSeeker extends UniversalAlertSeeker {
 		const activityCode = context.activityCode;
 
 		if (!this.appliesTo(activityCode)) return null;
+
+		/** Art. 32 caps are evaluated by `cash_limit_art32`; avoid duplicate alerts. */
+		if (getCashLimitUma(activityCode) !== null) {
+			return null;
+		}
 
 		const maxCashAmount = this.calculateActivityUmaThreshold(
 			activityCode,

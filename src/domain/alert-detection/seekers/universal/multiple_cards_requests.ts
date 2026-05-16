@@ -5,7 +5,7 @@
  * (cards, checks, etc.) in a short period — applicable mainly to TSC, TPP, TDR, CHV.
  */
 
-import { FREQUENT_OPERATION_WINDOW_DAYS } from "../constants";
+import { FREQUENT_OPERATION_WINDOW_DAYS } from "../window-constants";
 import {
 	UniversalAlertSeeker,
 	type AlertContext,

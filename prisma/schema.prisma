@@ -207,6 +207,7 @@ model Client {
   notes                String?
   countryCode          String?    @map("country_code")
   economicActivityCode String?    @map("economic_activity_code")
+  commercialActivityCode String?  @map("commercial_activity_code")
   // Enhanced KYC fields
   gender               String?
   occupation           String?
@@ -262,6 +263,8 @@ model Client {
   beneficialControllers  BeneficialController[]
   uploadLinks            UploadLink[]
   riskAssessments        ClientRiskAssessment[]
+  watchlistScreenings   ClientWatchlistScreening[]
+  beneficialControllerWatchlistScreenings BeneficialControllerWatchlistScreening[]
 
   @@index([organizationId])
   @@index([organizationId, environment])
@@ -270,6 +273,7 @@ model Client {
   @@index([deletedAt])
   @@index([countryCode])
   @@index([economicActivityCode])
+  @@index([commercialActivityCode])
   @@index([kycStatus])
   @@index([screeningResult])
   @@index([riskLevel])
@@ -478,6 +482,7 @@ model BeneficialController {
   addressProofDoc      ClientDocument?  @relation("BCAddressProof", fields: [addressProofDocId], references: [id], onDelete: SetNull)
   constanciaBcDoc      ClientDocument?  @relation("BCConstanciaBC", fields: [constanciaBcDocId], references: [id], onDelete: SetNull)
   powerOfAttorneyDoc   ClientDocument?  @relation("BCPowerOfAttorney", fields: [powerOfAttorneyDocId], references: [id], onDelete: SetNull)
+  watchlistScreenings  BeneficialControllerWatchlistScreening[]
 
   @@index([clientId])
   @@index([shareholderId])
@@ -1238,7 +1243,6 @@ model UmaValue {
 model OrganizationSettings {
   id                          String   @id
   organizationId              String   @unique @map("organization_id")
-  environment                 String   @default("production") @map("environment")
   obligatedSubjectKey         String   @map("obligated_subject_key")
   activityKey                 String   @map("activity_key")
   // KYC Self-Service settings
@@ -1246,6 +1250,14 @@ model OrganizationSettings {
   selfServiceExpiryHours      Int      @default(72) @map("self_service_expiry_hours")
   selfServiceRequiredSections String?  @map("self_service_required_sections") // JSON array
   selfServiceSendEmail        Boolean  @default(true) @map("self_service_send_email")
+  // Watchlist re-screen (scheduled cron)
+  watchlistRescanEnabled               Boolean  @default(true) @map("watchlist_rescan_enabled")
+  watchlistRescanIntervalDays          Int      @default(90) @map("watchlist_rescan_interval_days")
+  watchlistRescanIncludeBcs            Boolean  @default(true) @map("watchlist_rescan_include_bcs")
+  watchlistRescanNotifyOnStatusChange  Boolean  @default(true) @map("watchlist_rescan_notify_on_status_change")
+  watchlistRescanDailyCap              Int      @default(5000) @map("watchlist_rescan_daily_cap")
+  watchlistRescanNotifyChannels        String   @default("[\"in_app\"]") @map("watchlist_rescan_notify_channels") // JSON: in_app, email
+  watchlistRescanSources               String   @default("[\"ofac\",\"un\",\"sat69b\",\"pep\",\"adverse_media\"]") @map("watchlist_rescan_sources") // JSON
   createdAt                   DateTime @default(now()) @map("created_at")
   updatedAt                   DateTime @updatedAt @map("updated_at")
 
@@ -1253,6 +1265,65 @@ model OrganizationSettings {
   @@index([obligatedSubjectKey])
   @@index([activityKey])
   @@map("organization_settings")
+}
+
+// Historical snapshots for watchlist screening (AML Core)
+model ClientWatchlistScreening {
+  id                 String  @id
+  organizationId     String  @map("organization_id")
+  clientId           String  @map("client_id")
+  watchlistQueryId   String? @map("watchlist_query_id")
+  screenedAt         DateTime @map("screened_at")
+  triggeredBy        String  @map("triggered_by")
+  screeningResult    String  @map("screening_result")
+  ofacSanctioned     Boolean  @default(false) @map("ofac_sanctioned")
+  unscSanctioned     Boolean  @default(false) @map("unsc_sanctioned")
+  sat69bListed       Boolean  @default(false) @map("sat69b_listed")
+  isPep              Boolean  @default(false) @map("is_pep")
+  adverseMediaFlagged Boolean  @default(false) @map("adverse_media_flagged")
+  changeFlags        String?  @map("change_flags")
+  prevSnapshotId     String?  @map("prev_snapshot_id")
+  errorMessage       String?  @map("error_message")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  client       Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  prevSnapshot ClientWatchlistScreening?  @relation("ClientWatchlistScreeningChain", fields: [prevSnapshotId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  nextSnapshots ClientWatchlistScreening[] @relation("ClientWatchlistScreeningChain")
+
+  @@index([clientId, screenedAt(sort: Desc)])
+  @@index([organizationId, screenedAt(sort: Desc)])
+  @@index([organizationId])
+  @@map("client_watchlist_screening")
+}
+
+model BeneficialControllerWatchlistScreening {
+  id                     String   @id
+  organizationId         String   @map("organization_id")
+  beneficialControllerId String   @map("beneficial_controller_id")
+  clientId               String   @map("client_id")
+  watchlistQueryId       String?  @map("watchlist_query_id")
+  screenedAt             DateTime @map("screened_at")
+  triggeredBy            String   @map("triggered_by")
+  screeningResult        String   @map("screening_result")
+  ofacSanctioned         Boolean  @default(false) @map("ofac_sanctioned")
+  unscSanctioned         Boolean  @default(false) @map("unsc_sanctioned")
+  sat69bListed           Boolean  @default(false) @map("sat69b_listed")
+  isPep                  Boolean  @default(false) @map("is_pep")
+  adverseMediaFlagged     Boolean  @default(false) @map("adverse_media_flagged")
+  changeFlags            String?  @map("change_flags")
+  prevSnapshotId         String?  @map("prev_snapshot_id")
+  errorMessage           String?  @map("error_message")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  beneficialController BeneficialController @relation(fields: [beneficialControllerId], references: [id], onDelete: Cascade)
+  parentClient         Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  prevSnapshot         BeneficialControllerWatchlistScreening?  @relation("BcWatchlistScreeningChain", fields: [prevSnapshotId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  nextSnapshots        BeneficialControllerWatchlistScreening[] @relation("BcWatchlistScreeningChain")
+
+  @@index([beneficialControllerId, screenedAt(sort: Desc)])
+  @@index([organizationId, screenedAt(sort: Desc)])
+  @@index([clientId, screenedAt(sort: Desc)])
+  @@map("beneficial_controller_watchlist_screening")
 }
 
 // ============================================================================
@@ -1858,4 +1929,287 @@ model MethodologyAuditLog {
 
   @@index([methodologyId])
   @@map("methodology_audit_logs")
+}
+
+// ============================================================================
+// Janbot (AI chat) persistence
+// ============================================================================
+
+model ChatThread {
+  id                 String    @id
+  organizationId     String    @map("organization_id")
+  userId             String    @map("user_id")
+  title              String?
+  model              String?
+  status             String    @default("active")
+  tokenBudget        Int       @default(50000) @map("token_budget")
+  tokensUsed         Int       @default(0) @map("tokens_used")
+  autoApproveLowRisk Boolean   @default(false) @map("auto_approve_low_risk")
+  activeStreamId     String?   @map("active_stream_id")
+  userStatus         String?   @map("user_status")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  archivedAt         DateTime? @map("archived_at")
+
+  messages ChatMessage[]
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("chat_thread")
+}
+
+model ChatMessage {
+  id             String   @id
+  threadId       String   @map("thread_id")
+  role           String
+  partsJson      String   @map("parts_json")
+  model          String?
+  metadataJson   String?  @map("metadata_json")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  thread      ChatThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  toolCalls   ChatToolCall[]
+  attachments ChatAttachment[]
+
+  @@index([threadId])
+  @@map("chat_message")
+}
+
+model ChatToolCall {
+  id         String    @id
+  messageId  String    @map("message_id")
+  toolName   String    @map("tool_name")
+  inputJson  String?   @map("input_json")
+  outputJson String?   @map("output_json")
+  status     String    @default("completed")
+  approvedBy String?   @map("approved_by")
+  approvedAt DateTime? @map("approved_at")
+  latencyMs  Int?      @map("latency_ms")
+  error      String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("chat_tool_call")
+}
+
+model ChatAttachment {
+  id         String   @id
+  messageId  String   @map("message_id")
+  r2Key      String   @map("r2_key")
+  mimeType   String   @map("mime_type")
+  sizeBytes  Int      @map("size_bytes")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("chat_attachment")
+}
+
+model ChatAbuseEvent {
+  id             String   @id
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  threadId       String?  @map("thread_id")
+  kind           String
+  snippet        String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("chat_abuse_event")
+}
+
+// ============================================================================
+// AML Training (LMS) — global catalog + per-org enrollments / certifications
+// ============================================================================
+
+enum TrainingCourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TrainingModuleKind {
+  VIDEO
+  PDF
+  IMAGE
+  TEXT
+}
+
+enum TrainingQuizQuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+}
+
+enum TrainingEnrollmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+  FAILED
+}
+
+model TrainingCourse {
+  id               String               @id @default(uuid())
+  slug             String               @unique
+  titleI18n        Json                 @map("title_i18n")
+  descriptionI18n  Json                 @map("description_i18n")
+  status           TrainingCourseStatus @default(DRAFT)
+  version          Int                  @default(1)
+  isMandatory      Boolean              @default(true) @map("is_mandatory")
+  validityMonths   Int                  @default(12) @map("validity_months")
+  passingScore     Int                  @default(80) @map("passing_score")
+  maxAttempts      Int                  @default(3) @map("max_attempts")
+  cooldownHours    Int                  @default(24) @map("cooldown_hours")
+  publishedAt      DateTime?            @map("published_at")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  modules     TrainingCourseModule[]
+  quiz        TrainingCourseQuiz?
+  enrollments TrainingEnrollment[]
+
+  @@map("training_course")
+}
+
+model TrainingCourseModule {
+  id              String           @id @default(uuid())
+  courseId        String           @map("course_id")
+  sortOrder       Int              @map("sort_order")
+  kind            TrainingModuleKind
+  titleI18n       Json             @map("title_i18n")
+  descriptionI18n Json?            @map("description_i18n")
+  assetRef        String           @map("asset_ref")
+  durationSeconds Int?             @map("duration_seconds")
+  required        Boolean          @default(true)
+
+  course TrainingCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  progress TrainingEnrollmentProgress[]
+
+  @@index([courseId])
+  @@map("training_course_module")
+}
+
+model TrainingCourseQuiz {
+  id                String  @id @default(uuid())
+  courseId          String  @unique @map("course_id")
+  shuffleQuestions  Boolean @default(false) @map("shuffle_questions")
+  timeLimitMinutes  Int?    @map("time_limit_minutes")
+
+  course    TrainingCourse       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions TrainingQuizQuestion[]
+
+  @@map("training_course_quiz")
+}
+
+model TrainingQuizQuestion {
+  id             String                   @id @default(uuid())
+  quizId         String                   @map("quiz_id")
+  sortOrder      Int                      @map("sort_order")
+  promptI18n     Json                     @map("prompt_i18n")
+  type           TrainingQuizQuestionType
+  explanationI18n Json?                   @map("explanation_i18n")
+
+  quiz    TrainingCourseQuiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options TrainingQuizOption[]
+
+  @@index([quizId])
+  @@map("training_quiz_question")
+}
+
+model TrainingQuizOption {
+  id          String  @id @default(uuid())
+  questionId  String  @map("question_id")
+  sortOrder   Int     @map("sort_order")
+  textI18n    Json    @map("text_i18n")
+  isCorrect   Boolean @map("is_correct")
+
+  question TrainingQuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@map("training_quiz_option")
+}
+
+model TrainingEnrollment {
+  id              String                   @id @default(uuid())
+  organizationId  String                   @map("organization_id")
+  userId          String                   @map("user_id")
+  courseId        String                   @map("course_id")
+  courseVersion   Int                      @map("course_version")
+  status          TrainingEnrollmentStatus @default(ASSIGNED)
+  enrolledAt      DateTime                 @default(now()) @map("enrolled_at")
+  dueAt           DateTime?                @map("due_at")
+  completedAt     DateTime?                @map("completed_at")
+  validUntil      DateTime?                @map("valid_until")
+  attemptCount    Int                      @default(0) @map("attempt_count")
+
+  course   TrainingCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progress TrainingEnrollmentProgress[]
+  attempts TrainingQuizAttempt[]
+  certification TrainingCertification?
+
+  @@unique([organizationId, userId, courseId])
+  @@index([organizationId, status])
+  @@index([organizationId, userId])
+  @@index([validUntil])
+  @@map("training_enrollment")
+}
+
+model TrainingEnrollmentProgress {
+  id             String    @id @default(uuid())
+  enrollmentId   String    @map("enrollment_id")
+  moduleId       String    @map("module_id")
+  completedAt    DateTime? @map("completed_at")
+  watchedSeconds Int?      @map("watched_seconds")
+
+  enrollment TrainingEnrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  module     TrainingCourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, moduleId])
+  @@index([enrollmentId])
+  @@map("training_enrollment_progress")
+}
+
+model TrainingQuizAttempt {
+  id           String    @id @default(uuid())
+  enrollmentId String    @map("enrollment_id")
+  attemptNumber Int      @map("attempt_number")
+  startedAt    DateTime  @default(now()) @map("started_at")
+  submittedAt  DateTime? @map("submitted_at")
+  score        Int?
+  passed       Boolean?
+  answers      Json?
+
+  enrollment TrainingEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([enrollmentId])
+  @@map("training_quiz_attempt")
+}
+
+model TrainingCertification {
+  id                String    @id @default(uuid())
+  enrollmentId      String    @unique @map("enrollment_id")
+  organizationId    String    @map("organization_id")
+  userId            String    @map("user_id")
+  courseId          String    @map("course_id")
+  certificateNumber String    @unique @map("certificate_number")
+  /// Display name at issuance (JWT / profile); immutable on the certificate.
+  userName          String?   @map("user_name")
+  /// Organization legal/display name at issuance; immutable on the certificate.
+  organizationName  String?   @map("organization_name")
+  score             Int
+  issuedAt          DateTime  @default(now()) @map("issued_at")
+  expiresAt         DateTime  @map("expires_at")
+  pdfR2Key          String?   @map("pdf_r2_key")
+
+  enrollment TrainingEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, userId])
+  @@index([expiresAt])
+  @@map("training_certification")
 }

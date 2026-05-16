@@ -23,6 +23,7 @@ import {
 import type { AlertJob, UmaValueEntity } from "./types";
 import type { AlertRuleEntity } from "../alert/types";
 import { generateContextHash } from "../../lib/hash";
+import { getAmlFrontendUrl } from "../../lib/frontend-url";
 import { retry } from "../../lib/retry";
 import { AlertRepository, AlertRuleRepository } from "../alert/repository";
 import type { Bindings } from "../../types";
@@ -337,10 +338,7 @@ export class AlertDetectionProcessor {
 						clientDisplay,
 						seekerName: seeker.name,
 					});
-					const amlFrontendUrl =
-						this.env.TRUSTED_ORIGINS?.split(",")[0] ??
-						"https://aml.janovix.workers.dev";
-					const callbackUrl = `${amlFrontendUrl.replace(/\/$/, "")}/alerts/${alert.id}`;
+					const callbackUrl = `${getAmlFrontendUrl(this.env)}/alerts/${alert.id}`;
 
 					await notifService.notify({
 						tenantId: job.organizationId,

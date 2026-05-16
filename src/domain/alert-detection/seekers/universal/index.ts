@@ -14,6 +14,11 @@ export { UniversalForeignTransferPaymentSeeker } from "./foreign_transfer_paymen
 export { UniversalForeignCurrencyCashSeeker } from "./foreign_currency_cash";
 export { UniversalVirtualCurrencyPaymentSeeker } from "./virtual_currency_payment";
 export { UniversalCashHighValueSeeker } from "./cash_high_value";
+export { UniversalCashLimitArt32Seeker } from "./cash_limit_art32";
+export { UniversalCashFragmentationSeeker } from "./cash_fragmentation";
+export { UniversalPepAboveThresholdSeeker } from "./pep_above_threshold";
+export { UniversalPepOrHighRiskSeeker } from "./pep_or_high_risk";
+export { UniversalNewClientHighValueSeeker } from "./new_client_high_value";
 export { UniversalThirdPartyPayerSeeker } from "./third_party_payer";
 export { UniversalQuickRefundPatternSeeker } from "./quick_refund_pattern";
 export { UniversalMinorClientSeeker } from "./minor_client";
@@ -36,6 +41,11 @@ import { UniversalForeignTransferPaymentSeeker } from "./foreign_transfer_paymen
 import { UniversalForeignCurrencyCashSeeker } from "./foreign_currency_cash";
 import { UniversalVirtualCurrencyPaymentSeeker } from "./virtual_currency_payment";
 import { UniversalCashHighValueSeeker } from "./cash_high_value";
+import { UniversalCashLimitArt32Seeker } from "./cash_limit_art32";
+import { UniversalCashFragmentationSeeker } from "./cash_fragmentation";
+import { UniversalPepAboveThresholdSeeker } from "./pep_above_threshold";
+import { UniversalPepOrHighRiskSeeker } from "./pep_or_high_risk";
+import { UniversalNewClientHighValueSeeker } from "./new_client_high_value";
 import { UniversalThirdPartyPayerSeeker } from "./third_party_payer";
 import { UniversalQuickRefundPatternSeeker } from "./quick_refund_pattern";
 import { UniversalMinorClientSeeker } from "./minor_client";
@@ -61,6 +71,11 @@ export function createAllUniversalSeekers(): UniversalAlertSeeker[] {
 		new UniversalForeignCurrencyCashSeeker(),
 		new UniversalVirtualCurrencyPaymentSeeker(),
 		new UniversalCashHighValueSeeker(),
+		new UniversalCashLimitArt32Seeker(),
+		new UniversalCashFragmentationSeeker(),
+		new UniversalPepAboveThresholdSeeker(),
+		new UniversalPepOrHighRiskSeeker(),
+		new UniversalNewClientHighValueSeeker(),
 		new UniversalThirdPartyPayerSeeker(),
 		new UniversalQuickRefundPatternSeeker(),
 		new UniversalMinorClientSeeker(),

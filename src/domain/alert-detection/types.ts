@@ -87,6 +87,8 @@ export type SeekerRuleType =
 	| "frequent_operations"
 	| "third_party_accounts"
 	| "cash_payment_limit"
+	| "cash_high_value"
+	| "cash_limit_art32"
 	| "cash_fragmentation"
 	| "pep_above_threshold"
 	| "pep_or_high_risk"

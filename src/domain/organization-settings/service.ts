@@ -1,6 +1,10 @@
 import type { OrganizationSettingsEntity } from "./types";
 import { OrganizationSettingsRepository } from "./repository";
 import type { TenantContext } from "../../lib/tenant-context";
+import type {
+	OrganizationSettingsCreateInput,
+	OrganizationSettingsUpdateInput,
+} from "./schemas";
 
 export class OrganizationSettingsService {
 	constructor(private readonly repository: OrganizationSettingsRepository) {}
@@ -13,28 +17,14 @@ export class OrganizationSettingsService {
 
 	async createOrUpdate(
 		tenant: TenantContext,
-		data: {
-			obligatedSubjectKey: string;
-			activityKey: string;
-			selfServiceMode?: string;
-			selfServiceExpiryHours?: number;
-			selfServiceRequiredSections?: string[] | null;
-			selfServiceSendEmail?: boolean;
-		},
+		data: OrganizationSettingsCreateInput,
 	): Promise<OrganizationSettingsEntity> {
 		return this.repository.upsert(tenant, data);
 	}
 
 	async update(
 		tenant: TenantContext,
-		data: {
-			obligatedSubjectKey?: string;
-			activityKey?: string;
-			selfServiceMode?: string;
-			selfServiceExpiryHours?: number;
-			selfServiceRequiredSections?: string[] | null;
-			selfServiceSendEmail?: boolean;
-		},
+		data: OrganizationSettingsUpdateInput,
 	): Promise<OrganizationSettingsEntity> {
 		return this.repository.update(tenant, data);
 	}

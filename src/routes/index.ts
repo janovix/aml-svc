@@ -30,8 +30,14 @@ import {
 import { exchangeRatesRouter } from "./exchange-rates";
 import { kycSessionsRouter } from "./kyc-sessions";
 import { publicKycRouter } from "./public-kyc";
+import { publicUploadsRouter } from "./public-uploads";
 import { maintenanceRouter } from "./internal-maintenance";
+import { internalE2eRouter } from "./internal-e2e";
 import { riskRouter } from "./risk";
+import { chatRouter } from "./chat";
+import { janbotWatchlistRouter } from "./janbot-watchlist";
+import { trainingRouter } from "./training";
+import { sidebarRouter } from "./sidebar";
 
 export function createRouter() {
 	const router = new Hono<{
@@ -46,6 +52,7 @@ export function createRouter() {
 	router.route("/imports", importEventsRouter);
 	// Internal routes for worker-to-service communication (no auth, service binding only)
 	router.route("/internal/maintenance", maintenanceRouter);
+	router.route("/internal/e2e", internalE2eRouter);
 	router.route("/internal/imports", importInternalRouter);
 	router.route("/internal/clients", clientsInternalRouter);
 	// Transaction internal routes deprecated - use operations
@@ -58,6 +65,9 @@ export function createRouter() {
 
 	// Public catalogs (reference data — countries, economic activities, etc.)
 	router.route("/public/catalogs", catalogsRouter);
+
+	// Public uploads (token-based, no auth required)
+	router.route("/public/uploads", publicUploadsRouter);
 
 	// KYC Self-Service public endpoints (no auth, token-based)
 	router.route("/public/kyc", publicKycRouter);
@@ -103,6 +113,35 @@ export function createRouter() {
 	router.use("/risk/*", authMiddleware({ requireOrganization: true }));
 	router.use("/risk/*", requireActiveOrganization());
 
+	// Janbot chat persistence (org-scoped)
+	router.use("/chat/*", authMiddleware({ requireOrganization: true }));
+	router.use("/chat/*", requireActiveOrganization());
+	router.use("/chat", authMiddleware({ requireOrganization: true }));
+	router.use("/chat", requireActiveOrganization());
+
+	router.use(
+		"/janbot/watchlist/*",
+		authMiddleware({ requireOrganization: true }),
+	);
+	router.use("/janbot/watchlist/*", requireActiveOrganization());
+	router.use(
+		"/janbot/watchlist",
+		authMiddleware({ requireOrganization: true }),
+	);
+	router.use("/janbot/watchlist", requireActiveOrganization());
+
+	// AML Training (LMS) — org-scoped learner + org-admin views
+	router.use("/training/*", authMiddleware({ requireOrganization: true }));
+	router.use("/training/*", requireActiveOrganization());
+	router.use("/training", authMiddleware({ requireOrganization: true }));
+	router.use("/training", requireActiveOrganization());
+
+	// Sidebar aggregate badges (counts for nav indicators)
+	router.use("/sidebar/*", authMiddleware({ requireOrganization: true }));
+	router.use("/sidebar/*", requireActiveOrganization());
+	router.use("/sidebar", authMiddleware({ requireOrganization: true }));
+	router.use("/sidebar", requireActiveOrganization());
+
 	// Exchange rates are global utility - auth required but no org
 	router.use("/exchange-rates/*", authMiddleware());
 
@@ -130,6 +169,10 @@ export function createRouter() {
 	router.route("/imports", importsRouter);
 	router.route("/kyc-sessions", kycSessionsRouter);
 	router.route("/risk", riskRouter);
+	router.route("/chat", chatRouter);
+	router.route("/janbot/watchlist", janbotWatchlistRouter);
+	router.route("/training", trainingRouter);
+	router.route("/sidebar", sidebarRouter);
 
 	return router;
 }

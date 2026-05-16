@@ -2,9 +2,7 @@
  * Alert Seeker Registry and Auto-Discovery
  *
  * This module provides the seeker registry that manages all alert seekers.
- * It supports both:
- * - Legacy activity-specific seekers (VEH only)
- * - Universal pattern-based seekers (all 19 VAs)
+ * Universal pattern-based seekers cover all 19 vulnerable activities (VAs).
  */
 
 import type {
@@ -15,24 +13,11 @@ import type {
 	UniversalAlertSeeker,
 } from "./types";
 
-// Import VEH seekers (legacy, kept for backward compatibility)
-import { OperationAmountUmaSeeker } from "./VEH/operation_amount_uma";
-import { AggregateAmountUmaSeeker } from "./VEH/aggregate_amount_uma";
-import { CashPaymentLimitSeeker } from "./VEH/cash_payment_limit";
-import { CashFragmentationSeeker } from "./VEH/cash_fragmentation";
-import { PayerBuyerMismatchSeeker } from "./VEH/payer_buyer_mismatch";
-import { PepAboveThresholdSeeker } from "./VEH/pep_above_threshold";
-import { PepOrHighRiskSeeker } from "./VEH/pep_or_high_risk";
-import { FrequentOperationsSeeker } from "./VEH/frequent_operations";
-import { NewClientHighValueSeeker } from "./VEH/new_client_high_value";
-import { ThirdPartyAccountsSeeker } from "./VEH/third_party_accounts";
-
 // Import universal seekers
 import { createAllUniversalSeekers } from "./universal/index";
 
 /**
  * Default implementation of the SeekerRegistry
- * Now supports both legacy per-activity seekers and universal seekers.
  */
 class DefaultSeekerRegistry implements SeekerRegistry {
 	private seekers: Map<string, AlertSeeker> = new Map();
@@ -88,25 +73,20 @@ class DefaultSeekerRegistry implements SeekerRegistry {
 
 	/**
 	 * Gets all seekers for a specific activity.
-	 * Merges universal seekers that apply to this activity
-	 * with legacy activity-specific seekers (deduplicating by ruleType,
-	 * universal takes priority for overlapping types).
+	 * Merges universal seekers that apply to this activity with any
+	 * activity-specific seekers registered for that activity (universal wins on ruleType).
 	 */
 	getSeekersForActivity(activityCode: VulnerableActivityCode): AlertSeeker[] {
-		// Universal seekers that apply to this activity
 		const universalApplicable = this.universalSeekers.filter((s) =>
 			s.appliesTo(activityCode),
 		);
 
-		// Legacy activity-specific seekers
 		const legacySeekers = this.seekersByActivity.get(activityCode) || [];
 
-		// If no universal seekers, return legacy only
 		if (universalApplicable.length === 0) {
 			return legacySeekers;
 		}
 
-		// Merge: universal + legacy seekers whose ruleType isn't covered by universal
 		const universalRuleTypes = new Set(
 			universalApplicable.map((s) => s.ruleType),
 		);
@@ -208,22 +188,6 @@ export const seekerRegistry: SeekerRegistry & {
 } = new DefaultSeekerRegistry();
 
 /**
- * Registers all VEH (Vehículos) seekers
- */
-function registerVehSeekers(): void {
-	seekerRegistry.register(new OperationAmountUmaSeeker());
-	seekerRegistry.register(new AggregateAmountUmaSeeker());
-	seekerRegistry.register(new CashPaymentLimitSeeker());
-	seekerRegistry.register(new CashFragmentationSeeker());
-	seekerRegistry.register(new PayerBuyerMismatchSeeker());
-	seekerRegistry.register(new PepAboveThresholdSeeker());
-	seekerRegistry.register(new PepOrHighRiskSeeker());
-	seekerRegistry.register(new FrequentOperationsSeeker());
-	seekerRegistry.register(new NewClientHighValueSeeker());
-	seekerRegistry.register(new ThirdPartyAccountsSeeker());
-}
-
-/**
  * Registers all universal (pattern-based) seekers
  */
 function registerUniversalSeekers(): void {
@@ -240,11 +204,7 @@ function registerUniversalSeekers(): void {
 export function initializeSeekers(): void {
 	console.log("Initializing alert seekers...");
 
-	// Register universal seekers (all 19 VAs)
 	registerUniversalSeekers();
-
-	// Register legacy VEH seekers (kept for backward compatibility)
-	registerVehSeekers();
 
 	// Log registration summary
 	const activities = seekerRegistry.getRegisteredActivities();

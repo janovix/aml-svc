@@ -25,6 +25,11 @@ export interface TriggerSearchParams {
 	identifiers?: string[];
 	/** Countries for filtering (optional) */
 	countries?: string[];
+	/** Links query row to AML client or beneficial controller in watchlist-svc */
+	entityId?: string;
+	entityKind?: "client" | "beneficial_controller";
+	/** watchlist data slice (default production) */
+	environment?: string;
 }
 
 /**
@@ -42,6 +47,9 @@ interface WatchlistServiceRpc {
 			identifiers?: string[];
 			topK?: number;
 			threshold?: number;
+			environment?: string;
+			entityId?: string;
+			entityKind?: "client" | "beneficial_controller";
 		},
 		organizationId: string,
 		userId: string,
@@ -85,6 +93,9 @@ export class WatchlistSearchService {
 			birthDate,
 			identifiers,
 			countries,
+			entityId,
+			entityKind,
+			environment,
 		} = params;
 
 		try {
@@ -102,6 +113,8 @@ export class WatchlistSearchService {
 					countries,
 					topK: 50,
 					threshold: 0.875,
+					...(environment ? { environment } : {}),
+					...(entityId && entityKind ? { entityId, entityKind } : {}),
 				},
 				organizationId,
 				userId,

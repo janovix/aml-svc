@@ -201,4 +201,5 @@ dist
 ### Generated SQL Files ###
 scripts/populate/sql/*.sql
 scripts/generate-test-data/**/*.csv
+scripts/generate-test-data/output/generate-meta.json
 coverage-output*

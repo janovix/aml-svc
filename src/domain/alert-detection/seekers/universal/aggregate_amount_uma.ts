@@ -7,7 +7,7 @@
  */
 
 import { DEFAULT_UMA_DAILY_VALUE } from "../../config/activity-thresholds";
-import { AGGREGATION_WINDOW_DAYS } from "../constants";
+import { AGGREGATION_WINDOW_DAYS } from "../window-constants";
 import {
 	UniversalAlertSeeker,
 	type AlertContext,

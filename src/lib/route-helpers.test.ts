@@ -27,6 +27,15 @@ describe("parseWithZod", () => {
 			expect((e as APIError).message).toBe("Validation failed");
 		}
 	});
+
+	it("rethrows non-Zod parse errors", () => {
+		const schema = {
+			parse: () => {
+				throw new Error("not zod");
+			},
+		};
+		expect(() => parseWithZod(schema, {})).toThrow("not zod");
+	});
 });
 
 describe("handleServiceError", () => {
@@ -60,6 +69,52 @@ describe("handleServiceError", () => {
 		expect(() =>
 			handleServiceError(new Error("UNIQUE constraint failed: client.rfc")),
 		).toThrow(APIError);
+	});
+
+	it("maps generic Prisma P2002 to DUPLICATE_VALUE", () => {
+		const err = new Prisma.PrismaClientKnownRequestError("Unique", {
+			code: "P2002",
+			clientVersion: "test",
+			meta: { target: ["email"] },
+		});
+		expect(() => handleServiceError(err)).toThrow(APIError);
+		try {
+			handleServiceError(err);
+		} catch (e) {
+			expect((e as APIError).details).toMatchObject({
+				code: "DUPLICATE_VALUE",
+			});
+		}
+	});
+
+	it("maps Unique constraint failed message without rfc field", () => {
+		expect(() =>
+			handleServiceError(new Error("Unique constraint failed on idx_email")),
+		).toThrow(APIError);
+		try {
+			handleServiceError(new Error("Unique constraint failed on idx_email"));
+		} catch (e) {
+			expect((e as APIError).statusCode).toBe(409);
+			expect((e as APIError).details).toMatchObject({
+				code: "DUPLICATE_VALUE",
+			});
+		}
+	});
+
+	it("maps DOCUMENT, ADDRESS, and TRANSACTION not-found messages", () => {
+		expect(() =>
+			handleServiceError(new Error(NOT_FOUND_ERRORS.DOCUMENT)),
+		).toThrow(APIError);
+		expect(() =>
+			handleServiceError(new Error(NOT_FOUND_ERRORS.ADDRESS)),
+		).toThrow(APIError);
+		expect(() =>
+			handleServiceError(new Error(NOT_FOUND_ERRORS.TRANSACTION)),
+		).toThrow(APIError);
+	});
+
+	it("rethrows unknown errors", () => {
+		expect(() => handleServiceError(new Error("other"))).toThrow("other");
 	});
 });
 

@@ -5,15 +5,25 @@ import type { TenantContext } from "../../lib/tenant-context";
 import type { OrganizationSettingsEntity } from "./types";
 import { mapPrismaOrganizationSettings } from "./mappers";
 
+const WATCHLIST_DEFAULTS = {
+	watchlistRescanEnabled: true,
+	watchlistRescanIntervalDays: 90,
+	watchlistRescanIncludeBcs: true,
+	watchlistRescanNotifyOnStatusChange: true,
+	watchlistRescanDailyCap: 5000,
+	watchlistRescanNotifyChannels: '["in_app"]',
+	watchlistRescanSources: '["ofac","un","sat69b","pep","adverse_media"]',
+} as const;
+
 export class OrganizationSettingsRepository {
 	constructor(private readonly prisma: PrismaClient) {}
 
 	async findByOrganizationId(
 		tenant: TenantContext,
 	): Promise<OrganizationSettingsEntity | null> {
-		const { organizationId, environment } = tenant;
-		const record = await this.prisma.organizationSettings.findFirst({
-			where: { organizationId, environment },
+		const { organizationId } = tenant;
+		const record = await this.prisma.organizationSettings.findUnique({
+			where: { organizationId },
 		});
 
 		if (!record) {
@@ -32,14 +42,20 @@ export class OrganizationSettingsRepository {
 			selfServiceExpiryHours?: number;
 			selfServiceRequiredSections?: string[] | null;
 			selfServiceSendEmail?: boolean;
+			watchlistRescanEnabled?: boolean;
+			watchlistRescanIntervalDays?: number;
+			watchlistRescanIncludeBcs?: boolean;
+			watchlistRescanNotifyOnStatusChange?: boolean;
+			watchlistRescanDailyCap?: number;
+			watchlistRescanNotifyChannels?: string[] | null;
+			watchlistRescanSources?: string[] | null;
 		},
 	): Promise<OrganizationSettingsEntity> {
-		const { organizationId, environment } = tenant;
+		const { organizationId } = tenant;
 		const record = await this.prisma.organizationSettings.create({
 			data: {
 				id: generateId("ORGANIZATION_SETTINGS"),
 				organizationId,
-				environment,
 				obligatedSubjectKey: data.obligatedSubjectKey,
 				activityKey: data.activityKey,
 				selfServiceMode: data.selfServiceMode ?? "automatic",
@@ -49,6 +65,31 @@ export class OrganizationSettingsRepository {
 					data.selfServiceRequiredSections != null
 						? JSON.stringify(data.selfServiceRequiredSections)
 						: null,
+				...WATCHLIST_DEFAULTS,
+				...(data.watchlistRescanEnabled !== undefined && {
+					watchlistRescanEnabled: data.watchlistRescanEnabled,
+				}),
+				...(data.watchlistRescanIntervalDays !== undefined && {
+					watchlistRescanIntervalDays: data.watchlistRescanIntervalDays,
+				}),
+				...(data.watchlistRescanIncludeBcs !== undefined && {
+					watchlistRescanIncludeBcs: data.watchlistRescanIncludeBcs,
+				}),
+				...(data.watchlistRescanNotifyOnStatusChange !== undefined && {
+					watchlistRescanNotifyOnStatusChange:
+						data.watchlistRescanNotifyOnStatusChange,
+				}),
+				...(data.watchlistRescanDailyCap !== undefined && {
+					watchlistRescanDailyCap: data.watchlistRescanDailyCap,
+				}),
+				...(data.watchlistRescanNotifyChannels != null && {
+					watchlistRescanNotifyChannels: JSON.stringify(
+						data.watchlistRescanNotifyChannels,
+					),
+				}),
+				...(data.watchlistRescanSources != null && {
+					watchlistRescanSources: JSON.stringify(data.watchlistRescanSources),
+				}),
 			},
 		});
 
@@ -64,17 +105,24 @@ export class OrganizationSettingsRepository {
 			selfServiceExpiryHours?: number;
 			selfServiceRequiredSections?: string[] | null;
 			selfServiceSendEmail?: boolean;
+			watchlistRescanEnabled?: boolean;
+			watchlistRescanIntervalDays?: number;
+			watchlistRescanIncludeBcs?: boolean;
+			watchlistRescanNotifyOnStatusChange?: boolean;
+			watchlistRescanDailyCap?: number;
+			watchlistRescanNotifyChannels?: string[] | null;
+			watchlistRescanSources?: string[] | null;
 		},
 	): Promise<OrganizationSettingsEntity> {
-		const { organizationId, environment } = tenant;
-		const existing = await this.prisma.organizationSettings.findFirst({
-			where: { organizationId, environment },
+		const { organizationId } = tenant;
+		const existing = await this.prisma.organizationSettings.findUnique({
+			where: { organizationId },
 			select: { id: true },
 		});
 
 		if (!existing) {
 			throw new Error(
-				`Organization settings not found for org ${organizationId} env ${environment}`,
+				`Organization settings not found for org ${organizationId}`,
 			);
 		}
 
@@ -102,6 +150,34 @@ export class OrganizationSettingsRepository {
 							? JSON.stringify(data.selfServiceRequiredSections)
 							: null,
 				}),
+				...(data.watchlistRescanEnabled !== undefined && {
+					watchlistRescanEnabled: data.watchlistRescanEnabled,
+				}),
+				...(data.watchlistRescanIntervalDays !== undefined && {
+					watchlistRescanIntervalDays: data.watchlistRescanIntervalDays,
+				}),
+				...(data.watchlistRescanIncludeBcs !== undefined && {
+					watchlistRescanIncludeBcs: data.watchlistRescanIncludeBcs,
+				}),
+				...(data.watchlistRescanNotifyOnStatusChange !== undefined && {
+					watchlistRescanNotifyOnStatusChange:
+						data.watchlistRescanNotifyOnStatusChange,
+				}),
+				...(data.watchlistRescanDailyCap !== undefined && {
+					watchlistRescanDailyCap: data.watchlistRescanDailyCap,
+				}),
+				...(data.watchlistRescanNotifyChannels !== undefined && {
+					watchlistRescanNotifyChannels:
+						data.watchlistRescanNotifyChannels != null
+							? JSON.stringify(data.watchlistRescanNotifyChannels)
+							: WATCHLIST_DEFAULTS.watchlistRescanNotifyChannels,
+				}),
+				...(data.watchlistRescanSources !== undefined && {
+					watchlistRescanSources:
+						data.watchlistRescanSources != null
+							? JSON.stringify(data.watchlistRescanSources)
+							: WATCHLIST_DEFAULTS.watchlistRescanSources,
+				}),
 			},
 		});
 
@@ -117,45 +193,21 @@ export class OrganizationSettingsRepository {
 			selfServiceExpiryHours?: number;
 			selfServiceRequiredSections?: string[] | null;
 			selfServiceSendEmail?: boolean;
+			watchlistRescanEnabled?: boolean;
+			watchlistRescanIntervalDays?: number;
+			watchlistRescanIncludeBcs?: boolean;
+			watchlistRescanNotifyOnStatusChange?: boolean;
+			watchlistRescanDailyCap?: number;
+			watchlistRescanNotifyChannels?: string[] | null;
+			watchlistRescanSources?: string[] | null;
 		},
 	): Promise<OrganizationSettingsEntity> {
-		const { organizationId, environment } = tenant;
-		const existing = await this.prisma.organizationSettings.findFirst({
-			where: { organizationId, environment },
-			select: { id: true },
-		});
-
-		if (existing) {
-			const record = await this.prisma.organizationSettings.update({
-				where: { id: existing.id },
-				data: {
-					obligatedSubjectKey: data.obligatedSubjectKey,
-					activityKey: data.activityKey,
-					...(data.selfServiceMode !== undefined && {
-						selfServiceMode: data.selfServiceMode,
-					}),
-					...(data.selfServiceExpiryHours !== undefined && {
-						selfServiceExpiryHours: data.selfServiceExpiryHours,
-					}),
-					...(data.selfServiceSendEmail !== undefined && {
-						selfServiceSendEmail: data.selfServiceSendEmail,
-					}),
-					...(data.selfServiceRequiredSections !== undefined && {
-						selfServiceRequiredSections:
-							data.selfServiceRequiredSections != null
-								? JSON.stringify(data.selfServiceRequiredSections)
-								: null,
-					}),
-				},
-			});
-			return mapPrismaOrganizationSettings(record);
-		}
-
-		const record = await this.prisma.organizationSettings.create({
-			data: {
+		const { organizationId } = tenant;
+		const record = await this.prisma.organizationSettings.upsert({
+			where: { organizationId },
+			create: {
 				id: generateId("ORGANIZATION_SETTINGS"),
 				organizationId,
-				environment,
 				obligatedSubjectKey: data.obligatedSubjectKey,
 				activityKey: data.activityKey,
 				selfServiceMode: data.selfServiceMode ?? "automatic",
@@ -165,6 +217,78 @@ export class OrganizationSettingsRepository {
 					data.selfServiceRequiredSections != null
 						? JSON.stringify(data.selfServiceRequiredSections)
 						: null,
+				...WATCHLIST_DEFAULTS,
+				...(data.watchlistRescanEnabled !== undefined && {
+					watchlistRescanEnabled: data.watchlistRescanEnabled,
+				}),
+				...(data.watchlistRescanIntervalDays !== undefined && {
+					watchlistRescanIntervalDays: data.watchlistRescanIntervalDays,
+				}),
+				...(data.watchlistRescanIncludeBcs !== undefined && {
+					watchlistRescanIncludeBcs: data.watchlistRescanIncludeBcs,
+				}),
+				...(data.watchlistRescanNotifyOnStatusChange !== undefined && {
+					watchlistRescanNotifyOnStatusChange:
+						data.watchlistRescanNotifyOnStatusChange,
+				}),
+				...(data.watchlistRescanDailyCap !== undefined && {
+					watchlistRescanDailyCap: data.watchlistRescanDailyCap,
+				}),
+				...(data.watchlistRescanNotifyChannels != null && {
+					watchlistRescanNotifyChannels: JSON.stringify(
+						data.watchlistRescanNotifyChannels,
+					),
+				}),
+				...(data.watchlistRescanSources != null && {
+					watchlistRescanSources: JSON.stringify(data.watchlistRescanSources),
+				}),
+			},
+			update: {
+				obligatedSubjectKey: data.obligatedSubjectKey,
+				activityKey: data.activityKey,
+				...(data.selfServiceMode !== undefined && {
+					selfServiceMode: data.selfServiceMode,
+				}),
+				...(data.selfServiceExpiryHours !== undefined && {
+					selfServiceExpiryHours: data.selfServiceExpiryHours,
+				}),
+				...(data.selfServiceSendEmail !== undefined && {
+					selfServiceSendEmail: data.selfServiceSendEmail,
+				}),
+				...(data.selfServiceRequiredSections !== undefined && {
+					selfServiceRequiredSections:
+						data.selfServiceRequiredSections != null
+							? JSON.stringify(data.selfServiceRequiredSections)
+							: null,
+				}),
+				...(data.watchlistRescanEnabled !== undefined && {
+					watchlistRescanEnabled: data.watchlistRescanEnabled,
+				}),
+				...(data.watchlistRescanIntervalDays !== undefined && {
+					watchlistRescanIntervalDays: data.watchlistRescanIntervalDays,
+				}),
+				...(data.watchlistRescanIncludeBcs !== undefined && {
+					watchlistRescanIncludeBcs: data.watchlistRescanIncludeBcs,
+				}),
+				...(data.watchlistRescanNotifyOnStatusChange !== undefined && {
+					watchlistRescanNotifyOnStatusChange:
+						data.watchlistRescanNotifyOnStatusChange,
+				}),
+				...(data.watchlistRescanDailyCap !== undefined && {
+					watchlistRescanDailyCap: data.watchlistRescanDailyCap,
+				}),
+				...(data.watchlistRescanNotifyChannels !== undefined && {
+					watchlistRescanNotifyChannels:
+						data.watchlistRescanNotifyChannels != null
+							? JSON.stringify(data.watchlistRescanNotifyChannels)
+							: WATCHLIST_DEFAULTS.watchlistRescanNotifyChannels,
+				}),
+				...(data.watchlistRescanSources !== undefined && {
+					watchlistRescanSources:
+						data.watchlistRescanSources != null
+							? JSON.stringify(data.watchlistRescanSources)
+							: WATCHLIST_DEFAULTS.watchlistRescanSources,
+				}),
 			},
 		});
 		return mapPrismaOrganizationSettings(record);

@@ -11,6 +11,12 @@ import type {
 	OperationUpdateInput,
 } from "./schemas";
 import type { TenantContext } from "../../lib/tenant-context";
+import {
+	ACTIVITY_THRESHOLDS,
+	DEFAULT_UMA_DAILY_VALUE,
+	getIdentificationThresholdUma as getIdentificationThresholdUmaFromConfig,
+	getNoticeThresholdUma as getNoticeThresholdUmaFromConfig,
+} from "../alert-detection/config/activity-thresholds";
 
 export class DuplicateOperationError extends Error {
 	constructor(importHash: string) {
@@ -21,41 +27,8 @@ export class DuplicateOperationError extends Error {
 	}
 }
 
-/**
- * UMA thresholds by activity code (in UMAs) — LFPIORPI Art. 17
- *
- * Each activity has TWO thresholds:
- * - identification: operations >= this must capture client identity
- * - notice: operations >= this must file a SAT notice
- *
- * "ALWAYS" means the obligation applies regardless of amount.
- */
-const UMA_THRESHOLDS: Record<
-	ActivityCode,
-	{ identification: number | "ALWAYS"; notice: number | "ALWAYS" }
-> = {
-	JYS: { identification: 325, notice: 645 },
-	TSC: { identification: 805, notice: 1285 },
-	TPP: { identification: 645, notice: 645 },
-	TDR: { identification: 645, notice: 645 },
-	CHV: { identification: "ALWAYS", notice: 645 },
-	MPC: { identification: "ALWAYS", notice: 1605 },
-	INM: { identification: "ALWAYS", notice: 8025 },
-	DIN: { identification: "ALWAYS", notice: 8025 },
-	MJR: { identification: 805, notice: 1605 },
-	OBA: { identification: 2410, notice: 4815 },
-	VEH: { identification: 3210, notice: 6420 },
-	BLI: { identification: 2410, notice: 4815 },
-	TCV: { identification: "ALWAYS", notice: 3210 },
-	SPR: { identification: "ALWAYS", notice: "ALWAYS" },
-	FEP: { identification: "ALWAYS", notice: 8000 },
-	FES: { identification: "ALWAYS", notice: "ALWAYS" },
-	DON: { identification: 1605, notice: 3210 },
-	ARI: { identification: 1605, notice: 3210 },
-	AVI: { identification: "ALWAYS", notice: 210 },
-};
-
-const CURRENT_UMA = 117.31;
+/** Single source of truth: [activity-thresholds.ts](../alert-detection/config/activity-thresholds.ts) */
+const CURRENT_UMA = DEFAULT_UMA_DAILY_VALUE;
 const CURRENT_UMA_DAILY = CURRENT_UMA;
 
 export class OperationService {
@@ -137,12 +110,14 @@ export class OperationService {
 	}
 
 	getNoticeThresholdUma(activityCode: ActivityCode): number {
-		const t = UMA_THRESHOLDS[activityCode].notice;
+		const t = getNoticeThresholdUmaFromConfig(activityCode);
+		if (t === null) return 0;
 		return t === "ALWAYS" ? 0 : t;
 	}
 
 	getIdentificationThresholdUma(activityCode: ActivityCode): number {
-		const t = UMA_THRESHOLDS[activityCode].identification;
+		const t = getIdentificationThresholdUmaFromConfig(activityCode);
+		if (t === null) return 0;
 		return t === "ALWAYS" ? 0 : t;
 	}
 
@@ -239,13 +214,17 @@ export class OperationService {
 				noticeMxn: number;
 			}
 		> = {};
-		for (const [code, t] of Object.entries(UMA_THRESHOLDS)) {
+		for (const [code, t] of Object.entries(ACTIVITY_THRESHOLDS)) {
 			thresholds[code] = {
-				identificationUma: t.identification,
-				noticeUma: t.notice,
+				identificationUma: t.identificationThresholdUma,
+				noticeUma: t.noticeThresholdUma,
 				identificationMxn:
-					(t.identification === "ALWAYS" ? 0 : t.identification) * CURRENT_UMA,
-				noticeMxn: (t.notice === "ALWAYS" ? 0 : t.notice) * CURRENT_UMA,
+					(t.identificationThresholdUma === "ALWAYS"
+						? 0
+						: t.identificationThresholdUma) * CURRENT_UMA,
+				noticeMxn:
+					(t.noticeThresholdUma === "ALWAYS" ? 0 : t.noticeThresholdUma) *
+					CURRENT_UMA,
 			};
 		}
 		return thresholds as Record<

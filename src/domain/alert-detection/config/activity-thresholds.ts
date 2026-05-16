@@ -7,7 +7,9 @@
  *
  * "ALWAYS" means the activity must always be identified/reported regardless of amount.
  *
- * Source: LFPIORPI Art. 17 + SAT Threshold Tables (Feb 2026)
+ * Also: Art. 32 cash payment limits (UMA) where applicable; null = no specific cap in this model.
+ *
+ * Source: LFPIORPI Art. 17 + Art. 32 + SAT Threshold Tables (Feb 2026)
  */
 
 export interface ActivityThreshold {
@@ -15,6 +17,8 @@ export interface ActivityThreshold {
 	lfpiropiFraccion: string;
 	identificationThresholdUma: number | "ALWAYS";
 	noticeThresholdUma: number | "ALWAYS";
+	/** Art. 32 max cash (UMA) for a single payment; null if not subject to a listed cap */
+	cashLimitUma: number | null;
 	description: string;
 }
 
@@ -29,6 +33,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "I",
 		identificationThresholdUma: 325,
 		noticeThresholdUma: 645,
+		cashLimitUma: 3210,
 		description: "Juegos, concursos, sorteos",
 	},
 
@@ -38,6 +43,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "II-a",
 		identificationThresholdUma: 805,
 		noticeThresholdUma: 1285,
+		cashLimitUma: null,
 		description: "Tarjetas de crédito/servicios",
 	},
 	TPP: {
@@ -45,6 +51,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "II-b,c",
 		identificationThresholdUma: 645,
 		noticeThresholdUma: 645,
+		cashLimitUma: 3210,
 		description: "Tarjetas prepagadas",
 	},
 	TDR: {
@@ -52,6 +59,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "II-c",
 		identificationThresholdUma: 645,
 		noticeThresholdUma: 645,
+		cashLimitUma: null,
 		description: "Instrumentos valor/recompensas",
 	},
 
@@ -61,6 +69,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "III",
 		identificationThresholdUma: "ALWAYS",
 		noticeThresholdUma: 645,
+		cashLimitUma: null,
 		description: "Cheques de viajero",
 	},
 
@@ -70,6 +79,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "IV",
 		identificationThresholdUma: "ALWAYS",
 		noticeThresholdUma: 1605,
+		cashLimitUma: null,
 		description: "Préstamos/créditos",
 	},
 
@@ -79,6 +89,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "V",
 		identificationThresholdUma: "ALWAYS",
 		noticeThresholdUma: 8025,
+		cashLimitUma: 8025,
 		description: "Bienes inmuebles",
 	},
 
@@ -88,6 +99,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "V Bis",
 		identificationThresholdUma: "ALWAYS",
 		noticeThresholdUma: 8025,
+		cashLimitUma: 8025,
 		description: "Desarrollo inmobiliario",
 	},
 
@@ -97,6 +109,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "VI",
 		identificationThresholdUma: 805,
 		noticeThresholdUma: 1605,
+		cashLimitUma: 3210,
 		description: "Metales/piedras preciosas, joyas",
 	},
 
@@ -106,6 +119,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "VII",
 		identificationThresholdUma: 2410,
 		noticeThresholdUma: 4815,
+		cashLimitUma: 3210,
 		description: "Obras de arte",
 	},
 
@@ -115,6 +129,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "VIII",
 		identificationThresholdUma: 3210,
 		noticeThresholdUma: 6420,
+		cashLimitUma: 8025,
 		description: "Vehículos",
 	},
 
@@ -124,6 +139,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "IX",
 		identificationThresholdUma: 2410,
 		noticeThresholdUma: 4815,
+		cashLimitUma: 3210,
 		description: "Servicios de blindaje",
 	},
 
@@ -133,6 +149,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "X",
 		identificationThresholdUma: "ALWAYS",
 		noticeThresholdUma: 3210,
+		cashLimitUma: null,
 		description: "Traslado/custodia valores",
 	},
 
@@ -142,6 +159,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "XI",
 		identificationThresholdUma: "ALWAYS",
 		noticeThresholdUma: "ALWAYS",
+		cashLimitUma: null,
 		description: "Servicios profesionales",
 	},
 
@@ -151,6 +169,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "XII-A",
 		identificationThresholdUma: "ALWAYS",
 		noticeThresholdUma: 8000,
+		cashLimitUma: null,
 		description: "Fe pública (notarios)",
 	},
 
@@ -160,6 +179,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "XII-B",
 		identificationThresholdUma: "ALWAYS",
 		noticeThresholdUma: "ALWAYS",
+		cashLimitUma: null,
 		description: "Fe pública (corredores)",
 	},
 
@@ -169,6 +189,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "XIII",
 		identificationThresholdUma: 1605,
 		noticeThresholdUma: 3210,
+		cashLimitUma: null,
 		description: "Recepción de donativos",
 	},
 
@@ -178,6 +199,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "XV",
 		identificationThresholdUma: 1605,
 		noticeThresholdUma: 3210,
+		cashLimitUma: null,
 		description: "Arrendamiento inmuebles",
 	},
 
@@ -187,6 +209,7 @@ export const ACTIVITY_THRESHOLDS: Record<string, ActivityThreshold> = {
 		lfpiropiFraccion: "XVI",
 		identificationThresholdUma: "ALWAYS",
 		noticeThresholdUma: 210,
+		cashLimitUma: null,
 		description: "Activos virtuales",
 	},
 };
@@ -254,6 +277,34 @@ export function exceedsIdentificationThreshold(
 	const threshold = getIdentificationThresholdMxn(activityCode, umaDailyValue);
 	if (threshold === null) return false;
 	return amountMxn >= threshold;
+}
+
+/** Art. 32 cash limit in UMA; null if none configured */
+export function getCashLimitUma(activityCode: string): number | null {
+	const threshold = ACTIVITY_THRESHOLDS[activityCode];
+	if (!threshold) return null;
+	return threshold.cashLimitUma;
+}
+
+/** Art. 32 max cash in MXN for the activity */
+export function getCashLimitMxn(
+	activityCode: string,
+	umaDailyValue: number,
+): number | null {
+	const umaLimit = getCashLimitUma(activityCode);
+	if (umaLimit === null) return null;
+	return umaLimit * umaDailyValue;
+}
+
+/** True when cash amount exceeds Art. 32 cap for the activity */
+export function exceedsCashLimit(
+	activityCode: string,
+	cashAmountMxn: number,
+	umaDailyValue: number,
+): boolean {
+	const limit = getCashLimitMxn(activityCode, umaDailyValue);
+	if (limit === null) return false;
+	return cashAmountMxn > limit;
 }
 
 /** Default UMA daily value fallback (Feb 2026) */

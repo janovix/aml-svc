@@ -42,6 +42,7 @@ import { productionTenant } from "../lib/tenant-context";
 import { APIError } from "../middleware/error";
 import { parseQueryParams } from "../lib/query-params";
 import { emitWebhookEvent, WEBHOOK_EVENT_TYPES } from "../lib/webhook-events";
+import { computeClientIdentificationTier } from "../domain/client/identification-tier";
 
 export const clientsRouter = new Hono<{
 	Bindings: Bindings;
@@ -161,7 +162,16 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 
 	const requiredDocs = documentRequirements[client.personType] || [];
 	const uploadedDocTypes = documents.map((d) => d.document_type);
-	const missingDocs = requiredDocs.filter((d) => !uploadedDocTypes.includes(d));
+	const tierInfo = await computeClientIdentificationTier(
+		prisma,
+		organizationId,
+		client.id,
+	);
+	const identificationTier = tierInfo.identificationTier;
+	let missingDocs = requiredDocs.filter((d) => !uploadedDocTypes.includes(d));
+	if (identificationTier === "BELOW_THRESHOLD") {
+		missingDocs = [];
+	}
 
 	// Check document verification status
 	const verifiedDocs = documents.filter((d) => d.status === "VERIFIED").length;
@@ -190,116 +200,27 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 			: 100;
 
 	// Determine overall KYC status
+	const {
+		identificationRequired,
+		identificationThresholdMxn,
+		noticeThresholdMxn,
+		maxSingleOperationMxn,
+		sixMonthCumulativeMxn,
+		singleOpExceedsThreshold,
+		cumulativeExceedsNoticeThreshold,
+		identificationThresholdPct,
+		noticeThresholdPct,
+	} = tierInfo;
+
 	let kycStatus = "INCOMPLETE";
 	if (missingDocs.length === 0 && (!requiresBC || hasBC)) {
-		if (verifiedDocs === documents.length && documents.length > 0) {
+		if (identificationTier === "BELOW_THRESHOLD" && documents.length === 0) {
+			kycStatus = "COMPLETE";
+		} else if (verifiedDocs === documents.length && documents.length > 0) {
 			kycStatus = "COMPLETE";
 		} else if (pendingDocs > 0) {
 			kycStatus = "PENDING_VERIFICATION";
 		}
-	}
-
-	// ── Threshold-aware KYC status (Art. 17 LFPIORPI) ──────────────────────
-	// Get org settings to compute thresholds
-	let identificationRequired = true;
-	let identificationTier: "ALWAYS" | "ABOVE_THRESHOLD" | "BELOW_THRESHOLD" =
-		"ALWAYS";
-	let identificationThresholdMxn: number | null = null;
-	let noticeThresholdMxn: number | null = null;
-	let maxSingleOperationMxn = 0;
-	let sixMonthCumulativeMxn = 0;
-	let singleOpExceedsThreshold = false;
-	let cumulativeExceedsNoticeThreshold = false;
-	let identificationThresholdPct = 100;
-	let noticeThresholdPct = 100;
-
-	try {
-		const { OrganizationSettingsRepository: OrgSettingsRepo } = await import(
-			"../domain/organization-settings/repository"
-		);
-		const { getIdentificationThresholdUma, getNoticeThresholdUma } =
-			await import("../domain/operation/activities/registry");
-		const { UmaValueRepository } = await import("../domain/uma/repository");
-
-		const orgSettingsRepo = new OrgSettingsRepo(prisma);
-		const umaRepo = new UmaValueRepository(prisma);
-
-		const [orgSettings, umaValue] = await Promise.all([
-			orgSettingsRepo.findByOrganizationId(getTenantContext(c)),
-			umaRepo.getActive(),
-		]);
-
-		if (orgSettings && umaValue) {
-			const activityCode =
-				orgSettings.activityKey as import("../domain/operation/types").ActivityCode;
-			const idThresholdUma = getIdentificationThresholdUma(activityCode);
-			const noticeThresholdUma = getNoticeThresholdUma(activityCode);
-			const dailyValue = parseFloat(umaValue.dailyValue);
-
-			if (idThresholdUma === "ALWAYS") {
-				identificationTier = "ALWAYS";
-				identificationRequired = true;
-			} else {
-				const idMxn = idThresholdUma * dailyValue;
-				const noticeMxn =
-					noticeThresholdUma === "ALWAYS"
-						? 0
-						: (noticeThresholdUma as number) * dailyValue;
-
-				identificationThresholdMxn = idMxn;
-				noticeThresholdMxn = noticeMxn > 0 ? noticeMxn : null;
-
-				// Compute client's operation amounts
-				const maxOpResult = await prisma.operation.aggregate({
-					where: { clientId: client.id, deletedAt: null },
-					_max: { amount: true },
-				});
-				const maxOp = maxOpResult._max.amount;
-				maxSingleOperationMxn =
-					maxOp === null
-						? 0
-						: typeof maxOp === "number"
-							? maxOp
-							: parseFloat(maxOp.toString());
-
-				const sixMonthsAgo = new Date();
-				sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-				const cumulativeResult = await prisma.operation.aggregate({
-					where: {
-						clientId: client.id,
-						deletedAt: null,
-						operationDate: { gte: sixMonthsAgo },
-					},
-					_sum: { amount: true },
-				});
-				const cumulativeOp = cumulativeResult._sum.amount;
-				sixMonthCumulativeMxn =
-					cumulativeOp === null
-						? 0
-						: typeof cumulativeOp === "number"
-							? cumulativeOp
-							: parseFloat(cumulativeOp.toString());
-
-				singleOpExceedsThreshold = maxSingleOperationMxn >= idMxn;
-				cumulativeExceedsNoticeThreshold =
-					noticeMxn > 0 && sixMonthCumulativeMxn >= noticeMxn;
-
-				identificationRequired =
-					singleOpExceedsThreshold || cumulativeExceedsNoticeThreshold;
-				identificationTier = identificationRequired
-					? "ABOVE_THRESHOLD"
-					: "BELOW_THRESHOLD";
-
-				identificationThresholdPct =
-					idMxn > 0 ? Math.round((maxSingleOperationMxn / idMxn) * 100) : 0;
-				noticeThresholdPct =
-					noticeMxn > 0
-						? Math.round((sixMonthCumulativeMxn / noticeMxn) * 100)
-						: 0;
-			}
-		}
-	} catch (err) {
-		console.warn("[kyc-status] Could not compute threshold info:", err);
 	}
 
 	return c.json({
@@ -341,6 +262,78 @@ clientsRouter.get("/:id/kyc-status", async (c) => {
 			cumulativeExceedsNoticeThreshold,
 			identificationThresholdPct,
 			noticeThresholdPct,
+		},
+	});
+});
+
+clientsRouter.get("/:id/screening-history", async (c) => {
+	const params = parseWithZod(ClientIdParamSchema, c.req.param());
+	const tenant = getTenantContext(c);
+	const url = new URL(c.req.url);
+	const limit = Math.min(
+		100,
+		Math.max(1, parseInt(url.searchParams.get("limit") || "20", 10) || 20),
+	);
+	const offset = Math.max(
+		0,
+		parseInt(url.searchParams.get("offset") || "0", 10) || 0,
+	);
+	const prisma = getPrismaClient(c.env.DB);
+	const client = await prisma.client.findFirst({
+		where: {
+			id: params.id,
+			organizationId: tenant.organizationId,
+			environment: tenant.environment,
+			deletedAt: null,
+		},
+		select: { id: true },
+	});
+	if (!client) {
+		return c.json({ error: "Not found" }, 404);
+	}
+	const [rows, total] = await Promise.all([
+		prisma.clientWatchlistScreening.findMany({
+			where: { clientId: params.id, organizationId: tenant.organizationId },
+			orderBy: { screenedAt: "desc" },
+			take: limit,
+			skip: offset,
+		}),
+		prisma.clientWatchlistScreening.count({
+			where: { clientId: params.id, organizationId: tenant.organizationId },
+		}),
+	]);
+	const items = rows.map((r) => {
+		let changeFlags: Record<string, "new"> | null = null;
+		if (r.changeFlags) {
+			try {
+				changeFlags = JSON.parse(r.changeFlags) as Record<string, "new">;
+			} catch {
+				changeFlags = null;
+			}
+		}
+		return {
+			id: r.id,
+			watchlistQueryId: r.watchlistQueryId,
+			screenedAt: r.screenedAt.toISOString(),
+			triggeredBy: r.triggeredBy,
+			screeningResult: r.screeningResult,
+			ofacSanctioned: r.ofacSanctioned,
+			unscSanctioned: r.unscSanctioned,
+			sat69bListed: r.sat69bListed,
+			isPEP: r.isPep,
+			adverseMediaFlagged: r.adverseMediaFlagged,
+			changeFlags,
+			errorMessage: r.errorMessage,
+			createdAt: r.createdAt.toISOString(),
+		};
+	});
+	return c.json({
+		items,
+		pagination: {
+			limit,
+			offset,
+			total,
+			hasMore: offset + items.length < total,
 		},
 	});
 });
@@ -415,6 +408,9 @@ clientsRouter.post("/", async (c) => {
 					birthDate: created.birthDate || undefined,
 					identifiers: created.rfc ? [created.rfc] : undefined,
 					countries: created.nationality ? [created.nationality] : undefined,
+					entityId: created.id,
+					entityKind: "client",
+					environment: tenant.environment,
 				});
 
 				if (result?.queryId) {
@@ -496,6 +492,9 @@ clientsRouter.put("/:id", async (c) => {
 					birthDate: updated.birthDate || undefined,
 					identifiers: updated.rfc ? [updated.rfc] : undefined,
 					countries: updated.nationality ? [updated.nationality] : undefined,
+					entityId: updated.id,
+					entityKind: "client",
+					environment: tenantCtx.environment,
 				});
 
 				if (result?.queryId) {
@@ -593,6 +592,9 @@ clientsRouter.patch("/:id", async (c) => {
 						birthDate: updated.birthDate || undefined,
 						identifiers: updated.rfc ? [updated.rfc] : undefined,
 						countries: updated.nationality ? [updated.nationality] : undefined,
+						entityId: updated.id,
+						entityKind: "client",
+						environment: tenantCtx.environment,
 					});
 
 					if (result?.queryId) {
@@ -960,6 +962,9 @@ clientsInternalRouter.post("/", async (c) => {
 						birthDate: created.birthDate || undefined,
 						identifiers: created.rfc ? [created.rfc] : undefined,
 						countries: created.nationality ? [created.nationality] : undefined,
+						entityId: created.id,
+						entityKind: "client",
+						environment: "production",
 					});
 
 					if (result?.queryId) {

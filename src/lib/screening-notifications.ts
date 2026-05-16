@@ -142,3 +142,87 @@ export async function sendScreeningFlaggedNotification(
 		);
 	}
 }
+
+export type ScreeningStatusSource =
+	| "ofac"
+	| "un"
+	| "sat69b"
+	| "pep"
+	| "adverse_media";
+
+export interface ScreeningStatusChangedInput {
+	organizationId: string;
+	entityId: string;
+	entityName: string;
+	entityKind: "client" | "beneficial_controller";
+	changedSources: ScreeningStatusSource[];
+	channels: Array<"in_app" | "email">;
+	amlFrontendUrl?: string;
+}
+
+/**
+ * Notify when new watchlist hits appear on an entity that was already flagged / negative.
+ */
+export async function sendScreeningStatusChangedNotification(
+	env: Bindings,
+	input: ScreeningStatusChangedInput,
+): Promise<void> {
+	const notifService = env.NOTIFICATIONS_SERVICE;
+	if (!notifService) {
+		console.warn(
+			"[screening-notifications] NOTIFICATIONS_SERVICE not configured — skip status_changed",
+		);
+		return;
+	}
+	const amlFrontendUrl =
+		input.amlFrontendUrl?.replace(/\/$/, "") ??
+		"https://aml.janovix.workers.dev";
+	const callbackUrl =
+		input.entityKind === "client"
+			? `${amlFrontendUrl}/clients/${input.entityId}`
+			: `${amlFrontendUrl}/clients?bc=${input.entityId}`;
+
+	const lang = await getOrganizationLanguageForTenant(
+		env,
+		input.organizationId,
+	);
+	const sourcesLabel = input.changedSources.join(", ");
+	const title = t(lang, "screening.status_changed.title");
+	const body = t(lang, "screening.status_changed.body", {
+		entityName: input.entityName,
+		sources: sourcesLabel,
+	});
+	const sendEmail = input.channels.includes("email");
+
+	try {
+		await notifService.notify({
+			tenantId: input.organizationId,
+			target: { kind: "org" },
+			channelSlug: "system",
+			type: "aml.screening.status_changed",
+			title,
+			body,
+			payload: {
+				entityId: input.entityId,
+				entityName: input.entityName,
+				entityKind: input.entityKind,
+				changedSources: input.changedSources,
+			},
+			severity: "warn",
+			callbackUrl,
+			sendEmail,
+			emailI18n: {
+				titleKey: "screening.status_changed.title",
+				bodyKey: "screening.status_changed.body",
+				bodyParams: { entityName: input.entityName, sources: sourcesLabel },
+			},
+			sourceService: "aml-svc",
+			sourceEvent: "screening.status_changed",
+		});
+	} catch (err) {
+		console.error(
+			"[screening-notifications] Failed to send status_changed notification:",
+			err,
+		);
+	}
+}

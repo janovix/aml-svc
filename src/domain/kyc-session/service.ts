@@ -3,12 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { KycSessionEntity, KycSessionEventEntity } from "./types";
 import { KycSessionRepository } from "./repository";
 import { OrganizationSettingsRepository } from "../organization-settings/repository";
-import { UmaValueRepository } from "../uma/repository";
-import {
-	getIdentificationThresholdUma,
-	getNoticeThresholdUma,
-} from "../operation/activities/registry";
-import type { ActivityCode } from "../operation/types";
+import { computeClientIdentificationTier } from "../client/identification-tier";
 import type { KycSessionCreateInput, KycSessionRejectInput } from "./schemas";
 import { APIError } from "../../middleware/error";
 import type { TenantContext } from "../../lib/tenant-context";
@@ -29,53 +24,10 @@ function generateSessionToken(): string {
 export class KycSessionService {
 	private readonly sessionRepo: KycSessionRepository;
 	private readonly orgSettingsRepo: OrganizationSettingsRepository;
-	private readonly umaRepo: UmaValueRepository;
 
 	constructor(prisma: PrismaClient) {
 		this.sessionRepo = new KycSessionRepository(prisma);
 		this.orgSettingsRepo = new OrganizationSettingsRepository(prisma);
-		this.umaRepo = new UmaValueRepository(prisma);
-	}
-
-	/**
-	 * Computes the client's max single-operation amount from the DB.
-	 * Returns 0 if no operations found.
-	 */
-	private async getMaxOperationAmount(
-		prisma: PrismaClient,
-		clientId: string,
-	): Promise<number> {
-		const result = await prisma.operation.aggregate({
-			where: { clientId, deletedAt: null },
-			_max: { amount: true },
-		});
-		const val = result._max.amount;
-		if (val === null || val === undefined) return 0;
-		return typeof val === "number" ? val : parseFloat(val.toString());
-	}
-
-	/**
-	 * Computes the client's 6-month cumulative operation total.
-	 * Returns 0 if no operations found.
-	 */
-	private async getSixMonthCumulativeAmount(
-		prisma: PrismaClient,
-		clientId: string,
-	): Promise<number> {
-		const sixMonthsAgo = new Date();
-		sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-		const result = await prisma.operation.aggregate({
-			where: {
-				clientId,
-				deletedAt: null,
-				operationDate: { gte: sixMonthsAgo },
-			},
-			_sum: { amount: true },
-		});
-		const val = result._sum.amount;
-		if (val === null || val === undefined) return 0;
-		return typeof val === "number" ? val : parseFloat(val.toString());
 	}
 
 	async create(
@@ -108,52 +60,16 @@ export class KycSessionService {
 		expiresAt.setHours(expiresAt.getHours() + expiryHours);
 
 		// Compute identification tier from activity thresholds (Art. 17 LFPIORPI)
-		let identificationTier: "ALWAYS" | "ABOVE_THRESHOLD" | "BELOW_THRESHOLD" =
-			"ALWAYS";
-		let thresholdAmountMxn: number | null = null;
-		let clientCumulativeMxn: number | null = null;
-
-		try {
-			const activityCode = settings.activityKey as ActivityCode;
-			const idThresholdUma = getIdentificationThresholdUma(activityCode);
-			const noticeThresholdUma = getNoticeThresholdUma(activityCode);
-			const umaValue = await this.umaRepo.getActive();
-
-			if (idThresholdUma === "ALWAYS") {
-				identificationTier = "ALWAYS";
-			} else if (umaValue) {
-				const dailyValueNum = parseFloat(umaValue.dailyValue);
-				const idThresholdMxn = idThresholdUma * dailyValueNum;
-				const noticeThresholdMxn =
-					noticeThresholdUma === "ALWAYS"
-						? 0
-						: (noticeThresholdUma as number) * dailyValueNum;
-
-				const maxSingleOp = await this.getMaxOperationAmount(
-					prisma,
-					input.clientId,
-				);
-				const sixMonthCumulative = await this.getSixMonthCumulativeAmount(
-					prisma,
-					input.clientId,
-				);
-
-				const singleOpTriggered = maxSingleOp >= idThresholdMxn;
-				const cumulativeTriggered =
-					noticeThresholdUma !== "ALWAYS" &&
-					sixMonthCumulative >= noticeThresholdMxn;
-
-				identificationTier =
-					singleOpTriggered || cumulativeTriggered
-						? "ABOVE_THRESHOLD"
-						: "BELOW_THRESHOLD";
-				thresholdAmountMxn = idThresholdMxn;
-				clientCumulativeMxn = sixMonthCumulative;
-			}
-		} catch {
-			// If threshold computation fails (unknown activity code), default to ALWAYS for safety
-			identificationTier = "ALWAYS";
-		}
+		const tier = await computeClientIdentificationTier(
+			prisma,
+			tenant.organizationId,
+			input.clientId,
+		);
+		const identificationTier = tier.identificationTier;
+		const thresholdAmountMxn: number | null =
+			identificationTier === "ALWAYS" ? null : tier.identificationThresholdMxn;
+		const clientCumulativeMxn: number | null =
+			identificationTier === "ALWAYS" ? null : tier.sixMonthCumulativeMxn;
 
 		const token = generateSessionToken();
 

@@ -85,6 +85,24 @@ export interface AuthSvcRpc {
 		metadata: Record<string, unknown> | null;
 		status: string;
 	} | null>;
+	/** Better Auth member.role for the given user + org (training org-level routes). */
+	getMemberRole?(
+		userId: string,
+		organizationId: string,
+	): Promise<"owner" | "admin" | "member" | null>;
+	/** Paginated active org members for training enrollment sync. */
+	listActiveMembers?(
+		organizationId?: string,
+		cursor?: string,
+	): Promise<{
+		items: Array<{
+			userId: string;
+			organizationId: string;
+			email: string;
+			name: string;
+		}>;
+		nextCursor: string | null;
+	}>;
 }
 
 type NotificationsTarget =
@@ -161,6 +179,9 @@ export interface WatchlistRpc {
 			identifiers?: string[];
 			topK?: number;
 			threshold?: number;
+			environment?: string;
+			entityId?: string;
+			entityKind?: "client" | "beneficial_controller";
 		},
 		organizationId: string,
 		userId: string,
@@ -197,10 +218,16 @@ export type Bindings = Omit<
 	 * Example: "https://aml.janovix.com,https://auth.janovix.com,http://localhost:3000"
 	 */
 	TRUSTED_ORIGINS?: string;
+	/** Shared secret for internal E2E routes (alert thresholds, org purge). */
+	E2E_API_KEY?: string;
 	/** Queue for import processing jobs */
 	IMPORT_PROCESSING_QUEUE?: Queue<import("./domain/import").ImportJob>;
 	/** Queue for risk assessment jobs (consumed by aml-svc itself) */
 	RISK_ASSESSMENT_QUEUE?: Queue<import("./lib/risk-queue").RiskJob>;
+	/** Watchlist re-screen jobs (pep-check replacement; consumed by aml-svc) */
+	AML_SCREENING_REFRESH_QUEUE?: Queue<
+		import("./lib/watchlist-rescan-types").ScreeningRescanJob
+	>;
 	/** Queue for webhook event delivery (consumed by webhook-delivery-worker) */
 	WEBHOOK_QUEUE?: Queue<import("./lib/webhook-events").WebhookEvent>;
 	/**
@@ -218,6 +245,8 @@ export type Bindings = Omit<
 	 * Caller wrangler config must include `"entrypoint": "NotificationsEntrypoint"`.
 	 */
 	NOTIFICATIONS_SERVICE?: NotificationsRpc;
+	/** Public AML frontend URL used to build notification callback links */
+	AML_FRONTEND_URL?: string;
 	/** KYC Self-Service app URL for generating invite links */
 	KYC_SELF_SERVICE_URL?: string;
 	/** Internal service-to-service shared secret */
@@ -243,6 +272,26 @@ export type Bindings = Omit<
 	CURRENCYLAYER_API_KEY?: string;
 	/** API version override (defaults to package.json version) */
 	API_VERSION?: string;
+	/** Cloudflare account id (Stream direct upload API). */
+	CF_ACCOUNT_ID?: string;
+	/** Stream customer subdomain code for iframe URLs (`customer-{code}.cloudflarestream.com`). */
+	STREAM_CUSTOMER_CODE?: string;
+	/** Cloudflare Stream API token (direct upload). */
+	CLOUDFLARE_STREAM_API_TOKEN?: string;
+	/**
+	 * Base64-encoded JWK private key from Cloudflare `POST /stream/keys` for
+	 * signing Stream playback JWTs. The JWK's `kid` is used directly.
+	 * @see https://developers.cloudflare.com/stream/viewing-videos/securing-your-stream/#step-1-call-the-streamkey-endpoint-once-to-obtain-a-key
+	 */
+	STREAM_SIGNING_KEY_JWK?: string;
+	/** Training certificate PDF generation queue */
+	TRAINING_CERT_GEN_QUEUE?: Queue<
+		import("./lib/training/jobs").TrainingCertGenJob
+	>;
+	/** Training notification dispatch queue */
+	TRAINING_NOTIFICATION_QUEUE?: Queue<
+		import("./lib/training/jobs").TrainingNotificationJob
+	>;
 	/**
 	 * Cloudflare Worker version metadata.
 	 * Used for Sentry release tracking.

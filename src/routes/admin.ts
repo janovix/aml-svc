@@ -15,6 +15,7 @@ import {
 } from "../domain/organization-settings";
 import { RiskMethodologyRepository } from "../domain/risk/methodology/repository";
 import { productionTenant } from "../lib/tenant-context";
+import { trainingAdminRouter } from "./training-admin";
 
 export const adminRouter = new Hono<{
 	Bindings: Bindings;
@@ -23,6 +24,8 @@ export const adminRouter = new Hono<{
 
 // Apply admin auth middleware to all admin routes
 adminRouter.use("*", adminAuthMiddleware());
+
+adminRouter.route("/training", trainingAdminRouter);
 
 /**
  * GET /api/v1/admin/stats

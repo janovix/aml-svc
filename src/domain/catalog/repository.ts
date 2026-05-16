@@ -527,4 +527,101 @@ export class CatalogRepository {
 
 		return resultMap;
 	}
+
+	/**
+	 * Normalize a stored country field to ISO-3166 alpha-2 (catalog metadata.code).
+	 * Accepts alpha-2, alpha-3 (via catalog metadata.iso3 or common synonyms), 32-char catalog item id, or metadata.code.
+	 */
+	async resolveStoredCountryCode(
+		value: string | null | undefined,
+	): Promise<string | null> {
+		const raw = typeof value === "string" ? value.trim().toUpperCase() : "";
+		if (!raw) return null;
+		if (/^[A-Z]{2}$/.test(raw)) return raw;
+		const COMMON_ISO3: Record<string, string> = {
+			MEX: "MX",
+			USA: "US",
+			CAN: "CA",
+			GBR: "GB",
+			CUB: "CU",
+			BRA: "BR",
+			ARG: "AR",
+			COL: "CO",
+			ESP: "ES",
+			FRA: "FR",
+			DEU: "DE",
+			ITA: "IT",
+			CHN: "CN",
+			JPN: "JP",
+			KOR: "KR",
+			PRK: "KP",
+			IRN: "IR",
+			RUS: "RU",
+			VEN: "VE",
+			SYR: "SY",
+			MMR: "MM",
+		};
+		if (/^[A-Z]{3}$/.test(raw) && COMMON_ISO3[raw]) {
+			return COMMON_ISO3[raw];
+		}
+
+		const catalog = await this.prisma.catalog.findUnique({
+			where: { key: "countries" },
+		});
+		if (!catalog) return null;
+
+		const item = await this.findItemByIdOrCode(catalog.id, raw, true);
+		if (item) {
+			const meta = item.metadata;
+			const code =
+				meta && typeof meta.code === "string"
+					? String(meta.code).trim().toUpperCase()
+					: null;
+			if (code && /^[A-Z]{2}$/.test(code)) return code;
+		}
+
+		if (/^[A-Z]{3}$/.test(raw)) {
+			const items = await this.prisma.catalogItem.findMany({
+				where: { catalogId: catalog.id },
+			});
+			for (const row of items) {
+				const meta = parseMetadata(row.metadata);
+				const iso3 =
+					meta && typeof meta.iso3 === "string"
+						? String(meta.iso3).trim().toUpperCase()
+						: null;
+				if (iso3 === raw) {
+					const code =
+						meta && typeof meta.code === "string"
+							? String(meta.code).trim().toUpperCase()
+							: null;
+					if (code && /^[A-Z]{2}$/.test(code)) return code;
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Normalize a stored activity field to SAT 7-digit metadata.code (or null if unknown).
+	 */
+	async resolveStoredActivityCode(
+		catalogKey: string,
+		value: string | null | undefined,
+	): Promise<string | null> {
+		const raw = typeof value === "string" ? value.trim() : "";
+		if (!raw) return null;
+		if (/^\d{7}$/.test(raw)) return raw;
+
+		const catalog = await this.prisma.catalog.findUnique({
+			where: { key: catalogKey },
+		});
+		if (!catalog) return null;
+
+		const item = await this.findItemByIdOrCode(catalog.id, raw, true);
+		if (!item?.metadata || typeof item.metadata.code !== "string") return null;
+		const code = String(item.metadata.code).trim();
+		return /^\d{7}$/.test(code) ? code : null;
+	}
 }

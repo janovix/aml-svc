@@ -22,6 +22,9 @@ importers:
       jose:
         specifier: ^6.1.3
         version: 6.1.3
+      pdf-lib:
+        specifier: ^1.17.1
+        version: 1.17.1
       zod:
         specifier: 3.25.67
         version: 3.25.67
@@ -2061,6 +2064,18 @@ packages:
         integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==,
       }
     engines: { node: ">=8.0.0" }
+
+  "@pdf-lib/standard-fonts@1.0.0":
+    resolution:
+      {
+        integrity: sha512-hU30BK9IUN/su0Mn9VdlVKsWBS6GyhVfqjwl1FjZN4TxP6cCw0jP2w7V3Hf5uX7M0AZJ16vey9yE0ny7Sa59ZA==,
+      }
+
+  "@pdf-lib/upng@1.0.1":
+    resolution:
+      {
+        integrity: sha512-dQK2FUMQtowVP00mtIksrlZhdFXQZPC+taih1q4CvPZ5vqdxR/LKBaFg0oAfzd1GlHZXXSPdQfzQnt+ViGvEIQ==,
+      }
 
   "@pkgjs/parseargs@0.11.0":
     resolution:
@@ -5135,6 +5150,12 @@ packages:
         integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==,
       }
 
+  pako@1.0.11:
+    resolution:
+      {
+        integrity: sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==,
+      }
+
   parent-module@1.0.1:
     resolution:
       {
@@ -5255,6 +5276,12 @@ packages:
         integrity: sha512-//nshmD55c46FuFw26xV/xFAaB5HF9Xdap7HJBBnrKdAd6/GxDBaNA1870O79+9ueg61cZLSVc+OaFlfmObYVQ==,
       }
     engines: { node: ">= 14.16" }
+
+  pdf-lib@1.17.1:
+    resolution:
+      {
+        integrity: sha512-V/mpyJAoTsN4cnP31vc0wfNA1+p20evqqnap0KLoRUN0Yk/p3wN52DOEsL4oBFcLdb76hlpKPtzJIgo67j/XLw==,
+      }
 
   perfect-debounce@1.0.0:
     resolution:
@@ -5965,6 +5992,12 @@ packages:
     engines: { node: ">=18.12" }
     peerDependencies:
       typescript: ">=4.8.4"
+
+  tslib@1.14.1:
+    resolution:
+      {
+        integrity: sha512-Xni35NKzjgMrwevysHTCArtLDpPvye8zV/0E4EyYn43P7/7qvQwPh9BGkHewbMulVntbigmcT7rdX3BNo9wRJg==,
+      }
 
   tslib@2.8.1:
     resolution:
@@ -7395,6 +7428,14 @@ snapshots:
       "@octokit/openapi-types": 27.0.0
 
   "@opentelemetry/api@1.9.0": {}
+
+  "@pdf-lib/standard-fonts@1.0.0":
+    dependencies:
+      pako: 1.0.11
+
+  "@pdf-lib/upng@1.0.1":
+    dependencies:
+      pako: 1.0.11
 
   "@pkgjs/parseargs@0.11.0":
     optional: true
@@ -9203,6 +9244,8 @@ snapshots:
 
   package-json-from-dist@1.0.1: {}
 
+  pako@1.0.11: {}
+
   parent-module@1.0.1:
     dependencies:
       callsites: 3.1.0
@@ -9257,6 +9300,13 @@ snapshots:
   pathe@2.0.3: {}
 
   pathval@2.0.1: {}
+
+  pdf-lib@1.17.1:
+    dependencies:
+      "@pdf-lib/standard-fonts": 1.0.0
+      "@pdf-lib/upng": 1.0.1
+      pako: 1.0.11
+      tslib: 1.14.1
 
   perfect-debounce@1.0.0: {}
 
@@ -9715,6 +9765,8 @@ snapshots:
   ts-api-utils@2.1.0(typescript@5.9.3):
     dependencies:
       typescript: 5.9.3
+
+  tslib@1.14.1: {}
 
   tslib@2.8.1:
     optional: true

@@ -1,6 +1,27 @@
 #!/usr/bin/env node
 /**
- * AML Synthetic Test Data Generator
+ * AML Synthetic Test Data Generator (CSV path — import fixtures)
+ *
+ * Writes CSVs under `./output/`. This path feeds **client + operation import**
+ * and downstream risk / watchlist screening as observed fields only (no CSV columns
+ * for `isPEP` / sanctioned flags). For **D1-direct seeding**, use
+ * `pnpm run generate:synthetic` (`SyntheticDataGenerator`) instead.
+ *
+ * Risk-profile diversity (rows **30–69** physical, **80–94** moral):
+ *   - **LOW** — SAT economic/commercial codes from tier `LOW_*`; physical uses low-risk occupations.
+ *   - **MEDIUM** — moral rows only; `MEDIUM_BIZ` codes.
+ *   - **MEDIUM_HIGH** — `MH_*` codes; notes include `[MH]`.
+ *   - **PEP** — names + occupations from `./data/pep-sample.json` → `peps[]`; notes `[PEP …]`; RFC/CURP regenerated.
+ *   - **SANCTIONED** — identities from `sanctioned[]`; notes `[SANCTIONED …]`; mostly MX nationals (SDNTK-style pool).
+ *
+ * Environment (optional):
+ *   - **RISK_MIX** — JSON object, integer weights summing to **100**, keys:
+ *     `LOW`, `MEDIUM`, `MEDIUM_HIGH`, `PEP`, `SANCTIONED` (default 40/30/15/10/5).
+ *   - **INCLUDE_PEP** — `false` zeros PEP weight and redistributes into LOW/MEDIUM (40:30 remainder to LOW).
+ *   - **INCLUDE_SANCTIONED** — same for SANCTIONED weight.
+ *
+ * Sidecar: **`output/generate-meta.json`** — effective weights, marker counts, `profileByIndex`,
+ * and tier code arrays for `validate.mjs`.
  *
  * Generates 20 CSV files:
  *   - clients.csv         (100 clients: 70 physical, 25 moral, 5 trust)
@@ -28,7 +49,7 @@
  *                   map "Nombre" -> first_name, "Monto" -> amount, etc.
  */
 
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -36,6 +57,37 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const OUT = join(__dirname, "output");
 mkdirSync(OUT, { recursive: true });
+
+/** @typedef {"LOW" | "MEDIUM" | "MEDIUM_HIGH" | "PEP" | "SANCTIONED"} RiskProfile */
+
+const PEP_SAMPLE_PATH = join(__dirname, "data", "pep-sample.json");
+const PEP_SAMPLE = JSON.parse(readFileSync(PEP_SAMPLE_PATH, "utf8"));
+if (!Array.isArray(PEP_SAMPLE.peps) || PEP_SAMPLE.peps.length === 0) {
+	throw new Error("pep-sample.json: missing or empty peps[]");
+}
+if (
+	!Array.isArray(PEP_SAMPLE.sanctioned) ||
+	PEP_SAMPLE.sanctioned.length === 0
+) {
+	throw new Error("pep-sample.json: missing or empty sanctioned[]");
+}
+
+const REPO_ROOT = join(__dirname, "..", "..", "..");
+
+/**
+ * @param {string} relPath path from repo root, e.g. catalogs/economic-activities.csv
+ */
+function loadSevenDigitCodesFromCatalog(relPath) {
+	const path = join(REPO_ROOT, relPath);
+	const text = readFileSync(path, "utf8");
+	const codes = [];
+	for (const line of text.trim().split("\n").slice(1)) {
+		const raw = line.split(",")[0]?.trim() ?? "";
+		const code = raw.replace(/^"/, "").replace(/"$/, "").trim();
+		if (/^\d{7}$/.test(code)) codes.push(code);
+	}
+	return [...new Set(codes)];
+}
 
 const FOR_MAPPING = process.argv.includes("--for-mapping");
 
@@ -689,16 +741,21 @@ const BIZ = [
 	"Transportes",
 ];
 const BIZ_SFX = ["SA de CV", "SAPI de CV", "SC", "SRL", "AC", "IAP"];
-const ECO_ACT = [
-	"4651101",
-	"4653101",
-	"4651104",
-	"5221101",
-	"4311001",
-	"7010001",
-	"4921001",
-	"6820001",
-];
+const ECO_ACT = loadSevenDigitCodesFromCatalog(
+	"catalogs/economic-activities.csv",
+).slice(0, 80);
+const BIZ_ACT = loadSevenDigitCodesFromCatalog(
+	"catalogs/business-activities.csv",
+).slice(0, 80);
+
+// Tier subsets for risk-mix rows (intent labels; SAT catalog codes only).
+const LOW_ECO = ["1110100", "1110400", "1220100", "1330200"];
+const MEDIUM_ECO = ["8340100", "8240200", "4430200", "9140800", "3420200"];
+const MH_ECO = ["8120100", "8130500", "8140100", "8220600"];
+const LOW_BIZ = ["1100001", "1200001", "1500001", "1400002"];
+const MEDIUM_BIZ = ["5520014", "5650015", "5610015", "5180012", "5620015"];
+const MH_BIZ = ["5320013", "5360013", "7140019", "5370013", "5720016"];
+const LOW_RISK_OCCUPATIONS = ["Albanil", "Campesino", "Operador de maquinaria"];
 const OCCUPATIONS = [
 	"Ingeniero",
 	"Medico",
@@ -785,8 +842,9 @@ function buildPhysical(i) {
 		postal_code: loc.postal,
 		reference: "",
 		notes: `Test physical client ${i}`,
-		country_code: "MEX",
+		country_code: "MX",
 		economic_activity_code: noEcoAct ? "" : ECO_ACT[i % ECO_ACT.length],
+		commercial_activity_code: "",
 		gender,
 		occupation: OCCUPATIONS[i % OCCUPATIONS.length],
 		marital_status: MARITAL[i % MARITAL.length],
@@ -825,8 +883,9 @@ function buildMoral(i) {
 		postal_code: loc.postal,
 		reference: "",
 		notes: `Test moral entity ${idx}`,
-		country_code: "MEX",
-		economic_activity_code: ECO_ACT[idx % ECO_ACT.length],
+		country_code: "MX",
+		economic_activity_code: "",
+		commercial_activity_code: BIZ_ACT[idx % BIZ_ACT.length],
 		gender: "",
 		occupation: "",
 		marital_status: "",
@@ -865,8 +924,9 @@ function buildTrust(i) {
 		postal_code: loc.postal,
 		reference: "",
 		notes: `Test trust entity ${idx}`,
-		country_code: "MEX",
-		economic_activity_code: ECO_ACT[idx % ECO_ACT.length],
+		country_code: "MX",
+		economic_activity_code: "",
+		commercial_activity_code: "",
 		gender: "",
 		occupation: "",
 		marital_status: "",
@@ -875,11 +935,431 @@ function buildTrust(i) {
 	};
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Risk-profile mix (slots: physical global indices 30–69, moral 80–94)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEFAULT_RISK_WEIGHTS = {
+	LOW: 40,
+	MEDIUM: 30,
+	MEDIUM_HIGH: 15,
+	PEP: 10,
+	SANCTIONED: 5,
+};
+
+/** @returns {Record<string, number>} */
+function parseEffectiveRiskWeights() {
+	let w = { ...DEFAULT_RISK_WEIGHTS };
+	const raw = process.env.RISK_MIX?.trim();
+	if (raw) {
+		let j;
+		try {
+			j = JSON.parse(raw);
+		} catch (e) {
+			throw new Error(
+				`RISK_MIX must be valid JSON: ${/** @type {Error} */ (e).message}`,
+			);
+		}
+		for (const k of Object.keys(DEFAULT_RISK_WEIGHTS)) {
+			const v = j[k];
+			if (v !== undefined) {
+				const n = Number(v);
+				if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+					throw new Error(
+						`RISK_MIX.${k} must be a non-negative integer, got ${JSON.stringify(v)}`,
+					);
+				}
+				w[k] = n;
+			}
+		}
+		const sum = Object.values(w).reduce((a, b) => a + b, 0);
+		if (sum !== 100) {
+			throw new Error(
+				`RISK_MIX weights must sum to 100, got ${sum}: ${JSON.stringify(w)}`,
+			);
+		}
+	}
+
+	const includePep = process.env.INCLUDE_PEP !== "false";
+	const includeSan = process.env.INCLUDE_SANCTIONED !== "false";
+
+	if (!includePep) {
+		const p = w.PEP;
+		w.PEP = 0;
+		const toLow = Math.floor((p * 40) / 70);
+		const toMed = Math.floor((p * 30) / 70);
+		w.LOW += toLow;
+		w.MEDIUM += toMed;
+		w.LOW += p - toLow - toMed;
+	}
+	if (!includeSan) {
+		const p = w.SANCTIONED;
+		w.SANCTIONED = 0;
+		const toLow = Math.floor((p * 40) / 70);
+		const toMed = Math.floor((p * 30) / 70);
+		w.LOW += toLow;
+		w.MEDIUM += toMed;
+		w.LOW += p - toLow - toMed;
+	}
+
+	const sum2 = Object.values(w).reduce((a, b) => a + b, 0);
+	if (sum2 !== 100) {
+		throw new Error(
+			`Effective risk weights must sum to 100 after INCLUDE_* flags, got ${sum2}`,
+		);
+	}
+	return w;
+}
+
+/**
+ * Largest-remainder allocation of `total` slots across weighted keys.
+ * @param {number} total
+ * @param {Record<string, number>} weights integer percentages summing to 100
+ */
+function allocateRiskCounts(total, weights) {
+	const keys = /** @type {(keyof typeof DEFAULT_RISK_WEIGHTS)[]} */ ([
+		"LOW",
+		"MEDIUM",
+		"MEDIUM_HIGH",
+		"PEP",
+		"SANCTIONED",
+	]);
+	const raw = keys.map((k) => ({ k, v: (total * weights[k]) / 100 }));
+	const floors = raw.map((r) => ({
+		k: r.k,
+		n: Math.floor(r.v),
+		frac: r.v - Math.floor(r.v),
+	}));
+	let assigned = floors.reduce((s, f) => s + f.n, 0);
+	let rem = total - assigned;
+	floors.sort((a, b) => b.frac - a.frac);
+	for (let i = 0; i < rem; i++) {
+		floors[i % floors.length].n++;
+	}
+	/** @type {Record<string, number>} */
+	const counts = {};
+	for (const f of floors) counts[f.k] = f.n;
+	return counts;
+}
+
+function mulberry32(seed) {
+	return function () {
+		let t = (seed += 0x6d2b79f5);
+		t = Math.imul(t ^ (t >>> 15), t | 1);
+		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
+}
+
+/** @template T @param {T[]} arr @param {() => number} rng */
+function shuffleInPlace(arr, rng) {
+	for (let i = arr.length - 1; i > 0; i--) {
+		const j = Math.floor(rng() * (i + 1));
+		[arr[i], arr[j]] = [arr[j], arr[i]];
+	}
+	return arr;
+}
+
+/** @param {number} i physical index */
+function pickActivityCode(profile, person /** "physical" | "moral" */, i) {
+	if (person === "physical") {
+		if (profile === "LOW") return LOW_ECO[i % LOW_ECO.length];
+		if (profile === "MEDIUM_HIGH") return MH_ECO[i % MH_ECO.length];
+		return LOW_ECO[i % LOW_ECO.length];
+	}
+	if (profile === "LOW") return LOW_BIZ[i % LOW_BIZ.length];
+	if (profile === "MEDIUM") return MEDIUM_BIZ[i % MEDIUM_BIZ.length];
+	if (profile === "MEDIUM_HIGH") return MH_BIZ[i % MH_BIZ.length];
+	return LOW_BIZ[i % LOW_BIZ.length];
+}
+
+/**
+ * Mutates CLIENT_ROWS in risk slots; returns metadata for validate.mjs.
+ * @param {ReturnType<typeof buildPhysical>[]} rows
+ */
+function applyRiskProfiles(rows) {
+	const weights = parseEffectiveRiskWeights();
+	const TOTAL_RISK = 55;
+	const PHYS_RISK_INDICES = Array.from({ length: 40 }, (_, j) => 30 + j);
+	const MORAL_RISK_INDICES = Array.from({ length: 15 }, (_, j) => 80 + j);
+
+	let counts = allocateRiskCounts(TOTAL_RISK, weights);
+
+	// Cap PEP / SANCTIONED to physical risk slots; overflow -> LOW
+	let pepP = counts.PEP;
+	if (pepP > 40) {
+		counts.LOW += pepP - 40;
+		pepP = 40;
+	}
+	let sanP = counts.SANCTIONED;
+	const maxSan = 40 - pepP;
+	if (sanP > maxSan) {
+		counts.LOW += sanP - maxSan;
+		sanP = maxSan;
+	}
+
+	let medM = counts.MEDIUM;
+	const medOverflow = medM > 15 ? medM - 15 : 0;
+	if (medOverflow > 0) {
+		counts.LOW += medOverflow;
+		medM = 15;
+	}
+	counts.MEDIUM = medM;
+
+	const moralNonMed = 15 - medM;
+	const lowT = counts.LOW;
+	const mhT = counts.MEDIUM_HIGH;
+	const physRM = 40 - pepP - sanP;
+
+	let lowM = Math.min(lowT, moralNonMed);
+	let mhM = moralNonMed - lowM;
+	if (mhM > mhT) {
+		mhM = mhT;
+		lowM = moralNonMed - mhM;
+	}
+	let lowP = lowT - lowM;
+	let mhP = mhT - mhM;
+
+	if (lowP < 0 || mhP < 0 || lowP + mhP !== physRM) {
+		lowM = Math.max(0, moralNonMed - mhT);
+		mhM = moralNonMed - lowM;
+		lowP = lowT - lowM;
+		mhP = mhT - mhM;
+	}
+
+	const profileByIndex = /** @type {Map<number, RiskProfile>} */ (new Map());
+
+	const rng = mulberry32(0xdecafbad);
+	const physOrder = shuffleInPlace([...PHYS_RISK_INDICES], rng);
+	let pi = 0;
+	for (let k = 0; k < pepP; k++) profileByIndex.set(physOrder[pi++], "PEP");
+	for (let k = 0; k < sanP; k++)
+		profileByIndex.set(physOrder[pi++], "SANCTIONED");
+
+	const physRest = physOrder.slice(pi);
+	const physTailProfiles = /** @type {RiskProfile[]} */ ([]);
+	for (let k = 0; k < lowP; k++) physTailProfiles.push("LOW");
+	for (let k = 0; k < mhP; k++) physTailProfiles.push("MEDIUM_HIGH");
+	shuffleInPlace(physTailProfiles, rng);
+	for (let k = 0; k < physRest.length; k++) {
+		const pr = physTailProfiles[k];
+		if (!pr) throw new Error("internal: phys tail profile mismatch");
+		profileByIndex.set(physRest[k], pr);
+	}
+
+	const moralOrder = shuffleInPlace([...MORAL_RISK_INDICES], rng);
+	const moralProfiles = /** @type {RiskProfile[]} */ ([]);
+	for (let k = 0; k < medM; k++) moralProfiles.push("MEDIUM");
+	for (let k = 0; k < lowM; k++) moralProfiles.push("LOW");
+	for (let k = 0; k < mhM; k++) moralProfiles.push("MEDIUM_HIGH");
+	shuffleInPlace(moralProfiles, rng);
+	for (let k = 0; k < moralOrder.length; k++) {
+		const pr = moralProfiles[k];
+		if (!pr) throw new Error("internal: moral profile mismatch");
+		profileByIndex.set(moralOrder[k], pr);
+	}
+
+	const markerCounts = { PEP: 0, SANCTIONED: 0, MH: 0 };
+	const tierCounts = {
+		LOW: 0,
+		MEDIUM_HIGH: 0,
+		physical: { LOW: 0, MEDIUM_HIGH: 0, PEP: 0, SANCTIONED: 0 },
+		moral: { LOW: 0, MEDIUM: 0, MEDIUM_HIGH: 0 },
+	};
+
+	for (const gi of PHYS_RISK_INDICES) {
+		const row = rows[gi];
+		const profile = profileByIndex.get(gi);
+		if (!profile) continue;
+
+		const i = gi;
+		const isMinor = i < 2;
+		const isSharedAddr = i >= 7 && i < 10;
+		const noEcoAct = i >= 15 && i < 20;
+		const loc = isSharedAddr ? SHARED_ADDR : CITIES[i % CITIES.length];
+		const gender = i % 2 === 0 ? "M" : "F";
+
+		const baseNote = `Test physical client ${i}`;
+
+		if (profile === "PEP") {
+			const pep = PEP_SAMPLE.peps[i % PEP_SAMPLE.peps.length];
+			const fn = String(pep.first_name || "").trim();
+			const ln1 = String(pep.last_name || "").trim();
+			const ln2 = String(pep.second_last_name || "").trim();
+			const bdate =
+				pep.birth_date &&
+				/^\d{4}-\d{2}-\d{2}$/.test(String(pep.birth_date).trim())
+					? String(pep.birth_date).trim()
+					: isMinor
+						? minorBirth(i)
+						: adultBirth(i);
+			row.first_name = fn.toUpperCase();
+			row.last_name = ln1.toUpperCase();
+			row.second_last_name = ln2.toUpperCase();
+			row.birth_date = bdate;
+			row.nationality = String(pep.nationality || "MX").toUpperCase();
+			row.country_code = String(pep.country_code || "MX").toUpperCase();
+			row.country = row.country_code;
+			row.occupation = String(pep.occupation || "");
+			row.economic_activity_code = noEcoAct
+				? ""
+				: pickActivityCode("LOW", "physical", i);
+			row.source_of_funds = "Salario mensual";
+			row.notes =
+				`${baseNote} [PEP ${pep.profile}] ${pep.pep_category || ""}`.trim();
+			row.rfc = physRFCFromName(ln1, ln2, fn, bdate, i);
+			row.curp = genCURPFromName(
+				ln1,
+				ln2,
+				fn,
+				bdate,
+				gender,
+				loc.state || loc.state_code,
+				i,
+			);
+			markerCounts.PEP++;
+			tierCounts.physical.PEP++;
+		} else if (profile === "SANCTIONED") {
+			const s = PEP_SAMPLE.sanctioned[i % PEP_SAMPLE.sanctioned.length];
+			const fn = String(s.first_name || "").trim();
+			const ln1 = String(s.last_name || "").trim();
+			const ln2 = String(s.second_last_name || "").trim();
+			const bdate =
+				s.birth_date && /^\d{4}-\d{2}-\d{2}$/.test(String(s.birth_date).trim())
+					? String(s.birth_date).trim()
+					: isMinor
+						? minorBirth(i)
+						: adultBirth(i);
+			row.first_name = fn.toUpperCase();
+			row.last_name = ln1.toUpperCase();
+			row.second_last_name = ln2.toUpperCase();
+			row.birth_date = bdate;
+			row.nationality = String(s.country_code || "MX").toUpperCase();
+			row.country_code = row.nationality;
+			row.country = row.nationality;
+			row.occupation = String(s.occupation || "");
+			row.economic_activity_code = noEcoAct
+				? ""
+				: pickActivityCode("LOW", "physical", i);
+			row.source_of_funds = "Salario mensual";
+			row.notes =
+				`${baseNote} [SANCTIONED ${s.profile}] ${row.country_code}`.trim();
+			row.rfc = physRFCFromName(ln1, ln2, fn, bdate, i);
+			row.curp = genCURPFromName(
+				ln1,
+				ln2,
+				fn,
+				bdate,
+				gender,
+				loc.state || loc.state_code,
+				i,
+			);
+			markerCounts.SANCTIONED++;
+			tierCounts.physical.SANCTIONED++;
+		} else if (profile === "LOW") {
+			row.economic_activity_code = noEcoAct
+				? ""
+				: pickActivityCode("LOW", "physical", i);
+			row.occupation = LOW_RISK_OCCUPATIONS[i % LOW_RISK_OCCUPATIONS.length];
+			row.notes = baseNote;
+			row.source_of_funds = "Salario mensual";
+			tierCounts.physical.LOW++;
+			tierCounts.LOW++;
+		} else if (profile === "MEDIUM_HIGH") {
+			row.economic_activity_code = noEcoAct
+				? ""
+				: pickActivityCode("MEDIUM_HIGH", "physical", i);
+			row.notes = `${baseNote} [MH]`;
+			row.source_of_funds = "Salario mensual";
+			markerCounts.MH++;
+			tierCounts.physical.MEDIUM_HIGH++;
+			tierCounts.MEDIUM_HIGH++;
+		}
+	}
+
+	for (const gi of MORAL_RISK_INDICES) {
+		const row = rows[gi];
+		const profile = profileByIndex.get(gi);
+		if (!profile) continue;
+		const moralIdx = gi - 70;
+		if (profile === "LOW") {
+			row.commercial_activity_code = pickActivityCode("LOW", "moral", moralIdx);
+			row.notes = `Test moral entity ${gi}`;
+			tierCounts.moral.LOW++;
+			tierCounts.LOW++;
+		} else if (profile === "MEDIUM") {
+			row.commercial_activity_code = pickActivityCode(
+				"MEDIUM",
+				"moral",
+				moralIdx,
+			);
+			row.notes = `Test moral entity ${gi}`;
+			tierCounts.moral.MEDIUM++;
+			tierCounts.MEDIUM++;
+		} else if (profile === "MEDIUM_HIGH") {
+			row.commercial_activity_code = pickActivityCode(
+				"MEDIUM_HIGH",
+				"moral",
+				moralIdx,
+			);
+			row.notes = `Test moral entity ${gi} [MH]`;
+			markerCounts.MH++;
+			tierCounts.moral.MEDIUM_HIGH++;
+			tierCounts.MEDIUM_HIGH++;
+		}
+	}
+
+	console.log(
+		"\n── Risk mix (generate-test-data) ────────────────────────────",
+	);
+	console.log(
+		`  Effective weights: LOW ${weights.LOW}  MEDIUM ${weights.MEDIUM}  MEDIUM_HIGH ${weights.MEDIUM_HIGH}  PEP ${weights.PEP}  SANCTIONED ${weights.SANCTIONED}`,
+	);
+	console.log(
+		`  Pool sizes:        PEP ${PEP_SAMPLE.peps.length}  SANCTIONED ${PEP_SAMPLE.sanctioned.length}  (cycled when slots exceed pool)`,
+	);
+	console.log(
+		`  Physical risk (30–69): LOW ${tierCounts.physical.LOW}  MEDIUM_HIGH ${tierCounts.physical.MEDIUM_HIGH}  PEP ${tierCounts.physical.PEP}  SANCTIONED ${tierCounts.physical.SANCTIONED}`,
+	);
+	console.log(
+		`  Moral risk (80–94):    LOW ${tierCounts.moral.LOW}  MEDIUM ${tierCounts.moral.MEDIUM}  MEDIUM_HIGH ${tierCounts.moral.MEDIUM_HIGH}`,
+	);
+	console.log(
+		`  Notes markers:       [PEP …] ${markerCounts.PEP}  [SANCTIONED …] ${markerCounts.SANCTIONED}  [MH] ${markerCounts.MH}`,
+	);
+
+	return {
+		version: 1,
+		weightsEffective: weights,
+		poolSizes: {
+			peps: PEP_SAMPLE.peps.length,
+			sanctioned: PEP_SAMPLE.sanctioned.length,
+		},
+		riskIndices: {
+			physical: PHYS_RISK_INDICES,
+			moral: MORAL_RISK_INDICES,
+		},
+		markerCounts,
+		tierCounts,
+		profileByIndex: Object.fromEntries(profileByIndex),
+		tierSets: {
+			LOW_ECO,
+			MEDIUM_ECO,
+			MH_ECO,
+			LOW_BIZ,
+			MEDIUM_BIZ,
+			MH_BIZ,
+		},
+	};
+}
+
 // Build the full client pool and expose the RFC index for later use
 const CLIENT_ROWS = [];
 for (let i = 0; i < 70; i++) CLIENT_ROWS.push(buildPhysical(i));
 for (let i = 0; i < 25; i++) CLIENT_ROWS.push(buildMoral(i));
 for (let i = 0; i < 5; i++) CLIENT_ROWS.push(buildTrust(i));
+
+const RISK_META = applyRiskProfiles(CLIENT_ROWS);
 
 // Named RFC handles (used in operation scenarios)
 const RFC = {
@@ -983,6 +1463,7 @@ const CLIENT_HEADER_ALIASES = {
 	notes: "Notas",
 	country_code: "Código país",
 	economic_activity_code: "Actividad económica",
+	commercial_activity_code: "Giro mercantil",
 	gender: "Género",
 	occupation: "Ocupación",
 	marital_status: "Estado civil",
@@ -1075,6 +1556,7 @@ const CLIENT_HEADERS = [
 	"notes",
 	"country_code",
 	"economic_activity_code",
+	"commercial_activity_code",
 	"gender",
 	"occupation",
 	"marital_status",
@@ -2548,6 +3030,12 @@ console.log("══════════════════════�
 
 // 1. Clients
 write("clients.csv", CLIENT_HEADERS, CLIENT_ROWS);
+writeFileSync(
+	join(OUT, "generate-meta.json"),
+	`${JSON.stringify(RISK_META, null, 2)}\n`,
+	"utf8",
+);
+console.log(`  ✓ generate-meta.json  (risk-profile metadata for validate.mjs)`);
 
 // 2. Operations per activity (scenarios + coverage bulk)
 const GENERATORS = {

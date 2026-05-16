@@ -26,18 +26,12 @@ import {
 	getOperationRequiredHeaders,
 } from "./operation-processor";
 import { getPrismaClient } from "../../../lib/prisma";
+import { getAmlFrontendUrl } from "../../../lib/frontend-url";
 import { t, type LanguageCode } from "../../../lib/i18n";
 import { getOrganizationLanguageForTenant } from "../../../lib/org-language";
 import { productionTenant } from "../../../lib/tenant-context";
 
 const BATCH_SIZE = 100;
-
-function getAmlFrontendUrl(env: Bindings): string {
-	return (
-		((env as Record<string, unknown>).AML_FRONTEND_URL as string | undefined) ??
-		"https://aml.janovix.workers.dev"
-	);
-}
 
 export class ImportProcessor {
 	private readonly prisma: PrismaClient;
@@ -329,8 +323,7 @@ export class ImportProcessor {
 				skippedPart,
 			});
 
-			const amlFrontendUrl = getAmlFrontendUrl(this.env);
-			const callbackUrl = `${amlFrontendUrl.replace(/\/$/, "")}/imports/${importId}`;
+			const callbackUrl = `${getAmlFrontendUrl(this.env)}/imports/${importId}`;
 
 			await this.notifService.notify({
 				tenantId: organizationId,
@@ -393,8 +386,7 @@ export class ImportProcessor {
 			const title = t(lang, titleKey);
 			const body = t(lang, "import.failed.body", { errorMessage });
 
-			const amlFrontendUrl = getAmlFrontendUrl(this.env);
-			const callbackUrl = `${amlFrontendUrl.replace(/\/$/, "")}/imports/${importId}`;
+			const callbackUrl = `${getAmlFrontendUrl(this.env)}/imports/${importId}`;
 
 			await this.notifService.notify({
 				tenantId: organizationId,

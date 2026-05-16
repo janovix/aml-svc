@@ -41,17 +41,13 @@ export type VulnerableActivityCode =
 /**
  * Alert rule types for VEH (Vehículos) vulnerable activity (legacy)
  */
+/** Legacy DB / VEH-only seekers (being phased out; prefer UniversalAlertRuleType). */
 export type VehAlertRuleType =
-	| "operation_amount_uma"
-	| "aggregate_amount_uma"
 	| "cash_payment_limit"
 	| "cash_fragmentation"
-	| "payer_buyer_mismatch"
 	| "pep_above_threshold"
 	| "pep_or_high_risk"
-	| "frequent_operations"
-	| "new_client_high_value"
-	| "third_party_accounts";
+	| "new_client_high_value";
 
 /**
  * Universal alert rule types (pattern-based, all activities)
@@ -64,6 +60,11 @@ export type UniversalAlertRuleType =
 	| "foreign_currency_cash"
 	| "virtual_currency_payment"
 	| "cash_high_value"
+	| "cash_limit_art32"
+	| "cash_fragmentation"
+	| "pep_above_threshold"
+	| "pep_or_high_risk"
+	| "new_client_high_value"
 	| "third_party_payer"
 	| "quick_refund_pattern"
 	| "minor_client"
