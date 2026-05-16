@@ -1,3 +1,34 @@
+# [1.16.0](https://github.com/janovix/aml-svc/compare/v1.15.0...v1.16.0) (2026-05-16)
+
+
+### Bug Fixes
+
+* **config:** update TRUSTED_ORIGINS in wrangler configuration to use ngrok URL ([e44d8cd](https://github.com/janovix/aml-svc/commit/e44d8cd5384acdfb5aeff999deb673756660c155))
+
+
+### Features
+
+* **alert-detection:** add new cash limit rules and update alert patterns ([7901485](https://github.com/janovix/aml-svc/commit/790148597b13dba42bc06a3b596832cc5c6d3ed2))
+* **chat:** implement Janbot chat persistence with threads, messages, tool calls, attachments, and abuse events ([042d103](https://github.com/janovix/aml-svc/commit/042d10366ffe34b5d904f77a946a0a3cba767abb))
+* **config:** add E2E_API_KEY to wrangler configuration and internal E2E routes ([8a5868a](https://github.com/janovix/aml-svc/commit/8a5868aebe8b55bbe92323d5f129054c3bb7fadf))
+* **config:** update AML frontend URLs and adjust queue settings in wrangler configuration ([febf1c7](https://github.com/janovix/aml-svc/commit/febf1c7889843d6f3e05ef56a3ba594d7e034883))
+* **cors:** add 'x-e2e-turnstile-bypass' to allowed CORS headers for Playwright E2E compatibility ([71482c5](https://github.com/janovix/aml-svc/commit/71482c56ec67ab4d48c862ab39689f1076cd57d8))
+* **data-generation:** enhance synthetic data generation and validation scripts ([d04b143](https://github.com/janovix/aml-svc/commit/d04b143b8e05b7867589e43c97f9a4110bf1e4c4))
+* **headers:** implement lmsStreamedBinaryHeaders for consistent binary response headers ([66ee198](https://github.com/janovix/aml-svc/commit/66ee198cd34403e1ac090d491d94d231b834a3ce))
+* **sidebar:** implement sidebar badge service with counters and routes for badge retrieval ([bb25d85](https://github.com/janovix/aml-svc/commit/bb25d85bf87d9e8e5b3c33515a2e13401046a1f9))
+* **tests:** add unit tests for training enrollment sync, expiration, reminders, and alert mappers ([4160cc0](https://github.com/janovix/aml-svc/commit/4160cc04bbcead7947373de71146a5ff13d2330b))
+* **training:** add certification details to listEnrollmentsAdmin and update service test ([0ff713d](https://github.com/janovix/aml-svc/commit/0ff713dc3c8cb0e9d1588c4b34a26133a3eda6b2))
+* **training:** add endpoints for retrieving module assets and video player URLs ([597e93a](https://github.com/janovix/aml-svc/commit/597e93a1aa2905b8e3646012f94b6ad6fa5c5f85))
+* **training:** add optional description field to training course module ([1600600](https://github.com/janovix/aml-svc/commit/1600600d51665fb77c4a437dc60b3ac2db1fa08e))
+* **training:** add progress tracking to course details for learners ([df9f3fb](https://github.com/janovix/aml-svc/commit/df9f3fb6a229be4adbe7be8d9ca8006b0a663537))
+* **training:** add userName and organizationName to training certification for PDF snapshots ([c9ba84d](https://github.com/janovix/aml-svc/commit/c9ba84dc0c99b073b7bc898bfe88b5224e79b552))
+* **training:** enhance module asset handling with support for multiple image references and improved asset retrieval ([fc76dd8](https://github.com/janovix/aml-svc/commit/fc76dd8e1bbb4c252de1cb2c075c67115c982a5f))
+* **training:** implement AML training features including course management, enrollment, and certification processes ([d172fc9](https://github.com/janovix/aml-svc/commit/d172fc92900ddbe23670f977b9fd9fb65c5d6aaa))
+* **training:** update Stream signing implementation to use JWK instead of PEM ([e378ed0](https://github.com/janovix/aml-svc/commit/e378ed0c6903712265361df4cbcbec5c21b8164f))
+* **upload:** add public upload routes for asset uploads using temporary tokens ([2d71fc2](https://github.com/janovix/aml-svc/commit/2d71fc24212b818203fc34a9f04e0c38395ae8f4))
+* **watchlist:** implement watchlist rescan settings and historical screening records ([e20d735](https://github.com/janovix/aml-svc/commit/e20d735721ca999a35fa4fe4bd8b0620a45b946e))
+* **watchlist:** update watchlist rescan settings to 90-day interval and increase daily cap to 5000; add cron schedule for weekly rescan ([1773da3](https://github.com/janovix/aml-svc/commit/1773da3bb97b5016e84772c464285bd0b3ebd47b))
+
 # [1.16.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.15.0...v1.16.0-rc.1) (2026-05-16)
 
 
