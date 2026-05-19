@@ -46,7 +46,17 @@ async function main() {
 		process.exit(1);
 	}
 
+	const skipZipCodes = process.env.SKIP_ZIP_CODES === "true";
+	const skipCfdiProductServices =
+		process.env.SKIP_CFDI_PRODUCT_SERVICES === "true";
+
 	console.log("🚀 Generating SQL dump files...\n");
+	if (skipZipCodes || skipCfdiProductServices) {
+		console.log("⏭️  Skipping large catalogs:");
+		if (skipZipCodes) console.log("   - zip-codes");
+		if (skipCfdiProductServices) console.log("   - cfdi-product-services");
+		console.log("");
+	}
 
 	// Create sql/ directory if it doesn't exist
 	const sqlDir = join(__dirname, "sql");
@@ -56,7 +66,10 @@ async function main() {
 		// Generate catalogs SQL
 		if (target === "all" || target === "catalogs") {
 			console.log("📦 Generating catalogs.sql...");
-			const catalogsSql = await generateAllCatalogsSql();
+			const catalogsSql = await generateAllCatalogsSql({
+				skipZipCodes,
+				skipCfdiProductServices,
+			});
 			const catalogsPath = join(sqlDir, "catalogs.sql");
 			writeFileSync(catalogsPath, catalogsSql, "utf-8");
 			const catalogsSize = Buffer.byteLength(catalogsSql, "utf-8");
