@@ -62,6 +62,7 @@ const operationInclude = {
 	valuable: true,
 	art: true,
 	development: true,
+	exception: { include: { evidence: true } },
 } as const;
 
 export class OperationRepository {

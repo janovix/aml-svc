@@ -18,6 +18,7 @@ import {
 import { invoicesRouter, invoicesInternalRouter } from "./invoices";
 import { noticesRouter } from "./notices";
 import { operationsRouter, operationsInternalRouter } from "./operations";
+import { operationExceptionsRouter } from "./operation-exceptions";
 import { organizationSettingsRouter } from "./organization-settings";
 import { reportsRouter } from "./reports";
 // Transaction domain deprecated - use operations instead
@@ -158,6 +159,7 @@ export function createRouter() {
 	router.route("/clients", shareholdersRouter); // Shareholder routes nested under clients (/:clientId/shareholders/*)
 	router.route("/clients", beneficialControllersRouter); // BC routes nested under clients (/:clientId/beneficial-controllers/*)
 	router.route("/operations", operationsRouter);
+	router.route("/operations", operationExceptionsRouter);
 	router.route("/invoices", invoicesRouter);
 	router.route("/alert-rules", alertRulesRouter);
 	router.route("/alerts", alertsRouter);

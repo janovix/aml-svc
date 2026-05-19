@@ -1,4 +1,5 @@
 import type { EnrichedCatalogItem } from "../catalog/enrichment";
+import type { OperationExceptionEntity } from "../operation-exception/types";
 
 // Activity codes for all 20 vulnerable activities
 export type ActivityCode =
@@ -131,6 +132,8 @@ export interface OperationEntity {
 	valuable?: ValuableExtension | null;
 	art?: ArtExtension | null;
 	development?: DevelopmentExtension | null;
+	// Exception (primera venta)
+	exception?: OperationExceptionEntity | null;
 	// Enriched catalog items
 	activityCatalog?: EnrichedCatalogItem | null;
 	operationTypeCatalog?: EnrichedCatalogItem | null;

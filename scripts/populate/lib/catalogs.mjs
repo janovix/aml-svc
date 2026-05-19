@@ -66,6 +66,10 @@ const STANDARD_CATALOGS = [
 		key: "pld-financial-institution-types",
 		name: "PLD Financial Institution Types",
 	},
+	{
+		key: "pld-public-housing-orgs",
+		name: "PLD Public Housing Organizations",
+	},
 
 	// Activity-specific (47 catalogs)
 	{ key: "ari-operation-types", name: "Real Estate Leasing - Operation Types" },

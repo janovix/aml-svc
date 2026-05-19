@@ -20,6 +20,8 @@ import type {
 	OperationValuable,
 	OperationArt,
 	OperationDevelopment,
+	OperationException,
+	OperationExceptionEvidence,
 } from "@prisma/client";
 
 /**
@@ -58,6 +60,12 @@ import type {
 	DevelopmentExtension,
 	VehicleType,
 } from "./types";
+import type {
+	OperationExceptionEntity,
+	ExceptionType,
+	ExceptionStatus,
+	EvidenceType,
+} from "../operation-exception/types";
 
 export function mapPaymentToEntity(
 	payment: OperationPayment,
@@ -542,6 +550,10 @@ export function mapDevelopmentToExtension(
 	};
 }
 
+type OperationExceptionWithEvidence = OperationException & {
+	evidence?: OperationExceptionEvidence[];
+};
+
 type OperationWithRelations = Operation & {
 	payments?: OperationPayment[];
 	vehicle?: OperationVehicle | null;
@@ -563,6 +575,7 @@ type OperationWithRelations = Operation & {
 	valuable?: OperationValuable | null;
 	art?: OperationArt | null;
 	development?: OperationDevelopment | null;
+	exception?: OperationExceptionWithEvidence | null;
 };
 
 export function mapOperationToEntity(
@@ -634,5 +647,40 @@ export function mapOperationToEntity(
 		development: op.development
 			? mapDevelopmentToExtension(op.development)
 			: null,
+		exception: op.exception ? mapExceptionToEntity(op.exception) : null,
+	};
+}
+
+function mapExceptionToEntity(
+	ex: OperationExceptionWithEvidence,
+): OperationExceptionEntity {
+	return {
+		id: ex.id,
+		operationId: ex.operationId,
+		organizationId: ex.organizationId,
+		environment: ex.environment,
+		exceptionType: ex.exceptionType as ExceptionType,
+		status: ex.status as ExceptionStatus,
+		legalReference: ex.legalReference,
+		isFirstSale: ex.isFirstSale,
+		hasDevelopmentBankFunding: ex.hasDevelopmentBankFunding,
+		developmentBankCode: ex.developmentBankCode,
+		developmentBankName: ex.developmentBankName,
+		paidThroughFinancialSystem: ex.paidThroughFinancialSystem,
+		hasDocumentaryEvidence: ex.hasDocumentaryEvidence,
+		notes: ex.notes,
+		validatedAt: ex.validatedAt?.toISOString() ?? null,
+		validatedBy: ex.validatedBy,
+		createdAt: ex.createdAt.toISOString(),
+		updatedAt: ex.updatedAt.toISOString(),
+		evidence: (ex.evidence ?? []).map((ev) => ({
+			id: ev.id,
+			exceptionId: ev.exceptionId,
+			evidenceType: ev.evidenceType as EvidenceType,
+			description: ev.description,
+			docSvcDocumentId: ev.docSvcDocumentId,
+			uploadedBy: ev.uploadedBy,
+			createdAt: ev.createdAt.toISOString(),
+		})),
 	};
 }

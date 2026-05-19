@@ -55,6 +55,8 @@ const EXCLUDED_MODELS = new Set([
 	"OperationValuable",
 	"OperationArt",
 	"OperationDevelopment",
+	"OperationException", // Created via API when validating exceptions
+	"OperationExceptionEvidence", // Created via API/doc-svc when attaching evidence
 ]);
 
 // Models that are populated, not seeded

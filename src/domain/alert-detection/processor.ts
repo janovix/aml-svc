@@ -455,16 +455,18 @@ export class AlertDetectionProcessor {
 		const ops = await this.prisma.operation.findMany({
 			where: { clientId },
 			orderBy: { createdAt: "asc" },
-			include: { payments: true },
+			include: { payments: true, exception: true },
 		});
-		return ops.map((op) => ({
-			...op,
-			amount: Number(op.amount),
-			createdAt:
-				op.createdAt instanceof Date
-					? op.createdAt.toISOString()
-					: String(op.createdAt),
-		}));
+		return ops
+			.filter((op) => op.exception?.status !== "VALIDATED")
+			.map((op) => ({
+				...op,
+				amount: Number(op.amount),
+				createdAt:
+					op.createdAt instanceof Date
+						? op.createdAt.toISOString()
+						: String(op.createdAt),
+			}));
 	}
 }
 

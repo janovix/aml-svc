@@ -692,6 +692,7 @@ model Operation {
   valuable      OperationValuable?
   art           OperationArt?
   development   OperationDevelopment?
+  exception     OperationException?
 
   @@index([organizationId])
   @@index([organizationId, environment])
@@ -1212,6 +1213,54 @@ model OperationDevelopment {
 
   @@index([developmentTypeCode])
   @@map("operation_development")
+}
+
+// ============================================================================
+// Operation Exception Domain (Art. 27 Bis, Frac. III — primera venta)
+// ============================================================================
+
+model OperationException {
+  id                         String    @id
+  operationId                String    @unique @map("operation_id")
+  organizationId             String    @map("organization_id")
+  environment                String    @default("production")
+  exceptionType              String    @map("exception_type")
+  status                     String    @default("INCOMPLETE")
+  legalReference             String?   @map("legal_reference")
+  isFirstSale                Boolean?  @map("is_first_sale")
+  hasDevelopmentBankFunding  Boolean?  @map("has_development_bank_funding")
+  developmentBankCode        String?   @map("development_bank_code")
+  developmentBankName        String?   @map("development_bank_name")
+  paidThroughFinancialSystem Boolean?  @map("paid_through_financial_system")
+  hasDocumentaryEvidence     Boolean?  @map("has_documentary_evidence")
+  notes                      String?
+  validatedAt                DateTime? @map("validated_at")
+  validatedBy                String?   @map("validated_by")
+  createdAt                  DateTime  @default(now()) @map("created_at")
+  updatedAt                  DateTime  @updatedAt @map("updated_at")
+
+  operation Operation                    @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  evidence  OperationExceptionEvidence[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([exceptionType])
+  @@map("operation_exceptions")
+}
+
+model OperationExceptionEvidence {
+  id               String   @id
+  exceptionId      String   @map("exception_id")
+  evidenceType     String   @map("evidence_type")
+  description      String?
+  docSvcDocumentId String?  @map("doc_svc_document_id")
+  uploadedBy       String?  @map("uploaded_by")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  exception OperationException @relation(fields: [exceptionId], references: [id], onDelete: Cascade)
+
+  @@index([exceptionId])
+  @@map("operation_exception_evidence")
 }
 
 // ============================================================================
