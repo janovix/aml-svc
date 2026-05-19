@@ -254,10 +254,18 @@ function generateCatalogSql(catalogKey, catalogName, items) {
 
 /**
  * Generate SQL for ALL catalogs (regular + large)
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.skipZipCodes=false] - Skip zip-codes (~157K items)
+ * @param {boolean} [options.skipCfdiProductServices=false] - Skip cfdi-product-services (~52K items)
  */
-export async function generateAllCatalogsSql() {
+export async function generateAllCatalogsSql({
+	skipZipCodes = false,
+	skipCfdiProductServices = false,
+} = {}) {
 	const sql = [];
 	let totalItems = 0;
+	let catalogCount = 0;
 
 	sql.push(
 		`-- ============================================================================`,
@@ -283,6 +291,7 @@ export async function generateAllCatalogsSql() {
 
 	sql.push(generateCatalogSql("countries", "Countries", countriesItems));
 	totalItems += countriesItems.length;
+	catalogCount++;
 	console.log(`   ✅ countries: ${countriesItems.length} items`);
 
 	// ========================================================================
@@ -304,6 +313,7 @@ export async function generateAllCatalogsSql() {
 
 	sql.push(generateCatalogSql("currencies", "Currencies", currenciesItems));
 	totalItems += currenciesItems.length;
+	catalogCount++;
 	console.log(`   ✅ currencies: ${currenciesItems.length} items`);
 
 	// ========================================================================
@@ -323,6 +333,7 @@ export async function generateAllCatalogsSql() {
 
 	sql.push(generateCatalogSql("cfdi-units", "CFDI Units", cfdiUnitsItems));
 	totalItems += cfdiUnitsItems.length;
+	catalogCount++;
 	console.log(`   ✅ cfdi-units: ${cfdiUnitsItems.length} items`);
 
 	// ========================================================================
@@ -347,6 +358,7 @@ export async function generateAllCatalogsSql() {
 
 		sql.push(generateCatalogSql(catalog.key, catalog.name, items));
 		totalItems += items.length;
+		catalogCount++;
 		console.log(`   ✅ ${catalog.key}: ${items.length} items`);
 		catalogIndex++;
 	}
@@ -369,6 +381,7 @@ export async function generateAllCatalogsSql() {
 
 		sql.push(generateCatalogSql(catalog.key, catalog.name, items));
 		totalItems += items.length;
+		catalogCount++;
 		console.log(`   ✅ ${catalog.key}: ${items.length} items`);
 		catalogIndex++;
 	}
@@ -399,6 +412,7 @@ export async function generateAllCatalogsSql() {
 		),
 	);
 	totalItems += vaItems.length;
+	catalogCount++;
 	console.log(`   ✅ vulnerable-activities: ${vaItems.length} items`);
 	catalogIndex++;
 
@@ -425,66 +439,83 @@ export async function generateAllCatalogsSql() {
 		generateCatalogSql("pld-alert-types", "PLD Alert Types", alertTypesItems),
 	);
 	totalItems += alertTypesItems.length;
+	catalogCount++;
 	console.log(`   ✅ pld-alert-types: ${alertTypesItems.length} items`);
 	catalogIndex++;
 
 	// ========================================================================
 	// 8. ZIP CODES (8-column CSV, ~157K items)
 	// ========================================================================
-	console.log(`   [${catalogIndex}/88] Fetching zip-codes (large)...`);
-	const zipCodesCsv = await fetchCsv(`${BASE_URL}/zip-codes.csv`);
-	const zipCodesData = parseCsv(zipCodesCsv);
+	if (skipZipCodes) {
+		console.log(
+			`   [${catalogIndex}/88] ⏭️  Skipping zip-codes (SKIP_ZIP_CODES=true)`,
+		);
+	} else {
+		console.log(`   [${catalogIndex}/88] Fetching zip-codes (large)...`);
+		const zipCodesCsv = await fetchCsv(`${BASE_URL}/zip-codes.csv`);
+		const zipCodesData = parseCsv(zipCodesCsv);
 
-	const zipCodesItems = zipCodesData.map((row) => ({
-		name: `${row.zip_code} - ${row.settlement}, ${row.municipality}, ${row.state}`,
-		metadata: {
-			code: row.zip_code, // Standard catalog pattern, matches frontend
-			settlement: row.settlement,
-			settlementType: row.settlement_type, // camelCase, matches frontend
-			municipality: row.municipality,
-			state: row.state,
-			city: row.city,
-			stateCode: row.state_code, // camelCase, matches frontend
-			zone: row.zone,
-		},
-	}));
+		const zipCodesItems = zipCodesData.map((row) => ({
+			name: `${row.zip_code} - ${row.settlement}, ${row.municipality}, ${row.state}`,
+			metadata: {
+				code: row.zip_code, // Standard catalog pattern, matches frontend
+				settlement: row.settlement,
+				settlementType: row.settlement_type, // camelCase, matches frontend
+				municipality: row.municipality,
+				state: row.state,
+				city: row.city,
+				stateCode: row.state_code, // camelCase, matches frontend
+				zone: row.zone,
+			},
+		}));
 
-	sql.push(generateCatalogSql("zip-codes", "Códigos Postales", zipCodesItems));
-	totalItems += zipCodesItems.length;
-	console.log(
-		`   ✅ zip-codes: ${zipCodesItems.length.toLocaleString()} items`,
-	);
+		sql.push(
+			generateCatalogSql("zip-codes", "Códigos Postales", zipCodesItems),
+		);
+		totalItems += zipCodesItems.length;
+		catalogCount++;
+		console.log(
+			`   ✅ zip-codes: ${zipCodesItems.length.toLocaleString()} items`,
+		);
+	}
 	catalogIndex++;
 
 	// ========================================================================
 	// 9. CFDI PRODUCT/SERVICES (2-column CSV, ~52K items)
 	// ========================================================================
-	console.log(
-		`   [${catalogIndex}/88] Fetching cfdi-product-services (large)...`,
-	);
-	const cfdiProductServicesCsv = await fetchCsv(
-		`${BASE_URL}/cfdi-product-services.csv`,
-	);
-	const cfdiProductServicesData = parseCsv(cfdiProductServicesCsv);
+	if (skipCfdiProductServices) {
+		console.log(
+			`   [${catalogIndex}/88] ⏭️  Skipping cfdi-product-services (SKIP_CFDI_PRODUCT_SERVICES=true)`,
+		);
+	} else {
+		console.log(
+			`   [${catalogIndex}/88] Fetching cfdi-product-services (large)...`,
+		);
+		const cfdiProductServicesCsv = await fetchCsv(
+			`${BASE_URL}/cfdi-product-services.csv`,
+		);
+		const cfdiProductServicesData = parseCsv(cfdiProductServicesCsv);
 
-	const cfdiProductServicesItems = cfdiProductServicesData.map((row) => ({
-		name: row.name,
-		metadata: {
-			code: row.code,
-		},
-	}));
+		const cfdiProductServicesItems = cfdiProductServicesData.map((row) => ({
+			name: row.name,
+			metadata: {
+				code: row.code,
+			},
+		}));
 
-	sql.push(
-		generateCatalogSql(
-			"cfdi-product-services",
-			"CFDI Productos y Servicios",
-			cfdiProductServicesItems,
-		),
-	);
-	totalItems += cfdiProductServicesItems.length;
-	console.log(
-		`   ✅ cfdi-product-services: ${cfdiProductServicesItems.length.toLocaleString()} items`,
-	);
+		sql.push(
+			generateCatalogSql(
+				"cfdi-product-services",
+				"CFDI Productos y Servicios",
+				cfdiProductServicesItems,
+			),
+		);
+		totalItems += cfdiProductServicesItems.length;
+		catalogCount++;
+		console.log(
+			`   ✅ cfdi-product-services: ${cfdiProductServicesItems.length.toLocaleString()} items`,
+		);
+	}
 
 	// ========================================================================
 	// FOOTER
@@ -494,7 +525,7 @@ export async function generateAllCatalogsSql() {
 		`-- ============================================================================`,
 	);
 	sql.push(
-		`-- TOTAL: ${totalItems.toLocaleString()} catalog items across 87 catalogs`,
+		`-- TOTAL: ${totalItems.toLocaleString()} catalog items across ${catalogCount} catalogs`,
 	);
 	sql.push(
 		`-- ============================================================================`,

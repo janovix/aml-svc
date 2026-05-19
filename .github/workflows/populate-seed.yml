@@ -9,8 +9,6 @@ on:
         type: choice
         options:
           - populate-all
-          - populate-catalogs
-          - populate-zip-codes
           - seed
         default: populate-all
       environment:
@@ -23,7 +21,12 @@ on:
           - preview
         default: dev
       skip_zip_codes:
-        description: "Skip zip codes catalog (for populate-all/populate-catalogs)"
+        description: "Skip zip codes catalog (~157K items)"
+        required: false
+        type: boolean
+        default: true
+      skip_cfdi_product_services:
+        description: "Skip CFDI product/services catalog (~52K items)"
         required: false
         type: boolean
         default: true
@@ -79,27 +82,8 @@ jobs:
           REMOTE: "true"
           WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
           SKIP_ZIP_CODES: ${{ github.event.inputs.skip_zip_codes }}
+          SKIP_CFDI_PRODUCT_SERVICES: ${{ github.event.inputs.skip_cfdi_product_services }}
         run: node scripts/populate/all.mjs
-
-      - name: Run populate-catalogs
-        if: github.event.inputs.operation == 'populate-catalogs'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          REMOTE: "true"
-          WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
-          SKIP_ZIP_CODES: ${{ github.event.inputs.skip_zip_codes }}
-        run: node scripts/populate/all-catalogs.mjs
-
-      - name: Run populate-zip-codes
-        if: github.event.inputs.operation == 'populate-zip-codes'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          REMOTE: "true"
-          WRANGLER_CONFIG: ${{ steps.config.outputs.config }}
-          FORCE_ZIP_CODES: "true"
-        run: node scripts/populate/catalog-zip-codes.mjs
 
       - name: Run seed
         if: github.event.inputs.operation == 'seed'
@@ -119,12 +103,13 @@ jobs:
           echo "| Operation | \`${{ github.event.inputs.operation }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Environment | \`${{ github.event.inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Config | \`${{ steps.config.outputs.config }}\` |" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event.inputs.operation }}" != "seed" ] && [ "${{ github.event.inputs.operation }}" != "populate-zip-codes" ]; then
+          if [ "${{ github.event.inputs.operation }}" == "populate-all" ]; then
             echo "| Skip Zip Codes | \`${{ github.event.inputs.skip_zip_codes }}\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| Skip CFDI Product/Services | \`${{ github.event.inputs.skip_cfdi_product_services }}\` |" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Catalogs Included" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event.inputs.operation }}" == "populate-all" ] || [ "${{ github.event.inputs.operation }}" == "populate-catalogs" ]; then
+          if [ "${{ github.event.inputs.operation }}" == "populate-all" ]; then
+            echo "### Catalogs Included" >> $GITHUB_STEP_SUMMARY
             echo "#### Core Catalogs (14)" >> $GITHUB_STEP_SUMMARY
             echo "- Countries, States, Currencies" >> $GITHUB_STEP_SUMMARY
             echo "- Armor Levels, Business Activities" >> $GITHUB_STEP_SUMMARY
@@ -142,9 +127,6 @@ jobs:
             echo "- Tax Factors, Tax Objects" >> $GITHUB_STEP_SUMMARY
             echo "- Relation Types, Export Types" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "#### CFDI-PLD Integration (1)" >> $GITHUB_STEP_SUMMARY
-            echo "- CFDI-PLD Mappings" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
             echo "#### PLD Consolidated Catalogs (15)" >> $GITHUB_STEP_SUMMARY
             echo "- Alert Types, Monetary Instruments, Payment Forms" >> $GITHUB_STEP_SUMMARY
             echo "- Property Types, Incorporation Reasons" >> $GITHUB_STEP_SUMMARY
@@ -152,9 +134,17 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "#### Activity-Specific Catalogs (47)" >> $GITHUB_STEP_SUMMARY
             echo "- Individual catalogs for each of 19 vulnerable activities" >> $GITHUB_STEP_SUMMARY
-          fi
-          if [ "${{ github.event.inputs.operation }}" == "populate-all" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "#### UMA Values" >> $GITHUB_STEP_SUMMARY
-            echo "- Economic reference data" >> $GITHUB_STEP_SUMMARY
+            echo "#### Reference Data" >> $GITHUB_STEP_SUMMARY
+            echo "- Alert rules and configs" >> $GITHUB_STEP_SUMMARY
+            echo "- CFDI-PLD mappings" >> $GITHUB_STEP_SUMMARY
+            echo "- UMA values" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ github.event.inputs.skip_zip_codes }}" != "true" ]; then
+              echo "#### Large Catalogs" >> $GITHUB_STEP_SUMMARY
+              echo "- Zip Codes (~157K items)" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [ "${{ github.event.inputs.skip_cfdi_product_services }}" != "true" ]; then
+              echo "- CFDI Product/Services (~52K items)" >> $GITHUB_STEP_SUMMARY
+            fi
           fi
