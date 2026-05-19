@@ -1,3 +1,10 @@
+# [1.16.0-rc.2](https://github.com/janovix/aml-svc/compare/v1.16.0-rc.1...v1.16.0-rc.2) (2026-05-19)
+
+
+### Features
+
+* **operation-exception:** implement operation exception handling with CRUD operations and evidence management ([d33fcdd](https://github.com/janovix/aml-svc/commit/d33fcdd5154cdea42c6c722a9de83ed2eb1a4601))
+
 # [1.16.0-rc.1](https://github.com/janovix/aml-svc/compare/v1.15.0...v1.16.0-rc.1) (2026-05-16)
 
 
